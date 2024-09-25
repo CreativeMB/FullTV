@@ -10,22 +10,20 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.navigation.NavigationView
 import com.google.android.material.snackbar.Snackbar
-import com.google.firebase.Firebase
 import com.google.firebase.FirebaseApp
-import com.google.firebase.remoteconfig.FirebaseRemoteConfig
-import com.google.firebase.remoteconfig.remoteConfig
-import com.google.firebase.remoteconfig.remoteConfigSettings
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 
 class MainActivity : AppCompatActivity() {
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var navigationView: NavigationView
     private lateinit var recyclerView: RecyclerView
     private lateinit var moviesAdapter: MovieAdapter
-    private lateinit var remoteConfig: FirebaseRemoteConfig
+    private lateinit var firestore: FirebaseFirestore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        FirebaseApp.initializeApp(this)
         setContentView(R.layout.activity_main)
 
         // Configurar Toolbar
@@ -41,41 +39,49 @@ class MainActivity : AppCompatActivity() {
         val numberOfColumns = calculateNoOfColumns()
         recyclerView.layoutManager = GridLayoutManager(this, numberOfColumns)
 
-        // Inicializar Firebase Remote Config
+        // Inicializar FirebaseApp
+        FirebaseApp.initializeApp(this)
 
-        remoteConfig = Firebase.remoteConfig
+        // Inicializar Firestore
+        firestore = Firebase.firestore
 
-        // Configurar ajustes de Remote Config
-        val configSettings = remoteConfigSettings {
-            minimumFetchIntervalInSeconds = 10  // Tiempo mínimo entre solicitudes de actualización
-        }
-        remoteConfig.setConfigSettingsAsync(configSettings)
-
-        // Establecer valores predeterminados para las URLs de transmisión
-        remoteConfig.setDefaultsAsync(R.xml.remote_config_defaults)
-
-        // Obtener configuraciones de Firebase Remote Config y luego inicializar el RecyclerView
-        fetchRemoteConfig()
+        // Cargar datos desde Firestore
+        loadMoviesFromFirestore()
     }
 
-    // Método para obtener y activar las configuraciones desde Firebase Remote Config
-    private fun fetchRemoteConfig() {
-        remoteConfig.fetchAndActivate()
-            .addOnCompleteListener(this) { task ->
-                if (task.isSuccessful) {
-                    val updated = task.result
-                    Log.d("MainActivity", "Config params updated: $updated")
+    private fun loadMoviesFromFirestore() {
+        firestore.collection("movies")
+            .get()
+            .addOnSuccessListener { documents ->
+                val moviesList = ArrayList<Movie>()
+                for (document in documents) {
+                    val title = document.getString("title") ?: "Sin título"
+                    val synopsis = document.getString("synopsis") ?: "Sin sinopsis"
+                    val imageUrl = document.getString("imageUrl") ?: ""
+                    val streamUrl = document.getString("streamUrl") ?: ""
+                    Log.d("MainActivity", "URL del stream: $streamUrl")
+                    Log.d("MainActivity", "Title: $title, Synopsis: $synopsis, Image URL: $imageUrl, Stream URL: $streamUrl")
 
-                    // Obtener la lista de películas con las URLs de transmisión actualizadas desde Firebase Remote Config
-                    moviesAdapter = MovieAdapter(getMoviesList()) { streamUrls ->
-                        val intent = Intent(this, PlayerActivity::class.java)
-                        intent.putStringArrayListExtra("EXTRA_STREAM_URLS", ArrayList(streamUrls)) // Pasar la lista de URLs
-                        startActivity(intent)
-                    }
-                    recyclerView.adapter = moviesAdapter
-                } else {
-                    Log.e("MainActivity", "Error fetching Remote Config")
+                    moviesList.add(Movie(title, synopsis, imageUrl, streamUrl))
                 }
+
+                // Configurar MovieAdapter
+                moviesAdapter = MovieAdapter(moviesList) { url ->
+                    if (url.isNotEmpty()) {
+                        val intent = Intent(this@MainActivity, PlayerActivity::class.java)
+                        intent.putExtra("EXTRA_STREAM_URL", url)
+                        startActivity(intent)
+                    } else {
+                        // Maneja el caso en que la URL esté vacía
+                        Log.e("MainActivity", "Error: la URL del stream está vacía.")
+                        // Muestra un mensaje de error al usuario, por ejemplo, con un Snackbar
+                    }
+                }
+                recyclerView.adapter = moviesAdapter
+            }
+            .addOnFailureListener { e ->
+                Log.e("MainActivity", "Error loading movies: ", e)
+                showErrorSnackbar("Error al cargar las películas.")
             }
     }
 
@@ -87,126 +93,7 @@ class MainActivity : AppCompatActivity() {
         return (dpWidth / scalingFactor).toInt()
     }
 
-    // Método para obtener una lista de películas con URLs dinámicas desde Firebase Remote Config
-    private fun getMoviesList(): List<Movie> {
-        // Obtener las URLs de transmisión desde Firebase Remote Config
-        val distritoComediaUrl = remoteConfig.getString("adn40Url")
-        val cbnEspanolUrl = remoteConfig.getString("cbnEspanolUrl")
-        val buscandoanemourl = remoteConfig.getString("buscandoanemourl")
-        val fallbackUrl = "https://fallback-url.com/stream1"
-
-        return listOf(
-            Movie(
-                title = "ADN 40 Noticias",
-                imageUrl = "https://play-lh.googleusercontent.com/A20hNlH9G83dpMuG3AkFH58E2A6ChzBrNEY5Qpiec4rzjJ6RqGQEyMsXldKNkD6Uwuo=w240-h480-rw",
-                streamUrls = listOf(
-                    "#",
-                    distritoComediaUrl,  // URL de Firebase Remote Config
-                    fallbackUrl
-                )
-            ),
-            Movie(
-                title = "CBN Español",
-                imageUrl = "https://play-lh.googleusercontent.com/sP0gCCywjsZsSOIcQjoUTos0mIlLonUu3j1aCFpcti5WJjJz1630qVamAhbpXsh-WA",
-                streamUrls = listOf(
-                    "#",
-                    cbnEspanolUrl,  // URL de Firebase Remote Config
-                    fallbackUrl
-                )
-            ),
-            Movie(
-                title = "Buscando a Nemo",
-                imageUrl = "https://cuevana.pro/resize/200/storage/41366/g6DQkjRycxaB62pscbGiKq5u0Z1q6qUh35I9Ne1D.jpeg",
-                streamUrls = listOf(
-                    "#",
-                    buscandoanemourl,  // URL de respaldo
-                    fallbackUrl
-                )
-            ),
-            Movie(
-                title = "Película 4",
-                imageUrl = "https://url-to-image.com/movie4.jpg",
-                streamUrls = listOf(
-                    "#",
-                    fallbackUrl,
-                    fallbackUrl
-                )
-            ),
-            Movie(
-                title = "Película 4",
-                imageUrl = "https://url-to-image.com/movie4.jpg",
-                streamUrls = listOf(
-                    "#",
-                    fallbackUrl,
-                    fallbackUrl
-                ) ),
-            Movie(
-                title = "Película 4",
-                imageUrl = "https://url-to-image.com/movie4.jpg",
-                streamUrls = listOf(
-                    "#",
-                    fallbackUrl,
-                    fallbackUrl
-                ) ),
-            Movie(
-                title = "Película 4",
-                imageUrl = "https://url-to-image.com/movie4.jpg",
-                streamUrls = listOf(
-                    "#",
-                    fallbackUrl,
-                    fallbackUrl
-                ) ),
-            Movie(
-                title = "Película 4",
-                imageUrl = "https://url-to-image.com/movie4.jpg",
-                streamUrls = listOf(
-                    "#",
-                    fallbackUrl,
-                    fallbackUrl
-                ) ),
-            Movie(
-                title = "Película 4",
-                imageUrl = "https://url-to-image.com/movie4.jpg",
-                streamUrls = listOf(
-                    "#",
-                    fallbackUrl,
-                    fallbackUrl
-                ) ),
-            Movie(
-                title = "Película 4",
-                imageUrl = "https://url-to-image.com/movie4.jpg",
-                streamUrls = listOf(
-                    "#",
-                    fallbackUrl,
-                    fallbackUrl
-                ) ),
-            Movie(
-                title = "Película 4",
-                imageUrl = "https://url-to-image.com/movie4.jpg",
-                streamUrls = listOf(
-                    "#",
-                    fallbackUrl,
-                    fallbackUrl
-                ) ),
-            Movie(
-                title = "Película 4",
-                imageUrl = "https://url-to-image.com/movie4.jpg",
-                streamUrls = listOf(
-                    "#",
-                    fallbackUrl,
-                    fallbackUrl
-                )
-            ),
-            Movie(
-                title = "Película 5",
-                imageUrl = "https://url-to-image.com/movie5.jpg",
-                streamUrls = listOf(
-                    "#",
-                    fallbackUrl,
-                    fallbackUrl
-                )
-
-            )
-        )
+    private fun showErrorSnackbar(message: String) {
+        Snackbar.make(findViewById(R.id.drawer_layout), message, Snackbar.LENGTH_LONG).show()
     }
 }

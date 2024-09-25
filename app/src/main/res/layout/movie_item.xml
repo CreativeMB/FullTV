@@ -12,8 +12,8 @@
         android:layout_width="150dp"
         android:layout_height="200dp"
         android:src="@drawable/icono"
-        android:contentDescription="hola ya jaja"
-        android:scaleType="centerCrop" />
+    android:contentDescription="Imagen de la película"
+    android:scaleType="centerCrop" />
 
     <!-- Título de la película -->
     <TextView
@@ -26,5 +26,18 @@
         android:textSize="16sp"
         android:layout_marginTop="8dp"
         android:maxLines="2"
+        android:ellipsize="end" />
+
+    <!-- Sinopsis de la película -->
+    <TextView
+        android:id="@+id/movie_synopsis"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Sinopsis de la película"
+        android:textColor="@android:color/darker_gray"
+        android:gravity="center_horizontal"
+        android:textSize="14sp"
+        android:layout_marginTop="4dp"
+        android:maxLines="3"
         android:ellipsize="end" />
 </LinearLayout>

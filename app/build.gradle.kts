@@ -74,4 +74,15 @@ dependencies {
     implementation ("com.google.android.material:material:1.9.0")
     implementation ("com.github.bumptech.glide:glide:4.15.1")
 
+    implementation ("com.google.firebase:firebase-firestore-ktx:24.5.0")
+//    implementation ("com.google.firebase:firebase-core:21.3.0")
+    implementation(platform("com.google.firebase:firebase-bom:32.1.1"))
+    implementation ("com.google.firebase:firebase-firestore-ktx")
+//    implementation ("com.google.firebase:firebase-auth-ktx")
+    implementation ("com.google.firebase:firebase-analytics-ktx")
+
+    implementation("com.google.android.exoplayer:exoplayer-core:2.19.1")
+    implementation("com.google.android.exoplayer:exoplayer-ui:2.19.1")
+    implementation("com.google.android.exoplayer:exoplayer-core:2.19.1")
 }
+
