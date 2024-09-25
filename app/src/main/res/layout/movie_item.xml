@@ -4,7 +4,8 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:gravity="center"
-    android:padding="8dp">
+    android:padding="8dp"
+    android:background="@android:color/transparent"> <!-- Fondo transparente -->
 
     <!-- Imagen de la película -->
     <ImageView
@@ -12,8 +13,8 @@
         android:layout_width="150dp"
         android:layout_height="200dp"
         android:src="@drawable/icono"
-    android:contentDescription="Imagen de la película"
-    android:scaleType="centerCrop" />
+        android:contentDescription="Imagen de la película"
+        android:scaleType="centerCrop" />
 
     <!-- Título de la película -->
     <TextView
@@ -21,9 +22,10 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Título de la película"
-        android:textColor="@android:color/black"
+        android:textColor="#FFFFFF"
         android:gravity="center_horizontal"
         android:textSize="16sp"
+        android:textStyle="bold"
         android:layout_marginTop="8dp"
         android:maxLines="2"
         android:ellipsize="end" />
@@ -34,7 +36,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Sinopsis de la película"
-        android:textColor="@android:color/darker_gray"
+        android:textColor="#BDBDBD"
         android:gravity="center_horizontal"
         android:textSize="14sp"
         android:layout_marginTop="4dp"

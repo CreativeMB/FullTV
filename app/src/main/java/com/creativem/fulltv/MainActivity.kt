@@ -25,19 +25,11 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        // Configurar Toolbar
-        val toolbar: Toolbar = findViewById(R.id.toolbar)
-        setSupportActionBar(toolbar)
-
-        // Configurar DrawerLayout
-        drawerLayout = findViewById(R.id.drawer_layout)
-        navigationView = findViewById(R.id.navigation_view)
-
         // Configurar RecyclerView con un GridLayoutManager
         recyclerView = findViewById(R.id.recycler_view_movies)
         val numberOfColumns = calculateNoOfColumns()
         recyclerView.layoutManager = GridLayoutManager(this, numberOfColumns)
+
 
         // Inicializar FirebaseApp
         FirebaseApp.initializeApp(this)
@@ -66,7 +58,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 // Configurar MovieAdapter
-                moviesAdapter = MovieAdapter(moviesList) { url ->
+                moviesAdapter = MovieAdapter(moviesList, { url ->
                     if (url.isNotEmpty()) {
                         val intent = Intent(this@MainActivity, PlayerActivity::class.java)
                         intent.putExtra("EXTRA_STREAM_URL", url)
@@ -76,7 +68,8 @@ class MainActivity : AppCompatActivity() {
                         Log.e("MainActivity", "Error: la URL del stream está vacía.")
                         // Muestra un mensaje de error al usuario, por ejemplo, con un Snackbar
                     }
-                }
+                }, applicationContext) // Usar applicationContext
+
                 recyclerView.adapter = moviesAdapter
             }
             .addOnFailureListener { e ->
