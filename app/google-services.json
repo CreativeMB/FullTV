@@ -1,0 +1,180 @@
+{
+  "project_info": {
+    "project_number": "942582178550",
+    "firebase_url": "https://corario-16991-default-rtdb.firebaseio.com",
+    "project_id": "corario-16991",
+    "storage_bucket": "corario-16991.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942582178550:android:3a5eec227ba03af6cd02d7",
+        "android_client_info": {
+          "package_name": "com.creativem.corario"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "942582178550-rvq3e11q0vq9qsmlse3pmg6f7qrvebs7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.creativem.corario",
+            "certificate_hash": "e2686d5a4ac120d4f0c0f21dcc57c6bf6279fd52"
+          }
+        },
+        {
+          "client_id": "942582178550-rltqmtr1383ie39612hq250h40djbusi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2F45blGF3Z_DK7vwsA5uaFV1fSPVKzM8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "942582178550-14cs1tsj3mquuaah2ihfu41didbfobe1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942582178550:android:f1b78c7731834262cd02d7",
+        "android_client_info": {
+          "package_name": "com.creativem.fulltv"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "942582178550-rltqmtr1383ie39612hq250h40djbusi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2F45blGF3Z_DK7vwsA5uaFV1fSPVKzM8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "942582178550-14cs1tsj3mquuaah2ihfu41didbfobe1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942582178550:android:55dedb2b383253a2cd02d7",
+        "android_client_info": {
+          "package_name": "com.creativem.tiendacontrol"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "942582178550-rltqmtr1383ie39612hq250h40djbusi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2F45blGF3Z_DK7vwsA5uaFV1fSPVKzM8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "942582178550-14cs1tsj3mquuaah2ihfu41didbfobe1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942582178550:android:e320495e90c3d1f5cd02d7",
+        "android_client_info": {
+          "package_name": "com.example.firebase"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "942582178550-hmr9volsr3fte6khkg85ut563a3enbid.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.firebase",
+            "certificate_hash": "dba59efabad13af39a70c3b7d4bf13b297d9c406"
+          }
+        },
+        {
+          "client_id": "942582178550-rltqmtr1383ie39612hq250h40djbusi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2F45blGF3Z_DK7vwsA5uaFV1fSPVKzM8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "942582178550-14cs1tsj3mquuaah2ihfu41didbfobe1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942582178550:android:8e209237cf3e0792cd02d7",
+        "android_client_info": {
+          "package_name": "com.example.tiendacontrol"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "942582178550-6j0nr7shgdse7851ka26873nudpbl83o.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.tiendacontrol",
+            "certificate_hash": "dba59efabad13af39a70c3b7d4bf13b297d9c406"
+          }
+        },
+        {
+          "client_id": "942582178550-rltqmtr1383ie39612hq250h40djbusi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2F45blGF3Z_DK7vwsA5uaFV1fSPVKzM8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "942582178550-14cs1tsj3mquuaah2ihfu41didbfobe1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
