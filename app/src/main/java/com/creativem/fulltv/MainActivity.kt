@@ -92,6 +92,7 @@ class MainActivity : AppCompatActivity() {
         // Obtener las URLs de transmisión desde Firebase Remote Config
         val distritoComediaUrl = remoteConfig.getString("adn40Url")
         val cbnEspanolUrl = remoteConfig.getString("cbnEspanolUrl")
+        val buscandoanemourl = remoteConfig.getString("buscandoanemourl")
         val fallbackUrl = "https://fallback-url.com/stream1"
 
         return listOf(
@@ -114,14 +115,79 @@ class MainActivity : AppCompatActivity() {
                 )
             ),
             Movie(
-                title = "Película 3",
-                imageUrl = "https://url-to-image.com/movie3.jpg",
+                title = "Buscando a Nemo",
+                imageUrl = "https://cuevana.pro/resize/200/storage/41366/g6DQkjRycxaB62pscbGiKq5u0Z1q6qUh35I9Ne1D.jpeg",
                 streamUrls = listOf(
                     "#",
-                    fallbackUrl,  // URL de respaldo
+                    buscandoanemourl,  // URL de respaldo
                     fallbackUrl
                 )
             ),
+            Movie(
+                title = "Película 4",
+                imageUrl = "https://url-to-image.com/movie4.jpg",
+                streamUrls = listOf(
+                    "#",
+                    fallbackUrl,
+                    fallbackUrl
+                )
+            ),
+            Movie(
+                title = "Película 4",
+                imageUrl = "https://url-to-image.com/movie4.jpg",
+                streamUrls = listOf(
+                    "#",
+                    fallbackUrl,
+                    fallbackUrl
+                ) ),
+            Movie(
+                title = "Película 4",
+                imageUrl = "https://url-to-image.com/movie4.jpg",
+                streamUrls = listOf(
+                    "#",
+                    fallbackUrl,
+                    fallbackUrl
+                ) ),
+            Movie(
+                title = "Película 4",
+                imageUrl = "https://url-to-image.com/movie4.jpg",
+                streamUrls = listOf(
+                    "#",
+                    fallbackUrl,
+                    fallbackUrl
+                ) ),
+            Movie(
+                title = "Película 4",
+                imageUrl = "https://url-to-image.com/movie4.jpg",
+                streamUrls = listOf(
+                    "#",
+                    fallbackUrl,
+                    fallbackUrl
+                ) ),
+            Movie(
+                title = "Película 4",
+                imageUrl = "https://url-to-image.com/movie4.jpg",
+                streamUrls = listOf(
+                    "#",
+                    fallbackUrl,
+                    fallbackUrl
+                ) ),
+            Movie(
+                title = "Película 4",
+                imageUrl = "https://url-to-image.com/movie4.jpg",
+                streamUrls = listOf(
+                    "#",
+                    fallbackUrl,
+                    fallbackUrl
+                ) ),
+            Movie(
+                title = "Película 4",
+                imageUrl = "https://url-to-image.com/movie4.jpg",
+                streamUrls = listOf(
+                    "#",
+                    fallbackUrl,
+                    fallbackUrl
+                ) ),
             Movie(
                 title = "Película 4",
                 imageUrl = "https://url-to-image.com/movie4.jpg",
@@ -139,6 +205,7 @@ class MainActivity : AppCompatActivity() {
                     fallbackUrl,
                     fallbackUrl
                 )
+
             )
         )
     }
