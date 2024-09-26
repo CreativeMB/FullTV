@@ -70,10 +70,11 @@ class MovieAdapter(
             .error(R.drawable.portada)
             .into(holder.movieImage)
 
+        // Aplicar el color de fondo si el elemento está seleccionado
         if (position == selectedPosition) {
             holder.itemView.setBackgroundColor(ContextCompat.getColor(context, R.color.colorSelected))
         } else {
-            holder.itemView.setBackgroundColor(Color.TRANSPARENT)
+            holder.itemView.setBackgroundColor(Color.TRANSPARENT) // Fondo transparente para elementos no seleccionados
         }
     }
 

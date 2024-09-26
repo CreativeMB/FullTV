@@ -1,45 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:padding="8dp"
-    android:background="@android:color/transparent"> <!-- Fondo transparente -->
+    android:layout_margin="4dp"
+    android:elevation="8dp"
+    android:padding="4dp"
+    android:radius="12dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp"
+    app:cardPreventCornerOverlap="true"
+    app:cardUseCompatPadding="true">
 
-    <!-- Imagen de la película -->
-    <ImageView
-        android:id="@+id/movie_image"
-        android:layout_width="150dp"
-        android:layout_height="200dp"
-        android:src="@drawable/portada"
-        android:contentDescription="Imagen de la película"
-        android:scaleType="centerCrop" />
-
-    <!-- Título de la película -->
-    <TextView
-        android:id="@+id/movie_title"
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Título de la película"
-        android:textColor="#FFFFFF"
-        android:gravity="center_horizontal"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:layout_marginTop="8dp"
-        android:maxLines="2"
-        android:ellipsize="end" />
+        android:background="#8E000000"
+        android:gravity="center"
+        android:orientation="vertical">
 
-    <!-- Sinopsis de la película -->
-    <TextView
-        android:id="@+id/movie_synopsis"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Año de la película"
-        android:textColor="#BDBDBD"
-        android:gravity="center_horizontal"
-        android:textSize="14sp"
-        android:layout_marginTop="4dp"
-        android:maxLines="3"
-        android:ellipsize="end" />
-</LinearLayout>
+        <!-- Imagen de la película con escala adecuada -->
+        <ImageView
+            android:id="@+id/movie_image"
+            android:layout_width="150dp"
+            android:layout_height="200dp"
+            android:layout_gravity="center"
+            android:contentDescription="Imagen de la película"
+            android:scaleType="centerCrop"
+            android:src="@drawable/portada" />
+
+        <!-- Título de la película -->
+        <TextView
+            android:id="@+id/movie_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:gravity="center_horizontal"
+            android:maxLines="1"
+            android:text="Título de la película"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <!-- Sinopsis de la película -->
+        <TextView
+            android:id="@+id/movie_synopsis"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:gravity="center_horizontal"
+            android:maxLines="1"
+            android:text="Año de la película"
+            android:textColor="#E9E9E9"
+            android:textSize="14sp" />
+    </LinearLayout>
+</androidx.cardview.widget.CardView>
