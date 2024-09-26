@@ -9,17 +9,21 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import android.content.Context
+import java.security.Timestamp
+
 data class Movie(
     val title: String,
     val synopsis: String,
     val imageUrl: String,
-    val streamUrl: String
+    val streamUrl: String,
+    val createdAt: com.google.firebase.Timestamp
+
 )
 
 class MovieAdapter(
-    private val movieList: List<Movie>,
-    private val onMovieClick: (String) -> Unit,
-    private val context: Context // Usar android.content.Context
+    private val movieList: MutableList<Movie>, // MutableList para poder modificarla
+    private val onMovieClick: (String) -> Unit, // Callback para manejar clics en los items
+    private val context: Context
 ) : RecyclerView.Adapter<MovieAdapter.MovieViewHolder>() {
 
     private var selectedPosition = RecyclerView.NO_POSITION
@@ -40,13 +44,10 @@ class MovieAdapter(
                 }
             }
 
-            // Establecer el foco en el elemento cuando se selecciona
             view.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
-                    // Cambiar el estilo del elemento al tener foco (por ejemplo, agregar un fondo)
                     view.setBackgroundColor(ContextCompat.getColor(context, R.color.colorhover))
                 } else {
-                    // Restaurar el estilo del elemento al perder foco
                     view.setBackgroundColor(Color.TRANSPARENT)
                 }
             }
@@ -54,8 +55,7 @@ class MovieAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MovieViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.movie_item, parent, false)
+        val view = LayoutInflater.from(parent.context).inflate(R.layout.movie_item, parent, false)
         return MovieViewHolder(view)
     }
 
@@ -66,21 +66,37 @@ class MovieAdapter(
 
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
-            .placeholder(R.drawable.icono) // Reemplaza con tu placeholder
-            .error(R.drawable.icono)       // Reemplaza con tu imagen de error
+            .placeholder(R.drawable.portada)
+            .error(R.drawable.portada)
             .into(holder.movieImage)
 
-        // Cambiar el fondo del item seleccionado
         if (position == selectedPosition) {
-            // Aquí cambiamos el color del ítem seleccionado
             holder.itemView.setBackgroundColor(ContextCompat.getColor(context, R.color.colorSelected))
         } else {
-            // Aquí establecemos el color por defecto (puedes cambiarlo si prefieres otro color)
             holder.itemView.setBackgroundColor(Color.TRANSPARENT)
         }
     }
 
     override fun getItemCount(): Int {
         return movieList.size
+    }
+
+    fun addMovie(movie: Movie) {
+        if (!containsMovie(movie)) {
+            // Insertar en la posición correcta según la fecha de creación
+            val insertIndex = movieList.indexOfFirst { it.createdAt < movie.createdAt }
+            if (insertIndex == -1) {
+                // Si no hay películas más antiguas, se agrega al final
+                movieList.add(movie)
+            } else {
+                // Insertar en la posición correspondiente
+                movieList.add(insertIndex, movie)
+            }
+            notifyDataSetChanged() // Notificar que el dataset ha cambiado
+        }
+    }
+
+    fun containsMovie(movie: Movie): Boolean {
+        return movieList.any { it.title == movie.title }
     }
 }

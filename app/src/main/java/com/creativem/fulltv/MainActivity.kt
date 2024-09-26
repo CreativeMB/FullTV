@@ -14,10 +14,10 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.Timestamp
 
 class MainActivity : AppCompatActivity() {
     private lateinit var drawerLayout: DrawerLayout
-    private lateinit var navigationView: NavigationView
     private lateinit var recyclerView: RecyclerView
     private lateinit var moviesAdapter: MovieAdapter
     private lateinit var firestore: FirebaseFirestore
@@ -25,64 +25,65 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        // Configurar RecyclerView con un GridLayoutManager
+
         recyclerView = findViewById(R.id.recycler_view_movies)
         val numberOfColumns = calculateNoOfColumns()
         recyclerView.layoutManager = GridLayoutManager(this, numberOfColumns)
 
-
-        // Inicializar FirebaseApp
         FirebaseApp.initializeApp(this)
-
-        // Inicializar Firestore
         firestore = Firebase.firestore
 
-        // Cargar datos desde Firestore
+        moviesAdapter = MovieAdapter(mutableListOf(), { url ->
+            if (url.isNotEmpty()) {
+                val intent = Intent(this@MainActivity, PlayerActivity::class.java)
+                intent.putExtra("EXTRA_STREAM_URL", url)
+                startActivity(intent)
+            } else {
+                Snackbar.make(recyclerView, "La URL del stream está vacía", Snackbar.LENGTH_LONG).show()
+            }
+        }, applicationContext)
+
+        recyclerView.adapter = moviesAdapter
+
         loadMoviesFromFirestore()
     }
 
     private fun loadMoviesFromFirestore() {
         firestore.collection("movies")
-            .get()
-            .addOnSuccessListener { documents ->
-                val moviesList = ArrayList<Movie>()
-                for (document in documents) {
-                    val title = document.getString("title") ?: "Sin título"
-                    val synopsis = document.getString("synopsis") ?: "Sin sinopsis"
-                    val imageUrl = document.getString("imageUrl") ?: ""
-                    val streamUrl = document.getString("streamUrl") ?: ""
-                    Log.d("MainActivity", "URL del stream: $streamUrl")
-                    Log.d("MainActivity", "Title: $title, Synopsis: $synopsis, Image URL: $imageUrl, Stream URL: $streamUrl")
-
-                    moviesList.add(Movie(title, synopsis, imageUrl, streamUrl))
+            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING) // Cambiar timestamp a createdAt
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.e("MainActivity", "Error al cargar las películas: ", e)
+                    showErrorSnackbar("Error al cargar las películas.")
+                    return@addSnapshotListener
                 }
 
-                // Configurar MovieAdapter
-                moviesAdapter = MovieAdapter(moviesList, { url ->
-                    if (url.isNotEmpty()) {
-                        val intent = Intent(this@MainActivity, PlayerActivity::class.java)
-                        intent.putExtra("EXTRA_STREAM_URL", url)
-                        startActivity(intent)
-                    } else {
-                        // Maneja el caso en que la URL esté vacía
-                        Log.e("MainActivity", "Error: la URL del stream está vacía.")
-                        // Muestra un mensaje de error al usuario, por ejemplo, con un Snackbar
-                    }
-                }, applicationContext) // Usar applicationContext
+                if (snapshot != null && !snapshot.isEmpty) {
+                    for (document in snapshot.documents) {
+                        val title = document.getString("title") ?: "Sin título"
+                        val synopsis = document.getString("synopsis") ?: "Sin sinopsis"
+                        val imageUrl = document.getString("imageUrl") ?: ""
+                        val streamUrl = document.getString("streamUrl") ?: ""
+                        val createdAt = document.getTimestamp("createdAt") ?: Timestamp.now() // Obtener createdAt
 
-                recyclerView.adapter = moviesAdapter
-            }
-            .addOnFailureListener { e ->
-                Log.e("MainActivity", "Error loading movies: ", e)
-                showErrorSnackbar("Error al cargar las películas.")
+                        // Crear una nueva instancia de Movie con createdAt
+                        val movie = Movie(title, synopsis, imageUrl, streamUrl, createdAt)
+
+                        if (!moviesAdapter.containsMovie(movie)) {
+                            moviesAdapter.addMovie(movie)
+                        }
+                    }
+                } else {
+                    Log.d("MainActivity", "No se encontraron documentos.")
+                    showErrorSnackbar("No se encontraron películas.")
+                }
             }
     }
 
-    // Método para calcular el número de columnas basadas en el ancho de la pantalla
     private fun calculateNoOfColumns(): Int {
         val displayMetrics = resources.displayMetrics
         val dpWidth = displayMetrics.widthPixels / displayMetrics.density
-        val scalingFactor = 150  // Ancho aproximado de cada ítem en dp
+        val scalingFactor = 150
         return (dpWidth / scalingFactor).toInt()
     }
 

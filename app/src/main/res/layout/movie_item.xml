@@ -12,7 +12,7 @@
         android:id="@+id/movie_image"
         android:layout_width="150dp"
         android:layout_height="200dp"
-        android:src="@drawable/icono"
+        android:src="@drawable/portada"
         android:contentDescription="Imagen de la película"
         android:scaleType="centerCrop" />
 
@@ -35,7 +35,7 @@
         android:id="@+id/movie_synopsis"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Sinopsis de la película"
+        android:text="Año de la película"
         android:textColor="#BDBDBD"
         android:gravity="center_horizontal"
         android:textSize="14sp"
