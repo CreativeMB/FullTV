@@ -1,42 +1,43 @@
 package com.creativem.fulltv
+
 import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.exoplayer2.DefaultRenderersFactory
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem
-import com.google.android.exoplayer2.PlaybackException
-import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.source.DefaultMediaSourceFactory
-import com.google.android.exoplayer2.ui.AspectRatioFrameLayout
-import com.google.android.exoplayer2.ui.PlayerView
-import com.google.android.exoplayer2.util.Util
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import com.google.android.material.snackbar.Snackbar
 
 class PlayerActivity : AppCompatActivity() {
     private lateinit var playerView: PlayerView
     private var player: ExoPlayer? = null
     private var streamUrl: String = ""
+    private var playbackPosition: Long = 0L // Posición de reproducción guardada
+    private var isLiveStream = false // Flag para indicar si el stream es en vivo
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
 
-        // Orientación y pantalla encendida
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         playerView = findViewById(R.id.player_view)
-        playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
         playerView.useController = true
 
-        // Obtener la URL del Intent
         streamUrl = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
-        Log.d("PlayerActivity", "Stream URL recibida: $streamUrl")
 
         if (streamUrl.isEmpty()) {
             Log.e("PlayerActivity", "No se recibió la URL de streaming.")
@@ -45,94 +46,136 @@ class PlayerActivity : AppCompatActivity() {
             return
         }
 
-        // Inicializar ExoPlayer
         initializePlayer()
     }
 
     private fun initializePlayer() {
-        if (player == null) {
-            player = ExoPlayer.Builder(this)
-                .setMediaSourceFactory(DefaultMediaSourceFactory(this))
-                .build()
-                .also { exoPlayer ->
-                    playerView.player = exoPlayer
-                    exoPlayer.addListener(playerListener)
+        player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(this))
+            .build().also { exoPlayer ->
+                playerView.player = exoPlayer
+                exoPlayer.addListener(playerListener)
 
-                    // Cargar el stream
-                    val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
-                    exoPlayer.setMediaItem(mediaItem)
-                    exoPlayer.prepare()
-                    exoPlayer.playWhenReady = true
-                    Log.d("PlayerActivity", "Cargando stream: $streamUrl")
-                }
-        }
+                // Establece el MediaItem antes de preparar el reproductor
+                val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+                exoPlayer.setMediaItem(mediaItem)
+
+                // Prepara el reproductor
+                exoPlayer.prepare()
+                exoPlayer.playWhenReady = true // Iniciar automáticamente
+            }
     }
 
     private val playerListener = object : Player.Listener {
-        override fun onPlayerError(error: PlaybackException) {
-            Log.e("PlayerActivity", "Error en la reproducción: ${error.message}")
-            showErrorSnackbar("Error al cargar la transmisión. Por favor, inténtalo de nuevo.")
+        override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
+            val currentMediaItem = player?.currentMediaItem
+
+            if (currentMediaItem != null) {
+                val title = currentMediaItem.mediaMetadata.title
+                val artist = currentMediaItem.mediaMetadata.artist
+                Log.d("PlayerActivity", "Título: $title, Artista: $artist")
+
+                // Verifica si es un stream en vivo
+                isLiveStream = player?.duration == C.TIME_UNSET
+                Log.d("PlayerActivity", "isLiveStream: $isLiveStream")
+            }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
                 Player.STATE_BUFFERING -> Log.d("PlayerActivity", "Reproductor almacenando en búfer...")
-                Player.STATE_READY -> Log.d("PlayerActivity", "Reproductor listo. Reproduciendo stream...")
+                Player.STATE_READY -> {
+                    Log.d("PlayerActivity", "Reproductor listo. Reproduciendo...")
+
+                    // Mostrar el diálogo para reanudar si es necesario
+                    if (playbackPosition > 0 && !isLiveStream) {
+                        showResumeDialog()
+                    } else if (!isLiveStream) {
+                        player?.playWhenReady = true // Iniciar la reproducción solo si no hay posición
+                    }
+                }
                 Player.STATE_ENDED -> Log.d("PlayerActivity", "Reproducción finalizada.")
                 Player.STATE_IDLE -> Log.d("PlayerActivity", "Reproductor inactivo.")
-                else -> Log.d("PlayerActivity", "Estado de reproducción desconocido: $playbackState")
             }
-        }
-    }
-
-    private fun releasePlayer() {
-        player?.removeListener(playerListener)
-        player?.release()
-        player = null
-    }
-
-    override fun onStart() {
-        super.onStart()
-        initializePlayer()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (player == null) {
-            initializePlayer()
         }
     }
 
     override fun onPause() {
         super.onPause()
-        releasePlayer()
+        player?.let {
+            if (!isLiveStream) {
+                playbackPosition = it.currentPosition // Guarda la posición actual
+            }
+            it.pause()
+        }
     }
 
-    override fun onStop() {
-        super.onStop()
-        releasePlayer()
+    override fun onResume() {
+        super.onResume()
+        Log.d("PlayerActivity", "onResume called")
+
+        // Comprueba si hay una posición de reproducción guardada
+        if (playbackPosition > 0 && !isLiveStream) {
+            Log.d("PlayerActivity", "Showing resume dialog")
+            showResumeDialog() // Mostrar diálogo para reanudar
+        } else {
+            player?.playWhenReady = true // Reanudar automáticamente si no hay posición guardada
+        }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        releasePlayer()
+    private fun releasePlayer() {
+        player?.run {
+            if (!isLiveStream) {
+                playbackPosition = currentPosition
+            }
+            removeListener(playerListener)
+            release()
+        }
+        player = null
     }
 
-    override fun onBackPressed() {
-        releasePlayer()
-        super.onBackPressed()
+    private fun showResumeDialog() {
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Continuar Reproducción")
+            .setMessage("Has reproducido hasta ${playbackPosition / 1000} segundos. ¿Deseas continuar o reiniciar?")
+            .setPositiveButton("Continuar") { dialogInterface, _ ->
+                dialogInterface.dismiss()
+                resumePlayer(playbackPosition) // Reanudar desde la posición guardada
+            }
+            .setNegativeButton("Reiniciar") { dialogInterface, _ ->
+                dialogInterface.dismiss()
+                resumePlayer(0L) // Reiniciar la reproducción
+            }
+            .create()
+
+        dialog.show()
     }
 
-    private fun enterFullScreen() {
-        window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_FULLSCREEN
-                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                )
+    private fun resumePlayer(position: Long) {
+        if (player == null) {
+            player = ExoPlayer.Builder(this)
+                .setMediaSourceFactory(DefaultMediaSourceFactory(this))
+                .build().also { exoPlayer ->
+                    playerView.player = exoPlayer
+                    exoPlayer.addListener(playerListener)
+
+                    val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+                    exoPlayer.setMediaItem(mediaItem)
+                    exoPlayer.seekTo(position)
+                    exoPlayer.prepare() // Prepara el reproductor aquí
+                    exoPlayer.playWhenReady = true // Inicia la reproducción automáticamente
+                }
+        } else {
+            player?.seekTo(position) // Retomar desde la posición guardada
+            player?.playWhenReady = true // Asegúrate de que se reproduzca
+        }
     }
 
-    private fun exitFullScreen() {
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+    private fun reconnectLiveStream() {
+        if (isLiveStream) {
+            Log.d("PlayerActivity", "Intentando reconectar a la transmisión en vivo...")
+            player?.prepare() // Preparar nuevamente el reproductor para reconectar
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -142,7 +185,32 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun enterFullScreen() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            window.insetsController?.hide(android.view.WindowInsets.Type.systemBars())
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_FULLSCREEN
+                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
+        }
+    }
+
     private fun showErrorSnackbar(message: String) {
         Snackbar.make(playerView, message, Snackbar.LENGTH_LONG).show()
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Guarda la posición del vídeo antes de liberar el reproductor
+        player?.let {
+            if (!isLiveStream) {
+                playbackPosition = it.currentPosition
+            }
+        }
+        releasePlayer()
+    }
+
 }
