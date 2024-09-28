@@ -1,5 +1,6 @@
 package com.creativem.fulltv
 
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.Bundle
@@ -9,10 +10,12 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageButton
+import androidx.appcompat.app.AlertDialog
 
 import androidx.appcompat.app.AppCompatActivity
 
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -39,17 +42,16 @@ class PlayerActivity : AppCompatActivity() {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        playerView = findViewById(R.id.player_view)
-        playerView.useController = true
-
         streamUrl = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
 
         if (streamUrl.isEmpty()) {
             Log.e("PlayerActivity", "No se recibió la URL de streaming.")
-            showErrorSnackbar("No se recibió la URL de streaming.")
-            finish()
+            showErrorDialog("No se recibió la URL de streaming.") // Muestra el dialogo de error
             return
         }
+
+        playerView = findViewById(R.id.player_view)
+        playerView.useController = true
         initializePlayer()
     }
 
@@ -87,19 +89,51 @@ class PlayerActivity : AppCompatActivity() {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
-                Player.STATE_BUFFERING -> Log.d(
-                    "PlayerActivity",
-                    "Reproductor almacenando en búfer..."
-                )
-
+                Player.STATE_BUFFERING -> Log.d("PlayerActivity", "Reproductor almacenando en búfer...")
                 Player.STATE_READY -> {
                     Log.d("PlayerActivity", "Reproductor listo. Reproduciendo...")
                 }
-
-                Player.STATE_ENDED -> Log.d("PlayerActivity", "Reproducción finalizada.")
-                Player.STATE_IDLE -> Log.d("PlayerActivity", "Reproductor inactivo.")
+                Player.STATE_ENDED -> {
+                    Log.d("PlayerActivity", "Reproducción finalizada.")
+                    reconnectLiveStream() // Intenta reconectar si finaliza
+                }
+                Player.STATE_IDLE -> {
+                    Log.d("PlayerActivity", "Reproductor inactivo. Intentando reconectar...")
+                    reconnectLiveStream() // Intenta reconectar si está inactivo
+                }
+                Player.STATE_READY -> {
+                    Log.d("PlayerActivity", "Error en la reproducción.")
+                    showErrorDialog("Error en la reproducción.") // Muestra el dialogo de error
+                }
             }
         }
+
+        override fun onPlayerError(error: PlaybackException) {
+            Log.e("PlayerActivity", "Error en el reproductor: ${error.message}")
+            showErrorDialog("Error en la reproducción: ${error.message}") // Muestra el dialogo de error
+        }
+    }
+
+    private fun reconnectLiveStream() {
+        if (isLiveStream) {
+            Log.d("PlayerActivity", "Intentando reconectar a la transmisión en vivo...")
+            val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+            player?.setMediaItem(mediaItem)
+            player?.prepare()
+            player?.playWhenReady = true // Asegúrate de reanudar la reproducción
+        }
+    }
+
+    private fun showErrorDialog(message: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Contenido fuera de línea")
+            .setMessage("Reportar por Telegram(3028667672)") // Cambiado el mensaje aquí
+            .setPositiveButton("Volver al contenido") { _, _ ->
+                val intent = Intent(this, MoviesPrincipal::class.java)
+                startActivity(intent)
+                finish() // Finaliza la actividad actual
+            }
+            .show() // Quitar el botón negativo
     }
 
     override fun onPause() {
@@ -116,13 +150,6 @@ class PlayerActivity : AppCompatActivity() {
         player?.removeListener(playerListener)
         player?.release()
         player = null
-    }
-
-    private fun reconnectLiveStream() {
-        if (isLiveStream) {
-            Log.d("PlayerActivity", "Intentando reconectar a la transmisión en vivo...")
-            player?.prepare() // Preparar nuevamente el reproductor para reconectar
-        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -145,10 +172,6 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun showErrorSnackbar(message: String) {
-        Snackbar.make(playerView, message, Snackbar.LENGTH_LONG).show()
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         releasePlayer()
@@ -160,15 +183,13 @@ class PlayerActivity : AppCompatActivity() {
                 showBottomSheet()
                 true // Indica que el botón ha sido manejado
             }
-
             else -> super.onKeyDown(keyCode, event) // Llama a la implementación base
         }
     }
 
     private fun showBottomSheet() {
         // Cerrar el BottomSheet si ya está visible
-        val fragment =
-            supportFragmentManager.findFragmentByTag(MoviesMenu::class.java.simpleName)
+        val fragment = supportFragmentManager.findFragmentByTag(MoviesMenu::class.java.simpleName)
         if (fragment != null && fragment.isVisible) {
             (fragment as MoviesMenu).dismiss() // Cerrar el fragmento si está visible
         }
