@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-        <color name="colorSelected">#DD2C00</color> <!-- Color para selección -->
-    <color name="colorhover">#BD00B8D4</color>    <!-- Color para hover -->
+        <color name="colorSelected">#FF0000</color> <!-- Color para selección -->
+    <color name="colorhover">#D500B8D4</color>
+    <color name="colorhover2">#D50000</color><!-- Color para hover -->
     <color name="negro">#000000</color> <!-- Color para selección -->
     <color name="fondo">#2B2B2B</color>    <!-- Color para hover -->
     <color name="bordeitems">#FFD600</color>
 
-    <color name="colorPrimary">#6200EE</color>        <!-- Color principal -->
-    <color name="colorPrimaryDark">#3700B3</color>    <!-- Color principal oscuro -->
+    <color name="colorPrimary">#202020</color>        <!-- Color principal -->
+    <color name="colorPrimaryDark">#A3A3A3</color>    <!-- Color principal oscuro -->
     <color name="colorAccent">#03DAC5</color>         <!-- Color de acento -->
 </resources>

@@ -23,9 +23,9 @@
     android:supportsRtl="true"
     android:theme="@style/Theme.FullTV">
 
-    <!-- Actividad principal (MainActivity) configurada para TV -->
+    <!-- Actividad principal (MoviesPrincipal) configurada para TV -->
     <activity
-        android:name=".MainActivity"
+        android:name=".MoviesPrincipal"
         android:screenOrientation="landscape"
         android:exported="true">
         <intent-filter>
@@ -44,7 +44,7 @@
         </activity>
         <!-- Actividad para el reproductor de video -->
         <activity
-            android:name=".MoviesBottomSheetFragment"
+            android:name=".MoviesMenu"
             android:screenOrientation="landscape">
         </activity>
 

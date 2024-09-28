@@ -1,5 +1,4 @@
 package com.creativem.fulltv
-import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -8,29 +7,18 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import android.content.Context
-import java.security.Timestamp
 
-data class Movie(
-    val title: String,
-    val synopsis: String,
-    val imageUrl: String,
-    val streamUrl: String,
-    val createdAt: com.google.firebase.Timestamp
-
-)
-
-class MovieAdapter(
-    private val movieList: MutableList<Movie>, // MutableList para poder modificarla
+// Define the MoviesMenuAdapter similar to MovieAdapter but with smaller items
+class MoviesMenuAdapter(
+    private val movieList: MutableList<Movie>, // Lista mutable para agregar nuevos elementos
     private val onMovieClick: (String) -> Unit // Callback para manejar clics en los items
-) : RecyclerView.Adapter<MovieAdapter.MovieViewHolder>() {
+) : RecyclerView.Adapter<MoviesMenuAdapter.SmallMovieViewHolder>() {
 
     private var selectedPosition = RecyclerView.NO_POSITION
 
-    inner class MovieViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val movieImage: ImageView = view.findViewById(R.id.movie_image)
-        val movieTitle: TextView = view.findViewById(R.id.movie_title)
-        val movieSynopsis: TextView = view.findViewById(R.id.movie_synopsis)
+    inner class SmallMovieViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val movieImage: ImageView = view.findViewById(R.id.movie_image_small) // Aquí usas el layout pequeño
+        val movieTitle: TextView = view.findViewById(R.id.movie_title_small)
 
         init {
             view.setOnClickListener {
@@ -45,23 +33,22 @@ class MovieAdapter(
 
             view.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
-                    view.setBackgroundColor(ContextCompat.getColor(view.context, R.color.colorhover))
+                    view.setBackgroundColor(ContextCompat.getColor(view.context, R.color.colorhover2))
                 } else {
-                    view.setBackgroundColor(Color.TRANSPARENT)
+                    view.setBackgroundColor(android.graphics.Color.BLACK)
                 }
             }
         }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MovieViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.movie_item, parent, false)
-        return MovieViewHolder(view)
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SmallMovieViewHolder {
+        val view = LayoutInflater.from(parent.context).inflate(R.layout.movie_menu_item, parent, false)
+        return SmallMovieViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: MovieViewHolder, position: Int) {
+    override fun onBindViewHolder(holder: SmallMovieViewHolder, position: Int) {
         val movie = movieList[position]
         holder.movieTitle.text = movie.title
-        holder.movieSynopsis.text = movie.synopsis
 
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
@@ -74,7 +61,7 @@ class MovieAdapter(
             if (position == selectedPosition)
                 ContextCompat.getColor(holder.itemView.context, R.color.colorSelected)
             else
-                Color.TRANSPARENT
+                android.graphics.Color.BLACK
         )
     }
 
@@ -82,21 +69,15 @@ class MovieAdapter(
         return movieList.size
     }
 
+    // Función para agregar una nueva película
     fun addMovie(movie: Movie) {
         if (!containsMovie(movie)) {
-            // Insertar en la posición correcta según la fecha de creación
-            val insertIndex = movieList.indexOfFirst { it.createdAt < movie.createdAt }
-            if (insertIndex == -1) {
-                // Si no hay películas más antiguas, se agrega al final
-                movieList.add(movie)
-            } else {
-                // Insertar en la posición correspondiente
-                movieList.add(insertIndex, movie)
-            }
-            notifyDataSetChanged() // Notificar que el dataset ha cambiado
+            movieList.add(movie)
+            notifyItemInserted(movieList.size - 1) // Notificar que se ha añadido un elemento nuevo
         }
     }
 
+    // Verificar si la película ya está en la lista
     fun containsMovie(movie: Movie): Boolean {
         return movieList.any { it.title == movie.title }
     }
