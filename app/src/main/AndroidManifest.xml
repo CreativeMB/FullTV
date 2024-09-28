@@ -42,6 +42,12 @@
             android:name=".PlayerActivity"
             android:screenOrientation="landscape">
         </activity>
+        <!-- Actividad para el reproductor de video -->
+        <activity
+            android:name=".MoviesBottomSheetFragment"
+            android:screenOrientation="landscape">
+        </activity>
 
-</application>
+
+    </application>
 </manifest>

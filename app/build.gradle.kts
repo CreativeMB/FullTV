@@ -86,6 +86,8 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.4.1") // Interfaz de usuario
     implementation ("androidx.media3:media3-exoplayer-hls:1.4.1") // Para soporte HLS
     implementation ("com.google.android.exoplayer:exoplayer:2.19.1")
+    implementation ("com.google.android.material:material:1.7.0")
+    implementation ("androidx.core:core-ktx:1.8.0")
 
 }
 

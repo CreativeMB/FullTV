@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="wrap_content"
+    android:layout_width="150dp"
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
     android:elevation="8dp"
@@ -13,23 +13,20 @@
     app:cardUseCompatPadding="true">
 
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#8E000000"
+        android:background="#C0000000"
         android:gravity="center"
         android:orientation="vertical">
 
-        <!-- Imagen de la película con escala adecuada -->
         <ImageView
             android:id="@+id/movie_image"
-            android:layout_width="150dp"
+            android:layout_width="match_parent"
             android:layout_height="200dp"
-            android:layout_gravity="center"
             android:contentDescription="Imagen de la película"
             android:scaleType="centerCrop"
             android:src="@drawable/portada" />
 
-        <!-- Título de la película -->
         <TextView
             android:id="@+id/movie_title"
             android:layout_width="wrap_content"
@@ -43,7 +40,6 @@
             android:textSize="16sp"
             android:textStyle="bold" />
 
-        <!-- Sinopsis de la película -->
         <TextView
             android:id="@+id/movie_synopsis"
             android:layout_width="wrap_content"

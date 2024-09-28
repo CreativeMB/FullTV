@@ -22,8 +22,7 @@ data class Movie(
 
 class MovieAdapter(
     private val movieList: MutableList<Movie>, // MutableList para poder modificarla
-    private val onMovieClick: (String) -> Unit, // Callback para manejar clics en los items
-    private val context: Context
+    private val onMovieClick: (String) -> Unit // Callback para manejar clics en los items
 ) : RecyclerView.Adapter<MovieAdapter.MovieViewHolder>() {
 
     private var selectedPosition = RecyclerView.NO_POSITION
@@ -46,7 +45,7 @@ class MovieAdapter(
 
             view.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
-                    view.setBackgroundColor(ContextCompat.getColor(context, R.color.colorhover))
+                    view.setBackgroundColor(ContextCompat.getColor(view.context, R.color.colorhover))
                 } else {
                     view.setBackgroundColor(Color.TRANSPARENT)
                 }
@@ -71,11 +70,12 @@ class MovieAdapter(
             .into(holder.movieImage)
 
         // Aplicar el color de fondo si el elemento está seleccionado
-        if (position == selectedPosition) {
-            holder.itemView.setBackgroundColor(ContextCompat.getColor(context, R.color.colorSelected))
-        } else {
-            holder.itemView.setBackgroundColor(Color.TRANSPARENT) // Fondo transparente para elementos no seleccionados
-        }
+        holder.itemView.setBackgroundColor(
+            if (position == selectedPosition)
+                ContextCompat.getColor(holder.itemView.context, R.color.colorSelected)
+            else
+                Color.TRANSPARENT
+        )
     }
 
     override fun getItemCount(): Int {

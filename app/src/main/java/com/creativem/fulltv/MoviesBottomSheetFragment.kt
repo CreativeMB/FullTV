@@ -1,39 +1,42 @@
 package com.creativem.fulltv
 
 import android.content.Intent
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
-import android.util.Log
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
-import androidx.drawerlayout.widget.DrawerLayout
+import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import androidx.compose.ui.graphics.Color
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.navigation.NavigationView
+import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.snackbar.Snackbar
-import com.google.firebase.FirebaseApp
+import com.google.firebase.database.collection.LLRBNode
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import com.google.firebase.Timestamp
 
-class MainActivity : AppCompatActivity() {
+class MoviesBottomSheetFragment : BottomSheetDialogFragment() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var moviesAdapter: MovieAdapter
     private lateinit var firestore: FirebaseFirestore
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        val view = inflater.inflate(R.layout.fragment_movies_bottom_sheet, container, false)
+        recyclerView = view.findViewById(R.id.recycler_view_movies)
 
-        recyclerView = findViewById(R.id.recycler_view_movies)
-        val numberOfColumns = calculateNoOfColumns()
-        recyclerView.layoutManager = GridLayoutManager(this, numberOfColumns)
+        recyclerView.layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
 
         firestore = Firebase.firestore
 
         moviesAdapter = MovieAdapter(mutableListOf()) { url ->
             if (url.isNotEmpty()) {
-                val intent = Intent(this, PlayerActivity::class.java)
+                val intent = Intent(requireContext(), PlayerActivity::class.java)
                 intent.putExtra("EXTRA_STREAM_URL", url)
                 startActivity(intent)
             } else {
@@ -42,8 +45,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         recyclerView.adapter = moviesAdapter
-
         loadMoviesFromFirestore()
+
+        return view
     }
 
     private fun loadMoviesFromFirestore() {
@@ -56,18 +60,18 @@ class MainActivity : AppCompatActivity() {
                     val synopsis = document.getString("synopsis") ?: "Sin sinopsis"
                     val imageUrl = document.getString("imageUrl") ?: ""
                     val streamUrl = document.getString("streamUrl") ?: ""
-                    val createdAt = document.getTimestamp("createdAt")!!
+                    val createdAt = document.getTimestamp("createdAt")
 
-                    val movie = Movie(title, synopsis, imageUrl, streamUrl, createdAt)
+                    val movie = Movie(title, synopsis, imageUrl, streamUrl, createdAt!!)
                     moviesAdapter.addMovie(movie)
                 }
             }
     }
 
-    private fun calculateNoOfColumns(): Int {
-        val displayMetrics = resources.displayMetrics
-        val dpWidth = displayMetrics.widthPixels / displayMetrics.density
-        val scalingFactor = 150
-        return (dpWidth / scalingFactor).toInt()
+    override fun onStart() {
+        super.onStart()
+        dialog?.window?.apply {
+            setLayout(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
     }
 }

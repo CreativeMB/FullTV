@@ -6,8 +6,11 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.ImageButton
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.C
@@ -26,11 +29,14 @@ class PlayerActivity : AppCompatActivity() {
     private var streamUrl: String = ""
     private var playbackPosition: Long = 0L // Posición de reproducción guardada
     private var isLiveStream = false // Flag para indicar si el stream es en vivo
+    private lateinit var menuButton: ImageButton
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
 
+        menuButton = findViewById(R.id.menu_button)
+        menuButton.visibility = View.GONE
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -47,6 +53,15 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         initializePlayer()
+        // Listener para el botón de menú
+        menuButton.setOnClickListener {
+            showMoviesBottomSheet()
+        }
+    }
+
+    private fun showMoviesBottomSheet() {
+        val bottomSheetFragment = MoviesBottomSheetFragment()
+        bottomSheetFragment.show(supportFragmentManager, bottomSheetFragment.tag)
     }
 
     private fun initializePlayer() {
@@ -110,13 +125,15 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private var isDialogShowing = false
     override fun onResume() {
         super.onResume()
         Log.d("PlayerActivity", "onResume called")
 
         // Comprueba si hay una posición de reproducción guardada
-        if (playbackPosition > 0 && !isLiveStream) {
+        if (playbackPosition > 0 && !isLiveStream && !isDialogShowing) {
             Log.d("PlayerActivity", "Showing resume dialog")
+            isDialogShowing = true // Marcar como diálogo mostrando
             showResumeDialog() // Mostrar diálogo para reanudar
         } else {
             player?.playWhenReady = true // Reanudar automáticamente si no hay posición guardada
@@ -135,18 +152,29 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun showResumeDialog() {
+        // Evitar mostrar el diálogo si es un stream en vivo
+        if (isLiveStream) {
+            return
+        }
+
         val dialog = AlertDialog.Builder(this)
             .setTitle("Continuar Reproducción")
             .setMessage("Has reproducido hasta ${playbackPosition / 1000} segundos. ¿Deseas continuar o reiniciar?")
             .setPositiveButton("Continuar") { dialogInterface, _ ->
-                dialogInterface.dismiss()
+                dialogInterface.dismiss() // Cierra el diálogo
                 resumePlayer(playbackPosition) // Reanudar desde la posición guardada
+                isDialogShowing = false // Restablecer el flag
             }
             .setNegativeButton("Reiniciar") { dialogInterface, _ ->
-                dialogInterface.dismiss()
+                dialogInterface.dismiss() // Cierra el diálogo
                 resumePlayer(0L) // Reiniciar la reproducción
+                isDialogShowing = false // Restablecer el flag
             }
             .create()
+
+        dialog.setOnDismissListener {
+            isDialogShowing = false // Asegúrate de restablecer el flag al cerrar el diálogo
+        }
 
         dialog.show()
     }
@@ -213,4 +241,49 @@ class PlayerActivity : AppCompatActivity() {
         releasePlayer()
     }
 
+    private var isBottomSheetVisible = false // Variable para rastrear el estado del fragmento
+    private var backPressCount = 0 // Contador para rastrear las pulsaciones de retroceso
+    private val backPressDelay: Long = 2000 // Tiempo en milisegundos para reiniciar el contador
+
+    override fun onBackPressed() {
+        if (isBottomSheetVisible) {
+            // Si el MoviesBottomSheetFragment está visible, lo cerramos
+            val fragment = supportFragmentManager.findFragmentByTag(MoviesBottomSheetFragment::class.java.simpleName)
+            if (fragment != null && fragment.isVisible) {
+                (fragment as MoviesBottomSheetFragment).dismiss()
+                isBottomSheetVisible = false // Actualiza el estado
+                return // No llamamos a super.onBackPressed() para evitar cerrar la actividad
+            }
+        } else {
+            // Si el MoviesBottomSheetFragment no está visible, mostramos el fragmento
+            val moviesBottomSheetFragment = MoviesBottomSheetFragment()
+            moviesBottomSheetFragment.show(supportFragmentManager, MoviesBottomSheetFragment::class.java.simpleName)
+            isBottomSheetVisible = true // Actualiza el estado
+            return // No llamamos a super.onBackPressed() para evitar cerrar la actividad
+        }
+        // Si el MoviesBottomSheetFragment no está visible
+        backPressCount++ // Incrementar el contador de pulsaciones de retroceso
+
+        if (backPressCount == 1) {
+
+            // Reiniciar el contador después de un tiempo, si no hay más pulsaciones
+            Handler(Looper.getMainLooper()).postDelayed({
+                backPressCount = 0 // Reinicia el contador después del tiempo establecido
+            }, backPressDelay)
+        } else if (backPressCount == 2) {
+            // Cerrar el reproductor y volver a MainActivity
+            releasePlayer() // Cerrar el reproductor
+            super.onBackPressed() // Cerrar la actividad
+        }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_MENU) {
+            // Crear y mostrar el MoviesBottomSheetFragment
+            val moviesBottomSheetFragment = MoviesBottomSheetFragment()
+            moviesBottomSheetFragment.show(supportFragmentManager, moviesBottomSheetFragment.tag)
+            return true // Indica que hemos manejado la tecla
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 }

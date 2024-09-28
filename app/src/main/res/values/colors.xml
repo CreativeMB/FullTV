@@ -5,4 +5,8 @@
     <color name="negro">#000000</color> <!-- Color para selección -->
     <color name="fondo">#2B2B2B</color>    <!-- Color para hover -->
     <color name="bordeitems">#FFD600</color>
+
+    <color name="colorPrimary">#6200EE</color>        <!-- Color principal -->
+    <color name="colorPrimaryDark">#3700B3</color>    <!-- Color principal oscuro -->
+    <color name="colorAccent">#03DAC5</color>         <!-- Color de acento -->
 </resources>
