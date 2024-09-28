@@ -18,6 +18,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 
+
 class MoviesBottomSheetFragment : BottomSheetDialogFragment() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var moviesAdapter: MovieAdapter

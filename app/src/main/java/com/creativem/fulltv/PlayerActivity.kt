@@ -11,6 +11,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageButton
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.C
@@ -22,6 +23,13 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
 
 class PlayerActivity : AppCompatActivity() {
     private lateinit var playerView: PlayerView
@@ -51,6 +59,7 @@ class PlayerActivity : AppCompatActivity() {
             finish()
             return
         }
+
 
         initializePlayer()
         // Listener para el botón de menú
@@ -241,49 +250,33 @@ class PlayerActivity : AppCompatActivity() {
         releasePlayer()
     }
 
-    private var isBottomSheetVisible = false // Variable para rastrear el estado del fragmento
-    private var backPressCount = 0 // Contador para rastrear las pulsaciones de retroceso
-    private val backPressDelay: Long = 2000 // Tiempo en milisegundos para reiniciar el contador
-
+    // Sobrescribiendo el método onBackPressed
     override fun onBackPressed() {
-        if (isBottomSheetVisible) {
-            // Si el MoviesBottomSheetFragment está visible, lo cerramos
-            val fragment = supportFragmentManager.findFragmentByTag(MoviesBottomSheetFragment::class.java.simpleName)
-            if (fragment != null && fragment.isVisible) {
-                (fragment as MoviesBottomSheetFragment).dismiss()
-                isBottomSheetVisible = false // Actualiza el estado
-                return // No llamamos a super.onBackPressed() para evitar cerrar la actividad
-            }
-        } else {
-            // Si el MoviesBottomSheetFragment no está visible, mostramos el fragmento
-            val moviesBottomSheetFragment = MoviesBottomSheetFragment()
-            moviesBottomSheetFragment.show(supportFragmentManager, MoviesBottomSheetFragment::class.java.simpleName)
-            isBottomSheetVisible = true // Actualiza el estado
-            return // No llamamos a super.onBackPressed() para evitar cerrar la actividad
-        }
-        // Si el MoviesBottomSheetFragment no está visible
-        backPressCount++ // Incrementar el contador de pulsaciones de retroceso
-
-        if (backPressCount == 1) {
-
-            // Reiniciar el contador después de un tiempo, si no hay más pulsaciones
-            Handler(Looper.getMainLooper()).postDelayed({
-                backPressCount = 0 // Reinicia el contador después del tiempo establecido
-            }, backPressDelay)
-        } else if (backPressCount == 2) {
-            // Cerrar el reproductor y volver a MainActivity
-            releasePlayer() // Cerrar el reproductor
-            super.onBackPressed() // Cerrar la actividad
-        }
+        // Aquí puedes implementar cualquier lógica que necesites
+        super.onBackPressed() // Esto cerrará la actividad normalmente
     }
 
+    // Captura de teclas
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_MENU) {
-            // Crear y mostrar el MoviesBottomSheetFragment
-            val moviesBottomSheetFragment = MoviesBottomSheetFragment()
-            moviesBottomSheetFragment.show(supportFragmentManager, moviesBottomSheetFragment.tag)
-            return true // Indica que hemos manejado la tecla
+        return when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                // Mostrar el BottomSheet al presionar la tecla de cruzeta hacia arriba
+                showBottomSheet()
+                true // Indica que la tecla ha sido manejada
+            }
+            else -> super.onKeyDown(keyCode, event) // Llama a la implementación base
         }
-        return super.onKeyDown(keyCode, event)
+    }
+    private var isBottomSheetVisible = false
+    private fun showBottomSheet() {
+        // Verificar si el BottomSheet ya está visible
+        if (!isBottomSheetVisible) {
+            val fragment = supportFragmentManager.findFragmentByTag(MoviesBottomSheetFragment::class.java.simpleName)
+            if (fragment == null || !fragment.isVisible) {
+                val moviesBottomSheetFragment = MoviesBottomSheetFragment()
+                moviesBottomSheetFragment.show(supportFragmentManager, MoviesBottomSheetFragment::class.java.simpleName)
+                isBottomSheetVisible = true // Actualizar el estado a visible
+            }
+        }
     }
 }
