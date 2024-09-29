@@ -10,6 +10,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageButton
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 
 import androidx.appcompat.app.AppCompatActivity
@@ -23,7 +24,6 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
 import androidx.media3.ui.PlayerView
 import com.google.android.material.snackbar.Snackbar
-
 
 
 class PlayerActivity : AppCompatActivity() {
@@ -89,18 +89,25 @@ class PlayerActivity : AppCompatActivity() {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
-                Player.STATE_BUFFERING -> Log.d("PlayerActivity", "Reproductor almacenando en búfer...")
+                Player.STATE_BUFFERING -> Log.d(
+                    "PlayerActivity",
+                    "Reproductor almacenando en búfer..."
+                )
+
                 Player.STATE_READY -> {
                     Log.d("PlayerActivity", "Reproductor listo. Reproduciendo...")
                 }
+
                 Player.STATE_ENDED -> {
                     Log.d("PlayerActivity", "Reproducción finalizada.")
                     reconnectLiveStream() // Intenta reconectar si finaliza
                 }
+
                 Player.STATE_IDLE -> {
                     Log.d("PlayerActivity", "Reproductor inactivo. Intentando reconectar...")
                     reconnectLiveStream() // Intenta reconectar si está inactivo
                 }
+
                 Player.STATE_READY -> {
                     Log.d("PlayerActivity", "Error en la reproducción.")
                     showErrorDialog("Error en la reproducción.") // Muestra el dialogo de error
@@ -177,15 +184,25 @@ class PlayerActivity : AppCompatActivity() {
         releasePlayer()
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        return when (keyCode) {
-            174 -> { // Reemplaza 200 con el keyCode del botón que quieras manejar
-                showBottomSheet()
-                true // Indica que el botón ha sido manejado
-            }
-            else -> super.onKeyDown(keyCode, event) // Llama a la implementación base
-        }
-    }
+//    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+//        return when (keyCode) {
+//            KeyEvent.KEYCODE_MENU -> { // Detecta la tecla de menú
+//                showBottomSheet() // Ejecuta acción cuando se presiona el botón de menú
+//                true // Indica que la tecla ha sido manejada
+//            }
+//            KeyEvent.KEYCODE_PAGE_UP -> { // Detecta la tecla de página arriba
+//                // Ejecuta la acción que quieras cuando se presione página arriba
+//                Toast.makeText(this, "Página arriba presionada", Toast.LENGTH_SHORT).show()
+//                true
+//            }
+//            KeyEvent.KEYCODE_PAGE_DOWN -> { // Detecta la tecla de página abajo
+//                // Ejecuta la acción que quieras cuando se presione página abajo
+//                Toast.makeText(this, "Página abajo presionada", Toast.LENGTH_SHORT).show()
+//                true
+//            }
+//            else -> super.onKeyDown(keyCode, event) // Llama a la implementación base para otros keyCodes
+//        }
+//    }
 
     private fun showBottomSheet() {
         // Cerrar el BottomSheet si ya está visible
@@ -200,5 +217,71 @@ class PlayerActivity : AppCompatActivity() {
             supportFragmentManager,
             MoviesMenu::class.java.simpleName
         )
+    }
+
+//    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+//        Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
+//
+//        // Verifica si se presionó la tecla de menú o alguna de las teclas de números (por ejemplo, 1, 2, 3)
+//        return when (keyCode) {
+//            KeyEvent.KEYCODE_1 -> { // Tecla de menú
+//                showBottomSheet()
+//                true
+//            }
+//            KeyEvent.KEYCODE_MENU,
+//            KeyEvent.KEYCODE_2, // Si presionas la tecla 2
+//            KeyEvent.KEYCODE_3, // Si presionas la tecla 3
+//            KeyEvent.KEYCODE_4 -> { // O la tecla 4
+//                showBottomSheet() // Realiza la misma acción para cualquiera de estas teclas
+//                true
+//            }
+//            KeyEvent.KEYCODE_ENTER -> { // Detecta si se presiona Enter (OK)
+//                // Acción para la tecla OK
+//                Log.d("KeyCodeTest", "Tecla OK presionada")
+//                true
+//            }
+//            else -> super.onKeyDown(keyCode, event) // Llama a la implementación base para las otras teclas
+//        }
+//    }
+//
+//    override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
+//        Log.d("KeyCodeTest", "Tecla mantenida presionada: $keyCode")
+//
+//        // Verifica si se mantuvo presionada la tecla OK (Enter)
+//        return when (keyCode) {
+//            KeyEvent.KEYCODE_ENTER -> { // Si mantienes presionada la tecla OK
+//                Log.d("KeyCodeTest", "Tecla OK sostenida")
+//                // Realiza la acción que deseas cuando OK es sostenido
+//                showBottomSheet()
+//                true
+//            }
+//            else -> super.onKeyLongPress(keyCode, event)
+//        }
+//    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        Log.d("KeyCodeTest", "Tecla liberada: $keyCode")
+
+        return when (keyCode) {
+            KeyEvent.KEYCODE_MENU -> {
+                showBottomSheet()
+                true
+            }
+            KeyEvent.KEYCODE_PAGE_UP -> {
+                // Acción para la tecla Página Arriba
+                Log.d("KeyCodeTest", "Página Arriba presionada")
+                showBottomSheet()
+                // Agrega aquí la acción que desees para la tecla Página Arriba
+                true
+            }
+            KeyEvent.KEYCODE_PAGE_DOWN -> {
+                // Acción para la tecla Página Abajo
+                Log.d("KeyCodeTest", "Página Abajo presionada")
+                showBottomSheet()
+                // Agrega aquí la acción que desees para la tecla Página Abajo
+                true
+            }
+            else -> super.onKeyUp(keyCode, event)
+        }
     }
 }
