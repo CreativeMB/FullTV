@@ -1,5 +1,6 @@
 package com.creativem.fulltv
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.net.Uri
@@ -25,24 +26,49 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import com.google.android.material.snackbar.Snackbar
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.creativem.fulltv.databinding.ActivityPlayerBinding
+import com.creativem.fulltv.ui.data.Movie
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.CollectionReference
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.firestore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import kotlin.math.log
+import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import java.io.IOException
 
 
 class PlayerActivity : AppCompatActivity() {
-    private lateinit var playerView: PlayerView
+    //    private lateinit var playerView: PlayerView
     private var player: ExoPlayer? = null
     private var streamUrl: String = ""
     private var isLiveStream = false
-    private lateinit var menuButton: ImageButton
+
+    private lateinit var binding: ActivityPlayerBinding
+    private lateinit var adapter: MoviesMenuAdapter
+    private lateinit var moviesCollection: CollectionReference
+    private lateinit var firestore: FirebaseFirestore
+
 
     private var reconnectionAttempts = 0 // Contador de intentos de reconexión
     private val maxReconnectionAttempts = 5 // Máximo de intentos permitidos
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_player)
+        binding = ActivityPlayerBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        menuButton = findViewById(R.id.menu_button)
-        menuButton.visibility = View.GONE
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -53,16 +79,97 @@ class PlayerActivity : AppCompatActivity() {
             showErrorDialog("No se recibió la URL de streaming.")
             return
         }
-
-        playerView = findViewById(R.id.player_view)
-        playerView.useController = true
+        firestore = Firebase.firestore
+        // Inicializa el RecyclerView
+        initializeRecyclerView()
+        player = ExoPlayer.Builder(this).build()
+        binding.reproductor.player = player
         initializePlayer()
+        val menupelis = binding.reproductor.findViewById<ImageButton>(R.id.exo_lista_pelis)
+        menupelis.setOnClickListener {
+            mostarpélis()
+
+        }
+        // Cargar películas de Firestore
+        loadMoviesFromFirestore()
+
     }
 
+    private fun mostarpélis() {
+        Log.e("PlayerActivity", "clki menupelis")
+        binding.recyclerViewMovies.visibility = if (binding.recyclerViewMovies.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+    }
+
+    private fun loadMoviesFromFirestore() {
+        firestore.collection("movies")
+            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val movies = mutableListOf<Movie>() // Crear una lista temporal para almacenar las películas
+
+                // Cargar las películas
+                val jobs = snapshot.documents.map { document ->
+                    CoroutineScope(Dispatchers.IO).async {
+                        val title = document.getString("title") ?: "Sin título"
+                        val synopsis = document.getString("synopsis") ?: "Sin sinopsis"
+                        val imageUrl = document.getString("imageUrl") ?: ""
+                        val streamUrl = document.getString("streamUrl") ?: ""
+                        val createdAt = document.getTimestamp("createdAt") ?: return@async null
+
+                        // Llama a isUrlValid de forma asíncrona
+                        val isValid = isUrlValid(streamUrl)
+
+                        // Crea una película y retorna
+                        Movie(title, synopsis, imageUrl, streamUrl, createdAt, isValid)
+                    }
+                }
+
+                // Esperar a que todos los trabajos se completen
+                GlobalScope.launch(Dispatchers.Main) {
+                    jobs.forEach { job ->
+                        job.await()?.let { movie ->
+                            movies.add(movie) // Añadir la película a la lista temporal
+                        }
+                    }
+
+                    // Actualizar el adaptador con la lista de películas
+                    adapter.updateMovies(movies)
+                }
+            }
+    }
+    // Cambia la función isUrlValid para que sea suspend
+    private suspend fun isUrlValid(url: String): Boolean {
+        val client = OkHttpClient()
+        val request = Request.Builder().url(url).head().build()
+
+        return try {
+            val response: Response = client.newCall(request).execute()
+            response.isSuccessful
+        } catch (e: IOException) {
+            false
+        }
+    }
+
+    private fun initializeRecyclerView() {
+        adapter = MoviesMenuAdapter(mutableListOf()) { movie ->
+            startMoviePlayback(movie.streamUrl)
+        }
+
+        binding.recyclerViewMovies.adapter = adapter
+        binding.recyclerViewMovies.layoutManager = LinearLayoutManager(this)
+        binding.recyclerViewMovies.visibility = View.GONE
+    }
+
+    private fun startMoviePlayback(streamUrl: String) {
+        val intent = Intent(this, PlayerActivity::class.java)
+        intent.putExtra("EXTRA_STREAM_URL", streamUrl) // Asegúrate de usar el mismo nombre clave que usas en VideoPlayerActivity
+        startActivity(intent)
+    }
+
+    @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
         // Configura el LoadControl
         val loadControl = DefaultLoadControl.Builder()
-            // Ajusta el tamaño del búfer según tus necesidades
             .setTargetBufferBytes(2 * 1024 * 1024)  // 2MB
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
@@ -71,8 +178,8 @@ class PlayerActivity : AppCompatActivity() {
         player = ExoPlayer.Builder(this)
             .setLoadControl(loadControl)
             .build().also { exoPlayer ->
-                // Asocia el ExoPlayer con el PlayerView
-                playerView.player = exoPlayer
+                // Asocia el ExoPlayer con el PlayerView usando binding
+                binding.reproductor.player = exoPlayer
                 exoPlayer.addListener(playerListener)
 
                 // Configura el MediaItem
@@ -90,25 +197,25 @@ class PlayerActivity : AppCompatActivity() {
         Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
         return when (keyCode) {
             KeyEvent.KEYCODE_MENU -> {
-                showBottomSheet()
+
                 true
             }
 
             KeyEvent.KEYCODE_PAGE_UP -> {
                 Log.d("KeyCodeTest", "Página Arriba presionada")
-                showBottomSheet()
+
                 true
             }
 
             KeyEvent.KEYCODE_PAGE_DOWN -> {
                 Log.d("KeyCodeTest", "Página Abajo presionada")
-                showBottomSheet()
+
                 true
             }
 
             174 -> { // Código del botón del control remoto
                 Log.d("KeyCodeTest", "Botón del control remoto (174) presionado")
-                showBottomSheet()
+                mostarpélis()
                 true
             }
 
@@ -121,25 +228,25 @@ class PlayerActivity : AppCompatActivity() {
         return when (keyCode) {
             KeyEvent.KEYCODE_MENU -> {
                 Log.d("KeyCodeTest", "Menu presionado")
-                showBottomSheet()
+
                 true
             }
 
             KeyEvent.KEYCODE_PAGE_UP -> {
                 Log.d("KeyCodeTest", "Página Arriba liberada")
-                showBottomSheet()
+
                 true
             }
 
             KeyEvent.KEYCODE_PAGE_DOWN -> {
                 Log.d("KeyCodeTest", "Página Abajo liberada")
-                showBottomSheet()
+
                 true
             }
 
             174 -> { // Código del botón del control remoto
                 Log.d("KeyCodeTest", "Botón del control remoto (174) liberado")
-                showBottomSheet()
+
                 true
             }
 
@@ -147,43 +254,13 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private var isBottomSheetShowing = false
 
-    private fun isShowing(): Boolean {
-        val fragmentManager = supportFragmentManager
-        val fragment = fragmentManager.findFragmentByTag(MoviesMenu::class.java.simpleName)
-        return fragment != null && fragment.isVisible
-    }
 
-    private fun dismissIfShowing() {
-        val fragmentManager = supportFragmentManager
-        val fragment = fragmentManager.findFragmentByTag(MoviesMenu::class.java.simpleName)
-        if (fragment != null && fragment.isVisible) {
-            (fragment as MoviesMenu).dismiss()
-        }
-    }
 
-    private fun showBottomSheet() {
-        if (isBottomSheetShowing) {
-            return  // Evita abrir si ya está mostrándose
-        }
 
-        // Usa el método isShowing para verificar si ya está visible antes de cerrarlo
-        if (isShowing()) {
-            dismissIfShowing() // Cierra si ya está mostrando
-        }
 
-        // Ahora muestra el nuevo bottom sheet
-        isBottomSheetShowing = true  // Indica que está mostrándose
-        val moviesMenu = MoviesMenu()
 
-        // Agrega un listener para saber cuándo se ha cerrado el fragmento
-        moviesMenu.addOnDismissListener {
-            isBottomSheetShowing = false  // Resetea cuando el diálogo se cierra
-        }
 
-        moviesMenu.show(supportFragmentManager, MoviesMenu::class.java.simpleName)
-    }
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -299,12 +376,20 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
     override fun onBackPressed() {
+        // Si el GridView es visible, simplemente ocultarlo
+        if (binding.recyclerViewMovies.visibility == View.VISIBLE) {
+            binding.recyclerViewMovies.visibility = View.GONE
+        } else {
+            super.onBackPressed() // Llama al comportamiento predeterminado
+        }
+    }
+   /* override fun onBackPressed() {
         super.onBackPressed()
         // Redirige a MoviesPrincipal
         val intent = Intent(this, MoviesPrincipal::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
         startActivity(intent)
         finish() // Opcional: Cierra la actividad actual
-    }
+    }*/
 
 }

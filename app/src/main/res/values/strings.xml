@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">CineFlex</string>
+    <string name="exo_controls_lista_pelis">lista de peliculas</string>
 </resources>

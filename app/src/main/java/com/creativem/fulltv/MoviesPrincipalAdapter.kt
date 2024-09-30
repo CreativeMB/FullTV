@@ -8,15 +8,8 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.creativem.fulltv.ui.data.Movie
 
-data class Movie(
-    val title: String,
-    val synopsis: String,
-    val imageUrl: String,
-    val streamUrl: String,
-    val createdAt: com.google.firebase.Timestamp,
-    val isValid: Boolean
-)
 
 class MovieAdapter(
     private val movieList: MutableList<Movie>,

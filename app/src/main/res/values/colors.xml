@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
         <color name="colorSelected">#FF0000</color> <!-- Color para selección -->
+        <color name="colorNotSelected">#00C51162</color> <!-- Color para selección -->
     <color name="colorhover">#D500B8D4</color>
     <color name="colorhover2">#D50000</color><!-- Color para hover -->
     <color name="negro">#000000</color> <!-- Color para selección -->
