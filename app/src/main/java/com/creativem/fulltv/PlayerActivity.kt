@@ -60,22 +60,30 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun initializePlayer() {
-        // Configuración del LoadControl
+        // Configura el LoadControl
         val loadControl = DefaultLoadControl.Builder()
-            .setTargetBufferBytes(5 * 1024 * 1024) // Buffer de 5MB
+            // Ajusta el tamaño del búfer según tus necesidades
+            .setTargetBufferBytes(2 * 1024 * 1024)  // 2MB
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
+        // Crea el ExoPlayer
         player = ExoPlayer.Builder(this)
-            .setLoadControl(loadControl) // Establece el LoadControl personalizado
+            .setLoadControl(loadControl)
             .build().also { exoPlayer ->
+                // Asocia el ExoPlayer con el PlayerView
                 playerView.player = exoPlayer
                 exoPlayer.addListener(playerListener)
 
+                // Configura el MediaItem
                 val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+
+                // Prepara el ExoPlayer para la reproducción
                 exoPlayer.setMediaItem(mediaItem)
                 exoPlayer.prepare()
-                exoPlayer.playWhenReady = true
+
+                // Ajusta el comportamiento de la reproducción según sea necesario
+                exoPlayer.playWhenReady = false // Inicia la reproducción al tocar un botón o un evento específico
             }
     }
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
