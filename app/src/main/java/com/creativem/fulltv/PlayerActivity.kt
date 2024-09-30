@@ -24,6 +24,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
 import androidx.media3.ui.PlayerView
 import com.google.android.material.snackbar.Snackbar
+import androidx.media3.exoplayer.DefaultLoadControl
 
 
 class PlayerActivity : AppCompatActivity() {
@@ -59,8 +60,14 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun initializePlayer() {
+        // Configuración del LoadControl
+        val loadControl = DefaultLoadControl.Builder()
+            .setTargetBufferBytes(5 * 1024 * 1024) // Buffer de 5MB
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
         player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(this))
+            .setLoadControl(loadControl) // Establece el LoadControl personalizado
             .build().also { exoPlayer ->
                 playerView.player = exoPlayer
                 exoPlayer.addListener(playerListener)
@@ -71,7 +78,6 @@ class PlayerActivity : AppCompatActivity() {
                 exoPlayer.playWhenReady = true
             }
     }
-
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
         return when (keyCode) {
