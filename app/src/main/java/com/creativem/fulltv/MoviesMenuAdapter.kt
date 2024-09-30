@@ -17,20 +17,24 @@ class MoviesMenuAdapter(
     private var selectedPosition = RecyclerView.NO_POSITION
 
     inner class SmallMovieViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val movieImage: ImageView = view.findViewById(R.id.movie_image_small) // Aquí usas el layout pequeño
+        val movieImage: ImageView = view.findViewById(R.id.movie_image_small)
         val movieTitle: TextView = view.findViewById(R.id.movie_title_small)
 
         init {
+            // Manejador de clics en el item
             view.setOnClickListener {
                 val position = bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
+                    notifyItemChanged(selectedPosition) // Actualiza el ítem previamente seleccionado
+                    selectedPosition = position // Actualiza la nueva posición seleccionada
                     notifyItemChanged(selectedPosition)
-                    selectedPosition = position
-                    notifyItemChanged(selectedPosition)
+
+                    // Llama al callback de clic
                     onMovieClick(movieList[position].streamUrl)
                 }
             }
 
+            // Manejador de enfoque para cambiar el color de fondo al recibir foco
             view.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
                     view.setBackgroundColor(ContextCompat.getColor(view.context, R.color.colorhover2))
@@ -42,7 +46,8 @@ class MoviesMenuAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SmallMovieViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.movie_menu_item, parent, false)
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.movie_menu_item, parent, false)
         return SmallMovieViewHolder(view)
     }
 
@@ -50,13 +55,14 @@ class MoviesMenuAdapter(
         val movie = movieList[position]
         holder.movieTitle.text = movie.title
 
+        // Carga la imagen de la película usando Glide
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
             .placeholder(R.drawable.portada)
             .error(R.drawable.portada)
             .into(holder.movieImage)
 
-        // Aplicar el color de fondo si el elemento está seleccionado
+        // Aplicar color de fondo si el elemento está seleccionado
         holder.itemView.setBackgroundColor(
             if (position == selectedPosition)
                 ContextCompat.getColor(holder.itemView.context, R.color.colorSelected)
@@ -73,7 +79,7 @@ class MoviesMenuAdapter(
     fun addMovie(movie: Movie) {
         if (movie.isValid && !containsMovie(movie)) { // Verifica que la película sea válida
             movieList.add(movie)
-            notifyItemInserted(movieList.size - 1) // Notificar que se ha añadido un elemento nuevo
+            notifyItemInserted(movieList.size - 1) // Notifica que se ha añadido un nuevo elemento
         }
     }
 

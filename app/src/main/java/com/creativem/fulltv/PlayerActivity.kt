@@ -30,8 +30,11 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var playerView: PlayerView
     private var player: ExoPlayer? = null
     private var streamUrl: String = ""
-    private var isLiveStream = false // Flag para indicar si el stream es en vivo
+    private var isLiveStream = false
     private lateinit var menuButton: ImageButton
+
+    private var reconnectionAttempts = 0 // Contador de intentos de reconexión
+    private val maxReconnectionAttempts = 5 // Máximo de intentos permitidos
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,7 +49,7 @@ class PlayerActivity : AppCompatActivity() {
 
         if (streamUrl.isEmpty()) {
             Log.e("PlayerActivity", "No se recibió la URL de streaming.")
-            showErrorDialog("No se recibió la URL de streaming.") // Muestra el dialogo de error
+            showErrorDialog("No se recibió la URL de streaming.")
             return
         }
 
@@ -62,72 +65,158 @@ class PlayerActivity : AppCompatActivity() {
                 playerView.player = exoPlayer
                 exoPlayer.addListener(playerListener)
 
-                // Establece el MediaItem antes de preparar el reproductor
                 val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
                 exoPlayer.setMediaItem(mediaItem)
-
-                // Prepara el reproductor
                 exoPlayer.prepare()
-                exoPlayer.playWhenReady = true // Iniciar automáticamente
+                exoPlayer.playWhenReady = true
             }
     }
 
-    private val playerListener = object : Player.Listener {
-        override fun onMediaMetadataChanged(mediaMetadata: androidx.media3.common.MediaMetadata) {
-            val currentMediaItem = player?.currentMediaItem
-
-            if (currentMediaItem != null) {
-                val title = currentMediaItem.mediaMetadata.title
-                val artist = currentMediaItem.mediaMetadata.artist
-                Log.d("PlayerActivity", "Título: $title, Artista: $artist")
-
-                // Verifica si es un stream en vivo
-                isLiveStream = player?.duration == androidx.media3.common.C.TIME_UNSET
-                Log.d("PlayerActivity", "isLiveStream: $isLiveStream")
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
+        return when (keyCode) {
+            KeyEvent.KEYCODE_MENU -> {
+                showBottomSheet()
+                true
             }
+
+            KeyEvent.KEYCODE_PAGE_UP -> {
+                Log.d("KeyCodeTest", "Página Arriba presionada")
+                showBottomSheet()
+                true
+            }
+
+            KeyEvent.KEYCODE_PAGE_DOWN -> {
+                Log.d("KeyCodeTest", "Página Abajo presionada")
+                showBottomSheet()
+                true
+            }
+
+            174 -> { // Código del botón del control remoto
+                Log.d("KeyCodeTest", "Botón del control remoto (174) presionado")
+                showBottomSheet()
+                true
+            }
+
+            else -> super.onKeyDown(keyCode, event)
+        }
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        Log.d("KeyCodeTest", "Tecla liberada: $keyCode")
+        return when (keyCode) {
+            KeyEvent.KEYCODE_MENU -> {
+                Log.d("KeyCodeTest", "Menu presionado")
+                showBottomSheet()
+                true
+            }
+
+            KeyEvent.KEYCODE_PAGE_UP -> {
+                Log.d("KeyCodeTest", "Página Arriba liberada")
+                showBottomSheet()
+                true
+            }
+
+            KeyEvent.KEYCODE_PAGE_DOWN -> {
+                Log.d("KeyCodeTest", "Página Abajo liberada")
+                showBottomSheet()
+                true
+            }
+
+            174 -> { // Código del botón del control remoto
+                Log.d("KeyCodeTest", "Botón del control remoto (174) liberado")
+                showBottomSheet()
+                true
+            }
+
+            else -> super.onKeyUp(keyCode, event)
+        }
+    }
+
+    private var isBottomSheetShowing = false
+
+    private fun isShowing(): Boolean {
+        val fragmentManager = supportFragmentManager
+        val fragment = fragmentManager.findFragmentByTag(MoviesMenu::class.java.simpleName)
+        return fragment != null && fragment.isVisible
+    }
+
+    private fun dismissIfShowing() {
+        val fragmentManager = supportFragmentManager
+        val fragment = fragmentManager.findFragmentByTag(MoviesMenu::class.java.simpleName)
+        if (fragment != null && fragment.isVisible) {
+            (fragment as MoviesMenu).dismiss()
+        }
+    }
+
+    private fun showBottomSheet() {
+        if (isBottomSheetShowing) {
+            return  // Evita abrir si ya está mostrándose
         }
 
+        // Usa el método isShowing para verificar si ya está visible antes de cerrarlo
+        if (isShowing()) {
+            dismissIfShowing() // Cierra si ya está mostrando
+        }
+
+        // Ahora muestra el nuevo bottom sheet
+        isBottomSheetShowing = true  // Indica que está mostrándose
+        val moviesMenu = MoviesMenu()
+
+        // Agrega un listener para saber cuándo se ha cerrado el fragmento
+        moviesMenu.addOnDismissListener {
+            isBottomSheetShowing = false  // Resetea cuando el diálogo se cierra
+        }
+
+        moviesMenu.show(supportFragmentManager, MoviesMenu::class.java.simpleName)
+    }
+
+    private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
-                Player.STATE_BUFFERING -> Log.d(
-                    "PlayerActivity",
-                    "Reproductor almacenando en búfer..."
-                )
+                Player.STATE_BUFFERING -> Log.d("PlayerActivity", "Reproductor almacenando en búfer...")
 
                 Player.STATE_READY -> {
                     Log.d("PlayerActivity", "Reproductor listo. Reproduciendo...")
+                    reconnectionAttempts = 0 // Reiniciar contador si está reproduciendo correctamente
                 }
 
                 Player.STATE_ENDED -> {
-                    Log.d("PlayerActivity", "Reproducción finalizada.")
-                    reconnectLiveStream() // Intenta reconectar si finaliza
+                    Log.d("PlayerActivity", "Reproducción finalizada. Intentando reconectar...")
+                    attemptReconnection()
                 }
 
                 Player.STATE_IDLE -> {
                     Log.d("PlayerActivity", "Reproductor inactivo. Intentando reconectar...")
-                    reconnectLiveStream() // Intenta reconectar si está inactivo
-                }
-
-                Player.STATE_READY -> {
-                    Log.d("PlayerActivity", "Error en la reproducción.")
-                    showErrorDialog("Error en la reproducción.") // Muestra el dialogo de error
+                    attemptReconnection()
                 }
             }
         }
 
         override fun onPlayerError(error: PlaybackException) {
             Log.e("PlayerActivity", "Error en el reproductor: ${error.message}")
-            showErrorDialog("Error en la reproducción: ${error.message}") // Muestra el dialogo de error
+            attemptReconnection()
+        }
+    }
+
+    private fun attemptReconnection() {
+        if (reconnectionAttempts < maxReconnectionAttempts) {
+            Log.d("PlayerActivity", "Intento de reconexión: $reconnectionAttempts")
+            reconnectionAttempts++
+            reconnectLiveStream()
+        } else {
+            Log.d("PlayerActivity", "Máximo número de intentos alcanzado. Mostrando diálogo de error.")
+            showErrorDialog("No se pudo reconectar al stream.")
         }
     }
 
     private fun reconnectLiveStream() {
-        if (isLiveStream) {
+        if (isLiveStream || player?.playbackState == Player.STATE_ENDED || player?.playbackState == Player.STATE_IDLE) {
             Log.d("PlayerActivity", "Intentando reconectar a la transmisión en vivo...")
             val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
             player?.setMediaItem(mediaItem)
             player?.prepare()
-            player?.playWhenReady = true // Asegúrate de reanudar la reproducción
+            player?.playWhenReady = true
         }
     }
 
@@ -145,16 +234,14 @@ class PlayerActivity : AppCompatActivity() {
             .setPositiveButton("Volver al contenido") { _, _ ->
                 val intent = Intent(this, MoviesPrincipal::class.java)
                 startActivity(intent)
-                finish() // Finaliza la actividad actual
+                finish()
             }
             .setNeutralButton("Donar") { _, _ ->
-                // Abre el enlace de donación
-                val donationUrl =
-                    "https://www.floristerialoslirios.com/" // Cambia esto por tu URL de donación
+                val donationUrl = "https://www.floristerialoslirios.com/"
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(donationUrl))
                 startActivity(intent)
             }
-            .show() // Quitar el botón negativo
+            .show()
     }
 
     override fun onPause() {
@@ -171,6 +258,11 @@ class PlayerActivity : AppCompatActivity() {
         player?.removeListener(playerListener)
         player?.release()
         player = null
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        releasePlayer()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -193,65 +285,4 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        releasePlayer()
-    }
-
-
-    private fun showBottomSheet() {
-        // Cerrar el BottomSheet si ya está visible
-        val fragment = supportFragmentManager.findFragmentByTag(MoviesMenu::class.java.simpleName)
-        if (fragment != null && fragment.isVisible) {
-            (fragment as MoviesMenu).dismiss() // Cerrar el fragmento si está visible
-        }
-
-        // Mostrar el BottomSheet nuevamente
-        val moviesMenu = MoviesMenu()
-        moviesMenu.show(
-            supportFragmentManager,
-            MoviesMenu::class.java.simpleName
-        )
-    }
-
-    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-        Log.d("KeyCodeTest", "Tecla liberada: $keyCode")
-
-        return when (keyCode) {
-            KeyEvent.KEYCODE_MENU -> {
-                showBottomSheet()
-                true
-            }
-
-            KeyEvent.KEYCODE_PAGE_UP -> {
-                // Acción para la tecla Página Arriba
-                Log.d("KeyCodeTest", "Página Arriba presionada")
-                showBottomSheet()
-                // Agrega aquí la acción que desees para la tecla Página Arriba
-                true
-            }
-
-            KeyEvent.KEYCODE_PAGE_DOWN -> {
-                // Acción para la tecla Página Abajo
-                Log.d("KeyCodeTest", "Página Abajo presionada")
-                showBottomSheet()
-                // Agrega aquí la acción que desees para la tecla Página Abajo
-                true
-            }
-
-            174 -> { // Código del botón del control remoto
-                Log.d("KeyCodeTest", "Botón del control remoto (174) presionado")
-                // Agrega aquí la acción que desees para el botón del control remoto
-                showBottomSheet()
-                true
-            }
-
-            else -> super.onKeyUp(keyCode, event)
-        }
-    }
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        Log.d("KeyCodeTest", "Tecla presionada: $keyCode") // Muestra el código de la tecla
-
-        return super.onKeyDown(keyCode, event) // Llama al método padre
-    }
 }
