@@ -134,12 +134,14 @@ class PlayerActivity : AppCompatActivity() {
     private fun showErrorDialog(message: String) {
         AlertDialog.Builder(this)
             .setTitle("¡Alquila Tu Acceso al Contenido!")
-            .setMessage("Este contenido ha sido bloqueado temporalmente, pero con una donación voluntaria, puedes \"alquilar\" el acceso por un tiempo limitado.\n" +
-                    "\n" +
-                    "Con tu ayuda, podremos restaurarlo en menos de 2 horas.\n" +
-                    "\n" +
-                    "Cada contribución cuenta para que sigamos ofreciendo este servicio! ¡Haz tu donación ahora y vuelve a disfrutar de lo que te gusta!\n" +
-                    "\nReporte de donacion al WhatsApp(3028667672)")
+            .setMessage(
+                "Este contenido ha sido bloqueado temporalmente, pero con una donación voluntaria, puedes \"alquilar\" el acceso por un tiempo limitado.\n" +
+                        "\n" +
+                        "Con tu ayuda, podremos restaurarlo en menos de 2 horas.\n" +
+                        "\n" +
+                        "Cada contribución cuenta para que sigamos ofreciendo este servicio! ¡Haz tu donación ahora y vuelve a disfrutar de lo que te gusta!\n" +
+                        "\nReporte de donacion al WhatsApp(3028667672)"
+            )
             .setPositiveButton("Volver al contenido") { _, _ ->
                 val intent = Intent(this, MoviesPrincipal::class.java)
                 startActivity(intent)
@@ -147,7 +149,8 @@ class PlayerActivity : AppCompatActivity() {
             }
             .setNeutralButton("Donar") { _, _ ->
                 // Abre el enlace de donación
-                val donationUrl = "https://www.floristerialoslirios.com/" // Cambia esto por tu URL de donación
+                val donationUrl =
+                    "https://www.floristerialoslirios.com/" // Cambia esto por tu URL de donación
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(donationUrl))
                 startActivity(intent)
             }
@@ -219,6 +222,7 @@ class PlayerActivity : AppCompatActivity() {
                 showBottomSheet()
                 true
             }
+
             KeyEvent.KEYCODE_PAGE_UP -> {
                 // Acción para la tecla Página Arriba
                 Log.d("KeyCodeTest", "Página Arriba presionada")
@@ -226,6 +230,7 @@ class PlayerActivity : AppCompatActivity() {
                 // Agrega aquí la acción que desees para la tecla Página Arriba
                 true
             }
+
             KeyEvent.KEYCODE_PAGE_DOWN -> {
                 // Acción para la tecla Página Abajo
                 Log.d("KeyCodeTest", "Página Abajo presionada")
@@ -233,7 +238,20 @@ class PlayerActivity : AppCompatActivity() {
                 // Agrega aquí la acción que desees para la tecla Página Abajo
                 true
             }
+
+            174 -> { // Código del botón del control remoto
+                Log.d("KeyCodeTest", "Botón del control remoto (174) presionado")
+                // Agrega aquí la acción que desees para el botón del control remoto
+                showBottomSheet()
+                true
+            }
+
             else -> super.onKeyUp(keyCode, event)
         }
+    }
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        Log.d("KeyCodeTest", "Tecla presionada: $keyCode") // Muestra el código de la tecla
+
+        return super.onKeyDown(keyCode, event) // Llama al método padre
     }
 }

@@ -1,13 +1,14 @@
 <!-- movie_menu_item.xml -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
-    android:layout_height="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="4dp"
     android:orientation="vertical">
 
     <ImageView
         android:id="@+id/movie_image_small"
-        android:layout_width="50dp"
-        android:layout_height="70dp"
+        android:layout_width="70dp"
+        android:layout_height="90dp"
         android:layout_gravity="center"
         android:padding="2dp"
         android:src="@drawable/portada"
@@ -20,6 +21,6 @@
         android:gravity="center"
         android:text="soy una pelicula"
         android:paddingTop="4dp"
-        android:textSize="10sp"
+        android:textSize="15sp"
         android:textColor="#FFFFFF" />
 </LinearLayout>

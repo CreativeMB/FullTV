@@ -20,6 +20,8 @@ import java.io.IOException
 
 // Importa la clase Movie
 import com.creativem.fulltv.Movie
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
 
 class MoviesMenu : BottomSheetDialogFragment() {
     private lateinit var recyclerView: RecyclerView
@@ -52,6 +54,12 @@ class MoviesMenu : BottomSheetDialogFragment() {
 
         return view
     }
+    override fun onStart() {
+        super.onStart()
+        // Configurar el BottomSheet para que ocupe todo el espacio
+        val dialog = dialog as BottomSheetDialog
+        dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED
+    }
 
     private fun loadMoviesFromFirestore() {
         firestore.collection("movies")
@@ -65,23 +73,22 @@ class MoviesMenu : BottomSheetDialogFragment() {
                     val streamUrl = document.getString("streamUrl") ?: ""
                     val createdAt = document.getTimestamp("createdAt")
 
-                    val isValid = isUrlValid(streamUrl) // Llama a isUrlValid
+                    // Llama a isUrlValid de forma asíncrona
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val isValid = isUrlValid(streamUrl) // Llama a isUrlValid
 
-                    val movie = Movie(title, synopsis, imageUrl, streamUrl, createdAt!!, isValid)
-                    moviesAdapter.addMovie(movie)
+                        // Regresar al hilo principal para agregar la película
+                        withContext(Dispatchers.Main) {
+                            val movie = Movie(title, synopsis, imageUrl, streamUrl, createdAt!!, isValid)
+                            moviesAdapter.addMovie(movie)
+                        }
+                    }
                 }
             }
     }
 
-    override fun onStart() {
-        super.onStart()
-        dialog?.window?.apply {
-            setLayout(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        }
-    }
-
-    // Función para validar la URL (la debes implementar aquí)
-    private fun isUrlValid(url: String): Boolean {
+    // Cambia la función isUrlValid para que sea suspend
+    private suspend fun isUrlValid(url: String): Boolean {
         val client = OkHttpClient()
         val request = Request.Builder().url(url).head().build()
 
