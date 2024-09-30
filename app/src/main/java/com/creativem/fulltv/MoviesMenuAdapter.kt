@@ -7,8 +7,8 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.creativem.fulltv.Movie
 
-// Define the MoviesMenuAdapter similar to MovieAdapter but with smaller items
 class MoviesMenuAdapter(
     private val movieList: MutableList<Movie>, // Lista mutable para agregar nuevos elementos
     private val onMovieClick: (String) -> Unit // Callback para manejar clics en los items
@@ -69,9 +69,9 @@ class MoviesMenuAdapter(
         return movieList.size
     }
 
-    // Función para agregar una nueva película
+    // Función para agregar una nueva película (solo si la URL es válida)
     fun addMovie(movie: Movie) {
-        if (!containsMovie(movie)) {
+        if (movie.isValid && !containsMovie(movie)) { // Verifica que la película sea válida
             movieList.add(movie)
             notifyItemInserted(movieList.size - 1) // Notificar que se ha añadido un elemento nuevo
         }
@@ -80,5 +80,12 @@ class MoviesMenuAdapter(
     // Verificar si la película ya está en la lista
     fun containsMovie(movie: Movie): Boolean {
         return movieList.any { it.title == movie.title }
+    }
+
+    // Actualiza la lista con nuevas películas
+    fun updateMovies(newMovies: List<Movie>) {
+        movieList.clear()
+        movieList.addAll(newMovies.filter { it.isValid })
+        notifyDataSetChanged()
     }
 }

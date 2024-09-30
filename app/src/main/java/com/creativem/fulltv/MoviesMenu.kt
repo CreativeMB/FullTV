@@ -12,7 +12,14 @@ import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import java.io.IOException
 
+// Importa la clase Movie
+import com.creativem.fulltv.Movie
 
 class MoviesMenu : BottomSheetDialogFragment() {
     private lateinit var recyclerView: RecyclerView
@@ -58,8 +65,10 @@ class MoviesMenu : BottomSheetDialogFragment() {
                     val streamUrl = document.getString("streamUrl") ?: ""
                     val createdAt = document.getTimestamp("createdAt")
 
-                    val movie = Movie(title, synopsis, imageUrl, streamUrl, createdAt!!)
-                    moviesAdapter.addMovie(movie) // Ahora addMovie está disponible
+                    val isValid = isUrlValid(streamUrl) // Llama a isUrlValid
+
+                    val movie = Movie(title, synopsis, imageUrl, streamUrl, createdAt!!, isValid)
+                    moviesAdapter.addMovie(movie)
                 }
             }
     }
@@ -68,6 +77,19 @@ class MoviesMenu : BottomSheetDialogFragment() {
         super.onStart()
         dialog?.window?.apply {
             setLayout(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
+    }
+
+    // Función para validar la URL (la debes implementar aquí)
+    private fun isUrlValid(url: String): Boolean {
+        val client = OkHttpClient()
+        val request = Request.Builder().url(url).head().build()
+
+        return try {
+            val response: Response = client.newCall(request).execute()
+            response.isSuccessful
+        } catch (e: IOException) {
+            false
         }
     }
 }

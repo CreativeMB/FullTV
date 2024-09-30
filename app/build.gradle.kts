@@ -88,6 +88,9 @@ dependencies {
     implementation ("com.google.android.exoplayer:exoplayer:2.19.1")
     implementation ("com.google.android.material:material:1.7.0")
     implementation ("androidx.core:core-ktx:1.8.0")
+    implementation ("com.squareup.okhttp3:okhttp:4.9.3")
 
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }
 

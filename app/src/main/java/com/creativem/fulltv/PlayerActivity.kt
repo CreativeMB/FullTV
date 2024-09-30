@@ -133,12 +133,23 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun showErrorDialog(message: String) {
         AlertDialog.Builder(this)
-            .setTitle("Contenido fuera de línea")
-            .setMessage("Reportar por Telegram(3028667672)") // Cambiado el mensaje aquí
+            .setTitle("¡Alquila Tu Acceso al Contenido!")
+            .setMessage("Este contenido ha sido bloqueado temporalmente, pero con una donación voluntaria, puedes \"alquilar\" el acceso por un tiempo limitado.\n" +
+                    "\n" +
+                    "Con tu ayuda, podremos restaurarlo en menos de 2 horas.\n" +
+                    "\n" +
+                    "Cada contribución cuenta para que sigamos ofreciendo este servicio! ¡Haz tu donación ahora y vuelve a disfrutar de lo que te gusta!\n" +
+                    "\nReporte de donacion al WhatsApp(3028667672)")
             .setPositiveButton("Volver al contenido") { _, _ ->
                 val intent = Intent(this, MoviesPrincipal::class.java)
                 startActivity(intent)
                 finish() // Finaliza la actividad actual
+            }
+            .setNeutralButton("Donar") { _, _ ->
+                // Abre el enlace de donación
+                val donationUrl = "https://www.floristerialoslirios.com/" // Cambia esto por tu URL de donación
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(donationUrl))
+                startActivity(intent)
             }
             .show() // Quitar el botón negativo
     }
@@ -184,25 +195,6 @@ class PlayerActivity : AppCompatActivity() {
         releasePlayer()
     }
 
-//    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-//        return when (keyCode) {
-//            KeyEvent.KEYCODE_MENU -> { // Detecta la tecla de menú
-//                showBottomSheet() // Ejecuta acción cuando se presiona el botón de menú
-//                true // Indica que la tecla ha sido manejada
-//            }
-//            KeyEvent.KEYCODE_PAGE_UP -> { // Detecta la tecla de página arriba
-//                // Ejecuta la acción que quieras cuando se presione página arriba
-//                Toast.makeText(this, "Página arriba presionada", Toast.LENGTH_SHORT).show()
-//                true
-//            }
-//            KeyEvent.KEYCODE_PAGE_DOWN -> { // Detecta la tecla de página abajo
-//                // Ejecuta la acción que quieras cuando se presione página abajo
-//                Toast.makeText(this, "Página abajo presionada", Toast.LENGTH_SHORT).show()
-//                true
-//            }
-//            else -> super.onKeyDown(keyCode, event) // Llama a la implementación base para otros keyCodes
-//        }
-//    }
 
     private fun showBottomSheet() {
         // Cerrar el BottomSheet si ya está visible
@@ -218,46 +210,6 @@ class PlayerActivity : AppCompatActivity() {
             MoviesMenu::class.java.simpleName
         )
     }
-
-//    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-//        Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
-//
-//        // Verifica si se presionó la tecla de menú o alguna de las teclas de números (por ejemplo, 1, 2, 3)
-//        return when (keyCode) {
-//            KeyEvent.KEYCODE_1 -> { // Tecla de menú
-//                showBottomSheet()
-//                true
-//            }
-//            KeyEvent.KEYCODE_MENU,
-//            KeyEvent.KEYCODE_2, // Si presionas la tecla 2
-//            KeyEvent.KEYCODE_3, // Si presionas la tecla 3
-//            KeyEvent.KEYCODE_4 -> { // O la tecla 4
-//                showBottomSheet() // Realiza la misma acción para cualquiera de estas teclas
-//                true
-//            }
-//            KeyEvent.KEYCODE_ENTER -> { // Detecta si se presiona Enter (OK)
-//                // Acción para la tecla OK
-//                Log.d("KeyCodeTest", "Tecla OK presionada")
-//                true
-//            }
-//            else -> super.onKeyDown(keyCode, event) // Llama a la implementación base para las otras teclas
-//        }
-//    }
-//
-//    override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
-//        Log.d("KeyCodeTest", "Tecla mantenida presionada: $keyCode")
-//
-//        // Verifica si se mantuvo presionada la tecla OK (Enter)
-//        return when (keyCode) {
-//            KeyEvent.KEYCODE_ENTER -> { // Si mantienes presionada la tecla OK
-//                Log.d("KeyCodeTest", "Tecla OK sostenida")
-//                // Realiza la acción que deseas cuando OK es sostenido
-//                showBottomSheet()
-//                true
-//            }
-//            else -> super.onKeyLongPress(keyCode, event)
-//        }
-//    }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
         Log.d("KeyCodeTest", "Tecla liberada: $keyCode")
