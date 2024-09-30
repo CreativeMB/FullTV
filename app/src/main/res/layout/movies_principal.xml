@@ -41,7 +41,8 @@
                         android:text="¡Contenido temporalmente bloqueado!"
                         android:gravity="center"
                         android:textColor="#FFFFFF"
-                        android:textSize="18sp"
+                        android:textSize="30sp"
+                        android:maxLines="1"
                         android:textStyle="bold" />
 
                     <androidx.recyclerview.widget.RecyclerView
