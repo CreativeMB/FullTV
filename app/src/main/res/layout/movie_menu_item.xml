@@ -7,8 +7,8 @@
 
     <ImageView
         android:id="@+id/movie_image_small"
-        android:layout_width="70dp"
-        android:layout_height="90dp"
+        android:layout_width="100dp"
+        android:layout_height="130dp"
         android:layout_gravity="center"
         android:padding="2dp"
         android:src="@drawable/portada"
@@ -21,6 +21,7 @@
         android:gravity="center"
         android:text="soy una pelicula"
         android:paddingTop="4dp"
+        android:maxLines="1"
         android:textSize="15sp"
         android:textColor="#FFFFFF" />
 </LinearLayout>

@@ -21,6 +21,9 @@
             android:name=".MoviesPrincipal"
             android:exported="false" />
         <activity
+            android:name=".ui.otras.MainFragment"
+            android:exported="false" />
+        <activity
             android:name=".PlayerActivity"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"></activity>
@@ -28,6 +31,7 @@
         <activity
             android:name=".ui.otras.Main"
             android:exported="true"
+
             android:screenOrientation="landscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

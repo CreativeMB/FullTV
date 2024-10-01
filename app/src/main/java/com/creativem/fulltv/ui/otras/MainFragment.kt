@@ -3,12 +3,14 @@ package com.creativem.fulltv.ui.otras
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import androidx.core.content.ContextCompat
 import androidx.leanback.app.BrowseSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
 import com.creativem.fulltv.PlayerActivity
+import com.creativem.fulltv.R
 import com.creativem.fulltv.ui.data.Movie
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +23,11 @@ class MainFragment : BrowseSupportFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        adapter = rowsAdapter
+        // Cambiar el color de fondo de toda la pantalla (fondo detrás de las categorías)
+        view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.tu_color_fondo))
+
+        // Configurar el adaptador
+        adapter = rowsAdapter// Configura el color de la barra de cabecera
 
         cargarPeliculas()
     }

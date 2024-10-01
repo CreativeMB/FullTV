@@ -223,45 +223,37 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-        Log.d("KeyCodeTest", "Tecla liberada: $keyCode")
-        return when (keyCode) {
-            KeyEvent.KEYCODE_MENU -> {
-                Log.d("KeyCodeTest", "Menu presionado")
-                mostarpélis()
-                true
-            }
-
-            KeyEvent.KEYCODE_PAGE_UP -> {
-                Log.d("KeyCodeTest", "Página Arriba liberada")
-                mostarpélis()
-                true
-            }
-
-            KeyEvent.KEYCODE_PAGE_DOWN -> {
-                Log.d("KeyCodeTest", "Página Abajo liberada")
-                mostarpélis()
-                true
-            }
-
-            174 -> { // Código del botón del control remoto
-                Log.d("KeyCodeTest", "Botón del control remoto (174) liberado")
-                mostarpélis()
-                true
-            }
-
-            else -> super.onKeyUp(keyCode, event)
-        }
-    }
-
-
-
-
-
-
-
-
-
+//    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+//        Log.d("KeyCodeTest", "Tecla liberada: $keyCode")
+//        return when (keyCode) {
+//            KeyEvent.KEYCODE_MENU -> {
+//                Log.d("KeyCodeTest", "Menu presionado")
+//                mostarpélis()
+//                true
+//            }
+//
+//            KeyEvent.KEYCODE_PAGE_UP -> {
+//                Log.d("KeyCodeTest", "Página Arriba liberada")
+//                mostarpélis()
+//                true
+//            }
+//
+//            KeyEvent.KEYCODE_PAGE_DOWN -> {
+//                Log.d("KeyCodeTest", "Página Abajo liberada")
+//                mostarpélis()
+//                true
+//            }
+//
+//            174 -> { // Código del botón del control remoto
+//                Log.d("KeyCodeTest", "Botón del control remoto (174) liberado")
+//                mostarpélis()
+//                true
+//            }
+//
+//            else -> super.onKeyUp(keyCode, event)
+//        }
+//    }
+//
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {

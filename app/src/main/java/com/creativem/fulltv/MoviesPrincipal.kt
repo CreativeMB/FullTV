@@ -41,11 +41,11 @@ class MoviesPrincipal : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.movies_principal)
 
-        recyclerViewValid = findViewById(R.id.recycler_view_movies_valid)
-        recyclerViewInvalid = findViewById(R.id.recycler_view_movies_invalid)
-        progressBar = findViewById(R.id.progress_bar)
-        dimView = findViewById(R.id.dim_view)
-        loadingText = findViewById(R.id.loading_text)
+//        recyclerViewValid = findViewById(R.id.recycler_view_movies_valid)
+//        recyclerViewInvalid = findViewById(R.id.recycler_view_movies_invalid)
+//        progressBar = findViewById(R.id.progress_bar)
+//        dimView = findViewById(R.id.dim_view)
+//        loadingText = findViewById(R.id.loading_text)
 
         val numberOfColumns = calculateNoOfColumns()
         recyclerViewValid.layoutManager = GridLayoutManager(this, numberOfColumns)

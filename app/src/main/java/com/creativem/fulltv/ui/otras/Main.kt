@@ -1,18 +1,24 @@
 package com.creativem.fulltv.ui.otras
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
-import com.creativem.fulltv.databinding.ActivityPruevaBinding
+import com.creativem.fulltv.R
+
+import com.creativem.fulltv.databinding.MainFragmentBinding
 
 class Main : FragmentActivity() {
-    private lateinit var binding: ActivityPruevaBinding
+    private lateinit var binding: MainFragmentBinding
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        binding = ActivityPruevaBinding.inflate(layoutInflater)
+        binding = MainFragmentBinding.inflate(layoutInflater)
         setContentView(binding.root)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+// Mantener la pantalla encendida
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 }
