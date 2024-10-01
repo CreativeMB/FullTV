@@ -197,19 +197,19 @@ class PlayerActivity : AppCompatActivity() {
         Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
         return when (keyCode) {
             KeyEvent.KEYCODE_MENU -> {
-
+                mostarpélis()
                 true
             }
 
             KeyEvent.KEYCODE_PAGE_UP -> {
                 Log.d("KeyCodeTest", "Página Arriba presionada")
-
+                mostarpélis()
                 true
             }
 
             KeyEvent.KEYCODE_PAGE_DOWN -> {
                 Log.d("KeyCodeTest", "Página Abajo presionada")
-
+                mostarpélis()
                 true
             }
 
@@ -228,25 +228,25 @@ class PlayerActivity : AppCompatActivity() {
         return when (keyCode) {
             KeyEvent.KEYCODE_MENU -> {
                 Log.d("KeyCodeTest", "Menu presionado")
-
+                mostarpélis()
                 true
             }
 
             KeyEvent.KEYCODE_PAGE_UP -> {
                 Log.d("KeyCodeTest", "Página Arriba liberada")
-
+                mostarpélis()
                 true
             }
 
             KeyEvent.KEYCODE_PAGE_DOWN -> {
                 Log.d("KeyCodeTest", "Página Abajo liberada")
-
+                mostarpélis()
                 true
             }
 
             174 -> { // Código del botón del control remoto
                 Log.d("KeyCodeTest", "Botón del control remoto (174) liberado")
-
+                mostarpélis()
                 true
             }
 
