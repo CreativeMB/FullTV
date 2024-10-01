@@ -70,13 +70,13 @@ class MainFragment : BrowseSupportFragment() {
             ocultarCarga()
 
             if (peliculasActivas.isNotEmpty()) {
-                agregarALista(peliculasActivas, "Películas Activas")
+                agregarALista(peliculasActivas, "Películas Pagadas")
             } else {
-                agregarALista(emptyList(), "No hay Películas Activas")
+                agregarALista(emptyList(), "No hay Películas")
             }
 
             if (peliculasInactivas.isNotEmpty()) {
-                agregarALista(peliculasInactivas, "Películas Inactivas")
+                agregarALista(peliculasInactivas, "Películas por Donar")
             } else {
                 agregarALista(emptyList(), "No hay Películas Inactivas")
             }
