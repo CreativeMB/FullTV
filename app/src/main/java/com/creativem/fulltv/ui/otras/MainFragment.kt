@@ -2,7 +2,12 @@ package com.creativem.fulltv.ui.otras
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.leanback.app.BrowseSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
@@ -19,22 +24,50 @@ import kotlinx.coroutines.launch
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
     private val firestoreRepository = FirestoreRepository()
+    private lateinit var progressBar: ProgressBar
+    private lateinit var loadingText: TextView
+    private lateinit var loadingContainer: FrameLayout
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        // Inflar el layout de BrowseSupportFragment
+        val view = super.onCreateView(inflater, container, savedInstanceState)
+
+        // Inflar el layout de carga
+        loadingContainer = inflater.inflate(R.layout.loading_overlay, container, false) as FrameLayout
+        progressBar = loadingContainer.findViewById(R.id.progressBar)
+        loadingText = loadingContainer.findViewById(R.id.loadingText)
+
+        // Agregar la vista de carga como superpuesta
+        (view as? ViewGroup)?.addView(loadingContainer)
+
+        return view
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Cambiar el color de fondo de toda la pantalla (fondo detrás de las categorías)
-        view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.tu_color_fondo))
+        // Cambiar el color de fondo de toda la pantalla
+        view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.tu_color_fondo)) // Reemplaza con tu color
 
         // Configurar el adaptador
-        adapter = rowsAdapter// Configura el color de la barra de cabecera
+        adapter = rowsAdapter
 
         cargarPeliculas()
     }
 
     private fun cargarPeliculas() {
+        // Mostrar la vista de carga
+        mostrarCarga("Actualizando biblioteca en linea...")
+
         CoroutineScope(Dispatchers.Main).launch {
-            val (peliculasActivas, peliculasInactivas) = firestoreRepository.obtenerPeliculas()
+            val (peliculasActivas, peliculasInactivas) = firestoreRepository.obtenerPeliculas() // Asegúrate de que la función esté implementada correctamente
+
+            // Ocultar la vista de carga una vez que se cargan los datos
+            ocultarCarga()
 
             if (peliculasActivas.isNotEmpty()) {
                 agregarALista(peliculasActivas, "Películas Activas")
@@ -60,10 +93,19 @@ class MainFragment : BrowseSupportFragment() {
     }
 
     private fun agregarALista(movies: List<Movie>, titulo: String) {
-        val cardPresenter = CardPresenter()
+        val cardPresenter = CardPresenter() // Asegúrate de que CardPresenter esté implementado
         val listRowAdapter = ArrayObjectAdapter(cardPresenter)
         listRowAdapter.addAll(0, movies)
         val headerItem = HeaderItem(0, titulo)
         rowsAdapter.add(ListRow(headerItem, listRowAdapter))
+    }
+
+    private fun mostrarCarga(mensaje: String = "Cargando...") {
+        loadingText.text = mensaje
+        loadingContainer.visibility = View.VISIBLE
+    }
+
+    private fun ocultarCarga() {
+        loadingContainer.visibility = View.GONE
     }
 }
