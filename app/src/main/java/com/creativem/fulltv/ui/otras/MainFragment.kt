@@ -1,10 +1,12 @@
 package com.creativem.fulltv.ui.otras
 
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -26,6 +28,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.core.view.WindowCompat
 
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -51,7 +54,7 @@ class MainFragment : BrowseSupportFragment() {
             inflater.inflate(R.layout.loading_overlay, container, false) as FrameLayout
         progressBar = loadingContainer.findViewById(R.id.progressBar)
         loadingText = loadingContainer.findViewById(R.id.loadingText)
-
+        requireActivity().window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         // Agregar la vista de carga como superpuesta
         (view as? ViewGroup)?.addView(loadingContainer)
 
@@ -61,7 +64,6 @@ class MainFragment : BrowseSupportFragment() {
         relojCuston.startClock()
         return view
     }
-
 
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -79,6 +81,7 @@ class MainFragment : BrowseSupportFragment() {
         adapter = rowsAdapter
 
         cargarPeliculas()
+
     }
 
     private fun cargarPeliculas() {

@@ -17,7 +17,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|end"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="1dp"
         android:layout_marginEnd="20dp"
         android:orientation="horizontal">
 
@@ -26,7 +26,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="TextView"
-            android:layout_marginEnd="8dp"
+            android:layout_marginEnd="10dp"
             android:textColor="@color/lb_tv_white"
             android:textSize="22sp" />
 
@@ -34,6 +34,7 @@
             android:id="@+id/textHora"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginEnd="5dp"
             android:text="TextView"
             android:textSize="22sp" />
     </LinearLayout>
