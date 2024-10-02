@@ -30,8 +30,6 @@
     <color name="exo_disabled_button_color">#9E9E9E</color> <!-- Botones deshabilitados (gris claro) -->
     <color name="exo_button_pressed_color">#FF5722</color> <!-- Color del botón al ser presionado (naranja oscuro) -->
 
-
-
     <color name="exo_button_color">#D50000</color> <!-- color botones -->
     <color name="colorNormal">#00C51162</color> <!-- Color por defecto -->
     <color name="colorPressed">#FFD600</color> <!-- Color al presionar -->

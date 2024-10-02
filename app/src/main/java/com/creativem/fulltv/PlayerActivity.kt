@@ -223,6 +223,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun startMoviePlayback(streamUrl: String) {
         val intent = Intent(this, PlayerActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         intent.putExtra(
             "EXTRA_STREAM_URL",
             streamUrl

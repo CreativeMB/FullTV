@@ -67,7 +67,6 @@
                     android:textStyle="bold"
                     android:textColor="@color/exo_button_color"/>
             </LinearLayout>
-
             <!-- Espacio vacío para centrar el botón de Play/Pause -->
             <Space
                 android:layout_width="0dp"
@@ -135,7 +134,6 @@
                     android:src="@drawable/ic_settings"
                     android:stateListAnimator="@animator/exo_button_state_animator"
                     android:tint="@color/exo_button_color" />
-
 
             </LinearLayout>
 
