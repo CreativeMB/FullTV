@@ -35,7 +35,11 @@ class FirestoreRepository {
                 }
             }
 
-            Pair(peliculasValidas, peliculasInvalidas) // Retorna un par de listas
+            // Ordenar las listas por fecha de publicación (createdAt)
+            val peliculasOrdenadasValidas = peliculasValidas.sortedByDescending { it.createdAt }
+            val peliculasOrdenadasInvalidas = peliculasInvalidas.sortedByDescending { it.createdAt }
+
+            Pair(peliculasOrdenadasValidas, peliculasOrdenadasInvalidas) // Retorna un par de listas
         } catch (e: Exception) {
             e.printStackTrace()
             Pair(emptyList(), emptyList()) // Retorna listas vacías en caso de error

@@ -16,10 +16,16 @@ import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
 import com.creativem.fulltv.PlayerActivity
 import com.creativem.fulltv.R
+import com.creativem.fulltv.databinding.MainFragmentBinding
 import com.creativem.fulltv.ui.data.Movie
+import com.creativem.fulltv.ui.data.RelojCuston
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -27,6 +33,9 @@ class MainFragment : BrowseSupportFragment() {
     private lateinit var progressBar: ProgressBar
     private lateinit var loadingText: TextView
     private lateinit var loadingContainer: FrameLayout
+    private lateinit var relojhora: RelojCuston
+    private lateinit var binding: MainFragmentBinding
+    private val relojScope = CoroutineScope(Dispatchers.Main)
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -36,22 +45,35 @@ class MainFragment : BrowseSupportFragment() {
         // Inflar el layout de BrowseSupportFragment
         val view = super.onCreateView(inflater, container, savedInstanceState)
 
+        binding = MainFragmentBinding.bind(requireActivity().findViewById(R.id.main))
         // Inflar el layout de carga
-        loadingContainer = inflater.inflate(R.layout.loading_overlay, container, false) as FrameLayout
+        loadingContainer =
+            inflater.inflate(R.layout.loading_overlay, container, false) as FrameLayout
         progressBar = loadingContainer.findViewById(R.id.progressBar)
         loadingText = loadingContainer.findViewById(R.id.loadingText)
 
         // Agregar la vista de carga como superpuesta
         (view as? ViewGroup)?.addView(loadingContainer)
 
+        val textHora = binding.textHora
+        val textfecha = binding.textfecha
+        val relojCuston = RelojCuston(textHora, textfecha)
+        relojCuston.startClock()
         return view
     }
+
+
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         // Cambiar el color de fondo de toda la pantalla
-        view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.tu_color_fondo)) // Reemplaza con tu color
+        view.setBackgroundColor(
+            ContextCompat.getColor(
+                requireContext(),
+                R.color.tu_color_fondo
+            )
+        ) // Reemplaza con tu color
 
         // Configurar el adaptador
         adapter = rowsAdapter
@@ -84,7 +106,10 @@ class MainFragment : BrowseSupportFragment() {
             setOnItemViewClickedListener { _, item, _, _ ->
                 if (item is Movie) {
                     val intent = Intent(context, PlayerActivity::class.java)
-                    intent.putParcelableArrayListExtra("movies", ArrayList(if (item.isActive) peliculasActivas else peliculasInactivas))
+                    intent.putParcelableArrayListExtra(
+                        "movies",
+                        ArrayList(if (item.isActive) peliculasActivas else peliculasInactivas)
+                    )
                     intent.putExtra("EXTRA_STREAM_URL", item.streamUrl)
                     startActivity(intent)
                 }

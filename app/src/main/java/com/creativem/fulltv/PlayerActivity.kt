@@ -11,7 +11,6 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageButton
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 
 import androidx.appcompat.app.AppCompatActivity
@@ -21,28 +20,21 @@ import androidx.media3.common.PlaybackException
 
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
-import androidx.media3.ui.PlayerView
-import com.google.android.material.snackbar.Snackbar
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.fulltv.databinding.ActivityPlayerBinding
 import com.creativem.fulltv.ui.data.Movie
+import com.creativem.fulltv.ui.data.RelojCuston
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
-import kotlin.math.log
-import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -54,12 +46,11 @@ class PlayerActivity : AppCompatActivity() {
     private var player: ExoPlayer? = null
     private var streamUrl: String = ""
     private var isLiveStream = false
-
     private lateinit var binding: ActivityPlayerBinding
     private lateinit var adapter: MoviesMenuAdapter
     private lateinit var moviesCollection: CollectionReference
     private lateinit var firestore: FirebaseFirestore
-
+    private lateinit var relojhora: RelojCuston
 
     private var reconnectionAttempts = 0 // Contador de intentos de reconexión
     private val maxReconnectionAttempts = 5 // Máximo de intentos permitidos
@@ -79,9 +70,16 @@ class PlayerActivity : AppCompatActivity() {
             showErrorDialog("No se recibió la URL de streaming.")
             return
         }
+        val textHora = binding.textHora
+        val textfecha = binding.textfecha
+        val relojCuston = RelojCuston(textHora, textfecha)
+        relojCuston.startClock()
+
         firestore = Firebase.firestore
         // Inicializa el RecyclerView
         initializeRecyclerView()
+        // Inicializa el SeekBar desde el binding
+
         player = ExoPlayer.Builder(this).build()
         binding.reproductor.player = player
         initializePlayer()
@@ -92,12 +90,13 @@ class PlayerActivity : AppCompatActivity() {
         }
         // Cargar películas de Firestore
         loadMoviesFromFirestore()
-
     }
+
 
     private fun mostarpélis() {
         Log.e("PlayerActivity", "clki menupelis")
-        binding.recyclerViewMovies.visibility = if (binding.recyclerViewMovies.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        binding.recyclerViewMovies.visibility =
+            if (binding.recyclerViewMovies.visibility == View.VISIBLE) View.GONE else View.VISIBLE
     }
 
     private fun loadMoviesFromFirestore() {
@@ -105,7 +104,8 @@ class PlayerActivity : AppCompatActivity() {
             .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snapshot ->
-                val movies = mutableListOf<Movie>() // Crear una lista temporal para almacenar las películas
+                val movies =
+                    mutableListOf<Movie>() // Crear una lista temporal para almacenar las películas
 
                 // Cargar las películas
                 val jobs = snapshot.documents.map { document ->
@@ -137,6 +137,7 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
     }
+
     // Cambia la función isUrlValid para que sea suspend
     private suspend fun isUrlValid(url: String): Boolean {
         val client = OkHttpClient()
@@ -162,7 +163,10 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun startMoviePlayback(streamUrl: String) {
         val intent = Intent(this, PlayerActivity::class.java)
-        intent.putExtra("EXTRA_STREAM_URL", streamUrl) // Asegúrate de usar el mismo nombre clave que usas en VideoPlayerActivity
+        intent.putExtra(
+            "EXTRA_STREAM_URL",
+            streamUrl
+        ) // Asegúrate de usar el mismo nombre clave que usas en VideoPlayerActivity
         startActivity(intent)
     }
 
@@ -190,9 +194,11 @@ class PlayerActivity : AppCompatActivity() {
                 exoPlayer.prepare()
 
                 // Ajusta el comportamiento de la reproducción según sea necesario
-                exoPlayer.playWhenReady = false // Inicia la reproducción al tocar un botón o un evento específico
+                exoPlayer.playWhenReady =
+                    false // Inicia la reproducción al tocar un botón o un evento específico
             }
     }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
         return when (keyCode) {
@@ -223,45 +229,18 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-//    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-//        Log.d("KeyCodeTest", "Tecla liberada: $keyCode")
-//        return when (keyCode) {
-//            KeyEvent.KEYCODE_MENU -> {
-//                Log.d("KeyCodeTest", "Menu presionado")
-//                mostarpélis()
-//                true
-//            }
-//
-//            KeyEvent.KEYCODE_PAGE_UP -> {
-//                Log.d("KeyCodeTest", "Página Arriba liberada")
-//                mostarpélis()
-//                true
-//            }
-//
-//            KeyEvent.KEYCODE_PAGE_DOWN -> {
-//                Log.d("KeyCodeTest", "Página Abajo liberada")
-//                mostarpélis()
-//                true
-//            }
-//
-//            174 -> { // Código del botón del control remoto
-//                Log.d("KeyCodeTest", "Botón del control remoto (174) liberado")
-//                mostarpélis()
-//                true
-//            }
-//
-//            else -> super.onKeyUp(keyCode, event)
-//        }
-//    }
-//
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
-                Player.STATE_BUFFERING -> Log.d("PlayerActivity", "Reproductor almacenando en búfer...")
+                Player.STATE_BUFFERING -> Log.d(
+                    "PlayerActivity",
+                    "Reproductor almacenando en búfer..."
+                )
 
                 Player.STATE_READY -> {
                     Log.d("PlayerActivity", "Reproductor listo. Reproduciendo...")
-                    reconnectionAttempts = 0 // Reiniciar contador si está reproduciendo correctamente
+                    reconnectionAttempts =
+                        0 // Reiniciar contador si está reproduciendo correctamente
                 }
 
                 Player.STATE_ENDED -> {
@@ -288,7 +267,10 @@ class PlayerActivity : AppCompatActivity() {
             reconnectionAttempts++
             reconnectLiveStream()
         } else {
-            Log.d("PlayerActivity", "Máximo número de intentos alcanzado. Mostrando diálogo de error.")
+            Log.d(
+                "PlayerActivity",
+                "Máximo número de intentos alcanzado. Mostrando diálogo de error."
+            )
             showErrorDialog("No se pudo reconectar al stream.")
         }
     }
@@ -314,10 +296,9 @@ class PlayerActivity : AppCompatActivity() {
                         "Cada contribución cuenta para que sigamos ofreciendo este servicio! ¡Haz tu donación ahora y vuelve a disfrutar de lo que te gusta!\n" +
                         "\nReporte de donacion al WhatsApp(3028667672)"
             )
-            .setPositiveButton("Volver al contenido") { _, _ ->
-                val intent = Intent(this, MoviesPrincipal::class.java)
-                startActivity(intent)
-                finish()
+            .setPositiveButton("Volver al contenido") { dialog, _ ->
+                dialog.dismiss() // Cierra el diálogo
+                onBackPressed() // Simula el botón de retroceso en lugar de terminar la actividad
             }
             .setNeutralButton("Donar") { _, _ ->
                 val donationUrl = "https://www.floristerialoslirios.com/"
@@ -346,6 +327,7 @@ class PlayerActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         releasePlayer()
+
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -367,6 +349,7 @@ class PlayerActivity : AppCompatActivity() {
                     )
         }
     }
+
     override fun onBackPressed() {
         // Si el GridView es visible, simplemente ocultarlo
         if (binding.recyclerViewMovies.visibility == View.VISIBLE) {
@@ -375,13 +358,4 @@ class PlayerActivity : AppCompatActivity() {
             super.onBackPressed() // Llama al comportamiento predeterminado
         }
     }
-   /* override fun onBackPressed() {
-        super.onBackPressed()
-        // Redirige a MoviesPrincipal
-        val intent = Intent(this, MoviesPrincipal::class.java)
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-        startActivity(intent)
-        finish() // Opcional: Cierra la actividad actual
-    }*/
-
 }
