@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Fondo para los controles -->
+    <View
+        android:id="@id/exo_controls_background"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#00000000" />
+
+    <!-- Controles de la barra inferior -->
+    <FrameLayout
+        android:id="@+id/controles_reproductor"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#320091EA"
+        android:padding="8dp">
+
+        <!-- Placeholder para la barra de progreso -->
+        <SeekBar
+            android:id="@+id/progreso"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/button_selector"
+            android:max="100"
+            android:layout_marginBottom="8dp"
+            android:tint="@color/exo_button_color"/>
+
+        <!-- Controles básicos en un LinearLayout horizontal -->
+        <LinearLayout
+            android:id="@id/exo_basic_controls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:padding="20dp"
+            android:orientation="horizontal"
+            android:layout_gravity="bottom">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tiemporeproducido"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="30dp"
+                    android:text="0:00"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="20dp"
+                    android:textColor="@color/exo_button_color" />
+
+                <Space
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/tiempototal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="30dp"
+                    android:text="-0:00"
+                    android:textStyle="bold"
+                    android:textColor="@color/exo_button_color"/>
+            </LinearLayout>
+
+            <!-- Espacio vacío para centrar el botón de Play/Pause -->
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+            <ImageButton
+                android:id="@id/home"
+                android:layout_width="70dp"
+                android:layout_height="70dp"
+                android:scaleType="fitCenter"
+                android:layout_marginEnd="20dp"
+                android:background="@drawable/button_selector"
+                android:contentDescription="@string/exo_shuffle"
+                android:src="@drawable/home"
+                android:stateListAnimator="@animator/exo_button_state_animator"
+                android:tint="@color/exo_button_color" />
+            <!-- Botón de Play/Pause en el centro -->
+            <ImageButton
+                android:id="@id/play_pause"
+                android:layout_width="70dp"
+                android:layout_height="70dp"
+                android:scaleType="fitCenter"
+                android:layout_marginEnd="25dp"
+                android:background="@drawable/button_selector"
+                android:contentDescription="@string/exo_play_pause"
+                android:src="@drawable/ic_play"
+                android:stateListAnimator="@animator/exo_button_state_animator"
+                android:tint="@color/exo_button_color" />
+
+                        <!-- Botones a la derecha -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <ImageButton
+                    android:id="@id/lista_pelis"
+                    android:layout_width="70dp"
+                    android:layout_height="70dp"
+                    android:scaleType="fitCenter"
+                    android:background="@drawable/button_selector"
+                    android:contentDescription="@string/exo_controls_lista_pelis"
+                    android:src="@drawable/pelis_menu"
+                    android:stateListAnimator="@animator/exo_button_state_animator"
+                    android:tint="@color/exo_button_color" />
+
+                <ImageButton
+                    android:id="@id/render"
+                    android:layout_width="70dp"
+                    android:layout_height="70dp"
+                    android:scaleType="fitCenter"
+                    android:background="@drawable/button_selector"
+                    android:contentDescription="@string/exo_fullscreen"
+                    android:src="@drawable/ic_render"
+                    android:stateListAnimator="@animator/exo_button_state_animator"
+                    android:tint="@color/exo_button_color" />
+
+                <ImageButton
+                    android:id="@id/settings"
+                    android:layout_width="70dp"
+                    android:layout_height="70dp"
+                    android:scaleType="fitCenter"
+                    android:background="@drawable/button_selector"
+                    android:contentDescription="@string/exo_settings"
+                    android:src="@drawable/ic_settings"
+                    android:stateListAnimator="@animator/exo_button_state_animator"
+                    android:tint="@color/exo_button_color" />
+
+
+            </LinearLayout>
+
+        </LinearLayout>
+    </FrameLayout>
+
+</merge>

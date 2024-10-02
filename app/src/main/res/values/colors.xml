@@ -20,4 +20,21 @@
     <color name="textColorPrimary">#FFFFFF</color> <!-- Color de texto principal -->
     <color name="textColorSecondary">#BB86FC</color> <!-- Color de texto secundario -->
 
+    <!-- Colores principales de la aplicación -->
+    <color name="exo_bottom_bar_background">#212121</color> <!-- Fondo oscuro de la barra inferior -->
+    <color name="exo_button_highlight">#FFEB3B</color> <!-- Color de resaltado cuando se selecciona un botón (amarillo) -->
+    <color name="exo_black_opacity_60">#99000000</color> <!-- Negro con 60% de opacidad para algunos fondos -->
+
+    <!-- Colores adicionales -->
+    <color name="exo_progress_color">#FF9800</color> <!-- Color para la barra de progreso (naranja) -->
+    <color name="exo_disabled_button_color">#9E9E9E</color> <!-- Botones deshabilitados (gris claro) -->
+    <color name="exo_button_pressed_color">#FF5722</color> <!-- Color del botón al ser presionado (naranja oscuro) -->
+
+
+
+    <color name="exo_button_color">#D50000</color> <!-- color botones -->
+    <color name="colorNormal">#00C51162</color> <!-- Color por defecto -->
+    <color name="colorPressed">#FFD600</color> <!-- Color al presionar -->
+    <color name="colorFocused">#DB00B8D4</color> <!-- Color al enfocar -->
+
 </resources>

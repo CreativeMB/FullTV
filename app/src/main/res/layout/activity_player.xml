@@ -8,9 +8,9 @@
         android:id="@+id/reproductor"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:controller_layout_id="@layout/custom_player_controls"
+        android:background="@color/negro"
         app:resize_mode="fill">
-
+        <include layout="@layout/controles_reproductor"/>
     </androidx.media3.ui.PlayerView>
 
     <TextView
@@ -43,5 +43,6 @@
         android:layout_gravity="center_horizontal|start"
         android:clipToPadding="false"
         android:visibility="invisible" />
+
 
 </FrameLayout>

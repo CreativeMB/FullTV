@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <item name="exo_lista_pelis" type="id"/>
-    <item name="exo_settings" type="id"/>
+    <item name="play_pause" type="id"/>
+    <item name="lista_pelis" type="id"/>
+    <item name="home" type="id"/>
+    <item name="settings" type="id"/>
+    <item name="render" type="id"/>
+
 </resources>

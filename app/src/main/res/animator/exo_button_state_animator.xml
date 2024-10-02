@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Estado presionado (cuando se hace clic en el botón) -->
+    <item android:state_pressed="true">
+        <set>
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:valueFrom="1.0"
+                android:valueTo="1.1"
+                android:duration="200" />
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:valueFrom="1.0"
+                android:valueTo="1.1"
+                android:duration="200" />
+        </set>
+    </item>
+
+    <!-- Estado normal (cuando no se presiona el botón) -->
+    <item>
+        <set>
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:valueFrom="1.1"
+                android:valueTo="1.0"
+                android:duration="200" />
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:valueFrom="1.1"
+                android:valueTo="1.0"
+                android:duration="200" />
+        </set>
+    </item>
+</selector>

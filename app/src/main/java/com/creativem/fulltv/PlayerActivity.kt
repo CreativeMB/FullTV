@@ -5,12 +5,18 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageButton
+import android.widget.PopupMenu
+import android.widget.SeekBar
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 
 import androidx.appcompat.app.AppCompatActivity
@@ -22,6 +28,8 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.fulltv.databinding.ActivityPlayerBinding
 import com.creativem.fulltv.ui.data.Movie
@@ -39,7 +47,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import java.io.IOException
-
+import android.text.format.DateUtils
 
 class PlayerActivity : AppCompatActivity() {
     //    private lateinit var playerView: PlayerView
@@ -51,15 +59,17 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var moviesCollection: CollectionReference
     private lateinit var firestore: FirebaseFirestore
     private lateinit var relojhora: RelojCuston
-
     private var reconnectionAttempts = 0 // Contador de intentos de reconexión
     private val maxReconnectionAttempts = 5 // Máximo de intentos permitidos
+    private lateinit var handler: Handler
+    private lateinit var runnable: Runnable
+    private val hideControlsDelay: Long = 10000 // 10 segundos
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
+        binding.reproductor.useController = false
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -83,17 +93,67 @@ class PlayerActivity : AppCompatActivity() {
         player = ExoPlayer.Builder(this).build()
         binding.reproductor.player = player
         initializePlayer()
-        val menupelis = binding.reproductor.findViewById<ImageButton>(R.id.exo_lista_pelis)
+
+        val menupelis = binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis)
         menupelis.setOnClickListener {
             mostarpélis()
 
+                    }
+        // Referencias a los botones
+
+        // Botón Play/Pause
+        val playPauseButton: ImageButton = findViewById(R.id.play_pause)
+        playPauseButton.setOnClickListener {
+            togglePlayPause()
         }
+
+        // Botón Shuffle
+        val shuffleButton: ImageButton = findViewById(R.id.home)
+        shuffleButton.setOnClickListener {
+            finish()
+        }
+
+        // Botón Pantalla Completa
+        val renderButton: ImageButton = findViewById(R.id.render)
+        renderButton.setOnClickListener {
+            cycleAspectRatio()
+        }
+
+        val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
+        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val duration = player?.duration ?: 1
+                    val newPosition = (progress / 100.0 * duration).toLong()
+                    player?.seekTo(newPosition)
+                    seekBar?.progress = progress // Actualización de la SeekBar
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                player?.pause()
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                player?.playWhenReady = true
+            }
+        })
         // Cargar películas de Firestore
         loadMoviesFromFirestore()
+
+        handler = Handler(Looper.getMainLooper())
+        runnable = Runnable {
+            hideControls()
+        }
+
+        binding.reproductor.setOnTouchListener { _, _ ->
+            showControlsAndResetTimer()
+            true
+        }
+        showControlsAndResetTimer() // Mostrar controles al inicio
     }
 
-
-    private fun mostarpélis() {
+      private fun mostarpélis() {
         Log.e("PlayerActivity", "clki menupelis")
         binding.recyclerViewMovies.visibility =
             if (binding.recyclerViewMovies.visibility == View.VISIBLE) View.GONE else View.VISIBLE
@@ -169,8 +229,7 @@ class PlayerActivity : AppCompatActivity() {
         ) // Asegúrate de usar el mismo nombre clave que usas en VideoPlayerActivity
         startActivity(intent)
     }
-
-    @SuppressLint("UnsafeOptInUsageError")
+       @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
         // Configura el LoadControl
         val loadControl = DefaultLoadControl.Builder()
@@ -200,6 +259,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        showControlsAndResetTimer()
         Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
         return when (keyCode) {
             KeyEvent.KEYCODE_MENU -> {
@@ -232,27 +292,39 @@ class PlayerActivity : AppCompatActivity() {
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
-                Player.STATE_BUFFERING -> Log.d(
-                    "PlayerActivity",
-                    "Reproductor almacenando en búfer..."
-                )
+                Player.STATE_BUFFERING -> {
+                    Log.d("PlayerActivity", "Reproductor almacenando en búfer...")
+                    // Puedes mostrar un indicador de carga aquí si lo necesitas
+                }
 
                 Player.STATE_READY -> {
                     Log.d("PlayerActivity", "Reproductor listo. Reproduciendo...")
-                    reconnectionAttempts =
-                        0 // Reiniciar contador si está reproduciendo correctamente
+                    reconnectionAttempts = 0 // Reiniciar contador de reconexión
+                    actualizarTiempo() // Actualizar tiempo al inicio
                 }
 
                 Player.STATE_ENDED -> {
-                    Log.d("PlayerActivity", "Reproducción finalizada. Intentando reconectar...")
-                    attemptReconnection()
+                    Log.d("PlayerActivity", "Reproducción finalizada.")
+                    if (isLiveStream) {
+                        // Intentar reconexión solo si es una transmisión en vivo
+                        attemptReconnection()
+                    } else {
+                        // Si no es en vivo, puedes manejar el fin de la reproducción
+                        // por ejemplo, reproducir el siguiente video, mostrar un mensaje, etc.
+                    }
                 }
 
                 Player.STATE_IDLE -> {
-                    Log.d("PlayerActivity", "Reproductor inactivo. Intentando reconectar...")
-                    attemptReconnection()
+                    Log.d("PlayerActivity", "Reproductor inactivo.")
+                    if (isLiveStream) {
+                        attemptReconnection()
+                    }
                 }
             }
+        }
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            super.onIsPlayingChanged(isPlaying)
+            actualizarTiempo()
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -323,7 +395,6 @@ class PlayerActivity : AppCompatActivity() {
         player?.release()
         player = null
     }
-
     override fun onDestroy() {
         super.onDestroy()
         releasePlayer()
@@ -359,4 +430,85 @@ class PlayerActivity : AppCompatActivity() {
             finish()
         }
     }
+    private fun showControlsAndResetTimer() {
+        binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.VISIBLE
+        // Reinicia el temporizador
+        handler.removeCallbacks(runnable)
+        handler.postDelayed(runnable, hideControlsDelay)
+    }
+
+    private fun hideControls() {
+        binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.GONE
+    }
+
+    // Funciones para cada acción de los botones
+    private var isPlaying = false
+    private var isShuffleEnabled = false
+    private var isRepeatEnabled = false
+    private var isSubtitlesEnabled = false
+    private var isFullscreen = false
+    // Inicializa el ExoPlayer en onCreate o cuando sea necesario
+     // Función para reproducir o pausar el video
+    private fun togglePlayPause() {
+        val player = binding.reproductor.player // Accede al reproductor desde PlayerView
+
+        if (player != null) {
+            if (player.isPlaying) {
+                player.pause()
+            } else {
+                player.play()
+            }
+        }
+    }
+
+    // Función para activar o desactivar el modo Shuffle
+    private fun toggleShuffle() {
+//        isShuffleEnabled = !isShuffleEnabled
+//        player.shuffleModeEnabled = isShuffleEnabled // Cambia el estado del modo shuffle
+    }
+
+
+    // Función para alternar entre pantalla completa y vista normal
+    private var currentAspectRatioMode = 0
+    private fun cycleAspectRatio() {
+        val playerView = binding.reproductor
+        val aspectRatios = listOf(
+            AspectRatioFrameLayout.RESIZE_MODE_FIT,
+            AspectRatioFrameLayout.RESIZE_MODE_FILL,
+            AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            // Puedes agregar otros modos de AspectRatioFrameLayout si lo necesitas
+        )
+        currentAspectRatioMode = (currentAspectRatioMode + 1) % aspectRatios.size
+        playerView.resizeMode = aspectRatios[currentAspectRatioMode]
+    }
+
+    // Función para mostrar opciones adicionales
+    private fun showOverflowOptions() {
+        // Aquí puedes implementar un PopupMenu, DialogFragment o lo que necesites para mostrar las opciones adicionales
+//        val popup = PopupMenu(this, findViewById(R.id.exo_overflow_show))
+//        popup.menuInflater.inflate(R.menu.overflow_menu, popup.menu)
+//        popup.show()
+    }
+
+    // Función para ocultar las opciones adicionales
+    private fun hideOverflowOptions() {
+        // Lógica para ocultar las opciones adicionales
+        // Por ejemplo, cerrar un PopupMenu o DialogFragment
+    }
+    private fun actualizarTiempo() {
+        handler.post { // Ejecuta la actualización en el hilo principal
+            val tiemporeproducido = binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido)
+            val tiempototal = binding.reproductor.findViewById<TextView>(R.id.tiempototal)
+            val posicionActual = player?.currentPosition ?: 0
+            val duracionTotal = player?.duration ?: 0
+
+            tiemporeproducido.text = tiempoFormateado(posicionActual)
+            tiempototal.text = tiempoFormateado(duracionTotal)
+        }
+    }
+
+    private fun tiempoFormateado(tiempoMs: Long): String {
+        return DateUtils.formatElapsedTime(tiempoMs / 1000)
+    }
 }
+

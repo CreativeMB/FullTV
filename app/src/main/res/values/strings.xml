@@ -1,4 +1,20 @@
 <resources>
     <string name="app_name">CineFlex</string>
-    <string name="exo_controls_lista_pelis">lista de peliculas</string>
+       <!-- Descripción de los botones en el control de la interfaz -->
+    <string name="exo_controls_lista_pelis">Lista de Películas</string>
+    <string name="exo_vr">Modo VR</string>
+    <string name="exo_shuffle">Modo Aleatorio</string>
+    <string name="exo_repeat_toggle">Repetir</string>
+    <string name="exo_subtitle">Subtítulos</string>
+    <string name="exo_settings">Configuración</string>
+    <string name="exo_fullscreen">Pantalla Completa</string>
+    <string name="exo_overflow_show">Mostrar Opciones</string>
+    <string name="exo_overflow_hide">Ocultar Opciones</string>
+    <string name="exo_rewind">rewind</string>
+    <string name="exo_play_pause">Pause</string>
+    <string name="exo_fast_forward">forward</string>
+
+    <!-- Otros posibles strings -->
+    <string name="exo_ffwd">Avanzar</string>
+    <string name="exo_download_removing">Eliminando Descarga</string>
 </resources>
