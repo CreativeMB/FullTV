@@ -355,7 +355,8 @@ class PlayerActivity : AppCompatActivity() {
         if (binding.recyclerViewMovies.visibility == View.VISIBLE) {
             binding.recyclerViewMovies.visibility = View.GONE
         } else {
-            super.onBackPressed() // Llama al comportamiento predeterminado
+            // Finaliza la actividad al presionar "atrás"
+            finish()
         }
     }
 }

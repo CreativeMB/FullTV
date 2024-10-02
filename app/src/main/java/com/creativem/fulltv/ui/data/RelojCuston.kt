@@ -20,7 +20,7 @@ class RelojCuston(private val textViewHora: TextView, private val textViewFecha:
     fun startClock() {
         clockScope.launch {
             while (true) {
-                val fecha = SimpleDateFormat("EEEE dd-MM-yyyy", Locale.getDefault()).format(Date())
+                val fecha = SimpleDateFormat("EEEE dd-MM-yy", Locale.getDefault()).format(Date())
                 val horaActual = SimpleDateFormat("hh:mm aa", Locale.getDefault()).format(Date())
 
                 textViewHora.text = horaActual
