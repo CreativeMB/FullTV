@@ -37,6 +37,12 @@
             android:layout_marginEnd="5dp"
             android:text="TextView"
             android:textSize="22sp" />
+        <ImageView
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:background="@drawable/icono"
+            android:padding="20dp"
+            />
     </LinearLayout>
 
 

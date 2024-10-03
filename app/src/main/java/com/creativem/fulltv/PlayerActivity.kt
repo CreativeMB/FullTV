@@ -378,7 +378,7 @@ class PlayerActivity : AppCompatActivity() {
             .setMessage(
                 "Este contenido ha sido bloqueado temporalmente, pero con una donación voluntaria, puedes \"alquilar\" el acceso por un tiempo limitado.\n" +
                         "\n" +
-                        "Con tu ayuda, podremos restaurarlo en menos de 2 horas.\n" +
+                        "Con tu ayuda, podremos restaurarlo En breve.\n" +
                         "\n" +
                         "Cada contribución cuenta para que sigamos ofreciendo este servicio! ¡Haz tu donación ahora y vuelve a disfrutar de lo que te gusta!\n" +
                         "\nReporte de donacion al WhatsApp(3028667672)"

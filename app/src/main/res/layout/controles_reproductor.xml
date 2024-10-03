@@ -14,8 +14,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="#320091EA"
-        android:padding="8dp">
+        android:background="@color/colorBarra"
+        android:padding="1dp">
 
         <!-- Placeholder para la barra de progreso -->
         <SeekBar
@@ -25,8 +25,8 @@
             android:background="@drawable/button_selector"
             android:max="100"
             android:layout_marginBottom="8dp"
-            android:progressTint="@color/tu_color_estado"
-        android:thumbTint="@color/ic_banner_background" />
+            android:progressTint="@color/colorSeekBar"
+        android:thumbTint="@color/colorSeekBar1" />
 
         <!-- Controles básicos en un LinearLayout horizontal -->
         <LinearLayout
@@ -85,17 +85,7 @@
                 android:stateListAnimator="@animator/exo_button_state_animator"
                 android:tint="@color/exo_button_color" />
 
-            <ImageButton
-                android:id="@id/home"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:scaleType="fitCenter"
-                android:layout_marginEnd="20dp"
-                android:background="@drawable/button_selector"
-                android:contentDescription="@string/exo_shuffle"
-                android:src="@drawable/home"
-                android:stateListAnimator="@animator/exo_button_state_animator"
-                android:tint="@color/exo_button_color" />
+
             <!-- Botón de Play/Pause en el centro -->
             <ImageButton
                 android:id="@id/play_pause"
@@ -135,6 +125,16 @@
                     android:background="@drawable/button_selector"
                     android:contentDescription="@string/exo_settings"
                     android:src="@drawable/ic_settings"
+                    android:stateListAnimator="@animator/exo_button_state_animator"
+                    android:tint="@color/exo_button_color" />
+                <ImageButton
+                    android:id="@id/home"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:scaleType="fitCenter"
+                    android:layout_marginEnd="1dp"
+                    android:background="@drawable/icono"
+                    android:contentDescription="@string/exo_shuffle"
                     android:stateListAnimator="@animator/exo_button_state_animator"
                     android:tint="@color/exo_button_color" />
 
