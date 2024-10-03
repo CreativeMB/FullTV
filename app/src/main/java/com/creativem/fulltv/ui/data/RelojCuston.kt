@@ -20,12 +20,19 @@ class RelojCuston(private val textViewHora: TextView, private val textViewFecha:
     fun startClock() {
         clockScope.launch {
             while (true) {
+                // Formato de fecha con la primera letra en mayúscula
                 val fecha = SimpleDateFormat("EEEE dd-MM-yy", Locale.getDefault()).format(Date())
+                val fechaConMayuscula = fecha.substring(0, 1).uppercase() + fecha.substring(1)
+
+                // Formato de hora con AM/PM en mayúsculas
                 val horaActual = SimpleDateFormat("hh:mm aa", Locale.getDefault()).format(Date())
+                val horaConMayuscula = horaActual.replace("am", "AM").replace("pm", "PM")
 
-                textViewHora.text = horaActual
-                textViewFecha.text = fecha
+                // Asignar la hora y la fecha formateada a los TextViews
+                textViewHora.text = horaConMayuscula  // Ahora asignamos correctamente 'horaConMayuscula'
+                textViewFecha.text = fechaConMayuscula
 
+                // Retraso de 1 segundo (1000 milisegundos)
                 delay(1000)
             }
         }
