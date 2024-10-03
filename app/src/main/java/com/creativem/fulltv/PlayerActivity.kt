@@ -149,7 +149,7 @@ class PlayerActivity : AppCompatActivity() {
             true
         }
         showControlsAndResetTimer() // Mostrar controles al inicio
-
+        handler.postDelayed(runnableActualizar, updateInterval)
     }
 
     private fun mostarpélis() {
@@ -255,6 +255,7 @@ class PlayerActivity : AppCompatActivity() {
 
                 // Ajusta el comportamiento de la reproducción según sea necesario
                 exoPlayer.playWhenReady = false // Inicia la reproducción al tocar un botón o un evento específico
+
             }
 
     }
@@ -333,12 +334,10 @@ class PlayerActivity : AppCompatActivity() {
             Log.d("PlayerActivity", "onIsPlayingChanged - isPlaying: $isPlaying")
             super.onIsPlayingChanged(isPlaying)
             if (isPlaying) {
-                handler.postDelayed(runnableActualizar, updateInterval) // Programa la próxima actualización
                 handler.postDelayed(runnableOcultar, hideControlsDelay) // Programa la ocultación de los controles
                 Log.d("PlayerActivity", "Se programó la próxima actualización")
             } else {
-                handler.removeCallbacks(runnableActualizar)
-                handler.removeCallbacks(runnableOcultar)
+                handler.removeCallbacks(runnableOcultar) // Solo cancela la ocultación
                 Log.d("PlayerActivity", "Se canceló la próxima actualización")
             }
         }
@@ -511,6 +510,8 @@ class PlayerActivity : AppCompatActivity() {
                 val progress = (posicionActual.toFloat() / duracionTotal * 100).toInt()
                 seekBar.progress = progress // Actualiza la SeekBar
                 Log.d("PlayerActivity", "SeekBar progress: $progress")
+
+                handler.postDelayed(runnableActualizar, updateInterval)
             }
         }
     }
