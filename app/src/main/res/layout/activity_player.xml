@@ -9,6 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@color/negro"
+
         app:resize_mode="fill">
         <include layout="@layout/controles_reproductor"/>
     </androidx.media3.ui.PlayerView>
