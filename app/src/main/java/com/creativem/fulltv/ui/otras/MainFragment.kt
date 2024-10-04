@@ -80,6 +80,7 @@ class MainFragment : BrowseSupportFragment() {
         // Configurar el adaptador
         adapter = rowsAdapter
 
+
         cargarPeliculas()
 
     }
@@ -95,15 +96,15 @@ class MainFragment : BrowseSupportFragment() {
             ocultarCarga()
 
             if (peliculasActivas.isNotEmpty()) {
-                agregarALista(peliculasActivas, "Películas Pagadas")
+                agregarALista(peliculasActivas, "Disponible")
             } else {
-                agregarALista(emptyList(), "No hay Películas")
+                agregarALista(emptyList(), "No hay Disponible")
             }
 
             if (peliculasInactivas.isNotEmpty()) {
-                agregarALista(peliculasInactivas, "Películas por Donar")
+                agregarALista(peliculasInactivas, "Alquiler")
             } else {
-                agregarALista(emptyList(), "No hay Películas Inactivas")
+                agregarALista(emptyList(), "No hay Alquiler")
             }
 
             setOnItemViewClickedListener { _, item, _, _ ->

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<merge xmlns:android="http://schemas.android.com/apk/res/android">
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <!-- Fondo para los controles -->
     <View
@@ -26,7 +27,7 @@
             android:max="100"
             android:layout_marginBottom="8dp"
             android:progressTint="@color/colorSeekBar"
-        android:thumbTint="@color/colorSeekBar1" />
+            android:thumbTint="@color/colorSeekBar1" />
 
         <!-- Controles básicos en un LinearLayout horizontal -->
         <LinearLayout
@@ -66,40 +67,41 @@
                     android:textSize="30dp"
                     android:text="-0:00"
                     android:textStyle="bold"
-                    android:textColor="@color/exo_button_color"/>
+                    android:textColor="@color/exo_button_color" />
             </LinearLayout>
             <!-- Espacio vacío para centrar el botón de Play/Pause -->
             <Space
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1" />
+
             <ImageButton
                 android:id="@id/lista_pelis"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
                 android:scaleType="fitCenter"
                 android:layout_marginEnd="10dp"
                 android:background="@drawable/button_selector"
                 android:contentDescription="@string/exo_controls_lista_pelis"
                 android:src="@drawable/pelis_menu"
                 android:stateListAnimator="@animator/exo_button_state_animator"
-                android:tint="@color/exo_button_color" />
+                app:tint="@color/exo_button_color" />
 
 
             <!-- Botón de Play/Pause en el centro -->
             <ImageButton
                 android:id="@id/play_pause"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
                 android:scaleType="fitCenter"
                 android:layout_marginEnd="25dp"
                 android:background="@drawable/button_selector"
                 android:contentDescription="@string/exo_play_pause"
                 android:src="@drawable/ic_play"
                 android:stateListAnimator="@animator/exo_button_state_animator"
-                android:tint="@color/exo_button_color" />
+                app:tint="@color/exo_button_color" />
 
-                        <!-- Botones a la derecha -->
+            <!-- Botones a la derecha -->
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -108,35 +110,37 @@
 
                 <ImageButton
                     android:id="@id/render"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
                     android:scaleType="fitCenter"
                     android:background="@drawable/button_selector"
                     android:contentDescription="@string/exo_fullscreen"
                     android:src="@drawable/ic_render"
                     android:stateListAnimator="@animator/exo_button_state_animator"
-                    android:tint="@color/exo_button_color" />
+                    app:tint="@color/exo_button_color" />
 
                 <ImageButton
                     android:id="@id/settings"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
                     android:scaleType="fitCenter"
                     android:background="@drawable/button_selector"
                     android:contentDescription="@string/exo_settings"
                     android:src="@drawable/ic_settings"
                     android:stateListAnimator="@animator/exo_button_state_animator"
-                    android:tint="@color/exo_button_color" />
+                    app:tint="@color/exo_button_color" />
+
                 <ImageButton
                     android:id="@id/home"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
                     android:scaleType="fitCenter"
                     android:layout_marginEnd="1dp"
-                    android:background="@drawable/icono"
+                    android:background="@drawable/button_selector"
+                    android:src="@drawable/ic_cineflex"
                     android:contentDescription="@string/exo_shuffle"
                     android:stateListAnimator="@animator/exo_button_state_animator"
-                    android:tint="@color/exo_button_color" />
+                    app:tint="@color/exo_button_color" />
 
             </LinearLayout>
 

@@ -33,7 +33,7 @@
     <color name="exo_button_color">#FFFFFF</color> <!-- color botones -->
     <color name="colorNormal">#00C51162</color> <!-- Color por defecto -->
     <color name="colorPressed">#00BFA5</color> <!-- Color al presionar -->
-    <color name="colorFocused">#780091EA</color> <!-- Color al enfocar -->
+    <color name="colorFocused">#58FF6D00</color> <!-- Color al enfocar -->
     <color name="colorBarra">#5D000000</color> <!-- Color al barra -->
     <color name="colorSeekBar">#DD2C00</color> <!-- Color al transucrrido -->
     <color name="colorSeekBar1">#009EFF</color> <!-- Color al indicador -->

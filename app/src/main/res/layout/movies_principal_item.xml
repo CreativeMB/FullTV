@@ -23,7 +23,7 @@
             android:layout_height="200dp"
             android:contentDescription="Imagen de la película"
             android:scaleType="centerCrop"
-            android:src="@drawable/portada" />
+            android:src="@drawable/icono" />
 
         <TextView
             android:id="@+id/movie_title"

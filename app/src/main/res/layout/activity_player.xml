@@ -18,7 +18,7 @@
         android:id="@+id/textHora"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="35dp"
+        android:layout_marginEnd="25dp"
         android:layout_marginTop="1dp"
         android:textColor="@color/lb_tv_white"
         android:layout_gravity="top|end"

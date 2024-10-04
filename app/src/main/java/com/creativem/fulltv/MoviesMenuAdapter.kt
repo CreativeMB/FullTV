@@ -53,8 +53,8 @@ class MoviesMenuAdapter(
 
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
-            .placeholder(R.drawable.portada)
-            .error(R.drawable.portada)
+            .placeholder(R.drawable.icono)
+            .error(R.drawable.icono)
             .into(holder.movieImage)
 
         holder.itemView.setBackgroundColor(

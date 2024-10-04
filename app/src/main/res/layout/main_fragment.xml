@@ -6,6 +6,11 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".ui.otras.MainFragment">
+    <ImageView
+        android:id="@+id/mainBackgroundImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop" />
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/main_fragmen_view"
@@ -44,6 +49,7 @@
             android:padding="20dp"
             />
     </LinearLayout>
+
 
 
 </FrameLayout>
