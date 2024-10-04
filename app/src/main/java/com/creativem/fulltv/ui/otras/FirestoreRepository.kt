@@ -8,6 +8,10 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 class FirestoreRepository {
     private val firestore = FirebaseFirestore.getInstance()
@@ -25,14 +29,21 @@ class FirestoreRepository {
                 document.toObject(Movie::class.java)
             }
 
-            // Verifica cada URL de stream y separa las películas válidas e inválidas
-            for (movie in peliculas) {
-                val isValid = isUrlValid(movie.streamUrl) // Verifica si el URL es válido
-                if (isValid) {
-                    peliculasValidas.add(movie.copy(isValid = true))
-                } else {
-                    peliculasInvalidas.add(movie.copy(isValid = false))
+            // Lanza una corutina para validar cada URL en paralelo
+            coroutineScope { // Esto permite el uso de 'async' dentro de este bloque
+                val validaciones = peliculas.map { movie ->
+                    async(Dispatchers.IO) { // Ejecuta la validación en un contexto IO
+                        val isValid = isUrlValid(movie.streamUrl) // Verifica si el URL es válido
+                        if (isValid) {
+                            peliculasValidas.add(movie.copy(isValid = true))
+                        } else {
+                            peliculasInvalidas.add(movie.copy(isValid = false))
+                        }
+                    }
                 }
+
+                // Espera a que todas las validaciones se completen
+                validaciones.awaitAll()
             }
 
             // Ordenar las listas por fecha de publicación (createdAt)

@@ -29,6 +29,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import androidx.core.view.WindowCompat
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+import com.bumptech.glide.request.RequestOptions
+import jp.wasabeef.glide.transformations.BlurTransformation
 
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -39,6 +43,7 @@ class MainFragment : BrowseSupportFragment() {
     private lateinit var relojhora: RelojCuston
     private lateinit var binding: MainFragmentBinding
     private val relojScope = CoroutineScope(Dispatchers.Main)
+    private val defaultBackgroundColor by lazy { ContextCompat.getColor(requireContext(), R.color.tu_color_fondo) }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -69,23 +74,30 @@ class MainFragment : BrowseSupportFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Cambiar el color de fondo de toda la pantalla
-        view.setBackgroundColor(
-            ContextCompat.getColor(
-                requireContext(),
-                R.color.tu_color_fondo
-            )
-        ) // Reemplaza con tu color
+        view.setBackgroundColor(defaultBackgroundColor)
 
-        // Configurar el adaptador
-        adapter = rowsAdapter
+        adapter = rowsAdapter // Inicializa el adaptador
 
+        setOnItemViewSelectedListener { _, item, _, _ ->
+            if (item is Movie) {
+                cargarImagenDeFondo(item.imageUrl)
+            } else {
+                restablecerColorFondo()
+            }
+        }
 
         cargarPeliculas()
-
     }
 
     private fun cargarPeliculas() {
+        Glide.with(requireContext())
+            .load("https://ejemplo.com/imagen.jpg")
+            .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
+            .centerCrop()
+            .into(binding.mainBackgroundImage)
+
+        binding.mainBackgroundImage.alpha = 1.0f
+
         // Mostrar la vista de carga
         mostrarCarga("Actualizando biblioteca en linea...")
 
@@ -118,7 +130,15 @@ class MainFragment : BrowseSupportFragment() {
                     startActivity(intent)
                 }
             }
+
         }
+    }
+    private fun cargarImagenDeFondo(url: String) {
+        Glide.with(requireContext())
+            .load(url)
+            .centerCrop()
+            .transition(DrawableTransitionOptions.withCrossFade(1000))
+            .into(binding.mainBackgroundImage)
     }
 
     private fun agregarALista(movies: List<Movie>, titulo: String) {
@@ -136,5 +156,9 @@ class MainFragment : BrowseSupportFragment() {
 
     private fun ocultarCarga() {
         loadingContainer.visibility = View.GONE
+    }
+    private fun restablecerColorFondo() {
+        binding.mainBackgroundImage.setImageDrawable(null)
+        view?.setBackgroundColor(defaultBackgroundColor)
     }
 }

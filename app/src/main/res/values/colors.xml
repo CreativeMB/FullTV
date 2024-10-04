@@ -8,7 +8,7 @@
     <color name="fondo">#2B2B2B</color>    <!-- Color para hover -->
     <color name="bordeitems">#FFD600</color>
 
-    <color name="tu_color_fondo">#820091EA</color>
+    <color name="tu_color_fondo">#580091EA</color>
     <color name="tu_color_barra">#FF0000</color>
     <color name="tu_color_navegacion">#0000FF</color>
     <color name="tu_color_estado">#00FF00</color>
