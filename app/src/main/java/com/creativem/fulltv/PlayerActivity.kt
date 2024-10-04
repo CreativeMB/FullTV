@@ -40,7 +40,17 @@ import okhttp3.Request
 import okhttp3.Response
 import java.io.IOException
 import android.text.format.DateUtils
+import androidx.media3.datasource.HttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import kotlinx.coroutines.MainScope
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import okhttp3.Protocol
+
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -65,6 +75,8 @@ class PlayerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+
 
         binding.reproductor.useController = false
 
@@ -116,6 +128,7 @@ class PlayerActivity : AppCompatActivity() {
         renderButton.setOnClickListener {
             cycleAspectRatio()
         }
+
 
         val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -237,11 +250,14 @@ class PlayerActivity : AppCompatActivity() {
             .setTargetBufferBytes(2 * 1024 * 1024)  // 2MB
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
-
-        // Crea el ExoPlayer
+        val dataSourceFactory = createInsecureDataSourceFactory()
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+        // Crea el ExoPlayer utilizando createRenderersFactory()
         player = ExoPlayer.Builder(this)
             .setLoadControl(loadControl)
+            .setMediaSourceFactory(mediaSourceFactory)
             .build().also { exoPlayer ->
+
                 // Asocia el ExoPlayer con el PlayerView usando binding
                 binding.reproductor.player = exoPlayer
                 exoPlayer.addListener(playerListener)
@@ -341,10 +357,28 @@ class PlayerActivity : AppCompatActivity() {
                 Log.d("PlayerActivity", "Se canceló la próxima actualización")
             }
         }
-
+        // Método para manejar errores del reproductor
         override fun onPlayerError(error: PlaybackException) {
             Log.e("PlayerActivity", "Error en el reproductor: ${error.message}")
-            attemptReconnection()
+            // Intento de reconexión
+            if (reconnectionAttempts < maxReconnectionAttempts) {
+                Log.d("PlayerActivity", "Intento de reconexión: $reconnectionAttempts")
+                reconnectionAttempts++
+
+                Handler(Looper.getMainLooper()).postDelayed({
+                    // Reconexión al stream
+                    val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+                    player?.setMediaItem(mediaItem)
+                    player?.prepare()
+                    player?.playWhenReady = true
+                }, 2000) // 2 segundos de retraso para el siguiente intento
+            } else {
+                Log.d(
+                    "PlayerActivity",
+                    "Máximo número de intentos alcanzado. Mostrando diálogo de error."
+                )
+                showErrorDialog("No se pudo reconectar al stream.")
+            }
         }
     }
 
@@ -519,4 +553,24 @@ class PlayerActivity : AppCompatActivity() {
         return DateUtils.formatElapsedTime(tiempoMs / 1000)
     }
 
+    private fun createInsecureDataSourceFactory(): HttpDataSource.Factory {
+        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+        })
+
+        val sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(null, trustAllCerts, SecureRandom())
+
+        // Configurar OkHttpClient
+        val client = OkHttpClient.Builder()
+            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+            .protocols(listOf(Protocol.HTTP_1_1, Protocol.HTTP_2)) // Establecer protocolos soportados
+            .build()
+
+        return OkHttpDataSource.Factory(client)
+    }
+
 }
+

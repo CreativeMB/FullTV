@@ -74,24 +74,24 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics")
     implementation ("com.google.firebase:firebase-config:21.0.2")
 
-    implementation ("com.google.android.exoplayer:exoplayer:2.19.0")
     implementation ("androidx.appcompat:appcompat:1.6.1")
     implementation ("androidx.recyclerview:recyclerview:1.3.1")
     implementation ("com.google.android.material:material:1.9.0")
     implementation ("com.github.bumptech.glide:glide:4.15.1")
 
     implementation ("com.google.firebase:firebase-firestore-ktx:24.5.0")
-//    implementation ("com.google.firebase:firebase-core:21.3.0")
+
     implementation(platform("com.google.firebase:firebase-bom:32.1.1"))
     implementation ("com.google.firebase:firebase-firestore-ktx")
-//    implementation ("com.google.firebase:firebase-auth-ktx")
+
     implementation ("com.google.firebase:firebase-analytics-ktx")
 
     implementation("androidx.media3:media3-exoplayer:1.4.1") // Dependencia principal
     implementation("androidx.media3:media3-exoplayer-dash:1.4.1") // Soporte para DASH
     implementation("androidx.media3:media3-ui:1.4.1") // Interfaz de usuario
     implementation ("androidx.media3:media3-exoplayer-hls:1.4.1") // Para soporte HLS
-    implementation ("com.google.android.exoplayer:exoplayer:2.19.1")
+    implementation ("androidx.media3:media3-datasource-okhttp:1.1.0")
+
     implementation ("com.google.android.material:material:1.7.0")
     implementation ("androidx.core:core-ktx:1.8.0")
     implementation ("com.squareup.okhttp3:okhttp:4.9.3")
@@ -105,6 +105,8 @@ dependencies {
     implementation ("com.github.bumptech.glide:glide:4.14.2")
     annotationProcessor ("com.github.bumptech.glide:compiler:4.14.2")
     implementation ("jp.wasabeef:glide-transformations:4.3.0")
+
+    implementation ("androidx.media3:media3-exoplayer-hls:1.0.0")
 
 
 }
