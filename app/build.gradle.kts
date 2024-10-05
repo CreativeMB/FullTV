@@ -79,9 +79,7 @@ dependencies {
     implementation ("androidx.recyclerview:recyclerview:1.3.1")
     implementation ("com.google.android.material:material:1.9.0")
     implementation ("com.github.bumptech.glide:glide:4.15.1")
-
     implementation ("com.google.firebase:firebase-firestore-ktx:24.5.0")
-
     implementation(platform("com.google.firebase:firebase-bom:32.1.1"))
     implementation ("com.google.firebase:firebase-firestore-ktx")
 
@@ -110,8 +108,11 @@ dependencies {
     annotationProcessor ("com.github.bumptech.glide:compiler:4.14.2")
     implementation ("jp.wasabeef:glide-transformations:4.3.0")
 
+    implementation ("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
+
+    implementation ("androidx.work:work-runtime-ktx:2.8.1")
+
 
 
 
 }
-

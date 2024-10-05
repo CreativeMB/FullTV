@@ -63,6 +63,13 @@ import androidx.media3.common.util.Util
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultDataSourceFactory
 import androidx.media3.exoplayer.util.EventLogger
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.creativem.fulltv.ui.data.EliminarItemsInactivosWorker
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -184,44 +191,80 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun loadMoviesFromFirestore() {
-        firestore.collection("movies")
-            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val movies =
-                    mutableListOf<Movie>() // Crear una lista temporal para almacenar las películas
+        // Usar un CoroutineScope adecuado (puede ser un lifecycleScope si estás dentro de una Activity o Fragment)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Obtener las películas desde Firestore
+                val snapshot = firestore.collection("movies")
+                    .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                    .get()
+                    .await() // Asegúrate de tener la dependencia de Firebase Kotlin Coroutines
+
+                val movies = mutableListOf<Movie>() // Crear una lista temporal para almacenar las películas
 
                 // Cargar las películas
                 val jobs = snapshot.documents.map { document ->
-                    CoroutineScope(Dispatchers.IO).async {
+                    async {
                         val title = document.getString("title") ?: "Sin título"
                         val synopsis = document.getString("synopsis") ?: "Sin sinopsis"
                         val imageUrl = document.getString("imageUrl") ?: ""
                         val streamUrl = document.getString("streamUrl") ?: ""
                         val createdAt = document.getTimestamp("createdAt") ?: return@async null
 
-                        // Llama a isUrlValid de forma asíncrona
+                        // Verificar si el URL es válido
                         val isValid = isUrlValid(streamUrl)
 
-                        // Crea una película y retorna
-                        Movie(title, synopsis, imageUrl, streamUrl, createdAt, isValid)
+                        // Crear la película y retornar
+                        Movie(
+                            id = document.id, // Asigna el ID del documento
+                            title = title,
+                            synopsis = synopsis,
+                            imageUrl = imageUrl,
+                            streamUrl = streamUrl,
+                            createdAt = createdAt, // Mantener el Timestamp
+                            isValid = isValid
+                        )
                     }
                 }
 
-                // Esperar a que todos los trabajos se completen
-                GlobalScope.launch(Dispatchers.Main) {
-                    jobs.forEach { job ->
-                        job.await()?.let { movie ->
-                            movies.add(movie) // Añadir la película a la lista temporal
-                        }
-                    }
+                // Esperar a que todos los trabajos se completen en el hilo principal
+                val moviesList = jobs.awaitAll().filterNotNull() // Filtrar nulos
 
-                    // Actualizar el adaptador con la lista de películas
-                    adapter.updateMovies(movies)
+                // Filtrar películas inválidas que son más viejas de 24 horas
+                val moviesToDelete = moviesList.filter { movie ->
+                    !movie.isValid && (System.currentTimeMillis() - movie.createdAt.toDate().time > TimeUnit.HOURS.toMillis(24))
                 }
+
+                // Eliminar películas inválidas
+                moviesToDelete.forEach { movie ->
+                    firestore.collection("movies").document(movie.id).delete()
+                }
+
+                // Filtrar las películas válidas o las que son más recientes de 24 horas
+                val filteredMovies = moviesList.filter { movie ->
+                    movie.isValid || (System.currentTimeMillis() - movie.createdAt.toDate().time <= TimeUnit.HOURS.toMillis(24))
+                }
+
+                // Actualizar el adaptador con la lista de películas filtradas
+                withContext(Dispatchers.Main) {
+                    adapter.updateMovies(filteredMovies)
+                    // Iniciar el Worker para la limpieza de elementos inactivos
+                    startInactiveItemsWorker()
+                }
+
+            } catch (exception: Exception) {
+                // Manejo de errores si la obtención de películas falla
+                exception.printStackTrace()
             }
+        }
     }
-
+    private fun startInactiveItemsWorker() {
+        // Crear una solicitud de trabajo
+        val workRequest = OneTimeWorkRequestBuilder<EliminarItemsInactivosWorker>()
+            .build()
+        // Enviar la solicitud de trabajo a WorkManager
+        WorkManager.getInstance(applicationContext).enqueue(workRequest)
+    }
     // Cambia la función isUrlValid para que sea suspend
     private suspend fun isUrlValid(url: String): Boolean {
         val client = OkHttpClient()
@@ -575,7 +618,7 @@ class PlayerActivity : AppCompatActivity() {
         return DateUtils.formatElapsedTime(tiempoMs / 1000)
     }
 
-//    private fun createInsecureDataSourceFactory(): HttpDataSource.Factory {
+    //    private fun createInsecureDataSourceFactory(): HttpDataSource.Factory {
 //        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
 //            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
 //            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
@@ -602,4 +645,3 @@ class PlayerActivity : AppCompatActivity() {
     }
 
 }
-

@@ -26,7 +26,7 @@ class FirestoreRepository {
             // Obtiene la colección de películas
             val snapshot = peliculasCollection.get().await()
             val peliculas = snapshot.documents.mapNotNull { document ->
-                document.toObject(Movie::class.java)
+                document.toObject(Movie::class.java)?.copy(id = document.id) // Asignar el ID
             }
 
             // Lanza una corutina para validar cada URL en paralelo
@@ -68,4 +68,10 @@ class FirestoreRepository {
             }
         }
     }
+    suspend fun eliminarPeliculas(peliculas: List<Movie>) {
+        peliculas.forEach { pelicula ->
+            firestore.collection("peliculas").document(pelicula.id).delete().await()
+        }
+    }
+
 }

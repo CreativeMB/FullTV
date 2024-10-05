@@ -29,10 +29,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import androidx.core.view.WindowCompat
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions
+import com.creativem.fulltv.ui.data.EliminarItemsInactivosWorker
 import jp.wasabeef.glide.transformations.BlurTransformation
+import java.util.concurrent.TimeUnit
 
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -78,6 +82,10 @@ class MainFragment : BrowseSupportFragment() {
 
         adapter = rowsAdapter // Inicializa el adaptador
 
+        val workRequest = PeriodicWorkRequestBuilder<EliminarItemsInactivosWorker>(24, TimeUnit.HOURS)
+            .build()
+        WorkManager.getInstance(requireContext()).enqueue(workRequest)
+
         setOnItemViewSelectedListener { _, item, _, _ ->
             if (item is Movie) {
                 cargarImagenDeFondo(item.imageUrl)
@@ -87,6 +95,7 @@ class MainFragment : BrowseSupportFragment() {
         }
 
         cargarPeliculas()
+
     }
 
     private fun cargarPeliculas() {

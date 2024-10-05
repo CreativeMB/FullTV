@@ -6,6 +6,7 @@ import android.os.Parcelable
 import com.google.firebase.Timestamp
 
 data class Movie(
+    val id: String = "",  // Añadir campo id
     val title: String = "",
     val synopsis: String = "",
     val imageUrl: String = "",
@@ -19,19 +20,22 @@ data class Movie(
         parcel.readString() ?: "",
         parcel.readString() ?: "",
         parcel.readString() ?: "",
-        Timestamp(parcel.readLong(), 0),  // Leer como long y convertir a Timestamp
-        parcel.readByte() != 0.toByte(),  // Leer boolean
-        parcel.readByte() != 0.toByte()   // Leer boolean
+        parcel.readString() ?: "",
+        Timestamp(parcel.readLong(), parcel.readInt().toInt()), // Lee los segundos y nanosegundos
+        parcel.readByte() != 0.toByte(),
+        parcel.readByte() != 0.toByte()
     )
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {
+        parcel.writeString(id)  // Escribir el id
         parcel.writeString(title)
         parcel.writeString(synopsis)
         parcel.writeString(imageUrl)
         parcel.writeString(streamUrl)
-        parcel.writeLong(createdAt.seconds)  // Escribir Timestamp como long
-        parcel.writeByte(if (isValid) 1 else 0)  // Escribir boolean como byte
-        parcel.writeByte(if (isActive) 1 else 0) // Escribir boolean como byte
+        parcel.writeLong(createdAt.seconds) // Escribir los segundos
+        parcel.writeInt(createdAt.nanoseconds) // Escribir los nanosegundos
+        parcel.writeByte(if (isValid) 1 else 0)
+        parcel.writeByte(if (isActive) 1 else 0)
     }
 
     override fun describeContents(): Int {
