@@ -1,6 +1,9 @@
 package com.creativem.fulltv.ui.otras
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -29,6 +32,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import androidx.core.view.WindowCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.bumptech.glide.Glide
@@ -48,6 +52,7 @@ class MainFragment : BrowseSupportFragment() {
     private lateinit var binding: MainFragmentBinding
     private val relojScope = CoroutineScope(Dispatchers.Main)
     private val defaultBackgroundColor by lazy { ContextCompat.getColor(requireContext(), R.color.tu_color_fondo) }
+
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -74,7 +79,6 @@ class MainFragment : BrowseSupportFragment() {
         return view
     }
 
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -93,9 +97,8 @@ class MainFragment : BrowseSupportFragment() {
                 restablecerColorFondo()
             }
         }
-
+//        updateMovieList()
         cargarPeliculas()
-
     }
 
     private fun cargarPeliculas() {
@@ -111,22 +114,14 @@ class MainFragment : BrowseSupportFragment() {
         mostrarCarga("Actualizando biblioteca en linea...")
 
         CoroutineScope(Dispatchers.Main).launch {
-            val (peliculasActivas, peliculasInactivas) = firestoreRepository.obtenerPeliculas() // Asegúrate de que la función esté implementada correctamente
+            // Obtén las películas actualizadas dentro del coroutine
+            val (peliculasActivas, peliculasInactivas) = firestoreRepository.obtenerPeliculas()
 
             // Ocultar la vista de carga una vez que se cargan los datos
             ocultarCarga()
 
-            if (peliculasActivas.isNotEmpty()) {
-                agregarALista(peliculasActivas, "Disponible")
-            } else {
-                agregarALista(emptyList(), "No hay Disponible")
-            }
-
-            if (peliculasInactivas.isNotEmpty()) {
-                agregarALista(peliculasInactivas, "Alquiler")
-            } else {
-                agregarALista(emptyList(), "No hay Alquiler")
-            }
+            // Llama a updateMovieList para agregar las películas a la lista
+            updateMovieList(peliculasActivas, peliculasInactivas) // Pasa las películas como argumentos
 
             setOnItemViewClickedListener { _, item, _, _ ->
                 if (item is Movie) {
@@ -139,8 +134,15 @@ class MainFragment : BrowseSupportFragment() {
                     startActivity(intent)
                 }
             }
-
         }
+    }
+
+    // Actualiza la función updateMovieList()
+    private fun updateMovieList(peliculasActivas: List<Movie>, peliculasInactivas: List<Movie>) {
+        // Actualiza la lista de películas en la interfaz de usuario
+        rowsAdapter.clear() // Limpia la lista actual
+        agregarALista(peliculasActivas, "Disponible")
+        agregarALista(peliculasInactivas, "Alquiler")
     }
     private fun cargarImagenDeFondo(url: String) {
         Glide.with(requireContext())
