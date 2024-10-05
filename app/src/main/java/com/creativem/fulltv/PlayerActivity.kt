@@ -40,17 +40,29 @@ import okhttp3.Request
 import okhttp3.Response
 import java.io.IOException
 import android.text.format.DateUtils
+
+import androidx.media3.exoplayer.DefaultRenderersFactory
+
+
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+
 import kotlinx.coroutines.MainScope
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+
 import okhttp3.Protocol
 
+
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+
+import androidx.media3.common.util.Util
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultDataSourceFactory
+import androidx.media3.exoplayer.util.EventLogger
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -250,13 +262,23 @@ class PlayerActivity : AppCompatActivity() {
             .setTargetBufferBytes(2 * 1024 * 1024)  // 2MB
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
-        val dataSourceFactory = createInsecureDataSourceFactory()
-        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
-        // Crea el ExoPlayer utilizando createRenderersFactory()
+
+        // Crea el reproductor con la factory personalizada
         player = ExoPlayer.Builder(this)
             .setLoadControl(loadControl)
-            .setMediaSourceFactory(mediaSourceFactory)
+            .setRenderersFactory(DefaultRenderersFactory(this)
+                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)) // Esto habilita FFmpeg
+            .setMediaSourceFactory(DefaultMediaSourceFactory(this)) // Configura la fuente de medios
             .build().also { exoPlayer ->
+
+//        val dataSourceFactory = createInsecureDataSourceFactory()
+////        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+//        // Crea el ExoPlayer utilizando createRenderersFactory()
+//        player = ExoPlayer.Builder(this)
+//            .setLoadControl(loadControl)
+////            .setMediaSourceFactory(mediaSourceFactory)
+//            .setRenderersFactory(createRenderersFactory())
+//            .build().also { exoPlayer ->
 
                 // Asocia el ExoPlayer con el PlayerView usando binding
                 binding.reproductor.player = exoPlayer
@@ -553,23 +575,30 @@ class PlayerActivity : AppCompatActivity() {
         return DateUtils.formatElapsedTime(tiempoMs / 1000)
     }
 
-    private fun createInsecureDataSourceFactory(): HttpDataSource.Factory {
-        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-        })
+//    private fun createInsecureDataSourceFactory(): HttpDataSource.Factory {
+//        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+//            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+//            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+//            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+//        })
+//
+//        val sslContext = SSLContext.getInstance("TLS")
+//        sslContext.init(null, trustAllCerts, SecureRandom())
+//
+//        // Configurar OkHttpClient
+//        val client = OkHttpClient.Builder()
+//            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+//            .protocols(listOf(Protocol.HTTP_1_1, Protocol.HTTP_2)) // Establecer protocolos soportados
+//            .build()
+//
+//        return OkHttpDataSource.Factory(client)
+//    }
+    private fun createMediaSourceFactory(): DefaultMediaSourceFactory {
+        // Crea un DataSource.Factory
+        val dataSourceFactory: DefaultDataSource.Factory = DefaultDataSource.Factory(this)
 
-        val sslContext = SSLContext.getInstance("TLS")
-        sslContext.init(null, trustAllCerts, SecureRandom())
-
-        // Configurar OkHttpClient
-        val client = OkHttpClient.Builder()
-            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
-            .protocols(listOf(Protocol.HTTP_1_1, Protocol.HTTP_2)) // Establecer protocolos soportados
-            .build()
-
-        return OkHttpDataSource.Factory(client)
+        // Crea y devuelve una instancia de DefaultMediaSourceFactory
+        return DefaultMediaSourceFactory(dataSourceFactory)
     }
 
 }

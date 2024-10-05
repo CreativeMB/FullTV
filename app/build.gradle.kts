@@ -51,6 +51,7 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
 }
 
 dependencies {
@@ -90,7 +91,10 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-dash:1.4.1") // Soporte para DASH
     implementation("androidx.media3:media3-ui:1.4.1") // Interfaz de usuario
     implementation ("androidx.media3:media3-exoplayer-hls:1.4.1") // Para soporte HLS
-    implementation ("androidx.media3:media3-datasource-okhttp:1.1.0")
+    implementation ("androidx.media3:media3-datasource-okhttp:1.4.1")
+    implementation ("androidx.media3:media3-exoplayer-hls:1.4.1")
+    implementation ("androidx.media3:media3-datasource:1.4.1")
+//    implementation("androidx.media3:media3-exoplayer-ffmpeg:1.4.1")
 
     implementation ("com.google.android.material:material:1.7.0")
     implementation ("androidx.core:core-ktx:1.8.0")
@@ -106,7 +110,7 @@ dependencies {
     annotationProcessor ("com.github.bumptech.glide:compiler:4.14.2")
     implementation ("jp.wasabeef:glide-transformations:4.3.0")
 
-    implementation ("androidx.media3:media3-exoplayer-hls:1.0.0")
+
 
 
 }
