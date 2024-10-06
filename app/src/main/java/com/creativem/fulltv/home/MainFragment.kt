@@ -1,11 +1,9 @@
-package com.creativem.fulltv.ui.otras
+package com.creativem.fulltv.home
 
-import android.content.BroadcastReceiver
-import android.content.Context
+
 import android.content.Intent
-import android.content.IntentFilter
-import android.content.pm.ActivityInfo
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,34 +11,28 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.leanback.app.BrowseSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
-import com.creativem.fulltv.PlayerActivity
 import com.creativem.fulltv.R
 import com.creativem.fulltv.databinding.MainFragmentBinding
-import com.creativem.fulltv.ui.data.Movie
-import com.creativem.fulltv.ui.data.RelojCuston
+import com.creativem.fulltv.data.Movie
+import com.creativem.fulltv.data.RelojCuston
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import androidx.core.view.WindowCompat
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions
-import com.creativem.fulltv.ui.data.EliminarItemsInactivosWorker
 import jp.wasabeef.glide.transformations.BlurTransformation
-import java.util.concurrent.TimeUnit
+import com.creativem.fulltv.menu.MenuItem
+import com.creativem.fulltv.adapter.CardPresenter
+import com.creativem.fulltv.adapter.FirestoreRepository
+import com.creativem.fulltv.menu.MenuPresenter
 
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -48,11 +40,13 @@ class MainFragment : BrowseSupportFragment() {
     private lateinit var progressBar: ProgressBar
     private lateinit var loadingText: TextView
     private lateinit var loadingContainer: FrameLayout
-    private lateinit var relojhora: RelojCuston
     private lateinit var binding: MainFragmentBinding
-    private val relojScope = CoroutineScope(Dispatchers.Main)
-    private val defaultBackgroundColor by lazy { ContextCompat.getColor(requireContext(), R.color.tu_color_fondo) }
-
+    private val defaultBackgroundColor by lazy {
+        ContextCompat.getColor(
+            requireContext(),
+            R.color.tu_color_fondo
+        )
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -62,20 +56,46 @@ class MainFragment : BrowseSupportFragment() {
         // Inflar el layout de BrowseSupportFragment
         val view = super.onCreateView(inflater, container, savedInstanceState)
 
+        // Inflar el layout principal
         binding = MainFragmentBinding.bind(requireActivity().findViewById(R.id.main))
-        // Inflar el layout de carga
+        // Inflar el layout de carga (loading overlay)
         loadingContainer =
             inflater.inflate(R.layout.loading_overlay, container, false) as FrameLayout
         progressBar = loadingContainer.findViewById(R.id.progressBar)
         loadingText = loadingContainer.findViewById(R.id.loadingText)
-        requireActivity().window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        // Agregar la vista de carga como superpuesta
-        (view as? ViewGroup)?.addView(loadingContainer)
 
+        requireActivity().window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Iniciar el reloj
         val textHora = binding.textHora
         val textfecha = binding.textfecha
         val relojCuston = RelojCuston(textHora, textfecha)
         relojCuston.startClock()
+        // Agregar la vista de entrada a la vista principal
+        (view as? ViewGroup)?.addView(loadingContainer)
+
+        // Configura el listener de clics mrnu
+        setOnItemViewClickedListener { _, item, _, _ ->
+            if (item is MenuItem) {
+                Log.d("MainFragment", "Menu item clicked: ${item.name}")
+                when (item.name) {
+                    "Pedidos" -> {
+                        val intent = Intent(requireContext(), PedidosActivity::class.java)
+                        startActivity(intent)
+                    }
+                    "Menu 2" -> {
+                        Toast.makeText(requireContext(), "Menu 2 seleccionado", Toast.LENGTH_SHORT).show()
+                    }
+                    else -> {
+                        Toast.makeText(requireContext(), "${item.name} seleccionado", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } else if (item is Movie) {
+                val intent = Intent(context, PlayerActivity::class.java)
+                intent.putExtra("EXTRA_STREAM_URL", item.streamUrl)
+                startActivity(intent)
+            }
+        }
+
         return view
     }
 
@@ -86,10 +106,6 @@ class MainFragment : BrowseSupportFragment() {
 
         adapter = rowsAdapter // Inicializa el adaptador
 
-        val workRequest = PeriodicWorkRequestBuilder<EliminarItemsInactivosWorker>(24, TimeUnit.HOURS)
-            .build()
-        WorkManager.getInstance(requireContext()).enqueue(workRequest)
-
         setOnItemViewSelectedListener { _, item, _, _ ->
             if (item is Movie) {
                 cargarImagenDeFondo(item.imageUrl)
@@ -97,8 +113,9 @@ class MainFragment : BrowseSupportFragment() {
                 restablecerColorFondo()
             }
         }
-//        updateMovieList()
+
         cargarPeliculas()
+
     }
 
     private fun cargarPeliculas() {
@@ -111,7 +128,7 @@ class MainFragment : BrowseSupportFragment() {
         binding.mainBackgroundImage.alpha = 1.0f
 
         // Mostrar la vista de carga
-        mostrarCarga("Actualizando biblioteca en linea...")
+        mostrarCarga("Actualizando biblioteca en línea...")
 
         CoroutineScope(Dispatchers.Main).launch {
             // Obtén las películas actualizadas dentro del coroutine
@@ -121,19 +138,7 @@ class MainFragment : BrowseSupportFragment() {
             ocultarCarga()
 
             // Llama a updateMovieList para agregar las películas a la lista
-            updateMovieList(peliculasActivas, peliculasInactivas) // Pasa las películas como argumentos
-
-            setOnItemViewClickedListener { _, item, _, _ ->
-                if (item is Movie) {
-                    val intent = Intent(context, PlayerActivity::class.java)
-                    intent.putParcelableArrayListExtra(
-                        "movies",
-                        ArrayList(if (item.isActive) peliculasActivas else peliculasInactivas)
-                    )
-                    intent.putExtra("EXTRA_STREAM_URL", item.streamUrl)
-                    startActivity(intent)
-                }
-            }
+            updateMovieList(peliculasActivas, peliculasInactivas)
         }
     }
 
@@ -141,9 +146,38 @@ class MainFragment : BrowseSupportFragment() {
     private fun updateMovieList(peliculasActivas: List<Movie>, peliculasInactivas: List<Movie>) {
         // Actualiza la lista de películas en la interfaz de usuario
         rowsAdapter.clear() // Limpia la lista actual
-        agregarALista(peliculasActivas, "Disponible")
-        agregarALista(peliculasInactivas, "Alquiler")
+        agregarALista(peliculasActivas, "CARTELERA")
+        agregarALista(peliculasInactivas, "ALQUILER")
+        // Agrega el menú aquí, después de cargar las películas
+        val menuAdapter = ArrayObjectAdapter(MenuPresenter())
+        val menuItems = listOf("Pedidos", "Menu 2", "Menu 3", "Menu 4", "Menu 5")
+        val menuIcons = listOf(
+            R.drawable.icono,
+            R.drawable.ic_play,
+            R.drawable.ic_play,
+            R.drawable.ic_play,
+            R.drawable.ic_play
+        )
+
+        for (i in menuItems.indices) {
+            val menuItem = MenuItem(menuItems[i], menuIcons[i])
+            menuAdapter.add(menuItem)
+        }
+
+        val headerItem = HeaderItem(3, "MENU")
+        val listRow = ListRow(headerItem, menuAdapter) // Crea la fila del menú
+
+        // Calcula la posición para insertar la fila del menú
+        val position = rowsAdapter.size() // Obtén la posición usando `rowsAdapter.size`
+
+        // Agrega la fila del menú al adaptador
+        rowsAdapter.add(position, listRow)
+
+        // Notifica la inserción de la fila al adaptador de filas
+        rowsAdapter.notifyArrayItemRangeChanged(position, 1)
+
     }
+
     private fun cargarImagenDeFondo(url: String) {
         Glide.with(requireContext())
             .load(url)
@@ -168,6 +202,7 @@ class MainFragment : BrowseSupportFragment() {
     private fun ocultarCarga() {
         loadingContainer.visibility = View.GONE
     }
+
     private fun restablecerColorFondo() {
         binding.mainBackgroundImage.setImageDrawable(null)
         view?.setBackgroundColor(defaultBackgroundColor)

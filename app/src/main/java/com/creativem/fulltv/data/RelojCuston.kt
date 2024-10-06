@@ -1,4 +1,4 @@
-package com.creativem.fulltv.ui.data
+package com.creativem.fulltv.data
 
 import android.annotation.SuppressLint
 import android.widget.TextView
@@ -21,7 +21,7 @@ class RelojCuston(private val textViewHora: TextView, private val textViewFecha:
         clockScope.launch {
             while (true) {
                 // Formato de fecha con la primera letra en mayúscula
-                val fecha = SimpleDateFormat("EEEE dd-MM-yy", Locale.getDefault()).format(Date())
+                val fecha = SimpleDateFormat("EEEE dd MM yy", Locale.getDefault()).format(Date())
                 val fechaConMayuscula = fecha.substring(0, 1).uppercase() + fecha.substring(1)
 
                 // Formato de hora con AM/PM en mayúsculas

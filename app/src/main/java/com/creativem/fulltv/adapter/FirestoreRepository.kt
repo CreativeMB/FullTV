@@ -1,7 +1,8 @@
-package com.creativem.fulltv.ui.otras
+package com.creativem.fulltv.adapter
 
 import android.util.Log
-import com.creativem.fulltv.ui.data.Movie
+import com.creativem.fulltv.data.Movie
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
@@ -12,7 +13,6 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 
 class FirestoreRepository {
     private val firestore = FirebaseFirestore.getInstance()
@@ -91,6 +91,30 @@ class FirestoreRepository {
             } catch (e: Exception) {
                 Log.e("FirestoreRepository", "Error al eliminar película: ${pelicula.title}", e)
             }
+        }
+    }
+
+    // Método suspendido para enviar un pedido a Firestore
+    suspend fun enviarPedido(texto: String): String {
+        val pedidosCollection = firestore.collection("pedidosMovies")
+
+        // Crear un mapa para el pedido
+        val pedido = hashMapOf(
+            "texto" to texto,
+            "timestamp" to System.currentTimeMillis() // Opcional: almacenar la fecha/hora
+        )
+
+        return try {
+            // Agregar el pedido a Firestore y esperar a que se complete
+            val documentReference: DocumentReference = pedidosCollection.add(pedido).await()
+            // Retornar el ID del documento creado
+            val id = documentReference.id
+            println("Pedido enviado exitosamente con ID: $id")
+            id // Retornar el ID del documento
+        } catch (e: Exception) {
+            // Manejar el error y lanzar una excepción
+            println("Error al enviar el pedido: ${e.message}")
+            throw e // Propagar la excepción
         }
     }
 }

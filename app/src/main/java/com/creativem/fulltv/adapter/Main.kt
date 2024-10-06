@@ -1,12 +1,10 @@
-package com.creativem.fulltv.ui.otras
+package com.creativem.fulltv.adapter
 
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.enableEdgeToEdge
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
-import com.creativem.fulltv.R
 
 import com.creativem.fulltv.databinding.MainFragmentBinding
 

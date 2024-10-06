@@ -1,13 +1,13 @@
-package com.creativem.fulltv.ui.otras
+package com.creativem.fulltv.adapter
 
 import android.content.Intent
 import android.view.ViewGroup
 import androidx.leanback.widget.ImageCardView
 import androidx.leanback.widget.Presenter
 import com.bumptech.glide.Glide
-import com.creativem.fulltv.PlayerActivity
+import com.creativem.fulltv.home.PlayerActivity
 import com.creativem.fulltv.R
-import com.creativem.fulltv.ui.data.Movie
+import com.creativem.fulltv.data.Movie
 
 
 class CardPresenter: Presenter(){
@@ -15,7 +15,7 @@ class CardPresenter: Presenter(){
         val cardView = ImageCardView(parent.context).apply {
             isFocusable = true
             isFocusableInTouchMode = true
-            setMainImageDimensions(180, 250)
+            setMainImageDimensions(200, 250)
             // cardLayoutTheme = R.style.DefaultCardTheme // Estilo opcional
         }
         return ViewHolder(cardView)

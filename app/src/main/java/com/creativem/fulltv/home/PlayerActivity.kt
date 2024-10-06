@@ -1,4 +1,4 @@
-package com.creativem.fulltv
+package com.creativem.fulltv.home
 
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -24,15 +24,14 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.fulltv.databinding.ActivityPlayerBinding
-import com.creativem.fulltv.ui.data.Movie
-import com.creativem.fulltv.ui.data.RelojCuston
+import com.creativem.fulltv.data.Movie
+import com.creativem.fulltv.data.RelojCuston
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -44,28 +43,15 @@ import android.text.format.DateUtils
 import androidx.media3.exoplayer.DefaultRenderersFactory
 
 
-import androidx.media3.datasource.HttpDataSource
-import androidx.media3.datasource.okhttp.OkHttpDataSource
-
 import kotlinx.coroutines.MainScope
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
-
-import okhttp3.Protocol
 
 
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
-import androidx.media3.common.util.Util
 import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultDataSourceFactory
-import androidx.media3.exoplayer.util.EventLogger
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import com.creativem.fulltv.ui.data.EliminarItemsInactivosWorker
+import com.creativem.fulltv.R
+import com.creativem.fulltv.menu.MoviesMenuAdapter
+
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -249,7 +235,7 @@ class PlayerActivity : AppCompatActivity() {
                 withContext(Dispatchers.Main) {
                     adapter.updateMovies(filteredMovies)
                     // Iniciar el Worker para la limpieza de elementos inactivos
-                    startInactiveItemsWorker()
+//                    startInactiveItemsWorker()
                 }
 
             } catch (exception: Exception) {
@@ -258,13 +244,13 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
     }
-    private fun startInactiveItemsWorker() {
-        // Crear una solicitud de trabajo
-        val workRequest = OneTimeWorkRequestBuilder<EliminarItemsInactivosWorker>()
-            .build()
-        // Enviar la solicitud de trabajo a WorkManager
-        WorkManager.getInstance(applicationContext).enqueue(workRequest)
-    }
+//    private fun startInactiveItemsWorker() {
+//        // Crear una solicitud de trabajo
+//        val workRequest = OneTimeWorkRequestBuilder<EliminarItemsInactivosWorker>()
+//            .build()
+//        // Enviar la solicitud de trabajo a WorkManager
+//        WorkManager.getInstance(applicationContext).enqueue(workRequest)
+//    }
     // Cambia la función isUrlValid para que sea suspend
     private suspend fun isUrlValid(url: String): Boolean {
         val client = OkHttpClient()

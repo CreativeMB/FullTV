@@ -1,6 +1,6 @@
 <resources xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <style name="Theme.FullTV" parent="Theme.MaterialComponents.Light.NoActionBar" />
+    <style name="Theme.FullTV" parent="Theme.AppCompat.Light.NoActionBar" />
     <style name="Theme.FullTV.tv" parent="@style/Theme.Leanback" >
         <item name="android:colorPrimary">#282828</item>
         <item name="android:windowAllowReturnTransitionOverlap">true</item>
