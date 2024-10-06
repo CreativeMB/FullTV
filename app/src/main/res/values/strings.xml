@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">CineFlex</string>
+    <string name="app_name">FullTV</string>
        <!-- Descripción de los botones en el control de la interfaz -->
     <string name="exo_controls_lista_pelis">Lista de Películas</string>
     <string name="exo_vr">Modo VR</string>

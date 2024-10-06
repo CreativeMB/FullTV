@@ -44,6 +44,6 @@
         android:layout_marginTop="16dp"
         android:background="@color/colorFocused"
         android:padding="16dp"
-        android:text="Enviar a Firestore"
+        android:text="Enviar"
         android:textColor="@android:color/white" />
 </LinearLayout>

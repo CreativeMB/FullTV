@@ -152,7 +152,7 @@ class MainFragment : BrowseSupportFragment() {
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
         val menuItems = listOf("Pedidos", "Menu 2", "Menu 3", "Menu 4", "Menu 5")
         val menuIcons = listOf(
-            R.drawable.icono,
+            R.drawable.pedidos,
             R.drawable.ic_play,
             R.drawable.ic_play,
             R.drawable.ic_play,

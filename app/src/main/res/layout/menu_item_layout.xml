@@ -16,7 +16,7 @@
             android:layout_width="80dp"
             android:layout_height="80dp"
             android:layout_marginBottom="8dp"
-            android:background="@drawable/icono"
+            android:background="@color/tu_color_fondo"
             android:padding="10dp"
             android:scaleType="centerCrop" />
 
