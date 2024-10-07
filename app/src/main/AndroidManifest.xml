@@ -24,6 +24,7 @@
             android:exported="false"
             tools:ignore="Instantiatable" />
         <activity android:name="com.creativem.fulltv.home.PedidosActivity"
+            android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
         <activity
             android:name=".home.PlayerActivity"
