@@ -40,6 +40,7 @@ class PedidosActivity : AppCompatActivity() {
                 .addOnSuccessListener {
                     Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
                     texpedido.text.clear() // Limpiar el campo de texto
+                    finish()
                 }
                 .addOnFailureListener { e ->
                     Toast.makeText(this, "Error al enviar el texto: ${e.message}", Toast.LENGTH_SHORT).show()
