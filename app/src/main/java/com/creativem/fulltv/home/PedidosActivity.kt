@@ -31,7 +31,7 @@ class PedidosActivity : AppCompatActivity() {
         if (texto.isNotEmpty()) {
             // Crear un nuevo objeto de datos
             val datos = hashMapOf(
-                "contenido" to texto
+                "title" to texto
             )
 
             // Enviar datos a Firestore
