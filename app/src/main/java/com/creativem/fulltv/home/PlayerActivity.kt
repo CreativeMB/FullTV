@@ -146,7 +146,8 @@ class PlayerActivity : AppCompatActivity() {
 
         runnableActualizar = Runnable { actualizarTiempo() }
         runnableOcultar = Runnable {
-            binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.GONE
+            binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility =
+                View.GONE
         }
 
         binding.reproductor.setOnTouchListener { _, _ ->
@@ -170,18 +171,12 @@ class PlayerActivity : AppCompatActivity() {
                 // Obtener la instancia de FirestoreRepository
                 val repository = FirestoreRepository()
 
-                // Obtener las películas desde Firestore utilizando el método de la clase FirestoreRepository
-                val (peliculasValidas, peliculasInvalidas) = repository.obtenerPeliculas()
+                // Obtener las películas desde Firestore
+                val (peliculasValidas) = repository.obtenerPeliculas()
 
-                // Filtrar las películas válidas o las que son más recientes de 24 horas
-                val filteredMovies = peliculasValidas.filter { movie ->
-                    // Puedes modificar esta lógica según tus necesidades
-                    System.currentTimeMillis() - movie.createdAt.toDate().time <= TimeUnit.HOURS.toMillis(24)
-                }
-
-                // Actualizar el adaptador con la lista de películas filtradas
+                // Actualizar el adaptador con la lista de películas válidas
                 withContext(Dispatchers.Main) {
-                    adapter.updateMovies(filteredMovies)
+                    adapter.updateMovies(peliculasValidas)
                 }
 
             } catch (exception: Exception) {
@@ -228,8 +223,10 @@ class PlayerActivity : AppCompatActivity() {
         // Crea el reproductor
         player = ExoPlayer.Builder(this)
             .setLoadControl(loadControl)
-            .setRenderersFactory(DefaultRenderersFactory(this)
-                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)) // Esto habilita FFmpeg
+            .setRenderersFactory(
+                DefaultRenderersFactory(this)
+                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            ) // Esto habilita FFmpeg
             .setMediaSourceFactory(mediaSourceFactory) // Configura la fuente de medios
             .build().also { exoPlayer ->
 
@@ -244,7 +241,8 @@ class PlayerActivity : AppCompatActivity() {
                 exoPlayer.prepare()
 
                 // Ajusta el comportamiento de la reproducción según sea necesario
-                exoPlayer.playWhenReady = false // Cambia a true si deseas que inicie la reproducción automáticamente
+                exoPlayer.playWhenReady =
+                    false // Cambia a true si deseas que inicie la reproducción automáticamente
             }
     }
 
@@ -287,11 +285,13 @@ class PlayerActivity : AppCompatActivity() {
                     Log.d("PlayerActivity", "Reproductor almacenando en búfer...")
                     // Puedes mostrar un indicador de carga si lo necesitas
                 }
+
                 Player.STATE_READY -> {
                     Log.d("PlayerActivity", "Reproductor listo. Reproduciendo...Tobias")
                     reconnectionAttempts = 0
                     actualizarTiempo() // Iniciar la actualización del tiempo
                 }
+
                 Player.STATE_ENDED -> {
                     Log.d("PlayerActivity", "Reproducción finalizada.")
                     if (isLiveStream) {
@@ -302,6 +302,7 @@ class PlayerActivity : AppCompatActivity() {
                         Log.d("PlayerActivity", "Se canceló la próxima actualización (STATE_ENDED)")
                     }
                 }
+
                 Player.STATE_IDLE -> {
                     Log.d("PlayerActivity", "Reproductor inactivo.")
                     if (isLiveStream) {
@@ -312,6 +313,7 @@ class PlayerActivity : AppCompatActivity() {
                         Log.d("PlayerActivity", "Se canceló la próxima actualización (STATE_IDLE)")
                     }
                 }
+
                 else -> {
                     Log.w("PlayerActivity", "Estado de reproducción desconocido: $playbackState")
                 }
@@ -322,13 +324,17 @@ class PlayerActivity : AppCompatActivity() {
             Log.d("PlayerActivity", "onIsPlayingChanged - isPlaying: $isPlaying")
             super.onIsPlayingChanged(isPlaying)
             if (isPlaying) {
-                handler.postDelayed(runnableOcultar, hideControlsDelay) // Programa la ocultación de los controles
+                handler.postDelayed(
+                    runnableOcultar,
+                    hideControlsDelay
+                ) // Programa la ocultación de los controles
                 Log.d("PlayerActivity", "Se programó la próxima actualización")
             } else {
                 handler.removeCallbacks(runnableOcultar) // Solo cancela la ocultación
                 Log.d("PlayerActivity", "Se canceló la próxima actualización")
             }
         }
+
         // Método para manejar errores del reproductor
         override fun onPlayerError(error: PlaybackException) {
             Log.e("PlayerActivity", "Error en el reproductor: ${error.message}")
@@ -501,14 +507,18 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun actualizarTiempo() {
         MainScope().launch {
-            val tiemporeproducido = binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido) // TextView del contador
+            val tiemporeproducido =
+                binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido) // TextView del contador
             val tiempototal = binding.reproductor.findViewById<TextView>(R.id.tiempototal)
             val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
             Log.d("PlayerActivity", "actualizarTiempo() llamado")
 
             val posicionActual = player?.currentPosition ?: 0
             val duracionTotal = player?.duration ?: 0
-            Log.d("PlayerActivity", "Posición actual: $posicionActual, Duración total: $duracionTotal")
+            Log.d(
+                "PlayerActivity",
+                "Posición actual: $posicionActual, Duración total: $duracionTotal"
+            )
 
             tiemporeproducido.text = tiempoFormateado(posicionActual) // Actualiza el TextView
             tiempototal.text = tiempoFormateado(duracionTotal)
@@ -522,6 +532,7 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
     }
+
     private fun tiempoFormateado(tiempoMs: Long): String {
         return DateUtils.formatElapsedTime(tiempoMs / 1000)
     }
