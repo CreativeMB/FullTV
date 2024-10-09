@@ -24,7 +24,6 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.fulltv.databinding.ActivityPlayerBinding
-import com.creativem.fulltv.data.Movie
 import com.creativem.fulltv.data.RelojCuston
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.CollectionReference
@@ -32,30 +31,18 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import java.io.IOException
 import android.text.format.DateUtils
-
 import androidx.media3.exoplayer.DefaultRenderersFactory
-
-
 import kotlinx.coroutines.MainScope
-
-
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-
 import androidx.media3.datasource.DefaultDataSource
 import com.creativem.fulltv.R
+import com.creativem.fulltv.adapter.FirestoreRepository
 import com.creativem.fulltv.menu.MoviesMenuAdapter
-
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
+
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -180,87 +167,27 @@ class PlayerActivity : AppCompatActivity() {
         // Usar un CoroutineScope adecuado (puede ser un lifecycleScope si estás dentro de una Activity o Fragment)
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Obtener las películas desde Firestore
-                val snapshot = firestore.collection("movies")
-                    .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                    .get()
-                    .await() // Asegúrate de tener la dependencia de Firebase Kotlin Coroutines
+                // Obtener la instancia de FirestoreRepository
+                val repository = FirestoreRepository()
 
-                val movies = mutableListOf<Movie>() // Crear una lista temporal para almacenar las películas
-
-                // Cargar las películas
-                val jobs = snapshot.documents.map { document ->
-                    async {
-                        val title = document.getString("title") ?: "Sin título"
-                        val synopsis = document.getString("synopsis") ?: "Sin sinopsis"
-                        val imageUrl = document.getString("imageUrl") ?: ""
-                        val streamUrl = document.getString("streamUrl") ?: ""
-                        val createdAt = document.getTimestamp("createdAt") ?: return@async null
-
-                        // Verificar si el URL es válido
-                        val isValid = isUrlValid(streamUrl)
-
-                        // Crear la película y retornar
-                        Movie(
-                            id = document.id, // Asigna el ID del documento
-                            title = title,
-                            synopsis = synopsis,
-                            imageUrl = imageUrl,
-                            streamUrl = streamUrl,
-                            createdAt = createdAt, // Mantener el Timestamp
-                            isValid = isValid
-                        )
-                    }
-                }
-
-                // Esperar a que todos los trabajos se completen en el hilo principal
-                val moviesList = jobs.awaitAll().filterNotNull() // Filtrar nulos
-
-                // Filtrar películas inválidas que son más viejas de 24 horas
-                val moviesToDelete = moviesList.filter { movie ->
-                    !movie.isValid && (System.currentTimeMillis() - movie.createdAt.toDate().time > TimeUnit.HOURS.toMillis(24))
-                }
-
-                // Eliminar películas inválidas
-                moviesToDelete.forEach { movie ->
-                    firestore.collection("movies").document(movie.id).delete()
-                }
+                // Obtener las películas desde Firestore utilizando el método de la clase FirestoreRepository
+                val (peliculasValidas, peliculasInvalidas) = repository.obtenerPeliculas()
 
                 // Filtrar las películas válidas o las que son más recientes de 24 horas
-                val filteredMovies = moviesList.filter { movie ->
-                    movie.isValid || (System.currentTimeMillis() - movie.createdAt.toDate().time <= TimeUnit.HOURS.toMillis(24))
+                val filteredMovies = peliculasValidas.filter { movie ->
+                    // Puedes modificar esta lógica según tus necesidades
+                    System.currentTimeMillis() - movie.createdAt.toDate().time <= TimeUnit.HOURS.toMillis(24)
                 }
 
                 // Actualizar el adaptador con la lista de películas filtradas
                 withContext(Dispatchers.Main) {
                     adapter.updateMovies(filteredMovies)
-                    // Iniciar el Worker para la limpieza de elementos inactivos
-//                    startInactiveItemsWorker()
                 }
 
             } catch (exception: Exception) {
                 // Manejo de errores si la obtención de películas falla
                 exception.printStackTrace()
             }
-        }
-    }
-//    private fun startInactiveItemsWorker() {
-//        // Crear una solicitud de trabajo
-//        val workRequest = OneTimeWorkRequestBuilder<EliminarItemsInactivosWorker>()
-//            .build()
-//        // Enviar la solicitud de trabajo a WorkManager
-//        WorkManager.getInstance(applicationContext).enqueue(workRequest)
-//    }
-    // Cambia la función isUrlValid para que sea suspend
-    private suspend fun isUrlValid(url: String): Boolean {
-        val client = OkHttpClient()
-        val request = Request.Builder().url(url).head().build()
-
-        return try {
-            val response: Response = client.newCall(request).execute()
-            response.isSuccessful
-        } catch (e: IOException) {
-            false
         }
     }
 
@@ -286,32 +213,28 @@ class PlayerActivity : AppCompatActivity() {
 
     @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
+        // Crea el DataSource.Factory
+        val dataSourceFactory = DefaultDataSource.Factory(this)
+
+        // Crea la MediaSourceFactory
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
         // Configura el LoadControl
         val loadControl = DefaultLoadControl.Builder()
-            .setTargetBufferBytes(2 * 1024 * 1024)  // 2MB
+            .setTargetBufferBytes(2 * 1024 * 1024) // 2MB
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
-        // Crea el reproductor con la factory personalizada
+        // Crea el reproductor
         player = ExoPlayer.Builder(this)
             .setLoadControl(loadControl)
             .setRenderersFactory(DefaultRenderersFactory(this)
                 .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)) // Esto habilita FFmpeg
-            .setMediaSourceFactory(DefaultMediaSourceFactory(this)) // Configura la fuente de medios
+            .setMediaSourceFactory(mediaSourceFactory) // Configura la fuente de medios
             .build().also { exoPlayer ->
-
-//        val dataSourceFactory = createInsecureDataSourceFactory()
-////        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
-//        // Crea el ExoPlayer utilizando createRenderersFactory()
-//        player = ExoPlayer.Builder(this)
-//            .setLoadControl(loadControl)
-////            .setMediaSourceFactory(mediaSourceFactory)
-//            .setRenderersFactory(createRenderersFactory())
-//            .build().also { exoPlayer ->
 
                 // Asocia el ExoPlayer con el PlayerView usando binding
                 binding.reproductor.player = exoPlayer
-                exoPlayer.addListener(playerListener)
 
                 // Configura el MediaItem
                 val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
@@ -321,10 +244,8 @@ class PlayerActivity : AppCompatActivity() {
                 exoPlayer.prepare()
 
                 // Ajusta el comportamiento de la reproducción según sea necesario
-                exoPlayer.playWhenReady = false // Inicia la reproducción al tocar un botón o un evento específico
-
+                exoPlayer.playWhenReady = false // Cambia a true si deseas que inicie la reproducción automáticamente
             }
-
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -503,6 +424,7 @@ class PlayerActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         releasePlayer()
+        player = null
 
     }
 
@@ -602,32 +524,6 @@ class PlayerActivity : AppCompatActivity() {
     }
     private fun tiempoFormateado(tiempoMs: Long): String {
         return DateUtils.formatElapsedTime(tiempoMs / 1000)
-    }
-
-    //    private fun createInsecureDataSourceFactory(): HttpDataSource.Factory {
-//        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-//            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-//            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-//            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-//        })
-//
-//        val sslContext = SSLContext.getInstance("TLS")
-//        sslContext.init(null, trustAllCerts, SecureRandom())
-//
-//        // Configurar OkHttpClient
-//        val client = OkHttpClient.Builder()
-//            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
-//            .protocols(listOf(Protocol.HTTP_1_1, Protocol.HTTP_2)) // Establecer protocolos soportados
-//            .build()
-//
-//        return OkHttpDataSource.Factory(client)
-//    }
-    private fun createMediaSourceFactory(): DefaultMediaSourceFactory {
-        // Crea un DataSource.Factory
-        val dataSourceFactory: DefaultDataSource.Factory = DefaultDataSource.Factory(this)
-
-        // Crea y devuelve una instancia de DefaultMediaSourceFactory
-        return DefaultMediaSourceFactory(dataSourceFactory)
     }
 
 }
