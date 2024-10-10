@@ -609,6 +609,36 @@ class PlayerActivity : AppCompatActivity() {
     private fun tiempoFormateado(tiempoMs: Long): String {
         return DateUtils.formatElapsedTime(tiempoMs / 1000)
     }
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        showControlsAndResetTimer()
+        Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
+        return when (keyCode) {
+            KeyEvent.KEYCODE_MENU -> {
+                mostarpélis()
+                true
+            }
+
+            KeyEvent.KEYCODE_PAGE_UP -> {
+                Log.d("KeyCodeTest", "Página Arriba presionada")
+                mostarpélis()
+                true
+            }
+
+            KeyEvent.KEYCODE_PAGE_DOWN -> {
+                Log.d("KeyCodeTest", "Página Abajo presionada")
+                mostarpélis()
+                true
+            }
+
+            174 -> { // Código del botón del control remoto
+                Log.d("KeyCodeTest", "Botón del control remoto (174) presionado")
+                mostarpélis()
+                true
+            }
+
+            else -> super.onKeyDown(keyCode, event)
+        }
+    }
 
 }
 
