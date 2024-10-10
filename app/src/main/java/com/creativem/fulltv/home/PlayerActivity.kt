@@ -33,6 +33,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import android.text.format.DateUtils
+import android.widget.Toast
 import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import kotlinx.coroutines.MainScope
@@ -206,7 +207,6 @@ class PlayerActivity : AppCompatActivity() {
         ) // Asegúrate de usar el mismo nombre clave que usas en VideoPlayerActivity
         startActivity(intent)
     }
-
     @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
         // Crea el DataSource.Factory
@@ -228,7 +228,7 @@ class PlayerActivity : AppCompatActivity() {
                 DefaultRenderersFactory(this)
                     .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             ) // Esto habilita FFmpeg
-            .setMediaSourceFactory(mediaSourceFactory) // Configura la fuente de medios
+            .setMediaSourceFactory(mediaSourceFactory)
             .build().also { exoPlayer ->
                 // Asocia el ExoPlayer con el PlayerView usando binding
                 binding.reproductor.player = exoPlayer
@@ -240,154 +240,244 @@ class PlayerActivity : AppCompatActivity() {
                 exoPlayer.setMediaItem(mediaItem)
                 exoPlayer.prepare()
 
-                // Ajusta el comportamiento de la reproducción según sea necesario
-                exoPlayer.playWhenReady = false // Cambia a true si deseas que inicie la reproducción automáticamente
+                // Ajusta el comportamiento de la reproducción
+                exoPlayer.playWhenReady = false
 
                 // Añade el listener del reproductor
                 exoPlayer.addListener(playerListener)
             }
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        showControlsAndResetTimer()
-        Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
-        return when (keyCode) {
-            KeyEvent.KEYCODE_MENU -> {
-                mostarpélis()
-                true
-            }
-
-            KeyEvent.KEYCODE_PAGE_UP -> {
-                Log.d("KeyCodeTest", "Página Arriba presionada")
-                mostarpélis()
-                true
-            }
-
-            KeyEvent.KEYCODE_PAGE_DOWN -> {
-                Log.d("KeyCodeTest", "Página Abajo presionada")
-                mostarpélis()
-                true
-            }
-
-            174 -> { // Código del botón del control remoto
-                Log.d("KeyCodeTest", "Botón del control remoto (174) presionado")
-                mostarpélis()
-                true
-            }
-
-            else -> super.onKeyDown(keyCode, event)
-        }
-    }
-
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
-            Log.d("PlayerActivity", "onPlaybackStateChanged - playbackState: $playbackState")
             when (playbackState) {
                 Player.STATE_BUFFERING -> {
                     Log.d("PlayerActivity", "Reproductor almacenando en búfer...")
-                    // Puedes mostrar un indicador de carga si lo necesitas
+                    mostrarBuffer()
                 }
 
                 Player.STATE_READY -> {
-                    Log.d("PlayerActivity", "Reproductor listo. Reproduciendo...Tobias")
                     reconnectionAttempts = 0
-                    actualizarTiempo() // Iniciar la actualización del tiempo
+                    actualizarTiempo()
                 }
 
-                Player.STATE_ENDED -> {
-                    Log.d("PlayerActivity", "Reproducción finalizada.")
+                Player.STATE_ENDED, Player.STATE_IDLE -> {
                     if (isLiveStream) {
                         attemptReconnection()
                     } else {
-                        // Detener la actualización del tiempo al finalizar la reproducción
                         handler.removeCallbacks(runnable)
-                        Log.d("PlayerActivity", "Se canceló la próxima actualización (STATE_ENDED)")
                     }
                 }
 
-                Player.STATE_IDLE -> {
-                    Log.d("PlayerActivity", "Reproductor inactivo.")
-                    if (isLiveStream) {
-                        attemptReconnection()
-                    } else {
-                        // Detener la actualización del tiempo cuando el reproductor está inactivo
-                        handler.removeCallbacks(runnable)
-                        Log.d("PlayerActivity", "Se canceló la próxima actualización (STATE_IDLE)")
-                    }
-                }
-
-                else -> {
-                    Log.w("PlayerActivity", "Estado de reproducción desconocido: $playbackState")
-                }
+                else -> Log.w("PlayerActivity", "Estado desconocido: $playbackState")
             }
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            Log.d("PlayerActivity", "onIsPlayingChanged - isPlaying: $isPlaying")
-            super.onIsPlayingChanged(isPlaying)
             if (isPlaying) {
-                handler.postDelayed(
-                    runnableOcultar,
-                    hideControlsDelay
-                ) // Programa la ocultación de los controles
-                Log.d("PlayerActivity", "Se programó la próxima actualización")
+                handler.postDelayed(runnableOcultar, hideControlsDelay)
             } else {
-                handler.removeCallbacks(runnableOcultar) // Solo cancela la ocultación
-                Log.d("PlayerActivity", "Se canceló la próxima actualización")
+                handler.removeCallbacks(runnableOcultar)
             }
         }
 
-        // Método para manejar errores del reproductor
         override fun onPlayerError(error: PlaybackException) {
-            Log.e("PlayerActivity", "Error en el reproductor: ${error.message}")
-            // Verificar si el error es recuperable
             val isRecoverableError = error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
-
-            // USAR isRecoverableError en la condición de reconexión
             if (isRecoverableError && reconnectionAttempts < maxReconnectionAttempts) {
-                Log.d("PlayerActivity", "Intento de reconexión: $reconnectionAttempts")
                 reconnectionAttempts++
-
                 Handler(Looper.getMainLooper()).postDelayed({
-                    // Reconexión al stream
-                    val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
-                    player?.setMediaItem(mediaItem)
-                    player?.prepare()
-                    player?.playWhenReady = true
-                }, 2000) // 2 segundos de retraso para el siguiente intento
+                    reconectarStream()
+                }, 2000) // 2 segundos de retraso
             } else {
-                Log.d(
-                    "PlayerActivity",
-                    "Error irrecuperable o límite de reintentos alcanzado. Mostrando diálogo de error."
-                )
-                showErrorDialog("No se pudo reproducir el stream.")
+                showErrorDialog("No se pudo reconectar al stream.")
             }
         }
     }
 
+    private fun mostrarBuffer() {
+        val bufferedPercentage = player?.bufferedPercentage ?: 0
+        val bufferedData = (bufferedPercentage / 100.0) * (2 * 1024) // 2MB de targetBufferBytes
+        Toast.makeText(
+            this,
+            "Búfer almacenado: ${bufferedData.toInt()} KB",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
     private fun attemptReconnection() {
         if (reconnectionAttempts < maxReconnectionAttempts) {
-            Log.d("PlayerActivity", "Intento de reconexión: $reconnectionAttempts")
             reconnectionAttempts++
             reconnectLiveStream()
         } else {
-            Log.d(
-                "PlayerActivity",
-                "Máximo número de intentos alcanzado. Mostrando diálogo de error."
-            )
             showErrorDialog("No se pudo reconectar al stream.")
         }
     }
 
     private fun reconnectLiveStream() {
-        if (isLiveStream || player?.playbackState == Player.STATE_ENDED || player?.playbackState == Player.STATE_IDLE) {
-            Log.d("PlayerActivity", "Intentando reconectar a la transmisión en vivo...")
-            val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
-            player?.setMediaItem(mediaItem)
-            player?.prepare()
-            player?.playWhenReady = true
-        }
+        val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+        player?.setMediaItem(mediaItem)
+        player?.prepare()
+        player?.playWhenReady = true
     }
+
+    private fun reconectarStream() {
+        val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+        player?.setMediaItem(mediaItem)
+        player?.prepare()
+        player?.playWhenReady = true
+    }
+
+//    @SuppressLint("UnsafeOptInUsageError")
+//    private fun initializePlayer() {
+//        // Crea el DataSource.Factory
+//        val dataSourceFactory = DefaultDataSource.Factory(this)
+//
+//        // Crea la MediaSourceFactory
+//        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+//
+//        // Configura el LoadControl
+//        val loadControl = DefaultLoadControl.Builder()
+//            .setTargetBufferBytes(2 * 1024 * 1024) // 2MB
+//            .setPrioritizeTimeOverSizeThresholds(true)
+//            .build()
+//
+//        // Crea el reproductor
+//        player = ExoPlayer.Builder(this)
+//            .setLoadControl(loadControl)
+//            .setRenderersFactory(
+//                DefaultRenderersFactory(this)
+//                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+//            ) // Esto habilita FFmpeg
+//            .setMediaSourceFactory(mediaSourceFactory) // Configura la fuente de medios
+//            .build().also { exoPlayer ->
+//                // Asocia el ExoPlayer con el PlayerView usando binding
+//                binding.reproductor.player = exoPlayer
+//
+//                // Configura el MediaItem
+//                val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+//
+//                // Prepara el ExoPlayer para la reproducción
+//                exoPlayer.setMediaItem(mediaItem)
+//                exoPlayer.prepare()
+//
+//                // Ajusta el comportamiento de la reproducción según sea necesario
+//                exoPlayer.playWhenReady = false // Cambia a true si deseas que inicie la reproducción automáticamente
+//
+//                // Añade el listener del reproductor
+//                exoPlayer.addListener(playerListener)
+//            }
+//    }
+//
+//
+//    private val playerListener = object : Player.Listener {
+//        override fun onPlaybackStateChanged(playbackState: Int) {
+//            Log.d("PlayerActivity", "onPlaybackStateChanged - playbackState: $playbackState")
+//            when (playbackState) {
+//                Player.STATE_BUFFERING -> {
+//                    Log.d("PlayerActivity", "Reproductor almacenando en búfer...")
+//                    // Puedes mostrar un indicador de carga si lo necesitas
+//                }
+//
+//                Player.STATE_READY -> {
+//                    Log.d("PlayerActivity", "Reproductor listo. Reproduciendo...Tobias")
+//                    reconnectionAttempts = 0
+//                    actualizarTiempo() // Iniciar la actualización del tiempo
+//                }
+//
+//                Player.STATE_ENDED -> {
+//                    Log.d("PlayerActivity", "Reproducción finalizada.")
+//                    if (isLiveStream) {
+//                        attemptReconnection()
+//                    } else {
+//                        // Detener la actualización del tiempo al finalizar la reproducción
+//                        handler.removeCallbacks(runnable)
+//                        Log.d("PlayerActivity", "Se canceló la próxima actualización (STATE_ENDED)")
+//                    }
+//                }
+//
+//                Player.STATE_IDLE -> {
+//                    Log.d("PlayerActivity", "Reproductor inactivo.")
+//                    if (isLiveStream) {
+//                        attemptReconnection()
+//                    } else {
+//                        // Detener la actualización del tiempo cuando el reproductor está inactivo
+//                        handler.removeCallbacks(runnable)
+//                        Log.d("PlayerActivity", "Se canceló la próxima actualización (STATE_IDLE)")
+//                    }
+//                }
+//
+//                else -> {
+//                    Log.w("PlayerActivity", "Estado de reproducción desconocido: $playbackState")
+//                }
+//            }
+//        }
+//
+//        override fun onIsPlayingChanged(isPlaying: Boolean) {
+//            Log.d("PlayerActivity", "onIsPlayingChanged - isPlaying: $isPlaying")
+//            super.onIsPlayingChanged(isPlaying)
+//            if (isPlaying) {
+//                handler.postDelayed(
+//                    runnableOcultar,
+//                    hideControlsDelay
+//                ) // Programa la ocultación de los controles
+//                Log.d("PlayerActivity", "Se programó la próxima actualización")
+//            } else {
+//                handler.removeCallbacks(runnableOcultar) // Solo cancela la ocultación
+//                Log.d("PlayerActivity", "Se canceló la próxima actualización")
+//            }
+//        }
+//
+//        // Método para manejar errores del reproductor
+//        override fun onPlayerError(error: PlaybackException) {
+//            Log.e("PlayerActivity", "Error en el reproductor: ${error.message}")
+//            // Verificar si el error es recuperable
+//            val isRecoverableError = error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
+//
+//            // USAR isRecoverableError en la condición de reconexión
+//            if (isRecoverableError && reconnectionAttempts < maxReconnectionAttempts) {
+//                Log.d("PlayerActivity", "Intento de reconexión: $reconnectionAttempts")
+//                reconnectionAttempts++
+//
+//                Handler(Looper.getMainLooper()).postDelayed({
+//                    // Reconexión al stream
+//                    val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+//                    player?.setMediaItem(mediaItem)
+//                    player?.prepare()
+//                    player?.playWhenReady = true
+//                }, 2000) // 2 segundos de retraso para el siguiente intento
+//            } else {
+//                Log.d(
+//                    "PlayerActivity",
+//                    "Error irrecuperable o límite de reintentos alcanzado. Mostrando diálogo de error."
+//                )
+//                showErrorDialog("No se pudo reproducir el stream.")
+//            }
+//        }
+//    }
+//
+//    private fun attemptReconnection() {
+//        if (reconnectionAttempts < maxReconnectionAttempts) {
+//            Log.d("PlayerActivity", "Intento de reconexión: $reconnectionAttempts")
+//            reconnectionAttempts++
+//            reconnectLiveStream()
+//        } else {
+//            Log.d(
+//                "PlayerActivity",
+//                "Máximo número de intentos alcanzado. Mostrando diálogo de error."
+//            )
+//            showErrorDialog("No se pudo reconectar al stream.")
+//        }
+//    }
+//
+//    private fun reconnectLiveStream() {
+//        if (isLiveStream || player?.playbackState == Player.STATE_ENDED || player?.playbackState == Player.STATE_IDLE) {
+//            Log.d("PlayerActivity", "Intentando reconectar a la transmisión en vivo...")
+//            val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+//            player?.setMediaItem(mediaItem)
+//            player?.prepare()
+//            player?.playWhenReady = true
+//        }
+//    }
 
     private fun showErrorDialog(message: String) {
         AlertDialog.Builder(this)
@@ -541,6 +631,37 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun tiempoFormateado(tiempoMs: Long): String {
         return DateUtils.formatElapsedTime(tiempoMs / 1000)
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        showControlsAndResetTimer()
+        Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
+        return when (keyCode) {
+            KeyEvent.KEYCODE_MENU -> {
+                mostarpélis()
+                true
+            }
+
+            KeyEvent.KEYCODE_PAGE_UP -> {
+                Log.d("KeyCodeTest", "Página Arriba presionada")
+                mostarpélis()
+                true
+            }
+
+            KeyEvent.KEYCODE_PAGE_DOWN -> {
+                Log.d("KeyCodeTest", "Página Abajo presionada")
+                mostarpélis()
+                true
+            }
+
+            174 -> { // Código del botón del control remoto
+                Log.d("KeyCodeTest", "Botón del control remoto (174) presionado")
+                mostarpélis()
+                true
+            }
+
+            else -> super.onKeyDown(keyCode, event)
+        }
     }
 
 }
