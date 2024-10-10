@@ -281,20 +281,16 @@ class PlayerActivity : AppCompatActivity() {
                     }
 
                     actualizarTiempo()
+
                 }
 
-                Player.STATE_ENDED, Player.STATE_IDLE -> {
+                Player.STATE_ENDED -> {
+                    Log.d("PlayerActivity", "Reproducción finalizada.")
                     isPlaybackActive = false
-                    Log.d("PlayerActivity", "Reproductor en estado ENDED o IDLE")
 
-                    if (!isPlaybackActive && reconnectionAttempts >= maxReconnectionAttempts) {
-                        Log.d("PlayerActivity", "No se pudo conectar al stream. Mostrando diálogo.")
-                        showErrorDialog("No se pudo conectar al stream.")
-                    } else if (isLiveStream && !isPlaybackActive) {
-                        Log.d(
-                            "PlayerActivity",
-                            "Transmisión en vivo finalizada. Intentando reconectar..."
-                        )
+                    // Si es un stream en vivo, intentar reconectar
+                    if (isLiveStream) {
+                        Log.d("PlayerActivity", "Transmisión en vivo finalizada. Intentando reconectar...")
                         intentarReconexion()
                     } else {
                         Log.d("PlayerActivity", "Deteniendo actualizaciones de tiempo.")
@@ -302,8 +298,26 @@ class PlayerActivity : AppCompatActivity() {
                     }
                 }
 
+                Player.STATE_IDLE -> {
+                    Log.d("PlayerActivity", "Reproductor en estado IDLE.")
+                    isPlaybackActive = false
+
+                    // Si es un stream en vivo, intentar reconectar
+                    if (isLiveStream) {
+                        Log.d("PlayerActivity", "Intentando reconectar transmisión en vivo...")
+                        intentarReconexion()
+                    } else {
+                        Log.d("PlayerActivity", "No hay reproducción activa.")
+                        handler.removeCallbacks(runnable)
+                    }
+                }
+
                 else -> {
-                    Log.w("PlayerActivity", "Estado desconocido: $playbackState")
+                    Log.w("PlayerActivity", "Estado desconocido del reproductor: $playbackState")
+                    // En caso de un estado desconocido, intentar reconectar si no hay actividad de reproducción
+                    if (!isPlaybackActive && reconnectionAttempts < maxReconnectionAttempts) {
+                        intentarReconexion()
+                    }
                 }
             }
         }
@@ -371,9 +385,13 @@ class PlayerActivity : AppCompatActivity() {
         reconnectionAttempts++
         isReconnecting = true
 
-        val tiempoEspera = initialReconnectionDelayMs * (2.0.pow((reconnectionAttempts - 1).toDouble())).toLong()
+        val tiempoEspera =
+            initialReconnectionDelayMs * (2.0.pow((reconnectionAttempts - 1).toDouble())).toLong()
 
-        Log.d("Reconexión", "Intentando reconectar (intento $reconnectionAttempts, espera de ${tiempoEspera}ms)...")
+        Log.d(
+            "Reconexión",
+            "Intentando reconectar (intento $reconnectionAttempts, espera de ${tiempoEspera}ms)..."
+        )
 
         // (Opcional) Mostrar indicador de reconexión
 
@@ -396,8 +414,15 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun simularClicPlay() {
-        Log.d("Reconexión", "Simulando clic en Play. Reintentando reconexión...")
-        intentarReconexion()
+        val playPauseButton: ImageButton = findViewById(R.id.play_pause)
+        playPauseButton.setOnClickListener {
+            if (isNetworkConnected()) {
+                Log.d("Reconexión", "Clic en Play detectado. Intentando reanudar...")
+                player?.playWhenReady = true
+            } else {
+                Log.d("Reconexión", "No hay conexión, no se puede reproducir.")
+            }
+        }
     }
 
     private fun reconectarStream() {
@@ -411,9 +436,12 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         try {
-            player?.seekTo(lastKnownPosition)
-            player?.prepare()
-            player?.playWhenReady = true
+            player?.let {
+                it.stop() // Asegúrate de detener antes de preparar
+                it.seekTo(0) // Reiniciar el stream desde el principio si es en vivo
+                it.prepare() // Prepara de nuevo el reproductor
+                it.playWhenReady = true // Reanuda automáticamente
+            }
         } catch (e: Exception) {
             Log.e("Reconexión", "Error al reiniciar la reproducción: ${e.message}")
             intentarReconexion()
@@ -422,7 +450,8 @@ class PlayerActivity : AppCompatActivity() {
 
     // Método auxiliar para verificar la conexión a internet
     private fun isNetworkConnected(): Boolean {
-        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val connectivityManager =
+            getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val activeNetwork = connectivityManager.activeNetworkInfo
         return activeNetwork?.isConnectedOrConnecting == true
     }
