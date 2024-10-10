@@ -552,5 +552,4 @@ private fun isNetworkConnected(): Boolean {
     private fun tiempoFormateado(tiempoMs: Long): String {
         return DateUtils.formatElapsedTime(tiempoMs / 1000)
     }
-
 }
