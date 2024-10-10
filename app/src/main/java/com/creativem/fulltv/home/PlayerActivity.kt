@@ -341,8 +341,9 @@ class PlayerActivity : AppCompatActivity() {
             Log.e("PlayerActivity", "Error en el reproductor: ${error.message}")
             // Verificar si el error es recuperable
             val isRecoverableError = error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
-            // Intento de reconexión
-            if (reconnectionAttempts < maxReconnectionAttempts) {
+
+            // USAR isRecoverableError en la condición de reconexión
+            if (isRecoverableError && reconnectionAttempts < maxReconnectionAttempts) {
                 Log.d("PlayerActivity", "Intento de reconexión: $reconnectionAttempts")
                 reconnectionAttempts++
 
@@ -356,9 +357,9 @@ class PlayerActivity : AppCompatActivity() {
             } else {
                 Log.d(
                     "PlayerActivity",
-                    "Máximo número de intentos alcanzado. Mostrando diálogo de error."
+                    "Error irrecuperable o límite de reintentos alcanzado. Mostrando diálogo de error."
                 )
-                showErrorDialog("No se pudo reconectar al stream.")
+                showErrorDialog("No se pudo reproducir el stream.")
             }
         }
     }
