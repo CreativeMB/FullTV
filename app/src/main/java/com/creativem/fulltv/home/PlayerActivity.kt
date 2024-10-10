@@ -33,6 +33,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import android.text.format.DateUtils
+import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import kotlinx.coroutines.MainScope
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -403,10 +404,11 @@ class PlayerActivity : AppCompatActivity() {
                 dialog.dismiss() // Cierra el diálogo
                 onBackPressed() // Simula el botón de retroceso en lugar de terminar la actividad
             }
-            .setNeutralButton("Donar") { _, _ ->
-                val donationUrl = "https://www.floristerialoslirios.com/"
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(donationUrl))
+            .setNeutralButton("Reporte de donacion") { _, _ ->
+                val intent = Intent(this, PedidosActivity::class.java)
                 startActivity(intent)
+                finish() // Cierra el diálogo
+                onBackPressed()
             }
             .show()
     }
