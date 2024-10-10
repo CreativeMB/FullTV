@@ -2,6 +2,7 @@ package com.creativem.fulltv.adapter
 
 import android.util.Log
 import com.creativem.fulltv.data.Movie
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
@@ -29,40 +30,30 @@ class FirestoreRepository {
     suspend fun obtenerPeliculas(): Pair<List<Movie>, List<Movie>> = coroutineScope {
         try {
             val snapshot = peliculasCollection.get().await()
+
+            // Obtener las películas y asignar el campo `createdAt`
             val peliculas = snapshot.documents.mapNotNull { document ->
-                document.toObject(Movie::class.java)?.copy(id = document.id)
+                document.toObject(Movie::class.java)?.copy(
+                    id = document.id,
+                    createdAt = document.getTimestamp("createdAt") ?: Timestamp.now()
+                )
             }
 
-            // Validación en paralelo con límite de concurrencia
-            val (peliculasValidas, peliculasInvalidas) =
-                validarPeliculasConcurrente(peliculas, maxConcurrentRequests = 16)
+            // Validar las URLs y separar las películas válidas e inválidas
+            val (peliculasValidas, peliculasInvalidas) = peliculas.partition { movie ->
+                isUrlValid(movie.streamUrl) // Validar la URL de cada película
+            }
 
             // Ordenar las listas por fecha de publicación
-            val peliculasOrdenadasValidas = peliculasValidas.sortedByDescending { it.createdAt }
-            val peliculasOrdenadasInvalidas = peliculasInvalidas.sortedByDescending { it.createdAt }
+            val peliculasOrdenadasValidas = peliculasValidas.sortedByDescending { it.createdAt.seconds }
+            val peliculasOrdenadasInvalidas = peliculasInvalidas.sortedByDescending { it.createdAt.seconds }
 
+            // Retornar las listas ordenadas
             Pair(peliculasOrdenadasValidas, peliculasOrdenadasInvalidas)
         } catch (e: Exception) {
             e.printStackTrace()
-            Pair(emptyList(), emptyList())
+            Pair(emptyList(), emptyList()) // Retornar listas vacías en caso de error
         }
-    }
-
-    private suspend fun validarPeliculasConcurrente(
-        peliculas: List<Movie>,
-        maxConcurrentRequests: Int
-    ): Pair<List<Movie>, List<Movie>> = coroutineScope {
-        val deferred = peliculas.map { movie ->
-            async(connectionPool) {
-                val isValid = isUrlValid(movie.streamUrl)
-                movie.copy(isValid = isValid) to isValid // Simplifica la separación
-            }
-        }
-
-        val resultados = deferred.awaitAll()
-        val peliculasValidas = resultados.filter { it.second }.map { it.first }
-        val peliculasInvalidas = resultados.filterNot { it.second }.map { it.first }
-        Pair(peliculasValidas, peliculasInvalidas)
     }
 
     private suspend fun isUrlValid(url: String?): Boolean {

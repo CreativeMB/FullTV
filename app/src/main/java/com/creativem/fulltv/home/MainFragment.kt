@@ -119,6 +119,7 @@ class MainFragment : BrowseSupportFragment() {
     }
 
     private fun cargarPeliculas() {
+        // Cargar una imagen de fondo utilizando Glide
         Glide.with(requireContext())
             .load("https://ejemplo.com/imagen.jpg")
             .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
@@ -130,6 +131,7 @@ class MainFragment : BrowseSupportFragment() {
         // Mostrar la vista de carga
         mostrarCarga("Actualizando biblioteca en línea...")
 
+        // Lanzar una coroutine en el contexto principal
         CoroutineScope(Dispatchers.Main).launch {
             // Obtén las películas actualizadas dentro del coroutine
             val (peliculasActivas, peliculasInactivas) = firestoreRepository.obtenerPeliculas()
@@ -142,12 +144,16 @@ class MainFragment : BrowseSupportFragment() {
         }
     }
 
-    // Actualiza la función updateMovieList()
     private fun updateMovieList(peliculasActivas: List<Movie>, peliculasInactivas: List<Movie>) {
-        // Actualiza la lista de películas en la interfaz de usuario
         rowsAdapter.clear() // Limpia la lista actual
-        agregarALista(peliculasActivas, "CARTELERA")
-        agregarALista(peliculasInactivas, "ALQUILER")
+
+        // Ordenar las listas de películas por fecha de creación (createdAt) antes de agregar
+        val peliculasOrdenadasActivas = peliculasActivas.sortedByDescending { it.createdAt.seconds }
+        val peliculasOrdenadasInactivas = peliculasInactivas.sortedByDescending { it.createdAt.seconds }
+
+        // Agregar a la lista
+        agregarALista(peliculasOrdenadasActivas, "CARTELERA")
+        agregarALista(peliculasOrdenadasInactivas, "ALQUILER")
         // Agrega el menú aquí, después de cargar las películas
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
         val menuItems = listOf("Pedidos", "Menu 2", "Menu 3", "Menu 4", "Menu 5")
