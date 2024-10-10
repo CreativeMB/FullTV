@@ -229,7 +229,6 @@ class PlayerActivity : AppCompatActivity() {
             ) // Esto habilita FFmpeg
             .setMediaSourceFactory(mediaSourceFactory) // Configura la fuente de medios
             .build().also { exoPlayer ->
-
                 // Asocia el ExoPlayer con el PlayerView usando binding
                 binding.reproductor.player = exoPlayer
 
@@ -241,8 +240,10 @@ class PlayerActivity : AppCompatActivity() {
                 exoPlayer.prepare()
 
                 // Ajusta el comportamiento de la reproducción según sea necesario
-                exoPlayer.playWhenReady =
-                    false // Cambia a true si deseas que inicie la reproducción automáticamente
+                exoPlayer.playWhenReady = false // Cambia a true si deseas que inicie la reproducción automáticamente
+
+                // Añade el listener del reproductor
+                exoPlayer.addListener(playerListener)
             }
     }
 
@@ -338,6 +339,8 @@ class PlayerActivity : AppCompatActivity() {
         // Método para manejar errores del reproductor
         override fun onPlayerError(error: PlaybackException) {
             Log.e("PlayerActivity", "Error en el reproductor: ${error.message}")
+            // Verificar si el error es recuperable
+            val isRecoverableError = error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
             // Intento de reconexión
             if (reconnectionAttempts < maxReconnectionAttempts) {
                 Log.d("PlayerActivity", "Intento de reconexión: $reconnectionAttempts")
