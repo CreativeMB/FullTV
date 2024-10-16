@@ -4,10 +4,21 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2024-10-10T19:37:53.480714200Z">
+        <DropdownSelection timestamp="2024-10-16T19:36:42.917032900Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\Floristerialoslirios\.android\avd\Television_1080p_API_34.avd" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\Floristerialoslirios\.android\avd\Pixel_8_Pro_API_34.avd" />
+            </handle>
+          </Target>
+        </DropdownSelection>
+        <DialogSelection />
+      </SelectionState>
+      <SelectionState runConfigName="app.tvfullurl">
+        <option name="selectionMode" value="DROPDOWN" />
+        <DropdownSelection timestamp="2024-10-16T19:44:44.764549400Z">
+          <Target type="DEFAULT_BOOT">
+            <handle>
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\Floristerialoslirios\.android\avd\Pixel_8_Pro_API_34.avd" />
             </handle>
           </Target>
         </DropdownSelection>

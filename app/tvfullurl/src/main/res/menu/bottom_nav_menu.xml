@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nuevaPeliculaFragment"
+        android:icon="@drawable/pedidos"
+        android:title="Agregar Película" />
+    <item
+        android:id="@+id/editarPeliculaFragment"
+        android:icon="@drawable/peliculas"
+        android:title="Lista de Películas" />
+    <item
+        android:id="@+id/soporteFragment"
+        android:icon="@drawable/peliculas"
+        android:title="Soporte" />
+</menu>

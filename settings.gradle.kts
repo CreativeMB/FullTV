@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "FullTV"
 include(":app")
- 
+include(":app:tvfullurl")

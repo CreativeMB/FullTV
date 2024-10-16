@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/nuevaPeliculaFragment">
+
+    <fragment
+        android:id="@+id/nuevaPeliculaFragment"
+        android:name="com.creativem.tvfullurl.Fragment.NuevaPeliculaFragment"
+        android:label="fragment_nueva_pelicula"
+        tools:layout="@layout/fragment_nueva_pelicula" >
+        <action
+            android:id="@+id/action_nuevaPeliculaFragment_to_editarPeliculaFragment"
+            app:destination="@id/editarPeliculaFragment" />
+        <action
+            android:id="@+id/action_nuevaPeliculaFragment_to_soporteFragment"
+            app:destination="@id/soporteFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/editarPeliculaFragment"
+        android:name="com.creativem.tvfullurl.Fragment.EditarPeliculaFragment"
+        android:label="fragment_editar_pelicula"
+        tools:layout="@layout/fragment_soporte" >
+        <action
+            android:id="@+id/action_editarPeliculaFragment_to_nuevaPeliculaFragment"
+            app:destination="@id/nuevaPeliculaFragment" />
+        <action
+            android:id="@+id/action_editarPeliculaFragment_to_soporteFragment"
+            app:destination="@id/soporteFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/soporteFragment"
+        android:name="com.creativem.tvfullurl.Fragment.SoporteFragment"
+        android:label="fragment_soporte"
+        tools:layout="@layout/fragment_soporte" >
+        <action
+            android:id="@+id/action_soporteFragment_to_editarPeliculaFragment"
+            app:destination="@id/editarPeliculaFragment" />
+        <action
+            android:id="@+id/action_soporteFragment_to_nuevaPeliculaFragment"
+            app:destination="@id/nuevaPeliculaFragment" />
+    </fragment>
+</navigation>
