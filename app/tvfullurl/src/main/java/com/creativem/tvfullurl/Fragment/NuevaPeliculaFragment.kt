@@ -61,13 +61,14 @@ class NuevaPeliculaFragment : Fragment() {
         // Llamar a las funciones necesarias
 //        binding.uploadText.setOnClickListener {  } // Llama a uploadMovie cuando se hace clic
         binding.url.setOnClickListener { openWebPage("https://castr.com/hlsplayer/") } // Abre la página web
+
         binding.uploadText.setOnClickListener {
             if (movieId == null) {
                 // Guardar una nueva película
                 saveNewMovie()
             } else {
                 // Actualizar la película existente
-                uploadMovie(movieId!!)
+                editarMovie(movieId!!)
             }
         }
 
@@ -92,38 +93,6 @@ class NuevaPeliculaFragment : Fragment() {
             .addOnFailureListener {
                 Toast.makeText(requireContext(), "Error al cargar los datos", Toast.LENGTH_SHORT)
                     .show()
-            }
-    }
-    private fun uploadMovie(movieId: String) {
-
-
-        if (!validarCampos()) return
-
-        // Crear el mapa con los datos de la película
-        val movie: MutableMap<String, Any> = mutableMapOf(
-            "title" to title,
-            "synopsis" to year,
-            "imageUrl" to imageUrl,
-            "streamUrl" to streamUrl,
-            "createdAt" to Timestamp.now()
-        )
-
-        // Usar add() para generar un nuevo documento con un ID único automáticamente
-        db.collection("movies")
-            .add(movie)
-            .addOnSuccessListener { documentReference ->
-                Log.d("movies", "Película creada correctamente con ID: ${documentReference.id}")
-                Toast.makeText(requireContext(), "Película creada correctamente", Toast.LENGTH_LONG)
-                    .show()
-                clearFields()
-            }
-            .addOnFailureListener { e ->
-                Log.e("movies", "Error al subir la película: ${e.message}")
-                Toast.makeText(
-                    requireContext(),
-                    "Error al subir la película: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
             }
     }
 
@@ -186,13 +155,14 @@ class NuevaPeliculaFragment : Fragment() {
 
 
     private fun validarCampos(): Boolean {
-        val title = binding.titleEditText.text.toString().trim()
-        val synopsis = binding.yearEditText.text.toString().trim()
-        val imageUrl = binding.imageUrlEditText.text.toString().trim()
-        val streamUrl = binding.streamUrlEditText.text.toString().trim()
+        // Actualiza las variables globales con los valores de los campos
+        title = binding.titleEditText.text.toString().trim()
+        year = binding.yearEditText.text.toString().trim()
+        imageUrl = binding.imageUrlEditText.text.toString().trim()
+        streamUrl = binding.streamUrlEditText.text.toString().trim()
 
         // Verificar si los campos están completos
-        if (title.isEmpty() || synopsis.isEmpty() || imageUrl.isEmpty() || streamUrl.isEmpty()) {
+        if (title.isEmpty() || year.isEmpty() || imageUrl.isEmpty()) {
             Toast.makeText(requireContext(), "Todos los campos son obligatorios", Toast.LENGTH_LONG).show()
             return false
         }
@@ -203,12 +173,39 @@ class NuevaPeliculaFragment : Fragment() {
             return false
         }
 
-        if (!URLUtil.isValidUrl(streamUrl)) {
-            Toast.makeText(requireContext(), "URL de video inválida", Toast.LENGTH_SHORT).show()
-            return false
-        }
-
         return true
+    }
+
+    private fun editarMovie(movieId: String) {
+        if (!validarCampos()) return
+
+        // Crear el mapa con los datos de la película actualizados
+        val movie: MutableMap<String, Any> = mutableMapOf(
+            "title" to title,  // Asegúrate de que estas variables ya tienen los valores correctos
+            "year" to year,
+            "imageUrl" to imageUrl,
+            "streamUrl" to streamUrl,
+            "updatedAt" to Timestamp.now()  // Marcar como actualizado
+        )
+
+        // Usar update() para modificar el documento existente
+        db.collection("movies")
+            .document(movieId)
+            .update(movie)
+            .addOnSuccessListener {
+                Log.d("movies", "Película actualizada correctamente con ID: $movieId")
+                Toast.makeText(requireContext(), "Película actualizada correctamente", Toast.LENGTH_LONG).show()
+// Navegar de vuelta a EditarPeliculaFragment
+                findNavController().navigateUp()
+            }
+            .addOnFailureListener { e ->
+                Log.e("movies", "Error al actualizar la película: ${e.message}")
+                Toast.makeText(
+                    requireContext(),
+                    "Error al actualizar la película: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
     }
 
     private fun clearFields() {
