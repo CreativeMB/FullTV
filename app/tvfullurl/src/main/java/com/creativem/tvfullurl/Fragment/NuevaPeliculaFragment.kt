@@ -49,7 +49,7 @@ class NuevaPeliculaFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         editTexts = listOf(
             binding.titleEditText,
-            binding.synopsisEditText,
+            binding.yearEditText,
             binding.imageUrlEditText,
             binding.streamUrlEditText
         )
@@ -64,10 +64,10 @@ class NuevaPeliculaFragment : Fragment() {
         binding.uploadText.setOnClickListener {
             if (movieId == null) {
                 // Guardar una nueva película
-                uploadMovie()
+                saveNewMovie()
             } else {
                 // Actualizar la película existente
-                updateMovie(movieId!!)
+                uploadMovie(movieId!!)
             }
         }
 
@@ -82,7 +82,7 @@ class NuevaPeliculaFragment : Fragment() {
                     movie?.let {
                         // Cargar los datos en los campos
                         binding.titleEditText.setText(it.title)
-                        binding.synopsisEditText.setText(it.year)
+                        binding.yearEditText.setText(it.year)
                         binding.imageUrlEditText.setText(it.imageUrl)
                         binding.streamUrlEditText.setText(it.streamUrl)
                         // Puedes cargar otros campos aquí
@@ -94,27 +94,57 @@ class NuevaPeliculaFragment : Fragment() {
                     .show()
             }
     }
+    private fun uploadMovie(movieId: String) {
 
-    private fun updateMovie(movieId: String) {
+
         if (!validarCampos()) return
-        val updatedMovie = mapOf(
-            "title" to binding.titleEditText.text.toString(),
-            "year" to binding.synopsisEditText.text.toString(),
-            "imageUrl" to binding.imageUrlEditText.text.toString(),
-            "streamUrl" to binding.streamUrlEditText.text.toString(),
-            // Otros campos a actualizar
+
+        // Crear el mapa con los datos de la película
+        val movie: MutableMap<String, Any> = mutableMapOf(
+            "title" to title,
+            "synopsis" to year,
+            "imageUrl" to imageUrl,
+            "streamUrl" to streamUrl,
+            "createdAt" to Timestamp.now()
         )
-        db.collection("movies").document(movieId).update(updatedMovie)
-            .addOnSuccessListener {
-                Toast.makeText(requireContext(), "Película actualizada", Toast.LENGTH_SHORT).show()
-                findNavController().popBackStack() // Volver a la lista de películas
+
+        // Usar add() para generar un nuevo documento con un ID único automáticamente
+        db.collection("movies")
+            .add(movie)
+            .addOnSuccessListener { documentReference ->
+                Log.d("movies", "Película creada correctamente con ID: ${documentReference.id}")
+                Toast.makeText(requireContext(), "Película creada correctamente", Toast.LENGTH_LONG)
+                    .show()
+                clearFields()
             }
-            .addOnFailureListener {
+            .addOnFailureListener { e ->
+                Log.e("movies", "Error al subir la película: ${e.message}")
                 Toast.makeText(
                     requireContext(),
-                    "Error al actualizar la película",
-                    Toast.LENGTH_SHORT
+                    "Error al subir la película: ${e.message}",
+                    Toast.LENGTH_LONG
                 ).show()
+            }
+    }
+
+    private fun saveNewMovie() {
+        if (!validarCampos()) return
+        val newMovie = Movie(
+            title = binding.titleEditText.text.toString(),
+            year = binding.yearEditText.text.toString(),
+            imageUrl = binding.imageUrlEditText.text.toString(),
+            streamUrl = binding.streamUrlEditText.text.toString()
+
+        )
+        db.collection("movies").add(newMovie)
+            .addOnSuccessListener {
+                Toast.makeText(requireContext(), "Película guardada", Toast.LENGTH_SHORT).show()
+
+                clearFields()
+            }
+            .addOnFailureListener {
+                Toast.makeText(requireContext(), "Error al guardar la película", Toast.LENGTH_SHORT)
+                    .show()
             }
     }
 
@@ -154,42 +184,10 @@ class NuevaPeliculaFragment : Fragment() {
     }
 
 
-    private fun uploadMovie() {
-
-
-        if (!validarCampos()) return
-
-        // Crear el mapa con los datos de la película
-        val movie: MutableMap<String, Any> = mutableMapOf(
-            "title" to title,
-            "year" to year,
-            "imageUrl" to imageUrl,
-            "streamUrl" to streamUrl,
-            "createdAt" to Timestamp.now()
-        )
-
-        // Usar add() para generar un nuevo documento con un ID único automáticamente
-        db.collection("movies")
-            .add(movie)
-            .addOnSuccessListener { documentReference ->
-                Log.d("movies", "Película creada correctamente con ID: ${documentReference.id}")
-                Toast.makeText(requireContext(), "Película creada correctamente", Toast.LENGTH_LONG)
-                    .show()
-                clearFields()
-            }
-            .addOnFailureListener { e ->
-                Log.e("movies", "Error al subir la película: ${e.message}")
-                Toast.makeText(
-                    requireContext(),
-                    "Error al subir la película: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-    }
 
     private fun validarCampos(): Boolean {
         val title = binding.titleEditText.text.toString().trim()
-        val synopsis = binding.synopsisEditText.text.toString().trim()
+        val synopsis = binding.yearEditText.text.toString().trim()
         val imageUrl = binding.imageUrlEditText.text.toString().trim()
         val streamUrl = binding.streamUrlEditText.text.toString().trim()
 
@@ -215,7 +213,7 @@ class NuevaPeliculaFragment : Fragment() {
 
     private fun clearFields() {
         binding.titleEditText.text.clear()
-        binding.synopsisEditText.text.clear()
+        binding.yearEditText.text.clear()
         binding.imageUrlEditText.text.clear()
         binding.streamUrlEditText.text.clear()
         binding.previewImageView.setImageResource(R.drawable.icono)
