@@ -33,12 +33,12 @@ class SoporteFragment : Fragment() {
         db = FirebaseFirestore.getInstance()
 
         iniciarRecycler()
-        loadPedido()
+        cargarPedidos()
 
         return binding.root
     }
 
-    private fun loadPedido() {
+    private fun cargarPedidos() {
         movieList.clear()
         db.collection("pedidosmovies").get()
             .addOnCompleteListener { task: Task<QuerySnapshot> ->
@@ -80,7 +80,7 @@ class SoporteFragment : Fragment() {
         db.collection("pedidosmovies").document(movieId).delete()
             .addOnSuccessListener {
                 Toast.makeText(requireContext(), "Pedido eliminado", Toast.LENGTH_SHORT).show()
-                loadPedido() // Recargar películas después de eliminar
+                cargarPedidos() // Recargar películas después de eliminar
             }
             .addOnFailureListener { e ->
                 Toast.makeText(

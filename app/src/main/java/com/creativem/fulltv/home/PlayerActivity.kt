@@ -36,7 +36,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import android.text.format.DateUtils
 import android.widget.Toast
-import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import kotlinx.coroutines.MainScope
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -45,7 +44,6 @@ import com.creativem.fulltv.R
 import com.creativem.fulltv.adapter.FirestoreRepository
 import com.creativem.fulltv.menu.MoviesMenuAdapter
 import kotlinx.coroutines.withContext
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
 
@@ -54,6 +52,8 @@ class PlayerActivity : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
     private var streamUrl: String = ""
+    private lateinit var movieTitle: String
+    private var movieYear: String = ""
     private var isLiveStream = false
     private lateinit var binding: ActivityPlayerBinding
     private lateinit var adapter: MoviesMenuAdapter
@@ -80,18 +80,23 @@ class PlayerActivity : AppCompatActivity() {
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-
+        firestore = FirebaseFirestore.getInstance()
 
         binding.reproductor.useController = false
 
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        streamUrl = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
+        // Recuperar los datos del Intent
+        intent?.let {
+            streamUrl = it.getStringExtra("EXTRA_STREAM_URL") ?: ""
+            movieTitle = it.getStringExtra("EXTRA_MOVIE_TITLE") ?: "Título desconocido"
+            movieYear = it.getStringExtra("EXTRA_MOVIE_YEAR") ?: ""
+        }
 
         if (streamUrl.isEmpty()) {
             Log.e("PlayerActivity", "No se recibió la URL de streaming.")
-            showErrorDialog("No se recibió la URL de streaming.")
+            showErrorDialog("No se recibió la URL de streaming.", movieTitle, movieYear)
             return
         }
         val textHora = binding.textHora
@@ -290,7 +295,10 @@ class PlayerActivity : AppCompatActivity() {
 
                     // Si es un stream en vivo, intentar reconectar
                     if (isLiveStream) {
-                        Log.d("PlayerActivity", "Transmisión en vivo finalizada. Intentando reconectar...")
+                        Log.d(
+                            "PlayerActivity",
+                            "Transmisión en vivo finalizada. Intentando reconectar..."
+                        )
                         intentarReconexion()
                     } else {
                         Log.d("PlayerActivity", "Deteniendo actualizaciones de tiempo.")
@@ -340,7 +348,7 @@ class PlayerActivity : AppCompatActivity() {
             if (isRecoverableError(error) && isPlaybackActive) {
                 intentarReconexion()
             } else if (!isPlaybackActive && reconnectionAttempts >= maxReconnectionAttempts) {
-                showErrorDialog("Error al cargar el video.")
+                showErrorDialog(streamUrl, movieTitle, movieYear)
             }
         }
     }
@@ -372,7 +380,11 @@ class PlayerActivity : AppCompatActivity() {
             isReconnecting = false
 
             if (!isPlaybackActive) {
-                showErrorDialog("No se pudo conectar al stream después de varios intentos.")
+                showErrorDialog(
+                    "No se pudo conectar al stream después de varios intentos.",
+                    movieTitle,
+                    movieYear
+                )
             }
             return
         }
@@ -456,28 +468,62 @@ class PlayerActivity : AppCompatActivity() {
         return activeNetwork?.isConnectedOrConnecting == true
     }
 
-    private fun showErrorDialog(message: String) {
+    private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
         AlertDialog.Builder(this)
             .setTitle("¡Alquila Tu Acceso al Contenido!")
             .setMessage(
-                "Este contenido ha sido bloqueado temporalmente, pero con una donación voluntaria, puedes \"alquilar\" el acceso por un tiempo limitado.\n" +
+                "La '$movieTitle' $movieYear ha sido bloqueado temporalmente, pero con una donación voluntaria, puedes \"alquilar\" el acceso por un tiempo limitado.\n" +
                         "\n" +
-                        "Con tu ayuda, podremos restaurarlo En breve.\n" +
+                        "Con tu ayuda, podremos restaurarlo en breve.\n" +
                         "\n" +
                         "Cada contribución cuenta para que sigamos ofreciendo este servicio! ¡Haz tu donación ahora y vuelve a disfrutar de lo que te gusta!\n" +
-                        "\nReporte de donacion al WhatsApp(3028667672)"
+                        "\nReporte de donación al WhatsApp(3028667672)"
             )
             .setPositiveButton("Volver al contenido") { dialog, _ ->
                 dialog.dismiss() // Cierra el diálogo
                 onBackPressed() // Simula el botón de retroceso en lugar de terminar la actividad
             }
             .setNeutralButton("Reporte de donacion") { _, _ ->
-                val intent = Intent(this, PedidosActivity::class.java)
-                startActivity(intent)
-                finish() // Cierra el diálogo
-                onBackPressed()
+                enviarPedido()
             }
             .show()
+    }
+
+    private fun enviarPedido() {
+
+
+        // Crear una consulta para buscar la película por título
+        val query = firestore.collection("pedidosmovies")
+            .whereEqualTo("title", movieTitle)
+
+        query.get().addOnSuccessListener { querySnapshot ->
+            if (querySnapshot.isEmpty) {
+                // La película no existe, agregarla
+                val datos = hashMapOf(
+                    "title" to movieTitle,
+                    "year" to movieYear
+                )
+                firestore.collection("pedidosmovies")
+                    .add(datos)
+                    .addOnSuccessListener {
+                        Log.d("Firestore", "Pedido enviado exitosamente: $it")
+                        Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
+                        finish()
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("Firestore", "Error al enviar el pedido: ${e.message}")
+                        Toast.makeText(this, "Error al enviar el pedido: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+            } else {
+                // La película ya existe, mostrar mensaje
+                Toast.makeText(this, "La película '$movieTitle' ya existe. Será actualizada.", Toast.LENGTH_SHORT).show()
+                // Aquí puedes agregar lógica para actualizar la película si es necesario
+                // Por ejemplo, puedes obtener el ID del documento existente y actualizarlo
+            }
+        }.addOnFailureListener { e ->
+            Log.e("Firestore", "Error al consultar la película: ${e.message}")
+            Toast.makeText(this, "Error al consultar la película: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onPause() {
@@ -609,6 +655,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun tiempoFormateado(tiempoMs: Long): String {
         return DateUtils.formatElapsedTime(tiempoMs / 1000)
     }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         showControlsAndResetTimer()
         Log.d("KeyCodeTest", "Tecla presionada: $keyCode")

@@ -110,4 +110,6 @@ dependencies {
     implementation ("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
     //work
     implementation ("androidx.work:work-runtime-ktx:2.8.1")
+//leanback
+    implementation ("androidx.leanback:leanback:1.0.0")
 }

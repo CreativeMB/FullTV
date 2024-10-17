@@ -1,52 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="8dp"
     android:background="@android:color/white"
-    app:cardElevation="4dp"
-    app:cardCornerRadius="8dp">
+    android:padding="3dp"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="4dp">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/linearLayout"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:layout_height="match_parent"
+        android:padding="1.2dp">
 
-        <LinearLayout
-            android:layout_width="match_parent"
+
+        <TextView
+            android:id="@+id/titleTextView"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="4dp"
+            android:paddingStart="2dp"
+            android:text="Título de la Película"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toTopOf="@+id/yearTextView"
+            app:layout_constraintEnd_toStartOf="@+id/editButton"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <TextView
-                android:id="@+id/titleTextView"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Título de la Película"
-                android:textSize="18sp"
-                android:textStyle="bold"/>
+        <TextView
+            android:id="@+id/yearTextView"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="8dp"
+            android:paddingStart="2dp"
+            android:text="year"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/editButton"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/titleTextView"
+            app:layout_constraintVertical_bias="0.0" />
 
+        <TextView
+            android:id="@+id/deleteButton"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/delete"
+            android:textColor="@android:color/holo_red_dark"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/editButton"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <TextView
-                android:id="@+id/deleteButton"
-                android:layout_width="40dp"
-                android:layout_height="30dp"
-                android:background="@drawable/delete"
-                android:textColor="@android:color/holo_red_dark"/>
-        </LinearLayout>
 
         <!-- Mover el botón de editar a la parte inferior -->
         <TextView
             android:id="@+id/editButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
+            android:layout_marginEnd="8dp"
             android:text="Editar"
-            android:textColor="@android:color/holo_blue_dark"/>
+            android:textColor="@android:color/holo_blue_dark"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/deleteButton"
+            app:layout_constraintStart_toEndOf="@+id/titleTextView"
+            app:layout_constraintTop_toTopOf="parent" />
 
-    </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.cardview.widget.CardView>

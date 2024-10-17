@@ -92,6 +92,8 @@ class MainFragment : BrowseSupportFragment() {
             } else if (item is Movie) {
                 val intent = Intent(context, PlayerActivity::class.java)
                 intent.putExtra("EXTRA_STREAM_URL", item.streamUrl)
+                intent.putExtra("EXTRA_MOVIE_TITLE", item.title) // Título de la película
+                intent.putExtra("EXTRA_MOVIE_YEAR", item.year) // Año de la película
                 startActivity(intent)
             }
         }
