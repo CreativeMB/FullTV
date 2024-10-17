@@ -16,17 +16,15 @@ import com.creativem.tvfullurl.databinding.FragmentSoporteBinding
 import com.google.firebase.firestore.FirebaseFirestore
 
 class EditarPeliculaFragment : Fragment() {
-
     private lateinit var binding: FragmentSoporteBinding
     private lateinit var db: FirebaseFirestore
     private lateinit var moviesAdapter: MoviesAdapter
     private var movieList: MutableList<Movie> = mutableListOf()
 
-
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
+    ): View {
         binding = FragmentSoporteBinding.inflate(inflater, container, false)
         db = FirebaseFirestore.getInstance()
         return binding.root
@@ -36,6 +34,18 @@ class EditarPeliculaFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         iniciarRecycler()
         loadMovies()
+
+        // Configurar el SearchView
+        binding.searchView.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                return false
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                moviesAdapter.filter(newText.orEmpty())
+                return true
+            }
+        })
     }
 
     private fun loadMovies() {
@@ -43,8 +53,7 @@ class EditarPeliculaFragment : Fragment() {
         db.collection("movies").get()
             .addOnSuccessListener { documents ->
                 for (document in documents) {
-                    val movie =
-                        document.toObject(Movie::class.java).copy(id = document.id) // Agregar el ID
+                    val movie = document.toObject(Movie::class.java).copy(id = document.id) // Agregar el ID
                     movieList.add(movie)
                 }
                 moviesAdapter.notifyDataSetChanged() // Notificar al adaptador de cambios
@@ -73,10 +82,9 @@ class EditarPeliculaFragment : Fragment() {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = moviesAdapter
         }
-
     }
 
-    private fun editMovie(movie: Movie){
+    private fun editMovie(movie: Movie) {
         val bundle = Bundle().apply {
             putString("movieId", movie.id)
         }
@@ -98,8 +106,7 @@ class EditarPeliculaFragment : Fragment() {
                     "Error al eliminar la película",
                     Toast.LENGTH_SHORT
                 ).show()
-                Log.e("ListaPeliculasFragment", "Error al eliminar la película", e)
+                Log.e("EditarPeliculaFragment", "Error al eliminar la película", e)
             }
     }
-
 }

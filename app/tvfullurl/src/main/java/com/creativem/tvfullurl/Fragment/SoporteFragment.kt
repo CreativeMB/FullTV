@@ -34,6 +34,18 @@ class SoporteFragment : Fragment() {
 
         iniciarRecycler()
         cargarPedidos()
+        // Configurar el SearchView
+        binding.searchView.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                return false
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                moviesAdapter.filter(newText.orEmpty())
+                return true
+            }
+        })
+
 
         return binding.root
     }
