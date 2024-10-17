@@ -185,7 +185,7 @@ class NuevaPeliculaFragment : Fragment() {
             "year" to year,
             "imageUrl" to imageUrl,
             "streamUrl" to streamUrl,
-            "updatedAt" to Timestamp.now()  // Marcar como actualizado
+            "createdAt" to Timestamp.now()  // Marcar como actualizado
         )
 
         // Usar update() para modificar el documento existente
