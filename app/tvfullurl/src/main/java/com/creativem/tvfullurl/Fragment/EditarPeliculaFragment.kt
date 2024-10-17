@@ -101,4 +101,5 @@ class EditarPeliculaFragment : Fragment() {
                 Log.e("ListaPeliculasFragment", "Error al eliminar la película", e)
             }
     }
+
 }

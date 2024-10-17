@@ -2,14 +2,11 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/nuevaPeliculaFragment"
-        android:icon="@drawable/pedidos"
-        android:title="Agregar Película" />
+        android:icon="@drawable/pelicula" />
     <item
         android:id="@+id/editarPeliculaFragment"
-        android:icon="@drawable/peliculas"
-        android:title="Lista de Películas" />
+        android:icon="@drawable/baseline_edit_square_24" />
     <item
         android:id="@+id/soporteFragment"
-        android:icon="@drawable/peliculas"
-        android:title="Soporte" />
+        android:icon="@drawable/soporte" />
 </menu>

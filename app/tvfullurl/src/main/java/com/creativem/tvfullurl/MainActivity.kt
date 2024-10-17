@@ -6,6 +6,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.navigation.fragment.NavHostFragment
+import androidx.navigation.ui.NavigationUI
 import androidx.navigation.ui.setupWithNavController
 import com.creativem.tvfullurl.databinding.ActivityMainBinding
 
@@ -23,5 +24,16 @@ class MainActivity : AppCompatActivity() {
 
         // 3. Configura el BottomNavigationView para que se sincronice con el NavController
         binding.bottomNavigationView.setupWithNavController(navController)
+        binding.bottomNavigationView.setOnNavigationItemSelectedListener { menuItem ->
+            if (menuItem.itemId == R.id.nuevaPeliculaFragment) {
+                // Navega a ListaPeliculasFragment2 y luego a AgregarPeliculaFragment2 usando la acción global
+                navController.navigate(R.id.action_global_self)
+                navController.navigate(R.id.nuevaPeliculaFragment)
+                true
+            } else {
+                // Maneja la navegación normal para otros elementos del menú
+                NavigationUI.onNavDestinationSelected(menuItem, navController)
+            }
+        }
     }
 }

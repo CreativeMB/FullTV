@@ -20,10 +20,11 @@
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomNavigationView"
         android:layout_width="match_parent"
-        android:layout_height="72dp"
-        app:itemIconSize="15dp"
-        app:itemIconTint="?attr/colorPrimaryInverse"
-        android:background="?android:attr/windowBackground"
+        android:layout_height="wrap_content"
+        app:itemIconSize="30dp"
+        app:labelVisibilityMode="unlabeled"
+        app:itemIconTint="@color/primaryDarkColor"
+        android:background="@color/primaryColor"
         app:layout_constraintBottom_toBottomOf="parent"
         app:menu="@menu/bottom_nav_menu" />
 

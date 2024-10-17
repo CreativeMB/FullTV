@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- Colores Primarios -->
+    <color name="primaryColor">#222222</color> <!-- Color principal -->
+    <color name="primaryDarkColor">#009688</color> <!-- Color oscuro -->
+    <color name="accentColor">#03DAC5</color> <!-- Color de acento -->
+
+    <!-- Colores Neutros -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="gray">#808080</color>
+
+    <!-- Colores Personalizados -->
+    <color name="backgroundColor">#F5F5F5</color> <!-- Fondo general -->
+    <color name="textColor">#212121</color> <!-- Color del texto -->
+    <color name="errorColor">#B00020</color> <!-- Color para errores -->
 </resources>
