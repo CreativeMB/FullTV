@@ -98,22 +98,22 @@ class NuevaPeliculaFragment : Fragment() {
 
     private fun saveNewMovie() {
         if (!validarCampos()) return
+
         val newMovie = Movie(
             title = binding.titleEditText.text.toString(),
             year = binding.yearEditText.text.toString(),
             imageUrl = binding.imageUrlEditText.text.toString(),
-            streamUrl = binding.streamUrlEditText.text.toString()
-
+            streamUrl = binding.streamUrlEditText.text.toString(),
+            createdAt = Timestamp.now()
         )
+
         db.collection("movies").add(newMovie)
             .addOnSuccessListener {
                 Toast.makeText(requireContext(), "Película guardada", Toast.LENGTH_SHORT).show()
-
                 clearFields()
             }
             .addOnFailureListener {
-                Toast.makeText(requireContext(), "Error al guardar la película", Toast.LENGTH_SHORT)
-                    .show()
+                Toast.makeText(requireContext(), "Error al guardar la película", Toast.LENGTH_SHORT).show()
             }
     }
 
@@ -153,7 +153,6 @@ class NuevaPeliculaFragment : Fragment() {
     }
 
 
-
     private fun validarCampos(): Boolean {
         // Actualiza las variables globales con los valores de los campos
         title = binding.titleEditText.text.toString().trim()
@@ -163,7 +162,8 @@ class NuevaPeliculaFragment : Fragment() {
 
         // Verificar si los campos están completos
         if (title.isEmpty() || year.isEmpty() || imageUrl.isEmpty()) {
-            Toast.makeText(requireContext(), "Todos los campos son obligatorios", Toast.LENGTH_LONG).show()
+            Toast.makeText(requireContext(), "Todos los campos son obligatorios", Toast.LENGTH_LONG)
+                .show()
             return false
         }
 
@@ -194,7 +194,11 @@ class NuevaPeliculaFragment : Fragment() {
             .update(movie)
             .addOnSuccessListener {
                 Log.d("movies", "Película actualizada correctamente con ID: $movieId")
-                Toast.makeText(requireContext(), "Película actualizada correctamente", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    requireContext(),
+                    "Película actualizada correctamente",
+                    Toast.LENGTH_LONG
+                ).show()
 // Navegar de vuelta a EditarPeliculaFragment
                 findNavController().navigateUp()
             }

@@ -15,7 +15,7 @@
       </SelectionState>
       <SelectionState runConfigName="app.tvfullurl">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2024-10-17T20:50:16.222477800Z">
+        <DropdownSelection timestamp="2024-10-17T22:52:25.662949400Z">
           <Target type="DEFAULT_BOOT">
             <handle>
               <DeviceId pluginId="PhysicalDevice" identifier="serial=ARGKUT3510001310" />
