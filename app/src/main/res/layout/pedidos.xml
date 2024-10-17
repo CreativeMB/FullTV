@@ -8,56 +8,12 @@
     android:padding="16dp">
 
     <TextView
-        android:id="@+id/textViewTitulo"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:text="Pedidos"
-        android:textColor="@android:color/white"
-        android:textSize="32sp" />
+        android:text="Somos su mejor opción para alquilar películas en línea con solo un pequeño pago por medio de Nequi y en breve tienes la película disponible para reproducir en múltiples dispositivos. TVFull la puedes alquilar desde la pantalla principal o pedir por WhatsApp la que quieres ver y en breve la tendrás disponible."
+        android:textColor="#FFFFFF"
+        android:textSize="30sp"
+        android:textAlignment="center"
+        android:gravity="center" />
 
-    <TextView
-        android:id="@+id/textViewSubtitulo"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="24dp"
-        android:text="Nombre, WhatsApp, Nombre pelicula, Año"
-        android:textColor="@android:color/white"
-        android:textSize="24sp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="24dp">
-
-        <Button
-            android:id="@+id/butMicrofono"
-            android:layout_width="wrap_content"
-            android:layout_height="120dp"
-            android:background="@drawable/mic"
-            android:layout_marginEnd="8dp" />
-
-        <EditText
-            android:id="@+id/texpedido"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:hint="Luis Ramirez, +573058745821, Buscando a Nemo, Año 2003"
-            android:maxLines="8"
-            android:minLines="4"
-            android:padding="16dp"
-            android:textColor="#0091EA"
-            android:textColorHint="#989898" />
-    </LinearLayout>
-
-    <Button
-        android:id="@+id/butpedido"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:background="@color/colorFocused"
-        android:padding="16dp"
-        android:text="Enviar"
-        android:textColor="@android:color/white" />
 </LinearLayout>
