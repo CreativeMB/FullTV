@@ -28,7 +28,7 @@ class CardPresenter: Presenter(){
         val cardView = viewHolder.view as ImageCardView
 
         cardView.titleText = movie.title
-        cardView.contentText = movie.synopsis
+        cardView.contentText = movie.year
 
         // Carga de imagen con Glide
         Glide.with(viewHolder.view.context)

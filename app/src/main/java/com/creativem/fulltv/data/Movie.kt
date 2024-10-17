@@ -8,7 +8,7 @@ import com.google.firebase.Timestamp
 data class Movie(
     val id: String = "",  // Añadir campo id
     val title: String = "",
-    val synopsis: String = "",
+    val year: String = "",
     val imageUrl: String = "",
     val streamUrl: String = "",
     val createdAt: Timestamp = Timestamp.now(),
@@ -29,7 +29,7 @@ data class Movie(
     override fun writeToParcel(parcel: Parcel, flags: Int) {
         parcel.writeString(id)  // Escribir el id
         parcel.writeString(title)
-        parcel.writeString(synopsis)
+        parcel.writeString(year)
         parcel.writeString(imageUrl)
         parcel.writeString(streamUrl)
         parcel.writeLong(createdAt.seconds) // Escribir los segundos
