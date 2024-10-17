@@ -152,7 +152,7 @@ class MainFragment : BrowseSupportFragment() {
         agregarALista(peliculasInactivas, "ALQUILER")
         // Agrega el menú aquí, después de cargar las películas
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("Nodotros", "Menu 2", "Menu 3", "Menu 4", "Menu 5")
+        val menuItems = listOf("Nosotros", "Menu 2", "Menu 3", "Menu 4", "Menu 5")
         val menuIcons = listOf(
             R.drawable.pedidos,
             R.drawable.ic_play,
