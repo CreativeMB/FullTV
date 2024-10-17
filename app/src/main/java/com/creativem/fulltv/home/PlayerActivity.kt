@@ -86,12 +86,15 @@ class PlayerActivity : AppCompatActivity() {
 
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
+// Referencia al TextView para el nombre de la película
+        val nombrePeliculaTextView: TextView = findViewById(R.id.nombrePelicula)
         // Recuperar los datos del Intent
         intent?.let {
             streamUrl = it.getStringExtra("EXTRA_STREAM_URL") ?: ""
             movieTitle = it.getStringExtra("EXTRA_MOVIE_TITLE") ?: "Título desconocido"
             movieYear = it.getStringExtra("EXTRA_MOVIE_YEAR") ?: ""
+            // Actualiza el TextView con el título
+            nombrePeliculaTextView.text = movieTitle
         }
 
         if (streamUrl.isEmpty()) {

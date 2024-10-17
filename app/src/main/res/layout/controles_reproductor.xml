@@ -55,6 +55,7 @@
                     android:layout_marginEnd="20dp"
                     android:textColor="@color/exo_button_color" />
 
+
                 <Space
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -66,6 +67,20 @@
                     android:layout_height="wrap_content"
                     android:textSize="30dp"
                     android:text="-0:00"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="20dp"
+                    android:textColor="@color/exo_button_color" />
+                <Space
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/nombrePelicula"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="20dp"
+                    android:text="Nombre pelicula"
                     android:textStyle="bold"
                     android:textColor="@color/exo_button_color" />
             </LinearLayout>
