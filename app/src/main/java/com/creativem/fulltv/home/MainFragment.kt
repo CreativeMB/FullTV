@@ -78,7 +78,7 @@ class MainFragment : BrowseSupportFragment() {
             if (item is MenuItem) {
                 Log.d("MainFragment", "Menu item clicked: ${item.name}")
                 when (item.name) {
-                    "Nodotros" -> {
+                    "Nosotros" -> {
                         val intent = Intent(requireContext(), PedidosActivity::class.java)
                         startActivity(intent)
                     }
