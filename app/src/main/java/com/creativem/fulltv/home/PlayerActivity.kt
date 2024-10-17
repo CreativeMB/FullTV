@@ -470,20 +470,20 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
         AlertDialog.Builder(this)
-            .setTitle("¡Alquila Tu Acceso al Contenido!")
+            .setTitle("¡Alquila Tu Peli!")
             .setMessage(
-                "La '$movieTitle' $movieYear ha sido bloqueado temporalmente, pero con una donación voluntaria, puedes \"alquilar\" el acceso por un tiempo limitado.\n" +
+                "Realiza el pago y reporta por WhatsApp(+573028667672) Nequi\n" +
                         "\n" +
-                        "Con tu ayuda, podremos restaurarlo en breve.\n" +
+                        "Pelicula: $movieTitle\n" +
                         "\n" +
-                        "Cada contribución cuenta para que sigamos ofreciendo este servicio! ¡Haz tu donación ahora y vuelve a disfrutar de lo que te gusta!\n" +
-                        "\nReporte de donación al WhatsApp(3028667672)"
+                        "$movieYear\n" +
+                        "\nEstara en linea en Breve"
             )
             .setPositiveButton("Volver al contenido") { dialog, _ ->
                 dialog.dismiss() // Cierra el diálogo
                 onBackPressed() // Simula el botón de retroceso en lugar de terminar la actividad
             }
-            .setNeutralButton("Reporte de donacion") { _, _ ->
+            .setNeutralButton("Alquilar") { _, _ ->
                 enviarPedido()
             }
             .show()
@@ -516,7 +516,8 @@ class PlayerActivity : AppCompatActivity() {
                     }
             } else {
                 // La película ya existe, mostrar mensaje
-                Toast.makeText(this, "La película '$movieTitle' ya existe. Será actualizada.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "La película '$movieTitle' Esta en espera de pago.", Toast.LENGTH_LONG).show()
+                finish()
                 // Aquí puedes agregar lógica para actualizar la película si es necesario
                 // Por ejemplo, puedes obtener el ID del documento existente y actualizarlo
             }
