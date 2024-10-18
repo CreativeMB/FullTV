@@ -79,7 +79,7 @@
                     android:id="@+id/nombrePelicula"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textSize="20dp"
+                    android:textSize="25dp"
                     android:text="Nombre pelicula"
                     android:textStyle="bold"
                     android:textColor="@color/exo_button_color" />
