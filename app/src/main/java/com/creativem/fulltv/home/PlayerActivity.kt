@@ -208,21 +208,17 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun initializeRecyclerView() {
         adapter = MoviesMenuAdapter(mutableListOf()) { movie ->
-            startMoviePlayback(movie.streamUrl)
+            startMoviePlayback(movie.streamUrl, movie.title)
         }
-
         binding.recyclerViewMovies.adapter = adapter
         binding.recyclerViewMovies.layoutManager = LinearLayoutManager(this)
         binding.recyclerViewMovies.visibility = View.GONE
     }
-
-    private fun startMoviePlayback(streamUrl: String) {
+    private fun startMoviePlayback(streamUrl: String, movieTitle: String) {
         val intent = Intent(this, PlayerActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        intent.putExtra(
-            "EXTRA_STREAM_URL",
-            streamUrl
-        ) // Asegúrate de usar el mismo nombre clave que usas en VideoPlayerActivity
+        intent.putExtra("EXTRA_STREAM_URL", streamUrl)
+        intent.putExtra("EXTRA_MOVIE_TITLE",  movieTitle)
         startActivity(intent)
     }
 
@@ -629,30 +625,30 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun actualizarTiempo() {
-        MainScope().launch {
-            val tiemporeproducido =
-                binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido) // TextView del contador
-            val tiempototal = binding.reproductor.findViewById<TextView>(R.id.tiempototal)
-            val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
-            Log.d("PlayerActivity", "actualizarTiempo() llamado")
+        if (player != null && player!!.isPlaying) {
+            MainScope().launch {
+                val tiemporeproducido = binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido)
+                val tiempototal = binding.reproductor.findViewById<TextView>(R.id.tiempototal)
+                val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
+                Log.d("PlayerActivity", "actualizarTiempo() llamado")
 
-            val posicionActual = player?.currentPosition ?: 0
-            val duracionTotal = player?.duration ?: 0
-            Log.d(
-                "PlayerActivity",
-                "Posición actual: $posicionActual, Duración total: $duracionTotal"
-            )
+                val posicionActual = player?.currentPosition ?: 0
+                val duracionTotal = player?.duration ?: 0
+                Log.d("PlayerActivity", "Posición actual: $posicionActual, Duración total: $duracionTotal")
 
-            tiemporeproducido.text = tiempoFormateado(posicionActual) // Actualiza el TextView
-            tiempototal.text = tiempoFormateado(duracionTotal)
+                tiemporeproducido.text = tiempoFormateado(posicionActual)
+                tiempototal.text = tiempoFormateado(duracionTotal)
 
-            if (duracionTotal > 0) {
-                val progress = (posicionActual.toFloat() / duracionTotal * 100).toInt()
-                seekBar.progress = progress // Actualiza la SeekBar
-                Log.d("PlayerActivity", "SeekBar progress: $progress")
+                if (duracionTotal > 0) {
+                    val progress = (posicionActual.toFloat() / duracionTotal * 100).toInt()
+                    seekBar.progress = progress
+                    Log.d("PlayerActivity", "SeekBar progress: $progress")
 
-                handler.postDelayed(runnableActualizar, updateInterval)
+                    handler.postDelayed(runnableActualizar, updateInterval)
+                }
             }
+        } else {
+            Log.d("PlayerActivity", "El reproductor no está listo o no está reproduciendo")
         }
     }
 
