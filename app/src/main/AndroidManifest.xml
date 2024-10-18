@@ -23,7 +23,7 @@
             android:name="com.creativem.fulltv.home.MainFragment"
             android:exported="false"
             tools:ignore="Instantiatable" />
-        <activity android:name="com.creativem.fulltv.home.PedidosActivity"
+        <activity android:name="com.creativem.fulltv.home.Nosotros"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
         <activity

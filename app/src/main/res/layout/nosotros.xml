@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#4C4C4C"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <!-- Texto grande centrado en la parte inferior -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Disfruta de las mejores películas de manera rápida y sencilla.\n\n
+        Solo realiza un pequeño pago escaneando uno de los QR y tendrás acceso en breve a la película que elijas por un mínimo 24 horas. ¡Podrás reproducirla en múltiples dispositivos!\n\n
+        Puedes seleccionar cualquier película disponible o pedir la que desees a través de WhatsApp. (+573028667672) En breve, estará lista para ver.\n\n
+        Al formar parte de nuestra comunidad, el contenido que alquiles estará disponible para todos, sin restricciones. Vive una experiencia de cine sin complicaciones, desde la comodidad de tu hogar."
+        android:textColor="#FFFFFF"
+        android:textSize="25sp"
+        android:textAlignment="center"
+        android:gravity="center"
+        android:layout_gravity="bottom"
+        android:padding="16dp"/>
+
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_gravity="bottom">
+
+            <!-- Primera imagen con título -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <ImageView
+                    android:layout_width="150dp"
+                    android:layout_height="150dp"
+                    android:src="@drawable/qrnequi"
+                    android:contentDescription="Imagen 1" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="QR Nequi(3014416502)"
+                    android:textColor="#FFFFFF"
+                    android:textAlignment="center"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <!-- Segunda imagen con título -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <ImageView
+                    android:layout_width="150dp"
+                    android:layout_height="150dp"
+                    android:src="@drawable/qrpse"
+                    android:contentDescription="Imagen 2" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="QR PSE(3014416502)"
+                    android:textColor="#FFFFFF"
+                    android:textAlignment="center"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <!-- Tercera imagen con título -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <ImageView
+                    android:layout_width="150dp"
+                    android:layout_height="150dp"
+                    android:src="@drawable/qrtarjeta"
+                    android:contentDescription="Imagen 3" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="QR TJ Credito"
+                    android:textColor="#FFFFFF"
+                    android:textAlignment="center"
+                    android:gravity="center" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

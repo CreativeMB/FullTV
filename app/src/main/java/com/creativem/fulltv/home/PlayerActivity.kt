@@ -471,12 +471,12 @@ class PlayerActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("¡Alquila Tu Peli!")
             .setMessage(
-                "Realiza el pago y reporta por WhatsApp(+573028667672) Nequi\n" +
+                "Realiza el pago y reporta por WhatsApp(+573028667672)\n" +
                         "\n" +
                         "Pelicula: $movieTitle\n" +
                         "\n" +
                         "$movieYear\n" +
-                        "\nEstara en linea en Breve"
+                        "\nEstara en linea en Breve, Ve a la pestaña Pago"
             )
             .setPositiveButton("Volver al contenido") { dialog, _ ->
                 dialog.dismiss() // Cierra el diálogo
