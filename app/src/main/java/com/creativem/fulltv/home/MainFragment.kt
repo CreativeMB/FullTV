@@ -82,8 +82,8 @@ class MainFragment : BrowseSupportFragment() {
                         val intent = Intent(requireContext(), Nosotros::class.java)
                         startActivity(intent)
                     }
-                    "Menu 2" -> {
-                        Toast.makeText(requireContext(), "Menu 2 seleccionado", Toast.LENGTH_SHORT).show()
+                    "Configuracion" -> {
+                        Toast.makeText(requireContext(), "Configuracion", Toast.LENGTH_SHORT).show()
                     }
                     else -> {
                         Toast.makeText(requireContext(), "${item.name} seleccionado", Toast.LENGTH_SHORT).show()
@@ -152,13 +152,10 @@ class MainFragment : BrowseSupportFragment() {
         agregarALista(peliculasInactivas, "ALQUILER")
         // Agrega el menú aquí, después de cargar las películas
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("Pago", "Menu 2", "Menu 3", "Menu 4", "Menu 5")
+        val menuItems = listOf("Pago", "Configuracion")
         val menuIcons = listOf(
             R.drawable.pago,
-            R.drawable.ic_play,
-            R.drawable.ic_play,
-            R.drawable.ic_play,
-            R.drawable.ic_play
+            R.drawable.ic_settings
         )
 
         for (i in menuItems.indices) {

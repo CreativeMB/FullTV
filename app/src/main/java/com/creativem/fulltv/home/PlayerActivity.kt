@@ -471,19 +471,20 @@ class PlayerActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("¡Alquila Tu Peli!")
             .setMessage(
-                "Realiza el pago y reporta por WhatsApp(+573028667672)\n" +
+                "Reporte pago por WhatsApp(+573028667672) con los datos\n" +
                         "\n" +
                         "Pelicula: $movieTitle\n" +
                         "\n" +
                         "$movieYear\n" +
-                        "\nEstara en linea en Breve, Ve a la pestaña Pago"
+                        "\nEstara en linea en Breve"
             )
             .setPositiveButton("Volver al contenido") { dialog, _ ->
                 dialog.dismiss() // Cierra el diálogo
                 onBackPressed() // Simula el botón de retroceso en lugar de terminar la actividad
             }
-            .setNeutralButton("Alquilar") { _, _ ->
+            .setNeutralButton("Alquilar Pelicula") { _, _ ->
                 enviarPedido()
+
             }
             .show()
     }
@@ -516,6 +517,9 @@ class PlayerActivity : AppCompatActivity() {
             } else {
                 // La película ya existe, mostrar mensaje
                 Toast.makeText(this, "La película '$movieTitle' Esta en espera de pago.", Toast.LENGTH_LONG).show()
+                // Aquí navegas a la nueva actividad
+                val intent = Intent(this, Nosotros::class.java)
+                startActivity(intent)
                 finish()
                 // Aquí puedes agregar lógica para actualizar la película si es necesario
                 // Por ejemplo, puedes obtener el ID del documento existente y actualizarlo
