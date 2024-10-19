@@ -35,6 +35,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import android.text.format.DateUtils
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import kotlinx.coroutines.MainScope
@@ -467,28 +468,65 @@ class PlayerActivity : AppCompatActivity() {
         return activeNetwork?.isConnectedOrConnecting == true
     }
 
-    private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
-        AlertDialog.Builder(this)
-            .setTitle("¡Alquila Tu Peli!")
-            .setMessage(
-                "Reporte pago por WhatsApp(+573028667672) con los datos\n" +
-                        "\n" +
-                        "Pelicula: $movieTitle\n" +
-                        "\n" +
-                        "$movieYear\n" +
-                        "\nEstara en linea en Breve"
-            )
-            .setPositiveButton("Volver al contenido") { dialog, _ ->
-                dialog.dismiss() // Cierra el diálogo
-                onBackPressed() // Simula el botón de retroceso en lugar de terminar la actividad
-            }
-            .setNeutralButton("Alquilar Pelicula") { _, _ ->
-                enviarPedido()
+//    private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
+//        AlertDialog.Builder(this)
+//            .setTitle("¡Alquila Tu Peli!")
+//            .setMessage(
+//                "Reporte pago por WhatsApp(+573028667672) con los datos\n" +
+//                        "\n" +
+//                        "Pelicula: $movieTitle\n" +
+//                        "\n" +
+//                        "$movieYear\n" +
+//                        "\nEstara en linea en Breve"
+//            )
+//            .setPositiveButton("Volver al contenido") { dialog, _ ->
+//                dialog.dismiss() // Cierra el diálogo
+//                onBackPressed() // Simula el botón de retroceso en lugar de terminar la actividad
+//            }
+//            .setNeutralButton("Alquilar Pelicula") { _, _ ->
+//                enviarPedido()
+//
+//            }
+//            .show()
+//    }
+private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
+    // Infla el layout personalizado para el diálogo
+    val dialogView = layoutInflater.inflate(R.layout.alert_reproductor, null)
 
-            }
-            .show()
-    }
+    // Encuentra los componentes dentro del layout
+    val messageText = dialogView.findViewById<TextView>(R.id.messageText)
+    val firstImage = dialogView.findViewById<ImageView>(R.id.firstImage)
+    val secondImage = dialogView.findViewById<ImageView>(R.id.secondImage)
+    val thirdImage = dialogView.findViewById<ImageView>(R.id.thirdImage)
+    val qrneqiText = dialogView.findViewById<TextView>(R.id.qrneqiText)
+    val qepseText = dialogView.findViewById<TextView>(R.id.qepseText)
+    val qrtjText = dialogView.findViewById<TextView>(R.id.qrtjText)
 
+    qrneqiText.text = "QR Nequi(3014416502)"
+    qepseText.text = "QR PSE(3014416502)"
+    qrtjText.text = "QR TJ Credito"
+    // Configura el mensaje
+    messageText.text = "Estara en linea en Breve estamos disponibles 24/7\nRecibo pago WhApp(+573028667672) Con los datos\n" +
+            "\nPelicula: $movieTitle\nPrecio: $movieYear\n\nVive una experiencia de cine sin complicaciones, desde la comodidad de tu hogar."
+
+    // Opcional: Cambia las imágenes si es necesario
+    firstImage.setImageResource(R.drawable.qrnequi)
+    secondImage.setImageResource(R.drawable.qrpse)
+    thirdImage.setImageResource(R.drawable.qrtarjeta)
+
+    // Crea el AlertDialog
+    AlertDialog.Builder(this)
+        .setTitle("¡Alquila Tu Peli!")
+        .setView(dialogView) // Aplica el layout personalizado
+        .setPositiveButton("Volver al contenido") { dialog, _ ->
+            dialog.dismiss() // Cierra el diálogo
+            onBackPressed() // Simula el botón de retroceso
+        }
+        .setNeutralButton("Alquilar Pelicula") { _, _ ->
+            enviarPedido()
+        }
+        .show()
+}
     private fun enviarPedido() {
 
 
