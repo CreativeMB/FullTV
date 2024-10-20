@@ -512,9 +512,9 @@ private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: Str
     messageText.text =  "Pelicula: $movieTitle\nPrecio CasTV: $$movieYear\n"+
             "Estara en linea en Breve estamos disponibles 24/7\nComprobante de pago WhatsApp(+573028667672)\n" +
             "\nSi no tienes saldo recuerda recargar" +
-            "\nPaquete Plata $5.000(Castv: 5000)\n" +
-            "Paquete Bronce $10.000(Castv: 12000)\n" +
-            "Paquete Oro $20.000(Castv: 25000)"
+            "\nPaquete Plata $5.000(Castv: 50)\n" +
+            "Paquete Bronce $10.000(Castv: 120)\n" +
+            "Paquete Oro $20.000(Castv: 250"
 
     // Opcional: Cambia las imágenes si es necesario
     firstImage.setImageResource(R.drawable.qrnequi)

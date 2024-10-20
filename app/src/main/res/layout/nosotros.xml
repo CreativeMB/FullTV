@@ -16,7 +16,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Disfruta de las mejores películas de manera rápida y sencilla.\n Compra uno de nuestros paquetes\nPaquete Plata $5.000(Castv: 5000)\nPaquete Bronce $10.000(Castv: 12000) \nPaquete Oro $20.000(Castv: 25000)\n Pago Facil escaneando uno de los QR recarga su paquete ¡Podrás reproducirla en múltiples dispositivos! disponible minimo por 24 horas\n\n
+            android:text="Disfruta de las mejores películas de manera rápida y sencilla.\n Compra uno de nuestros paquetes\nPaquete Plata $5.000(Castv: 50)\nPaquete Bronce $10.000(Castv: 120) \nPaquete Oro $20.000(Castv: 250)\n Pago Facil escaneando uno de los QR recarga su paquete ¡Podrás reproducirla en múltiples dispositivos! disponible minimo por 24 horas\n\n
         Puedes seleccionar cualquier película disponible o pedir la que desees a través de WhatsApp. (+573028667672) En breve, estará lista para ver.\n\n
         Al formar parte de nuestra comunidad, el contenido que alquiles estará disponible para todos, sin restricciones. Vive una experiencia de cine sin complicaciones, desde la comodidad de tu hogar."
         android:textColor="#FFFFFF"
