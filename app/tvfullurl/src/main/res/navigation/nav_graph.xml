@@ -45,4 +45,20 @@
             android:id="@+id/action_soporteFragment_to_nuevaPeliculaFragment"
             app:destination="@id/nuevaPeliculaFragment" />
     </fragment>
+    <fragment
+        android:id="@+id/CastvFragment"
+        android:name="com.creativem.tvfullurl.Fragment.CastvFragment"
+        android:label="fragment_soporte"
+        tools:layout="@layout/fragment_soporte" >
+        <action
+            android:id="@+id/action_soporteFragment_to_editarPeliculaFragment"
+            app:destination="@id/editarPeliculaFragment" />
+        <action
+            android:id="@+id/action_soporteFragment_to_nuevaPeliculaFragment"
+            app:destination="@id/nuevaPeliculaFragment" />
+        <action
+            android:id="@+id/action_CastvFragment_to_soporteFragment"
+            app:destination="@id/soporteFragment" />
+
+    </fragment>
 </navigation>

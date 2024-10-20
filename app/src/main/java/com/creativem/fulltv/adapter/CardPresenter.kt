@@ -25,7 +25,7 @@ class CardPresenter: Presenter(){
         val movie = item as? Movie ?: return
         val cardView = viewHolder.view as ImageCardView
 
-        val casText = "CasTV: $"
+        val casText = "Castv: $"
         // Concatenar casTV y año
         cardView.titleText = movie.title
         cardView.contentText = "$casText${movie.year}"
