@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">FullTV</string>
-       <!-- Descripción de los botones en el control de la interfaz -->
+    <!-- Descripción de los botones en el control de la interfaz -->
     <string name="exo_controls_lista_pelis">Lista de Películas</string>
     <string name="exo_vr">Modo VR</string>
     <string name="exo_shuffle">Modo Aleatorio</string>
@@ -13,7 +13,7 @@
     <string name="exo_rewind">rewind</string>
     <string name="exo_play_pause">Pause</string>
     <string name="exo_fast_forward">forward</string>
-
+    <string name="default_web_client_id">TU_DEFAULT_WEB_CLIENT_ID</string>
     <!-- Otros posibles strings -->
     <string name="exo_ffwd">Avanzar</string>
     <string name="exo_download_removing">Eliminando Descarga</string>

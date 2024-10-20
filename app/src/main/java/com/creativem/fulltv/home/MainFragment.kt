@@ -18,6 +18,7 @@ import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
+import androidx.lifecycle.lifecycleScope
 import com.creativem.fulltv.R
 import com.creativem.fulltv.databinding.MainFragmentBinding
 import com.creativem.fulltv.data.Movie
@@ -33,6 +34,7 @@ import com.creativem.fulltv.menu.MenuItem
 import com.creativem.fulltv.adapter.CardPresenter
 import com.creativem.fulltv.adapter.FirestoreRepository
 import com.creativem.fulltv.menu.MenuPresenter
+import com.google.firebase.auth.FirebaseAuth
 
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -64,6 +66,10 @@ class MainFragment : BrowseSupportFragment() {
         progressBar = loadingContainer.findViewById(R.id.progressBar)
         loadingText = loadingContainer.findViewById(R.id.loadingText)
 
+        // Establecer valores iniciales para nombre de usuario y cantidad de Castv
+        binding.textUsuario.text = "users" // Cambia [Usuario] por el valor real
+        binding.textCastv.text = "Castv" // Cambia el valor según corresponda
+
         requireActivity().window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         // Iniciar el reloj
         val textHora = binding.textHora
@@ -85,6 +91,9 @@ class MainFragment : BrowseSupportFragment() {
                     "Configuracion" -> {
                         Toast.makeText(requireContext(), "Configuracion", Toast.LENGTH_SHORT).show()
                     }
+                    "Cerrar Sesión" -> {
+                        cerrarSesion() // Llama al método de cerrar sesión
+                    }
                     else -> {
                         Toast.makeText(requireContext(), "${item.name} seleccionado", Toast.LENGTH_SHORT).show()
                     }
@@ -99,6 +108,17 @@ class MainFragment : BrowseSupportFragment() {
         }
 
         return view
+    }
+    // Agrega este método para cerrar sesión
+    private fun cerrarSesion() {
+        val auth = FirebaseAuth.getInstance()
+        auth.signOut()
+        Toast.makeText(requireContext(), "Sesión cerrada", Toast.LENGTH_SHORT).show()
+
+        // Aquí puedes redirigir al usuario a la pantalla de inicio de sesión o cualquier otra actividad
+        val intent = Intent(requireContext(), LoginActivity::class.java) // Cambia a tu actividad de inicio de sesión
+        startActivity(intent)
+        requireActivity().finish() // Finaliza la actividad actual si es necesario
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -118,9 +138,33 @@ class MainFragment : BrowseSupportFragment() {
 
         cargarPeliculas()
 
+        // Cargar información del usuario
+        val usuarioId = FirebaseAuth.getInstance().currentUser?.uid // Obtén el ID del usuario autenticado
+
+        // Llama a obtenerNombreUsuario y obtenerCantidadCastv dentro de una coroutine
+        if (usuarioId != null) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                val nombreUsuario = firestoreRepository.obtenerNombreUsuario(usuarioId)
+                val cantidadCastv = firestoreRepository.obtenerCantidadCastv(usuarioId)
+                actualizarUsuario(nombreUsuario, cantidadCastv) // Actualiza la UI con la información del usuario
+            }
+        } else {
+            // Manejo de usuario no autenticado
+            Log.e("MainFragment", "No hay usuario autenticado")
+            actualizarUsuario("Usuario Desconocido", 0) // Actualiza la UI con información predeterminada
+        }
+    }
+
+    // Función para actualizar el nombre de usuario y la cantidad de Castv
+    fun actualizarUsuario(usuario: String, cantidadCastv: Int) {
+        binding.textUsuario.text = "$usuario"
+        binding.textCastv.text = "$:$cantidadCastv"
     }
 
     private fun cargarPeliculas() {
+        // Oculta la interfaz mientras se carga la biblioteca
+        binding.linearLayout.visibility = View.GONE // Oculta cualquier vista que quieras ocultar (ej. RecyclerView)
+
         Glide.with(requireContext())
             .load("https://ejemplo.com/imagen.jpg")
             .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
@@ -132,15 +176,35 @@ class MainFragment : BrowseSupportFragment() {
         // Mostrar la vista de carga
         mostrarCarga("Actualizando biblioteca en línea...")
 
-        CoroutineScope(Dispatchers.Main).launch {
-            // Obtén las películas actualizadas dentro del coroutine
+        // Lanza una coroutine en el contexto Main
+        viewLifecycleOwner.lifecycleScope.launch {
+            // Obtén las películas actualizadas dentro de la coroutine
             val (peliculasActivas, peliculasInactivas) = firestoreRepository.obtenerPeliculas()
+
+            // Supongamos que también obtienes el nombre de usuario y la cantidad de Castv
+            val usuarioId = FirebaseAuth.getInstance().currentUser?.uid // Obtén el ID del usuario autenticado
+            val nombreUsuario: String
+            val cantidadCastv: Int
+
+            if (usuarioId != null) {
+                nombreUsuario = firestoreRepository.obtenerNombreUsuario(usuarioId) // Obtiene el nombre de usuario
+                cantidadCastv = firestoreRepository.obtenerCantidadCastv(usuarioId) // Obtiene la cantidad de Castv
+            } else {
+                nombreUsuario = "Usuario Desconocido"
+                cantidadCastv = 0
+            }
 
             // Ocultar la vista de carga una vez que se cargan los datos
             ocultarCarga()
 
+            // Muestra nuevamente la vista oculta
+            binding.linearLayout.visibility = View.VISIBLE // Muestra la vista oculta (ej. RecyclerView)
+
             // Llama a updateMovieList para agregar las películas a la lista
             updateMovieList(peliculasActivas, peliculasInactivas)
+
+            // Actualiza el nombre de usuario y la cantidad de Castv
+            actualizarUsuario(nombreUsuario, cantidadCastv)
         }
     }
 
@@ -152,10 +216,11 @@ class MainFragment : BrowseSupportFragment() {
         agregarALista(peliculasInactivas, "ALQUILER")
         // Agrega el menú aquí, después de cargar las películas
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("Pago", "Configuracion")
+        val menuItems = listOf("Pago", "Configuracion", "Cerrar Sesión")
         val menuIcons = listOf(
             R.drawable.pago,
-            R.drawable.ic_settings
+            R.drawable.ic_settings,
+            R.drawable.ic_shuffle
         )
 
         for (i in menuItems.indices) {

@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.creativem.fulltv"
-        minSdk = 21
+        minSdk = 23
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -78,6 +78,10 @@ dependencies {
     implementation ("com.google.firebase:firebase-analytics-ktx")
     implementation ("com.google.firebase:firebase-config:21.0.2")
     implementation ("com.google.firebase:firebase-firestore-ktx:24.5.0")
+    // Firebase Authentication
+    implementation ("com.google.firebase:firebase-auth:21.0.3")
+    // Google Sign-In
+    implementation ("com.google.android.gms:play-services-auth:20.0.0")
     //appcompat
     implementation ("androidx.appcompat:appcompat:1.6.1")
     //recyclerview

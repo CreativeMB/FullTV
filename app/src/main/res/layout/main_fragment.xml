@@ -6,6 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".home.MainFragment">
+
     <ImageView
         android:id="@+id/mainBackgroundImage"
         android:layout_width="match_parent"
@@ -19,6 +20,7 @@
         android:layout_height="match_parent" />
 
     <LinearLayout
+        android:id="@+id/linearLayout"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|end"
@@ -26,28 +28,69 @@
         android:layout_marginEnd="20dp"
         android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/textfecha"
+        <!-- Contenedor vertical para las tres filas -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="TextView"
-            android:layout_marginEnd="10dp"
-            android:textColor="@color/lb_tv_white"
-            android:textSize="22sp" />
+            android:orientation="vertical"
+            android:layout_gravity="end">
 
-        <TextView
-            android:id="@+id/textHora"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="5dp"
-            android:text="TextView"
-            android:textSize="22sp" />
+            <!-- Fila de Fecha y Hora -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/textfecha"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="TextView"
+                    android:layout_marginEnd="10dp"
+                    android:textColor="@color/lb_tv_white"
+                    android:textSize="22sp" />
+
+                <TextView
+                    android:id="@+id/textHora"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="5dp"
+                    android:text="TextView"
+                    android:textSize="22sp" />
+            </LinearLayout>
+
+            <!-- Fila de Nombre de Usuario -->
+            <TextView
+                android:id="@+id/textUsuario"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:layout_marginEnd="8dp"
+                android:text="Nombre del Usuario"
+                android:textColor="@color/lb_tv_white"
+                android:textSize="18sp"
+                android:layout_marginTop="8dp" />
+
+            <!-- Fila de Cantidad de Castv -->
+            <TextView
+                android:id="@+id/textCastv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:layout_marginEnd="8dp"
+                android:text="Cantidad de Castv"
+                android:textColor="@color/lb_tv_white"
+                android:textSize="18sp"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <!-- Imagen al lado derecho, en la parte superior -->
         <ImageView
-            android:layout_width="60dp"
-            android:layout_height="60dp"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
             android:background="@drawable/icono"
             android:padding="20dp"
-            />
+            android:layout_gravity="top|end" />
     </LinearLayout>
 
 </FrameLayout>

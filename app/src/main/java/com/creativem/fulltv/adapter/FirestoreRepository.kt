@@ -46,6 +46,7 @@ class FirestoreRepository {
             e.printStackTrace()
             Pair(emptyList(), emptyList())
         }
+
     }
 
     private suspend fun validarPeliculasConcurrente(
@@ -81,4 +82,40 @@ class FirestoreRepository {
             }
         }
     }
+    // Función para obtener el nombre de usuario
+    suspend fun obtenerNombreUsuario(usuarioId: String): String {
+        return withContext(Dispatchers.IO) {
+            try {
+                val doc = firestore.collection("users").document(usuarioId).get().await()
+                return@withContext if (doc.exists()) {
+                    doc.getString("nombre") ?: "Usuario Desconocido"
+                } else {
+                    Log.e("FirestoreRepository", "El documento no existe")
+                    "Usuario Desconocido"
+                }
+            } catch (e: Exception) {
+                Log.e("FirestoreRepository", "Error obteniendo nombre de usuario", e)
+                "Error"
+            }
+        }
+    }
+
+    // Función para obtener la cantidad de Castv
+    suspend fun obtenerCantidadCastv(usuarioId: String): Int {
+        return withContext(Dispatchers.IO) {
+            try {
+                val doc = firestore.collection("users").document(usuarioId).get().await()
+                return@withContext if (doc.exists()) {
+                    doc.getLong("puntos")?.toInt() ?: 0 // Asegúrate de que el campo sea correcto
+                } else {
+                    Log.e("FirestoreRepository", "El documento no existe")
+                    0
+                }
+            } catch (e: Exception) {
+                Log.e("FirestoreRepository", "Error obteniendo cantidad de Castv", e)
+                0
+            }
+        }
+    }
+
 }
