@@ -24,10 +24,12 @@
         android:usesCleartextTraffic="true">
         <activity
             android:name=".adapter.Main"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="landscape"/>
         <activity
             android:name=".home.MainFragment"
             android:exported="false"
+            android:screenOrientation="landscape"
             tools:ignore="Instantiatable" />
         <activity
             android:name=".home.Nosotros"
