@@ -2,7 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#4C4C4C"
+    android:background="@color/colorPrimary"
     android:padding="16dp">
 
     <LinearLayout
@@ -16,12 +16,11 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Disfruta de las mejores películas de manera rápida y sencilla.\n\n
-        Compra uno de nuestros paquetes\nPaquete Plata $5.000(Castv: 50000)\nPaquete Bronce $10.000(Castv: 120000) \nPaquete Oro $20.000(Castv: 250000)\n de Castv pago escaneando uno de los QR y tendrás acceso en breve a la película que elijas por un mínimo 24 horas. ¡Podrás reproducirla en múltiples dispositivos!\n\n
+            android:text="Disfruta de las mejores películas de manera rápida y sencilla.\n Compra uno de nuestros paquetes\nPaquete Plata $5.000(Castv: 5000)\nPaquete Bronce $10.000(Castv: 12000) \nPaquete Oro $20.000(Castv: 25000)\n Pago Facil escaneando uno de los QR recarga su paquete ¡Podrás reproducirla en múltiples dispositivos! disponible minimo por 24 horas\n\n
         Puedes seleccionar cualquier película disponible o pedir la que desees a través de WhatsApp. (+573028667672) En breve, estará lista para ver.\n\n
         Al formar parte de nuestra comunidad, el contenido que alquiles estará disponible para todos, sin restricciones. Vive una experiencia de cine sin complicaciones, desde la comodidad de tu hogar."
         android:textColor="#FFFFFF"
-        android:textSize="20sp"
+        android:textSize="18sp"
         android:textAlignment="center"
         android:gravity="center"
         android:layout_gravity="bottom"

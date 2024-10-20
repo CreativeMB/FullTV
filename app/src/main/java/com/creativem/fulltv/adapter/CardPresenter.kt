@@ -21,32 +21,33 @@ class CardPresenter: Presenter(){
         return ViewHolder(cardView)
     }
 
-
-
     override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
         val movie = item as? Movie ?: return
         val cardView = viewHolder.view as ImageCardView
 
+        val casText = "CasTV: $"
+        // Concatenar casTV y año
         cardView.titleText = movie.title
-        cardView.contentText = movie.year
+        cardView.contentText = "$casText${movie.year}"
 
-        // Carga de imagen con Glide
+        // Cargar la imagen con Glide
         Glide.with(viewHolder.view.context)
             .load(movie.imageUrl)
             .centerCrop()
-            .error(R.drawable.icono) // Imagen por defecto si falla la carga
+            .error(R.drawable.icono) // Imagen de error si no se puede cargar
             .into(cardView.mainImageView)
 
-        // Manejar clic en la tarjeta
+        // Configurar el clic de la tarjeta
         cardView.setOnClickListener {
             val context = viewHolder.view.context
             val intent = Intent(context, PlayerActivity::class.java)
 
-            // Asegúrate de usar la clave correcta "EXTRA_STREAM_URL"
+            // Usar la clave correcta para pasar la URL del stream
             intent.putExtra("EXTRA_STREAM_URL", movie.streamUrl)
 
             context.startActivity(intent)
         }
     }
-     override fun onUnbindViewHolder(viewHolder: ViewHolder) {}
+
+    override fun onUnbindViewHolder(viewHolder: ViewHolder) {}
 }

@@ -13,7 +13,8 @@ data class Movie(
     val streamUrl: String = "",
     val createdAt: Timestamp = Timestamp.now(),
     var isValid: Boolean = false,
-    var isActive: Boolean = true
+    var isActive: Boolean = true,
+    val casTV: String = ""
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
         parcel.readString() ?: "",

@@ -181,7 +181,7 @@ class MainFragment : BrowseSupportFragment() {
     // Función para actualizar el nombre de usuario y la cantidad de Castv
     fun actualizarUsuario(usuario: String, cantidadCastv: Int) {
         binding.textUsuario.text = "$usuario"
-        binding.textCastv.text = "$:$cantidadCastv"
+        binding.textCastv.text = "Castv: $:$cantidadCastv"
     }
 
     private fun cargarPeliculas() {

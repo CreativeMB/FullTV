@@ -509,11 +509,12 @@ private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: Str
     qepseText.text = "QR PSE(3014416502)"
     qrtjText.text = "QR TJ Credito"
     // Configura el mensaje
-    messageText.text =  "\nPelicula: $movieTitle\nPrecio CasTV: $movieYear\n"+
+    messageText.text =  "Pelicula: $movieTitle\nPrecio CasTV: $$movieYear\n"+
             "Estara en linea en Breve estamos disponibles 24/7\nComprobante de pago WhatsApp(+573028667672)\n" +
-            "\nPaquete Plata $5.000(Castv: 50000)\n" +
-            "Paquete Bronce $10.000(Castv: 120000)\n" +
-            "Paquete Oro $20.000(Castv: 250000)\n\nVive una experiencia de cine sin complicaciones, desde la comodidad de tu hogar."
+            "\nSi no tienes saldo recuerda recargar" +
+            "\nPaquete Plata $5.000(Castv: 5000)\n" +
+            "Paquete Bronce $10.000(Castv: 12000)\n" +
+            "Paquete Oro $20.000(Castv: 25000)"
 
     // Opcional: Cambia las imágenes si es necesario
     firstImage.setImageResource(R.drawable.qrnequi)
@@ -596,7 +597,7 @@ private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: Str
                     }
             } else {
                 // No tiene suficientes puntos, mostrar mensaje y redirigir
-                Toast.makeText(this, "Compra uno de nuestros paquetes de CasTV", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "¡Ho! No tienes Saldo de CasTV para poder Alquilar", Toast.LENGTH_LONG).show()
                 val intent = Intent(this, Nosotros::class.java)
                 startActivity(intent)
                 finish()
