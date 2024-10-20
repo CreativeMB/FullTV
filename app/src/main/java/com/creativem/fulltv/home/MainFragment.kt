@@ -137,6 +137,7 @@ class MainFragment : BrowseSupportFragment() {
         }
 
         cargarPeliculas()
+        actualizarUsuarioInfo()
 
         // Cargar información del usuario
         val usuarioId = FirebaseAuth.getInstance().currentUser?.uid // Obtén el ID del usuario autenticado
@@ -153,6 +154,28 @@ class MainFragment : BrowseSupportFragment() {
             Log.e("MainFragment", "No hay usuario autenticado")
             actualizarUsuario("Usuario Desconocido", 0) // Actualiza la UI con información predeterminada
         }
+    }
+    private fun actualizarUsuarioInfo() {
+        val usuarioId = FirebaseAuth.getInstance().currentUser?.uid // Obtén el ID del usuario autenticado
+
+        // Llama a obtenerNombreUsuario y obtenerCantidadCastv dentro de una coroutine
+        if (usuarioId != null) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                val nombreUsuario = firestoreRepository.obtenerNombreUsuario(usuarioId)
+                val cantidadCastv = firestoreRepository.obtenerCantidadCastv(usuarioId)
+                actualizarUsuario(nombreUsuario, cantidadCastv) // Actualiza la UI con la información del usuario
+            }
+        } else {
+            // Manejo de usuario no autenticado
+            Log.e("MainFragment", "No hay usuario autenticado")
+            actualizarUsuario("Usuario Desconocido", 0) // Actualiza la UI con información predeterminada
+        }
+    }
+
+    // Sobrescribir el método onResume para actualizar la información del usuario
+    override fun onResume() {
+        super.onResume()
+        actualizarUsuarioInfo() // Actualiza la información del usuario cada vez que el fragmento se vuelve visible
     }
 
     // Función para actualizar el nombre de usuario y la cantidad de Castv
@@ -271,4 +294,5 @@ class MainFragment : BrowseSupportFragment() {
         binding.mainBackgroundImage.setImageDrawable(null)
         view?.setBackgroundColor(defaultBackgroundColor)
     }
+
 }
