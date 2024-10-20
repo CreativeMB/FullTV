@@ -115,7 +115,7 @@ class LoginActivity : AppCompatActivity() {
                     val user = hashMapOf(
                         "nombre" to nombre,
                         "email" to email,
-                        "puntos" to 100 // Valor inicial de puntos
+                        "puntos" to 1000 // Valor inicial de puntos
                     )
                     userRef.set(user)
                         .addOnSuccessListener {

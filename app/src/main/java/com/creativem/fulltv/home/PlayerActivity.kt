@@ -509,8 +509,11 @@ private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: Str
     qepseText.text = "QR PSE(3014416502)"
     qrtjText.text = "QR TJ Credito"
     // Configura el mensaje
-    messageText.text = "Estara en linea en Breve estamos disponibles 24/7\nRecibo pago WhApp(+573028667672) Con los datos\n" +
-            "\nPelicula: $movieTitle\nPrecio: $movieYear\n\nVive una experiencia de cine sin complicaciones, desde la comodidad de tu hogar."
+    messageText.text =  "\nPelicula: $movieTitle\nPrecio CasTV: $movieYear\n"+
+            "Estara en linea en Breve estamos disponibles 24/7\nComprobante de pago WhatsApp(+573028667672)\n" +
+            "\nPaquete Plata $5.000(Castv: 50000)\n" +
+            "Paquete Bronce $10.000(Castv: 120000)\n" +
+            "Paquete Oro $20.000(Castv: 250000)\n\nVive una experiencia de cine sin complicaciones, desde la comodidad de tu hogar."
 
     // Opcional: Cambia las imágenes si es necesario
     firstImage.setImageResource(R.drawable.qrnequi)
