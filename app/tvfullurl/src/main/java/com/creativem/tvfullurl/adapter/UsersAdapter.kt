@@ -19,6 +19,7 @@ class UsersAdapter(
 
     inner class UserViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val userName: TextView = itemView.findViewById(R.id.userName)
+        val userEmail: TextView = itemView.findViewById(R.id.userEmail)
         val userPoints: EditText = itemView.findViewById(R.id.userPoints)
         val editImage: ImageView = itemView.findViewById(R.id.editImage)
         val deleteImage: ImageView = itemView.findViewById(R.id.deleteImage)
@@ -44,6 +45,7 @@ class UsersAdapter(
         val user = filteredList[position] // Cambia userList por filteredList
 
         holder.userName.text = user.nombre
+        holder.userEmail.text = user.email
         holder.userPoints.setText(user.puntos.toString())
 
         // Acción para editar puntos (al hacer clic en la imagen de editar)

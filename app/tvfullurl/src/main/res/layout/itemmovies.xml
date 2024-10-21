@@ -14,52 +14,60 @@
         android:id="@+id/linearLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="1.2dp">
+        android:padding="2dp">
 
+        <!-- Nombre de usuario -->
+        <TextView
+            android:id="@+id/userNameTextView"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="16dp"
+            android:text="user"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/editButton" />
 
+        <!-- Título de la película -->
         <TextView
             android:id="@+id/titleTextView"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="24dp"
-            android:layout_marginBottom="4dp"
-            android:paddingStart="2dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginEnd="16dp"
             android:text="Título de la Película"
             android:textSize="18sp"
             android:textStyle="bold"
-            app:layout_constraintBottom_toTopOf="@+id/yearTextView"
-            app:layout_constraintEnd_toStartOf="@+id/editButton"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toBottomOf="@id/userNameTextView"
+            app:layout_constraintEnd_toStartOf="@+id/editButton" />
 
+        <!-- Año o Cast -->
         <TextView
             android:id="@+id/yearTextView"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginEnd="24dp"
-            android:layout_marginBottom="8dp"
-            android:paddingStart="2dp"
-            android:text="year"
+            android:layout_marginEnd="16dp"
+            android:text="Cast"
             android:textSize="18sp"
             android:textStyle="bold"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/editButton"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/titleTextView"
-            app:layout_constraintVertical_bias="0.0" />
+            app:layout_constraintTop_toBottomOf="@id/titleTextView"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/editButton" />
 
         <TextView
             android:id="@+id/deleteButton"
-            android:layout_width="wrap_content"
-            android:layout_height="30dp"
-            android:layout_marginStart="24dp"
-            android:layout_marginEnd="16dp"
+            android:layout_width="40dp"
+            android:layout_height="50dp"
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="10dp"
             android:background="@drawable/delete"
-            android:textColor="@android:color/holo_red_dark"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@+id/editButton"
@@ -69,11 +77,10 @@
         <!-- Mover el botón de editar a la parte inferior -->
         <TextView
             android:id="@+id/editButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:text="Editar"
-            android:textColor="@android:color/holo_blue_dark"
+            android:layout_width="40dp"
+            android:layout_height="50dp"
+            android:layout_marginEnd="2dp"
+            android:background="@drawable/baseline_edit_square_24"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@+id/deleteButton"
             app:layout_constraintStart_toEndOf="@+id/titleTextView"

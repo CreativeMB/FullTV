@@ -12,6 +12,7 @@ import com.creativem.cineflexurl.modelo.Movie
 import com.creativem.tvfullurl.adapter.MoviesAdapter
 import com.creativem.tvfullurl.databinding.FragmentSoporteBinding
 import com.google.android.gms.tasks.Task
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.QuerySnapshot
 
@@ -46,28 +47,69 @@ class SoporteFragment : Fragment() {
             }
         })
 
-
         return binding.root
     }
 
     private fun cargarPedidos() {
         movieList.clear()
+
         db.collection("pedidosmovies").get()
             .addOnCompleteListener { task: Task<QuerySnapshot> ->
                 if (task.isSuccessful) {
+                    val userIds = mutableListOf<String>()
                     for (document in task.result!!) {
-                        val movie: Movie =
-                            document.toObject(Movie::class.java).copy(id = document.id)
-                        movieList.add(movie)
+                        val movie: Movie = document.toObject(Movie::class.java).copy(id = document.id)
+                        userIds.add(movie.userId)
+                        movieList.add(movie) // Aquí solo agregamos la película sin el usuario de prueba
                     }
-                    moviesAdapter.notifyDataSetChanged()
+                    Log.d("SoporteFragment", "Películas cargadas: ${movieList.size}") // Log de verificación
+                    cargarNombresUsuarios(userIds) // Cargar nombres de usuario después de cargar las películas
+
+                    // Notificar al adaptador aquí
+                    moviesAdapter.notifyDataSetChanged() // Aquí puedes notificar el cambio también
                 } else {
                     Log.e("PedidosMovies", "Error getting documents: ", task.exception)
                 }
             }
             .addOnFailureListener { e ->
-                Log.e("PedidosMovies", "Error loading vermovies", e)
+                Log.e("PedidosMovies", "Error loading movies", e)
             }
+    }
+
+    private fun cargarNombresUsuarios(userIds: List<String>) {
+        val filteredUserIds = userIds.filter { it.isNotEmpty() }
+
+        if (filteredUserIds.isEmpty()) return
+        db.collection("users")
+            .whereIn(FieldPath.documentId(), filteredUserIds)
+            .get()
+            .addOnSuccessListener { documents ->
+                val userNamesMap = mutableMapOf<String, String>()
+                for (document in documents) {
+                    val userId = document.id
+                    val userName = document.getString("nombre") ?: "Usuario desconocido"
+                    userNamesMap[userId] = userName
+                }
+
+                actualizarNombresUsuariosEnPeliculas(userNamesMap)
+
+                // Actualiza la lista del adaptador con la nueva lista de películas
+                moviesAdapter.updateMovieList(movieList) // Actualiza el adaptador
+            }
+            .addOnFailureListener { e ->
+                Log.e("users", "Error al cargar nombres de usuarios", e)
+            }
+    }
+
+    private fun actualizarNombresUsuariosEnPeliculas(userNamesMap: Map<String, String>) {
+        // Actualizar los nombres de usuario en la lista de películas
+        for (movie in movieList) {
+            val userName = userNamesMap[movie.userId] ?: "Usuario desconocido"
+            movie.userName = userName // Asigna el nombre de usuario correspondiente
+        }
+
+        // Notificar al adaptador que los datos han cambiado
+        moviesAdapter.notifyDataSetChanged()
     }
 
     private fun iniciarRecycler() {
