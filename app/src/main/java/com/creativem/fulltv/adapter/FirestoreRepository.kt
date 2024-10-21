@@ -2,6 +2,7 @@ package com.creativem.fulltv.adapter
 
 import android.util.Log
 import com.creativem.fulltv.data.Movie
+import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +50,7 @@ class FirestoreRepository {
 
     }
 
-    private suspend fun validarPeliculasConcurrente(
+   suspend fun validarPeliculasConcurrente(
         peliculas: List<Movie>,
         maxConcurrentRequests: Int
     ): Pair<List<Movie>, List<Movie>> = coroutineScope {
@@ -117,5 +118,7 @@ class FirestoreRepository {
             }
         }
     }
-
+    fun obtenerPeliculasRef(): CollectionReference {
+        return firestore.collection("movies")
+    }
 }

@@ -135,7 +135,7 @@ class MainFragment : BrowseSupportFragment() {
                 restablecerColorFondo()
             }
         }
-
+        escucharCambiosEnPeliculas()
         cargarPeliculas()
         actualizarUsuarioInfo()
 
@@ -293,6 +293,43 @@ class MainFragment : BrowseSupportFragment() {
     private fun restablecerColorFondo() {
         binding.mainBackgroundImage.setImageDrawable(null)
         view?.setBackgroundColor(defaultBackgroundColor)
+    }
+    // Método para escuchar cambios en Firestore y actualizar la lista de películas
+    private fun escucharCambiosEnPeliculas() {
+        firestoreRepository.obtenerPeliculasRef().addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                Log.e("MainFragment", "Error al escuchar cambios: ${error.message}")
+                Toast.makeText(requireContext(), "Error al cargar películas", Toast.LENGTH_SHORT).show()
+                return@addSnapshotListener
+            }
+
+            if (snapshot != null && !snapshot.isEmpty) {
+                // Mapeamos los documentos a objetos Movie
+                val peliculas = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(Movie::class.java)?.copy(id = doc.id)
+                }
+
+                // Validamos las URLs de las películas en una corrutina
+                lifecycleScope.launch {
+                    // Asegúrate de pasar el valor de maxConcurrentRequests aquí
+                    val (peliculasValidas, peliculasInvalidas) =
+                        firestoreRepository.validarPeliculasConcurrente(peliculas, maxConcurrentRequests = 16)
+
+                    // Ordenar las listas por fecha de publicación, de más reciente a más antiguo
+                    val peliculasOrdenadasValidas = peliculasValidas.sortedByDescending { it.createdAt }
+                    val peliculasOrdenadasInvalidas = peliculasInvalidas.sortedByDescending { it.createdAt }
+
+                    // Actualizamos la lista de películas en la interfaz
+                    updateMovieList(peliculasOrdenadasValidas, peliculasOrdenadasInvalidas)
+                }
+
+            } else {
+                // Si no hay datos en el snapshot
+                Log.d("MainFragment", "No se encontraron películas.")
+                Toast.makeText(requireContext(), "No hay películas disponibles", Toast.LENGTH_SHORT).show()
+                updateMovieList(emptyList(), emptyList()) // Limpia las listas si no hay datos
+            }
+        }
     }
 
 }
