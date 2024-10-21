@@ -17,14 +17,14 @@ import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.creativem.cineflexurl.modelo.Movie
 import com.creativem.tvfullurl.R
-import com.creativem.tvfullurl.databinding.FragmentNuevaPeliculaBinding
+import com.creativem.tvfullurl.databinding.FragmentNuevaEditarBinding
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 
 
 class NuevaPeliculaFragment : Fragment() {
 
-    private lateinit var binding: FragmentNuevaPeliculaBinding
+    private lateinit var binding: FragmentNuevaEditarBinding
     private val db = FirebaseFirestore.getInstance()
     private lateinit var editTexts: List<EditText>
     private var movieId: String? = null
@@ -39,7 +39,7 @@ class NuevaPeliculaFragment : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        binding = FragmentNuevaPeliculaBinding.inflate(inflater, container, false)
+        binding = FragmentNuevaEditarBinding.inflate(inflater, container, false)
         movieId = arguments?.getString("movieId")
         return binding.root
 

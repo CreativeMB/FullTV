@@ -12,11 +12,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.cineflexurl.modelo.Movie
 import com.creativem.tvfullurl.R
 import com.creativem.tvfullurl.adapter.MoviesAdapter
-import com.creativem.tvfullurl.databinding.FragmentSoporteBinding
+import com.creativem.tvfullurl.databinding.FragmentPedidosBinding
 import com.google.firebase.firestore.FirebaseFirestore
 
 class EditarPeliculaFragment : Fragment() {
-    private lateinit var binding: FragmentSoporteBinding
+    private lateinit var binding: FragmentPedidosBinding
     private lateinit var db: FirebaseFirestore
     private lateinit var moviesAdapter: MoviesAdapter
     private var movieList: MutableList<Movie> = mutableListOf()
@@ -25,7 +25,7 @@ class EditarPeliculaFragment : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        binding = FragmentSoporteBinding.inflate(inflater, container, false)
+        binding = FragmentPedidosBinding.inflate(inflater, container, false)
         db = FirebaseFirestore.getInstance()
         return binding.root
     }

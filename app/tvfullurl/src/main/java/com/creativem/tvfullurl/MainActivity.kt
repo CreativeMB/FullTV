@@ -1,21 +1,18 @@
 package com.creativem.tvfullurl
 
 import android.os.Bundle
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.NavigationUI
 import androidx.navigation.ui.setupWithNavController
-import com.creativem.tvfullurl.databinding.ActivityMainBinding
+import com.creativem.tvfullurl.databinding.PantallaPrincipalBinding
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var binding: ActivityMainBinding
+    private lateinit var binding: PantallaPrincipalBinding
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 //        enableEdgeToEdge()
-        binding= ActivityMainBinding.inflate(layoutInflater)
+        binding= PantallaPrincipalBinding.inflate(layoutInflater)
         setContentView(binding.root)
         // 1. Encuentra el NavHostFragment (que contiene tu gráfico de navegación)
         val navHostFragment = supportFragmentManager.findFragmentById(R.id.fragmentContainer) as NavHostFragment

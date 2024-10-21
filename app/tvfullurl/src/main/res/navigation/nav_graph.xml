@@ -13,7 +13,7 @@
         android:id="@+id/nuevaPeliculaFragment"
         android:name="com.creativem.tvfullurl.Fragment.NuevaPeliculaFragment"
         android:label="fragment_nueva_pelicula"
-        tools:layout="@layout/fragment_nueva_pelicula" >
+        tools:layout="@layout/fragment_nueva_editar" >
         <action
             android:id="@+id/action_nuevaPeliculaFragment_to_editarPeliculaFragment"
             app:destination="@id/editarPeliculaFragment" />
@@ -25,7 +25,7 @@
         android:id="@+id/editarPeliculaFragment"
         android:name="com.creativem.tvfullurl.Fragment.EditarPeliculaFragment"
         android:label="fragment_editar_pelicula"
-        tools:layout="@layout/fragment_soporte" >
+        tools:layout="@layout/fragment_pedidos" >
         <action
             android:id="@+id/action_editarPeliculaFragment_to_nuevaPeliculaFragment"
             app:destination="@id/nuevaPeliculaFragment" />
@@ -35,9 +35,9 @@
     </fragment>
     <fragment
         android:id="@+id/soporteFragment"
-        android:name="com.creativem.tvfullurl.Fragment.SoporteFragment"
+        android:name="com.creativem.tvfullurl.Fragment.PedidosFragment"
         android:label="fragment_soporte"
-        tools:layout="@layout/fragment_soporte" >
+        tools:layout="@layout/fragment_pedidos" >
         <action
             android:id="@+id/action_soporteFragment_to_editarPeliculaFragment"
             app:destination="@id/editarPeliculaFragment" />
@@ -49,7 +49,7 @@
         android:id="@+id/CastvFragment"
         android:name="com.creativem.tvfullurl.Fragment.CastvFragment"
         android:label="fragment_soporte"
-        tools:layout="@layout/fragment_soporte" >
+        tools:layout="@layout/fragment_pedidos" >
         <action
             android:id="@+id/action_soporteFragment_to_editarPeliculaFragment"
             app:destination="@id/editarPeliculaFragment" />

@@ -10,15 +10,15 @@ import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.cineflexurl.modelo.Movie
 import com.creativem.tvfullurl.adapter.MoviesAdapter
-import com.creativem.tvfullurl.databinding.FragmentSoporteBinding
+import com.creativem.tvfullurl.databinding.FragmentPedidosBinding
 import com.google.android.gms.tasks.Task
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.QuerySnapshot
 
 
-class SoporteFragment : Fragment() {
-    private lateinit var binding: FragmentSoporteBinding
+class PedidosFragment : Fragment() {
+    private lateinit var binding: FragmentPedidosBinding
 
     private lateinit var moviesAdapter: MoviesAdapter
     private var movieList: MutableList<Movie> = mutableListOf()
@@ -30,7 +30,7 @@ class SoporteFragment : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        binding = FragmentSoporteBinding.inflate(layoutInflater)
+        binding = FragmentPedidosBinding.inflate(layoutInflater)
         db = FirebaseFirestore.getInstance()
 
         iniciarRecycler()
@@ -62,7 +62,7 @@ class SoporteFragment : Fragment() {
                         userIds.add(movie.userId)
                         movieList.add(movie) // Aquí solo agregamos la película sin el usuario de prueba
                     }
-                    Log.d("SoporteFragment", "Películas cargadas: ${movieList.size}") // Log de verificación
+                    Log.d("PedidosFragment", "Películas cargadas: ${movieList.size}") // Log de verificación
                     cargarNombresUsuarios(userIds) // Cargar nombres de usuario después de cargar las películas
 
                     // Notificar al adaptador aquí

@@ -8,20 +8,16 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.creativem.tvfullurl.adapter.MoviesAdapter
-import com.creativem.tvfullurl.adapter.UsersAdapter
-import com.creativem.tvfullurl.databinding.CastvFragmentBinding
+import com.creativem.tvfullurl.adapter.CastvAdapter
+import com.creativem.tvfullurl.databinding.FragmentCastvBinding
 import com.creativem.tvfullurl.modelo.User
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.QuerySnapshot
 
 class CastvFragment : Fragment() {
 
-    private var _binding: CastvFragmentBinding? = null
+    private var _binding: FragmentCastvBinding? = null
     private val binding get() = _binding!!
-
-    private lateinit var moviesAdapter: MoviesAdapter
-    private lateinit var usersAdapter: UsersAdapter
+    private lateinit var castvAdapter: CastvAdapter
     private var userList: MutableList<User> = mutableListOf()
 
     private lateinit var db: FirebaseFirestore
@@ -31,7 +27,7 @@ class CastvFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View? {
         // Inflar el layout usando ViewBinding
-        _binding = CastvFragmentBinding.inflate(inflater, container, false)
+        _binding = FragmentCastvBinding.inflate(inflater, container, false)
         return binding.root
     }
 
@@ -51,7 +47,7 @@ class CastvFragment : Fragment() {
 
             override fun onQueryTextChange(newText: String?): Boolean {
                 // Filtrar la lista de usuarios según el texto ingresado
-                usersAdapter.filter(newText.orEmpty())
+                castvAdapter.filter(newText.orEmpty())
                 return true
             }
         })
@@ -67,7 +63,7 @@ class CastvFragment : Fragment() {
                         val user: User = document.toObject(User::class.java).copy(id = document.id)
                         userList.add(user)
                     }
-                    usersAdapter.notifyDataSetChanged() // Notificar al adaptador que los datos han cambiado
+                    castvAdapter.notifyDataSetChanged() // Notificar al adaptador que los datos han cambiado
                 } else {
                     Log.e("Users", "Error getting documents: ", task.exception)
                 }
@@ -80,7 +76,7 @@ class CastvFragment : Fragment() {
     // Iniciar el RecyclerView
     private fun iniciarRecycler() {
         // Inicializar el adaptador de usuarios con las acciones de editar y eliminar
-        usersAdapter = UsersAdapter(
+        castvAdapter = CastvAdapter(
             userList,
             onEditClick = { userId, newPoints -> updatePoints(userId, newPoints) },
             onDeleteClick = { userId -> deleteUsers(userId) }
@@ -89,7 +85,7 @@ class CastvFragment : Fragment() {
         // Configurar el RecyclerView para los usuarios
         binding.recyclerViewUsers.apply {
             layoutManager = LinearLayoutManager(requireContext())
-            adapter = usersAdapter
+            adapter = castvAdapter
         }
     }
 

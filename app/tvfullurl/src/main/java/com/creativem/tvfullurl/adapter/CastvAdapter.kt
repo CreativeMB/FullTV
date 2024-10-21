@@ -9,11 +9,11 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.creativem.tvfullurl.R
 import com.creativem.tvfullurl.modelo.User
-class UsersAdapter(
+class CastvAdapter(
     private val userList: MutableList<User>,
     private val onEditClick: (userId: String, newPoints: Int) -> Unit,
     private val onDeleteClick: (userId: String) -> Unit
-) : RecyclerView.Adapter<UsersAdapter.UserViewHolder>() {
+) : RecyclerView.Adapter<CastvAdapter.UserViewHolder>() {
 
     private var filteredList: List<User> = userList
 
@@ -26,7 +26,7 @@ class UsersAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_user, parent, false)
+        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_castv, parent, false)
         return UserViewHolder(view)
     }
 
