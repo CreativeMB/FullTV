@@ -321,6 +321,7 @@ class MainFragment : BrowseSupportFragment() {
 
                     // Actualizamos la lista de películas en la interfaz
                     updateMovieList(peliculasOrdenadasValidas, peliculasOrdenadasInvalidas)
+                    actualizarUsuarioInfo()
                 }
 
             } else {
