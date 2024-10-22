@@ -14,7 +14,6 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.creativem.fulltv.R
 import com.creativem.fulltv.adapter.Main
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.messaging.FirebaseMessaging
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var auth: FirebaseAuth
@@ -86,18 +85,8 @@ class LoginActivity : AppCompatActivity() {
                     val user = auth.currentUser
                     user?.let {
 
-//                        updateUserPoints(it.uid, it.displayName ?: "", it.email ?: "", tokenFCM)
-                        // Obtener token FCM y actualizar información del usuario
-                        FirebaseMessaging.getInstance().token.addOnCompleteListener { tokenTask ->
-                            if (tokenTask.isSuccessful) {
-                                val tokenFCM = tokenTask.result
-                                updateUserPoints(it.uid, it.displayName ?: "", it.email ?: "")
-                            } else {
-                                // Manejar error al obtener token FCM
-                                Log.w(TAG, "Error al obtener token FCM", tokenTask.exception)
-                                // ... (Puedes mostrar un mensaje al usuario si lo consideras necesario)
-                            }
-                        }
+                        updateUserPoints(it.uid, it.displayName ?: "", it.email ?: "")
+
                     }
                     val intent = Intent(this, Main::class.java)
                     startActivity(intent)

@@ -51,8 +51,6 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
-import com.google.firebase.messaging.FirebaseMessaging
-import com.google.firebase.messaging.RemoteMessage
 import org.json.JSONObject
 
 
@@ -195,7 +193,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun loadMoviesFromFirestore() {
-        // Usar un CoroutineScope adecuado (puede ser un lifecycleScope si estás dentro de una Activity o Fragment)
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 // Obtener la instancia de FirestoreRepository
@@ -477,28 +475,6 @@ class PlayerActivity : AppCompatActivity() {
         val activeNetwork = connectivityManager.activeNetworkInfo
         return activeNetwork?.isConnectedOrConnecting == true
     }
-
-    //    private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
-//        AlertDialog.Builder(this)
-//            .setTitle("¡Alquila Tu Peli!")
-//            .setMessage(
-//                "Reporte pago por WhatsApp(+573028667672) con los datos\n" +
-//                        "\n" +
-//                        "Pelicula: $movieTitle\n" +
-//                        "\n" +
-//                        "$movieYear\n" +
-//                        "\nEstara en linea en Breve"
-//            )
-//            .setPositiveButton("Volver al contenido") { dialog, _ ->
-//                dialog.dismiss() // Cierra el diálogo
-//                onBackPressed() // Simula el botón de retroceso en lugar de terminar la actividad
-//            }
-//            .setNeutralButton("Alquilar Pelicula") { _, _ ->
-//                enviarPedido()
-//
-//            }
-//            .show()
-//    }
     private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
         // Infla el layout personalizado para el diálogo
         val dialogView = layoutInflater.inflate(R.layout.alert_reproductor, null)
@@ -604,51 +580,13 @@ class PlayerActivity : AppCompatActivity() {
             isProcessingOrder = false // Restablecer el flag al finalizar
         }
     }
-
-//    private fun enviarNotificacionNuevoPedido(userIdQueAgregoPelicula: String, movieTitle: String) {
-//        // Obtener todos los usuarios (excepto el que agregó la película)
-//        firestore.collection("users")
-//            .whereNotEqualTo("userId", userIdQueAgregoPelicula) // Excluir al usuario actual
-//            .get()
-//            .addOnSuccessListener { querySnapshot ->
-//                for (document in querySnapshot) {
-//                    val usuarioData = document.data
-//                    val tokenFCM = usuarioData["tokenFCM"] as? String
-//
-//                    if (tokenFCM != null) {
-//                        // Enviar un mensaje de datos
-//                        val messageData = mapOf(
-//                            "title" to "Nuevo Pedido",
-//                            "body" to "Se ha añadido la película '$movieTitle'"
-//                        )
-//
-//                        val message = RemoteMessage.Builder(tokenFCM)
-//                            .setData(messageData)
-//                            .build()
-//
-//                        try {
-//                            FirebaseMessaging.getInstance().send(message)
-//                            Log.d("FCM", "Notificación enviada exitosamente")
-//                        } catch (e: Exception) {
-//                            Log.e("FCM", "Error al enviar la notificación: ${e.message}")
-//                        }
-//                    }
-//                }
-//
-//                // Enviar un correo al agregar un nuevo pedido
-//                enviarCorreoNuevoPedido(movieTitle)
-//            }
-//            .addOnFailureListener { e ->
-//                Log.e("Firestore", "Error al obtener usuarios: ${e.message}")
-//            }
-//    }
     // Método para enviar un correo
     private fun enviarCorreoNuevoPedido(movieTitle: String) {
         // Crear un objeto JSON para el correo
         val emailData = mapOf(
             "to" to "fulltvurl@gmail.com", // Cambia esto por el correo del destinatario
             "subject" to "$movieTitle",
-            "text" to "PELICULA PAGADA: $movieTitle"
+            "text" to "PAGADA: $movieTitle"
         )
 
         // Hacer la solicitud POST al servidor que envía el correo
