@@ -41,6 +41,9 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import kotlinx.coroutines.MainScope
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultDataSource
+import com.android.volley.Response
+import com.android.volley.toolbox.JsonObjectRequest
+import com.android.volley.toolbox.Volley
 import com.creativem.fulltv.R
 import com.creativem.fulltv.adapter.FirestoreRepository
 import com.creativem.fulltv.menu.MoviesMenuAdapter
@@ -48,6 +51,9 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.RemoteMessage
+import org.json.JSONObject
 
 
 class PlayerActivity : AppCompatActivity() {
@@ -218,11 +224,12 @@ class PlayerActivity : AppCompatActivity() {
         binding.recyclerViewMovies.layoutManager = LinearLayoutManager(this)
         binding.recyclerViewMovies.visibility = View.GONE
     }
+
     private fun startMoviePlayback(streamUrl: String, movieTitle: String) {
         val intent = Intent(this, PlayerActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         intent.putExtra("EXTRA_STREAM_URL", streamUrl)
-        intent.putExtra("EXTRA_MOVIE_TITLE",  movieTitle)
+        intent.putExtra("EXTRA_MOVIE_TITLE", movieTitle)
         startActivity(intent)
     }
 
@@ -471,7 +478,7 @@ class PlayerActivity : AppCompatActivity() {
         return activeNetwork?.isConnectedOrConnecting == true
     }
 
-//    private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
+    //    private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
 //        AlertDialog.Builder(this)
 //            .setTitle("¡Alquila Tu Peli!")
 //            .setMessage(
@@ -492,49 +499,50 @@ class PlayerActivity : AppCompatActivity() {
 //            }
 //            .show()
 //    }
-private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
-    // Infla el layout personalizado para el diálogo
-    val dialogView = layoutInflater.inflate(R.layout.alert_reproductor, null)
+    private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
+        // Infla el layout personalizado para el diálogo
+        val dialogView = layoutInflater.inflate(R.layout.alert_reproductor, null)
 
-    // Encuentra los componentes dentro del layout
-    val messageText = dialogView.findViewById<TextView>(R.id.messageText)
-    val firstImage = dialogView.findViewById<ImageView>(R.id.firstImage)
-    val secondImage = dialogView.findViewById<ImageView>(R.id.secondImage)
-    val thirdImage = dialogView.findViewById<ImageView>(R.id.thirdImage)
-    val qrneqiText = dialogView.findViewById<TextView>(R.id.qrneqiText)
-    val qepseText = dialogView.findViewById<TextView>(R.id.qepseText)
-    val qrtjText = dialogView.findViewById<TextView>(R.id.qrtjText)
+        // Encuentra los componentes dentro del layout
+        val messageText = dialogView.findViewById<TextView>(R.id.messageText)
+        val firstImage = dialogView.findViewById<ImageView>(R.id.firstImage)
+        val secondImage = dialogView.findViewById<ImageView>(R.id.secondImage)
+        val thirdImage = dialogView.findViewById<ImageView>(R.id.thirdImage)
+        val qrneqiText = dialogView.findViewById<TextView>(R.id.qrneqiText)
+        val qepseText = dialogView.findViewById<TextView>(R.id.qepseText)
+        val qrtjText = dialogView.findViewById<TextView>(R.id.qrtjText)
 
-    qrneqiText.text = "QR Nequi(3014416502)"
-    qepseText.text = "QR PSE(3014416502)"
-    qrtjText.text = "QR TJ Credito"
-    // Configura el mensaje
-    messageText.text =  "Pelicula: $movieTitle\nPrecio CasTV: $$movieYear\n"+
-            "Estara en linea en Breve estamos disponibles 24/7\n" +
-            "\nSi no tienes saldo recuerda recargar en COP" +
-            "\nPaquete Plata $5.000(Castv: 50)\n" +
-            "Paquete Bronce $10.000(Castv: 120)\n" +
-            "Paquete Oro $20.000(Castv: 250\n" +
-            "Comprobante de pago WhatsApp(+573028667672)"
+        qrneqiText.text = "QR Nequi(3014416502)"
+        qepseText.text = "QR PSE(3014416502)"
+        qrtjText.text = "QR TJ Credito"
+        // Configura el mensaje
+        messageText.text = "Pelicula: $movieTitle\nPrecio CasTV: $$movieYear\n" +
+                "Estara en linea en Breve estamos disponibles 24/7\n" +
+                "\nSi no tienes saldo recuerda recargar en COP" +
+                "\nPaquete Plata $5.000(Castv: 50)\n" +
+                "Paquete Bronce $10.000(Castv: 120)\n" +
+                "Paquete Oro $20.000(Castv: 250\n" +
+                "Comprobante de pago WhatsApp(+573028667672)"
 
-    // Opcional: Cambia las imágenes si es necesario
-    firstImage.setImageResource(R.drawable.qrnequi)
-    secondImage.setImageResource(R.drawable.qrpse)
-    thirdImage.setImageResource(R.drawable.qrtarjeta)
+        // Opcional: Cambia las imágenes si es necesario
+        firstImage.setImageResource(R.drawable.qrnequi)
+        secondImage.setImageResource(R.drawable.qrpse)
+        thirdImage.setImageResource(R.drawable.qrtarjeta)
 
-    // Crea el AlertDialog
-    AlertDialog.Builder(this)
-        .setTitle("¡Alquila Tu Peli!")
-        .setView(dialogView) // Aplica el layout personalizado
-        .setPositiveButton("Volver al contenido") { dialog, _ ->
-            dialog.dismiss() // Cierra el diálogo
-            onBackPressed() // Simula el botón de retroceso
-        }
-        .setNeutralButton("Alquilar Pelicula") { _, _ ->
-            enviarPedido()
-        }
-        .show()
-}
+        // Crea el AlertDialog
+        AlertDialog.Builder(this)
+            .setTitle("¡Alquila Tu Peli!")
+            .setView(dialogView) // Aplica el layout personalizado
+            .setPositiveButton("Volver al contenido") { dialog, _ ->
+                dialog.dismiss() // Cierra el diálogo
+                onBackPressed() // Simula el botón de retroceso
+            }
+            .setNeutralButton("Alquilar Pelicula") { _, _ ->
+                enviarPedido()
+            }
+            .show()
+    }
+
     private fun enviarPedido() {
         if (isProcessingOrder) {
             return // Salir si ya se está procesando un pedido
@@ -564,27 +572,109 @@ private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: Str
                         .addOnSuccessListener { documentReference ->
                             // Descontar puntos del usuario
                             descontarPuntos(userId, movieYear.toLong(), datos)
+
+                            // *** Enviar notificación ***
+                            enviarCorreoNuevoPedido(movieTitle)
                         }
                         .addOnFailureListener { e ->
                             Log.e("Firestore", "Error al agregar la película: ${e.message}")
-                            Toast.makeText(this, "Error al realizar el pedido: ${e.message}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                this,
+                                "Error al realizar el pedido: ${e.message}",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                 } else {
                     Toast.makeText(this, "No hay usuario autenticado.", Toast.LENGTH_SHORT).show()
                 }
             } else {
                 // La película ya existe, mostrar mensaje y redirigir
-                Toast.makeText(this, "La película '$movieTitle' ya fue pedida; puedes alquilar más...", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this,
+                    "La película '$movieTitle' ya fue pedida; puedes alquilar más...",
+                    Toast.LENGTH_LONG
+                ).show()
                 finish()
             }
         }.addOnFailureListener { e ->
             Log.e("Firestore", "Error al consultar la película: ${e.message}")
-            Toast.makeText(this, "Error al consultar la película: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Error al consultar la película: ${e.message}", Toast.LENGTH_SHORT)
+                .show()
         }.addOnCompleteListener {
             isProcessingOrder = false // Restablecer el flag al finalizar
         }
     }
-    private fun descontarPuntos(userId: String, puntosADescontar: Long, datos: HashMap<String, Any>) {
+
+//    private fun enviarNotificacionNuevoPedido(userIdQueAgregoPelicula: String, movieTitle: String) {
+//        // Obtener todos los usuarios (excepto el que agregó la película)
+//        firestore.collection("users")
+//            .whereNotEqualTo("userId", userIdQueAgregoPelicula) // Excluir al usuario actual
+//            .get()
+//            .addOnSuccessListener { querySnapshot ->
+//                for (document in querySnapshot) {
+//                    val usuarioData = document.data
+//                    val tokenFCM = usuarioData["tokenFCM"] as? String
+//
+//                    if (tokenFCM != null) {
+//                        // Enviar un mensaje de datos
+//                        val messageData = mapOf(
+//                            "title" to "Nuevo Pedido",
+//                            "body" to "Se ha añadido la película '$movieTitle'"
+//                        )
+//
+//                        val message = RemoteMessage.Builder(tokenFCM)
+//                            .setData(messageData)
+//                            .build()
+//
+//                        try {
+//                            FirebaseMessaging.getInstance().send(message)
+//                            Log.d("FCM", "Notificación enviada exitosamente")
+//                        } catch (e: Exception) {
+//                            Log.e("FCM", "Error al enviar la notificación: ${e.message}")
+//                        }
+//                    }
+//                }
+//
+//                // Enviar un correo al agregar un nuevo pedido
+//                enviarCorreoNuevoPedido(movieTitle)
+//            }
+//            .addOnFailureListener { e ->
+//                Log.e("Firestore", "Error al obtener usuarios: ${e.message}")
+//            }
+//    }
+    // Método para enviar un correo
+    private fun enviarCorreoNuevoPedido(movieTitle: String) {
+        // Crear un objeto JSON para el correo
+        val emailData = mapOf(
+            "to" to "fulltvurl@gmail.com", // Cambia esto por el correo del destinatario
+            "subject" to "$movieTitle",
+            "text" to "PELICULA PAGADA: $movieTitle"
+        )
+
+        // Hacer la solicitud POST al servidor que envía el correo
+        val url = "https://fulltvurl.glitch.me/sendEmail" // Cambia esto por la URL de tu servidor
+
+        // Usar Volley para hacer la solicitud
+        val requestQueue = Volley.newRequestQueue(this) // Contexto de tu actividad
+
+        val jsonObjectRequest = object : JsonObjectRequest(
+            Method.POST, url, JSONObject(emailData),
+            Response.Listener { response ->
+                Log.d("Email", "Correo enviado exitosamente: ${response.toString()}")
+            },
+            Response.ErrorListener { error ->
+                Log.e("Email", "Error al enviar el correo: ${error.message}")
+            }
+        ) {}
+
+        requestQueue.add(jsonObjectRequest)
+    }
+
+    private fun descontarPuntos(
+        userId: String,
+        puntosADescontar: Long,
+        datos: HashMap<String, Any>
+    ) {
         val userRef = firestore.collection("users").document(userId)
 
         userRef.get().addOnSuccessListener { userDocument ->
@@ -596,27 +686,38 @@ private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: Str
                 userRef.update("puntos", puntosActuales - puntosADescontar)
                     .addOnSuccessListener {
                         // Solo se ejecuta aquí si se han descontado puntos
-                        Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT)
+                            .show()
                         val intent = Intent(this, Nosotros::class.java)
                         startActivity(intent)
                         finish()
                     }
                     .addOnFailureListener { e ->
                         Log.e("Firestore", "Error al descontar puntos: ${e.message}")
-                        Toast.makeText(this, "Error al descontar puntos: ${e.message}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            this,
+                            "Error al descontar puntos: ${e.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
             } else {
                 // No tiene suficientes puntos, mostrar mensaje y redirigir
-                Toast.makeText(this, "¡Ho! No tienes Saldo de CasTV para poder Alquilar", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this,
+                    "¡Ho! No tienes Saldo de CasTV para poder Alquilar",
+                    Toast.LENGTH_LONG
+                ).show()
                 val intent = Intent(this, Nosotros::class.java)
                 startActivity(intent)
                 finish()
             }
         }.addOnFailureListener { e ->
             Log.e("Firestore", "Error al obtener el documento del usuario: ${e.message}")
-            Toast.makeText(this, "Error al obtener usuario: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Error al obtener usuario: ${e.message}", Toast.LENGTH_SHORT)
+                .show()
         }
     }
+
     override fun onPause() {
         super.onPause()
         player?.pause()
@@ -719,14 +820,18 @@ private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: Str
     private fun actualizarTiempo() {
         if (player != null && player!!.isPlaying) {
             MainScope().launch {
-                val tiemporeproducido = binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido)
+                val tiemporeproducido =
+                    binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido)
                 val tiempototal = binding.reproductor.findViewById<TextView>(R.id.tiempototal)
                 val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
                 Log.d("PlayerActivity", "actualizarTiempo() llamado")
 
                 val posicionActual = player?.currentPosition ?: 0
                 val duracionTotal = player?.duration ?: 0
-                Log.d("PlayerActivity", "Posición actual: $posicionActual, Duración total: $duracionTotal")
+                Log.d(
+                    "PlayerActivity",
+                    "Posición actual: $posicionActual, Duración total: $duracionTotal"
+                )
 
                 tiemporeproducido.text = tiempoFormateado(posicionActual)
                 tiempototal.text = tiempoFormateado(duracionTotal)

@@ -1,5 +1,6 @@
 package com.creativem.tvfullurl.Fragment
 
+import android.app.NotificationManager
 import android.os.Bundle
 import android.util.Log
 import androidx.fragment.app.Fragment
@@ -7,8 +8,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.app.NotificationCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.cineflexurl.modelo.Movie
+import com.creativem.tvfullurl.R
 import com.creativem.tvfullurl.adapter.MoviesAdapter
 import com.creativem.tvfullurl.databinding.FragmentPedidosBinding
 import com.google.android.gms.tasks.Task
@@ -61,6 +64,7 @@ class PedidosFragment : Fragment() {
                         val movie: Movie = document.toObject(Movie::class.java).copy(id = document.id)
                         userIds.add(movie.userId)
                         movieList.add(movie) // Aquí solo agregamos la película sin el usuario de prueba
+
                     }
                     Log.d("PedidosFragment", "Películas cargadas: ${movieList.size}") // Log de verificación
                     cargarNombresUsuarios(userIds) // Cargar nombres de usuario después de cargar las películas
@@ -145,4 +149,5 @@ class PedidosFragment : Fragment() {
                 Log.e("PedidosMovies", "Error deleting movie", e)
             }
     }
+
 }

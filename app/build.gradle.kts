@@ -74,6 +74,8 @@ dependencies {
 
     //firebase
     implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
+    implementation ("com.google.firebase:firebase-messaging-ktx")
+    implementation("com.google.firebase:firebase-messaging-ktx:23.2.1")
     implementation("com.google.firebase:firebase-analytics")
     implementation ("com.google.firebase:firebase-analytics-ktx")
     implementation ("com.google.firebase:firebase-config:21.0.2")
@@ -116,4 +118,9 @@ dependencies {
     implementation ("androidx.work:work-runtime-ktx:2.8.1")
 //leanback
     implementation ("androidx.leanback:leanback:1.0.0")
+
+    implementation ("com.android.volley:volley:1.2.1")
+
+
+
 }

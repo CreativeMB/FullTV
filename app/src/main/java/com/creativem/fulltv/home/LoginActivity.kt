@@ -14,7 +14,7 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.creativem.fulltv.R
 import com.creativem.fulltv.adapter.Main
 import com.google.firebase.firestore.FirebaseFirestore
-
+import com.google.firebase.messaging.FirebaseMessaging
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var auth: FirebaseAuth
@@ -85,7 +85,19 @@ class LoginActivity : AppCompatActivity() {
                     Log.d(TAG, "signInWithCredential:success")
                     val user = auth.currentUser
                     user?.let {
-                        updateUserPoints(it.uid, it.displayName ?: "", it.email ?: "")
+
+//                        updateUserPoints(it.uid, it.displayName ?: "", it.email ?: "", tokenFCM)
+                        // Obtener token FCM y actualizar información del usuario
+                        FirebaseMessaging.getInstance().token.addOnCompleteListener { tokenTask ->
+                            if (tokenTask.isSuccessful) {
+                                val tokenFCM = tokenTask.result
+                                updateUserPoints(it.uid, it.displayName ?: "", it.email ?: "")
+                            } else {
+                                // Manejar error al obtener token FCM
+                                Log.w(TAG, "Error al obtener token FCM", tokenTask.exception)
+                                // ... (Puedes mostrar un mensaje al usuario si lo consideras necesario)
+                            }
+                        }
                     }
                     val intent = Intent(this, Main::class.java)
                     startActivity(intent)
@@ -98,7 +110,7 @@ class LoginActivity : AppCompatActivity() {
             }
     }
 
-    private fun updateUserPoints(userId: String, nombre: String, email: String) {
+    private fun updateUserPoints(userId: String, nombre: String, email: String?) {
         val userRef = firestore.collection("users").document(userId)
 
         // Guardar o actualizar el documento del usuario
@@ -115,7 +127,7 @@ class LoginActivity : AppCompatActivity() {
                     val user = hashMapOf(
                         "nombre" to nombre,
                         "email" to email,
-                        "puntos" to 10 // Valor inicial de puntos
+                        "puntos" to 10, // Valor inicial de puntos
                     )
                     userRef.set(user)
                         .addOnSuccessListener {
