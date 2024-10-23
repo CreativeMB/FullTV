@@ -70,7 +70,14 @@ class MoviesMenuAdapter(
 
     fun updateMovies(newMovies: List<Movie>) {
         movieList.clear()
-        movieList.addAll(newMovies.filter { it.isValid })
+        // Validar las URLs de cada película
+        val validMovies = newMovies.filter { isUrlValid(it.streamUrl) }
+        movieList.addAll(validMovies)
         notifyDataSetChanged()
+    }
+
+    private fun isUrlValid(url: String): Boolean {
+        // Lógica de validación aquí
+        return url.isNotEmpty() && (url.startsWith("http://") || url.startsWith("https://"))
     }
 }

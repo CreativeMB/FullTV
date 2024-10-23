@@ -5,6 +5,7 @@ import com.creativem.fulltv.data.Movie
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.tasks.await
@@ -16,6 +17,9 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
@@ -27,16 +31,18 @@ class FirestoreRepository {
     // Pool de conexiones para reutilizar conexiones HTTP
     private val connectionPool = Executors.newFixedThreadPool(8).asCoroutineDispatcher()
 
-    suspend fun obtenerPeliculas(): Pair<List<Movie>, List<Movie>> = coroutineScope {
+    // Función para obtener todas las películas y validar las URLs
+    suspend fun obtenerPeliculas(): Pair<List<Movie>, List<Movie>> = withContext(connectionPool) {
         try {
             val snapshot = peliculasCollection.get().await()
             val peliculas = snapshot.documents.mapNotNull { document ->
                 document.toObject(Movie::class.java)?.copy(id = document.id)
             }
 
-            // Validación en paralelo con límite de concurrencia
-            val (peliculasValidas, peliculasInvalidas) =
-                validarPeliculasConcurrente(peliculas, maxConcurrentRequests = 16)
+            // Validación de URLs para todas las películas
+            val (peliculasValidas, peliculasInvalidas) = peliculas.partition { movie ->
+                isUrlValid(movie.streamUrl)
+            }
 
             // Ordenar las listas por fecha de publicación
             val peliculasOrdenadasValidas = peliculasValidas.sortedByDescending { it.createdAt }
@@ -47,43 +53,47 @@ class FirestoreRepository {
             e.printStackTrace()
             Pair(emptyList(), emptyList())
         }
-
     }
 
-   suspend fun validarPeliculasConcurrente(
-        peliculas: List<Movie>,
-        maxConcurrentRequests: Int
-    ): Pair<List<Movie>, List<Movie>> = coroutineScope {
-        val deferred = peliculas.map { movie ->
-            async(connectionPool) {
-                val isValid = isUrlValid(movie.streamUrl)
-                movie.copy(isValid = isValid) to isValid // Simplifica la separación
-            }
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(500, TimeUnit.MILLISECONDS)
+        .readTimeout(500, TimeUnit.MILLISECONDS)
+        .writeTimeout(500, TimeUnit.MILLISECONDS)
+        .connectionPool(ConnectionPool(50, 1, TimeUnit.MINUTES)) // Reutilizar conexiones
+        .dispatcher(Dispatcher(Executors.newFixedThreadPool(32))) // Procesar validaciones en paralelo
+        .build()
+
+    suspend fun isUrlValid(url: String?): Boolean {
+        if (url.isNullOrEmpty()) return false
+
+        val validUrl = if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            "https://$url"
+        } else {
+            url
         }
 
-        val resultados = deferred.awaitAll()
-        val peliculasValidas = resultados.filter { it.second }.map { it.first }
-        val peliculasInvalidas = resultados.filterNot { it.second }.map { it.first }
-        Pair(peliculasValidas, peliculasInvalidas)
-    }
-
-    private suspend fun isUrlValid(url: String?): Boolean {
-        if (url == null) return false
-
-        return withContext(Dispatchers.IO) { // Usa Dispatchers.IO para E/S
+        return withContext(Dispatchers.IO) {
             try {
-                (URL(url).openConnection() as HttpURLConnection).run {
-                    requestMethod = "HEAD"
-                    connectTimeout = 2500 // Ajusta el tiempo de espera según tus necesidades
-                    readTimeout = 2500
-                    responseCode in 200..299
+                val request = Request.Builder()
+                    .url(validUrl)
+                    .head()
+                    .build()
+
+                val result = httpClient.newCall(request).execute().use { response ->
+                    response.isSuccessful && response.code in 200..299
                 }
-            } catch (e: Exception) {
+
+                result
+            } catch (e: IOException) {
+                Log.e("FirestoreRepository", "Error de conexión: $validUrl", e)
+                false
+            } catch (e: IllegalArgumentException) {
+                Log.e("FirestoreRepository", "URL malformada: $validUrl", e)
                 false
             }
         }
     }
-    // Función para obtener el nombre de usuario
+        // Función para obtener el nombre de usuario
     suspend fun obtenerNombreUsuario(usuarioId: String): String {
         return withContext(Dispatchers.IO) {
             try {
@@ -101,13 +111,13 @@ class FirestoreRepository {
         }
     }
 
-    // Función para obtener la cantidad de Castv
+    // Función para obtener la cantidad de puntos Castv
     suspend fun obtenerCantidadCastv(usuarioId: String): Int {
         return withContext(Dispatchers.IO) {
             try {
                 val doc = firestore.collection("users").document(usuarioId).get().await()
                 return@withContext if (doc.exists()) {
-                    doc.getLong("puntos")?.toInt() ?: 0 // Asegúrate de que el campo sea correcto
+                    doc.getLong("puntos")?.toInt() ?: 0
                 } else {
                     Log.e("FirestoreRepository", "El documento no existe")
                     0
@@ -118,6 +128,8 @@ class FirestoreRepository {
             }
         }
     }
+
+    // Función para obtener la referencia de la colección de películas
     fun obtenerPeliculasRef(): CollectionReference {
         return firestore.collection("movies")
     }

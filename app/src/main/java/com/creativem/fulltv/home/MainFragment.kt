@@ -184,7 +184,7 @@ class MainFragment : BrowseSupportFragment() {
         binding.textCastv.text = "Castv: $:$cantidadCastv"
     }
 
-    private fun cargarPeliculas() {
+   fun cargarPeliculas() {
         // Oculta la interfaz mientras se carga la biblioteca
         binding.linearLayout.visibility = View.GONE // Oculta cualquier vista que quieras ocultar (ej. RecyclerView)
 
@@ -311,9 +311,18 @@ class MainFragment : BrowseSupportFragment() {
 
                 // Validamos las URLs de las películas en una corrutina
                 lifecycleScope.launch {
-                    // Asegúrate de pasar el valor de maxConcurrentRequests aquí
-                    val (peliculasValidas, peliculasInvalidas) =
-                        firestoreRepository.validarPeliculasConcurrente(peliculas, maxConcurrentRequests = 16)
+                    val peliculasValidas = mutableListOf<Movie>()
+                    val peliculasInvalidas = mutableListOf<Movie>()
+
+                    // Validamos cada URL individualmente
+                    peliculas.forEach { pelicula ->
+                        val isValid = firestoreRepository.isUrlValid(pelicula.streamUrl)
+                        if (isValid) {
+                            peliculasValidas.add(pelicula)
+                        } else {
+                            peliculasInvalidas.add(pelicula)
+                        }
+                    }
 
                     // Ordenar las listas por fecha de publicación, de más reciente a más antiguo
                     val peliculasOrdenadasValidas = peliculasValidas.sortedByDescending { it.createdAt }

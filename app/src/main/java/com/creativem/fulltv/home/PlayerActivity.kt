@@ -46,6 +46,7 @@ import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.creativem.fulltv.R
 import com.creativem.fulltv.adapter.FirestoreRepository
+import com.creativem.fulltv.data.Movie
 import com.creativem.fulltv.menu.MoviesMenuAdapter
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.withContext
@@ -169,8 +170,7 @@ class PlayerActivity : AppCompatActivity() {
                 player?.playWhenReady = true
             }
         })
-        // Cargar películas de Firestore
-        loadMoviesFromFirestore()
+
 
         runnableActualizar = Runnable { actualizarTiempo() }
         runnableOcultar = Runnable {
@@ -188,39 +188,45 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun mostarpélis() {
         Log.e("PlayerActivity", "clki menupelis")
-        binding.recyclerViewMovies.visibility =
-            if (binding.recyclerViewMovies.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-    }
-
-    private fun loadMoviesFromFirestore() {
-
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                // Obtener la instancia de FirestoreRepository
-                val repository = FirestoreRepository()
-
-                // Obtener las películas desde Firestore
-                val (peliculasValidas) = repository.obtenerPeliculas()
-
-                // Actualizar el adaptador con la lista de películas válidas
-                withContext(Dispatchers.Main) {
-                    adapter.updateMovies(peliculasValidas)
-                }
-
-            } catch (exception: Exception) {
-                // Manejo de errores si la obtención de películas falla
-                exception.printStackTrace()
-            }
-        }
+        binding.recyclerMoviesMenu.visibility =
+            if (binding.recyclerMoviesMenu.visibility == View.VISIBLE) View.GONE else View.VISIBLE
     }
 
     private fun initializeRecyclerView() {
+        // Crear el adaptador inicialmente con una lista vacía
         adapter = MoviesMenuAdapter(mutableListOf()) { movie ->
             startMoviePlayback(movie.streamUrl, movie.title)
         }
-        binding.recyclerViewMovies.adapter = adapter
-        binding.recyclerViewMovies.layoutManager = LinearLayoutManager(this)
-        binding.recyclerViewMovies.visibility = View.GONE
+        binding.recyclerMoviesMenu.adapter = adapter
+        binding.recyclerMoviesMenu.layoutManager = LinearLayoutManager(this@PlayerActivity)
+
+        // Cargar las películas desde Firestore
+        loadMovies() // Llama al método que carga las películas
+    }
+
+    private fun loadMovies() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val firestoreRepository = FirestoreRepository()
+            val (validMovies, invalidMovies) = firestoreRepository.obtenerPeliculas()
+
+            // Log para verificar la cantidad de películas cargadas
+            Log.d("MoviesData", "Películas válidas: ${validMovies.size}, Películas inválidas: ${invalidMovies.size}")
+
+            // Actualizar el adaptador
+            withContext(Dispatchers.Main) {
+                adapter.updateMovies(validMovies) // Esto ahora valida las URLs de nuevo
+                binding.recyclerMoviesMenu.visibility = View.VISIBLE // Siempre visible
+            }
+        }
+    }
+    // Método que llama al repositorio de Firestore para validar la URL
+    private suspend fun isUrlValidInFirestore(url: String?): Boolean {
+        return if (url.isNullOrEmpty()) {
+            false
+        } else {
+            // Llama al método en tu FirestoreRepository para validar la URL
+            FirestoreRepository().isUrlValid(url) // Ajusta esto según tu implementación
+        }
     }
 
     private fun startMoviePlayback(streamUrl: String, movieTitle: String) {
@@ -233,43 +239,52 @@ class PlayerActivity : AppCompatActivity() {
 
     @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
-        // Crea el DataSource.Factory
-        val dataSourceFactory = DefaultDataSource.Factory(this)
 
-        // Crea la MediaSourceFactory
-        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
-
-        // Configura el LoadControl
-        val loadControl = DefaultLoadControl.Builder()
-            .setTargetBufferBytes(2 * 1024 * 1024) // 2MB
-            .setPrioritizeTimeOverSizeThresholds(true)
-            .build()
-
-        // Crea el reproductor
-        player = ExoPlayer.Builder(this)
-            .setLoadControl(loadControl)
-            .setRenderersFactory(
-                DefaultRenderersFactory(this)
-                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-            ) // Esto habilita FFmpeg
-            .setMediaSourceFactory(mediaSourceFactory)
-            .build().also { exoPlayer ->
-                // Asocia el ExoPlayer con el PlayerView usando binding
-                binding.reproductor.player = exoPlayer
-
-                // Configura el MediaItem
-                val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
-
-                // Prepara el ExoPlayer para la reproducción
-                exoPlayer.setMediaItem(mediaItem)
-                exoPlayer.prepare()
-
-                // Ajusta el comportamiento de la reproducción
-                exoPlayer.playWhenReady = false
-
-                // Añade el listener del reproductor
-                exoPlayer.addListener(playerListener)
+        // Ejecuta la validación de la URL de forma asíncrona
+        CoroutineScope(Dispatchers.Main).launch {
+            if (!isUrlValidInFirestore(streamUrl)) { // Método de validación en Firestore
+                showErrorDialog(ulsvideo = streamUrl, movieTitle = "Título de la Película", movieYear = "2024")
+                return@launch
             }
+
+            // Crea el DataSource.Factory
+            val dataSourceFactory = DefaultDataSource.Factory(this@PlayerActivity)
+
+            // Crea la MediaSourceFactory
+            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
+            // Configura el LoadControl
+            val loadControl = DefaultLoadControl.Builder()
+                .setTargetBufferBytes(2 * 1024 * 1024) // 2MB
+                .setPrioritizeTimeOverSizeThresholds(true)
+                .build()
+
+            // Crea el reproductor
+            player = ExoPlayer.Builder(this@PlayerActivity)
+                .setLoadControl(loadControl)
+                .setRenderersFactory(
+                    DefaultRenderersFactory(this@PlayerActivity)
+                        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+                ) // Esto habilita FFmpeg
+                .setMediaSourceFactory(mediaSourceFactory)
+                .build().also { exoPlayer ->
+                    // Asocia el ExoPlayer con el PlayerView usando binding
+                    binding.reproductor.player = exoPlayer
+
+                    // Configura el MediaItem
+                    val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+
+                    // Prepara el ExoPlayer para la reproducción
+                    exoPlayer.setMediaItem(mediaItem)
+                    exoPlayer.prepare()
+
+                    // Ajusta el comportamiento de la reproducción
+                    exoPlayer.playWhenReady = true // Cambiado a true para iniciar la reproducción
+
+                    // Añade el listener del reproductor
+                    exoPlayer.addListener(playerListener)
+                }
+        }
     }
 
     private val playerListener = object : Player.Listener {
@@ -706,8 +721,8 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onBackPressed() {
         // Si el GridView es visible, simplemente ocultarlo
-        if (binding.recyclerViewMovies.visibility == View.VISIBLE) {
-            binding.recyclerViewMovies.visibility = View.GONE
+        if (binding.recyclerMoviesMenu.visibility == View.VISIBLE) {
+            binding.recyclerMoviesMenu.visibility = View.GONE
         } else {
             // Finaliza la actividad al presionar "atrás"
             finish()
