@@ -133,4 +133,11 @@ class FirestoreRepository {
     fun obtenerPeliculasRef(): CollectionReference {
         return firestore.collection("movies")
     }
+    suspend fun obtenerTodasLasUrls(): List<String> {
+        val db = FirebaseFirestore.getInstance()
+        val querySnapshot = db.collection("movies").get().await()
+
+        // Devolvemos una lista de URLs extraídas del snapshot
+        return querySnapshot.documents.mapNotNull { it.getString("url") }
+    }
 }

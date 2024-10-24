@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 import android.text.format.DateUtils
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import kotlinx.coroutines.MainScope
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -49,11 +50,11 @@ import com.creativem.fulltv.adapter.FirestoreRepository
 import com.creativem.fulltv.data.Movie
 import com.creativem.fulltv.menu.MoviesMenuAdapter
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
 import org.json.JSONObject
-
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -76,7 +77,6 @@ class PlayerActivity : AppCompatActivity() {
     private var isProcessingOrder = false
     private var reconnectionAttempts = 0
     private val maxReconnectionAttempts = 10
-    private val initialReconnectionDelayMs = 5000L
     private var isReconnecting = false
     private var isPlaybackActive = false // Indica si la reproducción ha sido activa
     private val playbackStartTime = AtomicLong(0) // Tiempo en que inicia la reproducción
@@ -128,7 +128,7 @@ class PlayerActivity : AppCompatActivity() {
         val menupelis = binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis)
         menupelis.setOnClickListener {
             mostarpélis()
-
+            loadMovies()
         }
         // Referencias a los botones
 
@@ -205,7 +205,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun loadMovies() {
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(Dispatchers.Main).launch {
             val firestoreRepository = FirestoreRepository()
             val (validMovies, invalidMovies) = firestoreRepository.obtenerPeliculas()
 
@@ -215,12 +215,13 @@ class PlayerActivity : AppCompatActivity() {
             // Actualizar el adaptador
             withContext(Dispatchers.Main) {
                 adapter.updateMovies(validMovies) // Esto ahora valida las URLs de nuevo
-                binding.recyclerMoviesMenu.visibility = View.VISIBLE // Siempre visible
+                binding.recyclerMoviesMenu.visibility = if (validMovies.isNotEmpty()) View.GONE else View.VISIBLE
             }
         }
     }
     // Método que llama al repositorio de Firestore para validar la URL
     private suspend fun isUrlValidInFirestore(url: String?): Boolean {
+        // Verifica si la URL está vacía o es nula
         return if (url.isNullOrEmpty()) {
             false
         } else {
@@ -229,20 +230,26 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    // Método para iniciar la reproducción de la película
     private fun startMoviePlayback(streamUrl: String, movieTitle: String) {
+        // Crea un Intent para abrir PlayerActivity
         val intent = Intent(this, PlayerActivity::class.java)
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP) // Limpia la pila de actividades
+        // Envía la URL de transmisión y el título de la película como extras
         intent.putExtra("EXTRA_STREAM_URL", streamUrl)
         intent.putExtra("EXTRA_MOVIE_TITLE", movieTitle)
+        // Inicia la actividad de reproducción
         startActivity(intent)
     }
 
+    // Método para inicializar el reproductor de video
     @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
-
         // Ejecuta la validación de la URL de forma asíncrona
         CoroutineScope(Dispatchers.Main).launch {
-            if (!isUrlValidInFirestore(streamUrl)) { // Método de validación en Firestore
+            // Validar la URL en Firestore antes de reproducir
+            if (!isUrlValidInFirestore(streamUrl)) {
+                // Si la URL no es válida, muestra un diálogo de error
                 showErrorDialog(ulsvideo = streamUrl, movieTitle = "Título de la Película", movieYear = "2024")
                 return@launch
             }
@@ -252,11 +259,11 @@ class PlayerActivity : AppCompatActivity() {
 
             // Crea la MediaSourceFactory
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
-
             // Configura el LoadControl
             val loadControl = DefaultLoadControl.Builder()
-                .setTargetBufferBytes(2 * 1024 * 1024) // 2MB
-                .setPrioritizeTimeOverSizeThresholds(true)
+                // Define el tamaño objetivo del búfer (tamaño máximo)
+                .setTargetBufferBytes(8 * 1024 * 1024) // 8 MB
+                .setPrioritizeTimeOverSizeThresholds(false)
                 .build()
 
             // Crea el reproductor
@@ -268,6 +275,7 @@ class PlayerActivity : AppCompatActivity() {
                 ) // Esto habilita FFmpeg
                 .setMediaSourceFactory(mediaSourceFactory)
                 .build().also { exoPlayer ->
+
                     // Asocia el ExoPlayer con el PlayerView usando binding
                     binding.reproductor.player = exoPlayer
 
@@ -278,130 +286,144 @@ class PlayerActivity : AppCompatActivity() {
                     exoPlayer.setMediaItem(mediaItem)
                     exoPlayer.prepare()
 
-                    // Ajusta el comportamiento de la reproducción
-                    exoPlayer.playWhenReady = true // Cambiado a true para iniciar la reproducción
+                    // Añade el listener del reproductor para detectar si es en vivo
+                    exoPlayer.addListener(object : Player.Listener {
+                        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+                            // Verifica si hay ventanas en la línea de tiempo
+                            if (timeline.windowCount > 0) {
+                                val window = Timeline.Window()
+                                timeline.getWindow(0, window)
+                                // Determina si la ventana es en vivo
+                                if (window.isLive) {
+                                    Log.d("PlayerActivity", "Es una transmisión en vivo")
+                                } else {
+                                    Log.d("PlayerActivity", "Es un video pregrabado")
+                                }
+                            }
+                        }
+                    })
 
-                    // Añade el listener del reproductor
-                    exoPlayer.addListener(playerListener)
+                    // Inicia la reproducción automáticamente
+                    exoPlayer.playWhenReady = true
                 }
         }
     }
 
+    // Listener para el reproductor
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
                 Player.STATE_BUFFERING -> {
                     Log.d("PlayerActivity", "Reproductor almacenando en búfer...")
-                    mostrarBuffer()
+                    mostrarBuffer() // Muestra el estado del búfer
                 }
 
                 Player.STATE_READY -> {
                     Log.d("PlayerActivity", "Reproductor en estado READY")
-                    isPlaybackActive = true
-                    playbackStartTime.set(System.currentTimeMillis())
-                    reconnectionAttempts = 0
-                    isReconnecting = false
+                    isPlaybackActive = true // Indica que la reproducción está activa
+                    playbackStartTime.set(System.currentTimeMillis()) // Guarda el tiempo de inicio
+                    reconnectionAttempts = 0 // Reinicia los intentos de reconexión
+                    isReconnecting = false // Indica que no se está reconectando
 
                     // Reanudar desde la última posición conocida
                     if (lastKnownPosition > 0) {
-                        player?.seekTo(lastKnownPosition)
-                        lastKnownPosition = 0 // Reiniciar la posición
+                        player?.seekTo(lastKnownPosition) // Busca a la última posición
+                        lastKnownPosition = 0 // Reinicia la posición
                     }
 
-                    actualizarTiempo()
-
+                    actualizarTiempo() // Actualiza el tiempo de reproducción
                 }
 
                 Player.STATE_ENDED -> {
                     Log.d("PlayerActivity", "Reproducción finalizada.")
-                    isPlaybackActive = false
+                    isPlaybackActive = false // La reproducción ya no está activa
 
                     // Si es un stream en vivo, intentar reconectar
                     if (isLiveStream) {
-                        Log.d(
-                            "PlayerActivity",
-                            "Transmisión en vivo finalizada. Intentando reconectar..."
-                        )
-                        intentarReconexion()
+                        Log.d("PlayerActivity", "Transmisión en vivo finalizada. Intentando reconectar...")
+                        intentarReconexion() // Llama al método de reconexión
                     } else {
                         Log.d("PlayerActivity", "Deteniendo actualizaciones de tiempo.")
-                        handler.removeCallbacks(runnable)
+                        handler.removeCallbacks(runnable) // Detiene el runnable
                     }
                 }
 
                 Player.STATE_IDLE -> {
                     Log.d("PlayerActivity", "Reproductor en estado IDLE.")
-                    isPlaybackActive = false
+                    isPlaybackActive = false // La reproducción ya no está activa
 
                     // Si es un stream en vivo, intentar reconectar
                     if (isLiveStream) {
                         Log.d("PlayerActivity", "Intentando reconectar transmisión en vivo...")
-                        intentarReconexion()
+                        intentarReconexion() // Llama al método de reconexión
                     } else {
                         Log.d("PlayerActivity", "No hay reproducción activa.")
-                        handler.removeCallbacks(runnable)
+                        handler.removeCallbacks(runnable) // Detiene el runnable
                     }
                 }
 
                 else -> {
                     Log.w("PlayerActivity", "Estado desconocido del reproductor: $playbackState")
-                    // En caso de un estado desconocido, intentar reconectar si no hay actividad de reproducción
+                    // En caso de un estado desconocido, intenta reconectar si no hay actividad de reproducción
                     if (!isPlaybackActive && reconnectionAttempts < maxReconnectionAttempts) {
-                        intentarReconexion()
+                        intentarReconexion() // Llama al método de reconexión
                     }
                 }
             }
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            // Cambia el comportamiento dependiendo si se está reproduciendo
             if (isPlaying) {
-                handler.postDelayed(runnableOcultar, hideControlsDelay)
+                handler.postDelayed(runnableOcultar, hideControlsDelay) // Oculta controles después de un tiempo
             } else {
-                handler.removeCallbacks(runnableOcultar)
+                handler.removeCallbacks(runnableOcultar) // Remueve el runnable si no se está reproduciendo
             }
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            Log.e(
-                "PlayerActivity",
-                "Error en el reproductor: ${error.message} - Código: ${error.errorCode}"
-            )
+            Log.e("PlayerActivity", "Error en el reproductor: ${error.message} - Código: ${error.errorCode}")
 
             // Intenta la reconexión solo si el error es recuperable y la reproducción ha sido activa
             if (isRecoverableError(error) && isPlaybackActive) {
-                intentarReconexion()
+                intentarReconexion() // Llama al método de reconexión
             } else if (!isPlaybackActive && reconnectionAttempts >= maxReconnectionAttempts) {
-                showErrorDialog(streamUrl, movieTitle, movieYear)
+                showErrorDialog(streamUrl, movieTitle, movieYear) // Muestra un diálogo de error
             }
         }
     }
 
+    // Método para determinar si el error es recuperable
     private fun isRecoverableError(error: PlaybackException): Boolean {
         // Define qué errores son recuperables para tu caso específico
         return error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
                 error.errorCode == PlaybackException.ERROR_CODE_REMOTE_ERROR // Y otros errores recuperables
     }
 
+    // Método para mostrar el estado del búfer
     private fun mostrarBuffer() {
         val bufferedPercentage = player?.bufferedPercentage ?: 0
         val bufferedData = (bufferedPercentage / 100.0) * (2 * 1024) // 2MB de targetBufferBytes
         Toast.makeText(
             this,
-            "Búfer almacenado: ${bufferedData.toInt()} KB",
+            "Búfer almacenado: ${bufferedData.toInt()} KB", // Muestra el tamaño del búfer
             Toast.LENGTH_SHORT
         ).show()
     }
 
+    // Método para intentar reconectar
     private fun intentarReconexion() {
         if (isReconnecting) {
-            return
+            return // No intenta reconectar si ya se está reconectando
         }
 
+        // Verifica si se alcanzó el máximo de intentos de reconexión
         if (reconnectionAttempts >= maxReconnectionAttempts) {
             Log.d("Reconexión", "Se alcanzó el máximo de intentos. No se puede reconectar.")
-            reconnectionAttempts = 0
-            isReconnecting = false
+            reconnectionAttempts = 0 // Reinicia los intentos de reconexión
+            isReconnecting = false // Indica que no se está reconectando
 
+            // Muestra un diálogo de error si no hay reproducción activa
             if (!isPlaybackActive) {
                 showErrorDialog(
                     "No se pudo conectar al stream después de varios intentos.",
@@ -412,84 +434,36 @@ class PlayerActivity : AppCompatActivity() {
             return
         }
 
+        // Verifica la conexión a internet
         if (!isNetworkConnected()) {
             Log.d("Reconexión", "No hay conexión a Internet. Esperando...")
-            return
+            return // No intenta reconectar si no hay conexión
         }
 
-        reconnectionAttempts++
-        isReconnecting = true
+        reconnectionAttempts++ // Incrementa los intentos de reconexión
+        isReconnecting = true // Indica que se está reconectando
 
-        val tiempoEspera =
-            initialReconnectionDelayMs * (2.0.pow((reconnectionAttempts - 1).toDouble())).toLong()
+        // Calcula el tiempo de espera para reconectar
+        val waitTime = (2.0).pow(reconnectionAttempts).toLong() * 1000 // Espera un tiempo exponencial
 
-        Log.d(
-            "Reconexión",
-            "Intentando reconectar (intento $reconnectionAttempts, espera de ${tiempoEspera}ms)..."
-        )
-
-        // (Opcional) Mostrar indicador de reconexión
-
-        Handler(Looper.getMainLooper()).postDelayed({
-            reconectarStream()
-
-            // Verificar el estado de la reproducción después de intentar reconectar
-            Handler(Looper.getMainLooper()).postDelayed({
-                if (!isPlaybackActive) {
-                    // Si la reproducción no se ha reanudado, simular el clic en "Play"
-                    simularClicPlay()
-                } else {
-                    // La reproducción se reanudó con éxito
-                    Log.d("Reconexión", "Reconexión exitosa.")
-                    reconnectionAttempts = 0
-                }
-            }, tiempoEspera) // Usar el mismo tiempo de espera
-
-        }, tiempoEspera)
-    }
-
-    private fun simularClicPlay() {
-        val playPauseButton: ImageButton = findViewById(R.id.play_pause)
-        playPauseButton.setOnClickListener {
-            if (isNetworkConnected()) {
-                Log.d("Reconexión", "Clic en Play detectado. Intentando reanudar...")
-                player?.playWhenReady = true
-            } else {
-                Log.d("Reconexión", "No hay conexión, no se puede reproducir.")
+        // Inicia una corutina para manejar la reconexión
+        CoroutineScope(Dispatchers.Main).launch {
+            delay(waitTime) // Espera el tiempo calculado
+            // Intenta reiniciar la reproducción
+            if (streamUrl != null) {
+                startMoviePlayback(streamUrl, movieTitle) // Llama al método de inicio
+                isReconnecting = false // Indica que no se está reconectando
             }
         }
     }
 
-    private fun reconectarStream() {
-        Log.d("Reconexión", "Reanudando la reproducción...")
-        isReconnecting = false
-
-        if (!isNetworkConnected()) {
-            Log.d("Reconexión", "Sin conexión a internet. Volviendo a intentar...")
-            intentarReconexion()
-            return
-        }
-
-        try {
-            player?.let {
-                it.stop() // Asegúrate de detener antes de preparar
-                it.seekTo(0) // Reiniciar el stream desde el principio si es en vivo
-                it.prepare() // Prepara de nuevo el reproductor
-                it.playWhenReady = true // Reanuda automáticamente
-            }
-        } catch (e: Exception) {
-            Log.e("Reconexión", "Error al reiniciar la reproducción: ${e.message}")
-            intentarReconexion()
-        }
-    }
-
-    // Método auxiliar para verificar la conexión a internet
+    // Método para verificar si hay conexión a Internet
     private fun isNetworkConnected(): Boolean {
-        val connectivityManager =
-            getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val activeNetwork = connectivityManager.activeNetworkInfo
-        return activeNetwork?.isConnectedOrConnecting == true
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val networkInfo = connectivityManager.activeNetworkInfo
+        return networkInfo?.isConnected == true // Devuelve true si hay conexión
     }
+
     private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
         // Infla el layout personalizado para el diálogo
         val dialogView = layoutInflater.inflate(R.layout.alert_reproductor, null)
