@@ -499,7 +499,7 @@ class PlayerActivity : AppCompatActivity() {
             .setView(dialogView) // Aplica el layout personalizado
             .setPositiveButton("Volver al contenido") { dialog, _ ->
                 dialog.dismiss() // Cierra el diálogo
-                onBackPressed() // Simula el botón de retroceso
+                finish() // Simula el botón de retroceso
             }
             .setNeutralButton("Alquilar Pelicula") { _, _ ->
                 enviarPedido()
