@@ -9,7 +9,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@color/negro"
-
         app:resize_mode="fill">
         <include layout="@layout/controles_reproductor"/>
     </androidx.media3.ui.PlayerView>
@@ -39,11 +38,11 @@
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_movies_menu"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="center_horizontal|start"
         android:clipToPadding="false"
-        android:visibility="invisible"/>
+        android:visibility="visible"/>
 
 
 </FrameLayout>

@@ -128,7 +128,6 @@ class PlayerActivity : AppCompatActivity() {
         val menupelis = binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis)
         menupelis.setOnClickListener {
             mostarpélis()
-            loadMovies()
         }
         // Referencias a los botones
 
