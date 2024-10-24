@@ -54,13 +54,29 @@ class FirestoreRepository {
             Pair(emptyList(), emptyList())
         }
     }
+//   suspend fun isUrlValid(url: String?): Boolean {
+//        if (url == null) return false
+//
+//        return withContext(Dispatchers.IO) { // Usa Dispatchers.IO para E/S
+//            try {
+//                (URL(url).openConnection() as HttpURLConnection).run {
+//                    requestMethod = "HEAD"
+//                    connectTimeout = 1500 // Ajusta el tiempo de espera según tus necesidades
+//                    readTimeout = 1500
+//                    responseCode in 200..299
+//                }
+//            } catch (e: Exception) {
+//                false
+//            }
+//        }
+//    }
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(500, TimeUnit.MILLISECONDS)
-        .readTimeout(500, TimeUnit.MILLISECONDS)
-        .writeTimeout(500, TimeUnit.MILLISECONDS)
+        .connectTimeout(8000, TimeUnit.MILLISECONDS)
+        .readTimeout(8000, TimeUnit.MILLISECONDS)
+        .writeTimeout(8000, TimeUnit.MILLISECONDS)
         .connectionPool(ConnectionPool(50, 1, TimeUnit.MINUTES)) // Reutilizar conexiones
-        .dispatcher(Dispatcher(Executors.newFixedThreadPool(32))) // Procesar validaciones en paralelo
+        .dispatcher(Dispatcher(Executors.newFixedThreadPool(8))) // Procesar validaciones en paralelo
         .build()
 
     suspend fun isUrlValid(url: String?): Boolean {
@@ -73,6 +89,7 @@ class FirestoreRepository {
         }
 
         return withContext(Dispatchers.IO) {
+
             try {
                 val request = Request.Builder()
                     .url(validUrl)
@@ -132,12 +149,5 @@ class FirestoreRepository {
     // Función para obtener la referencia de la colección de películas
     fun obtenerPeliculasRef(): CollectionReference {
         return firestore.collection("movies")
-    }
-    suspend fun obtenerTodasLasUrls(): List<String> {
-        val db = FirebaseFirestore.getInstance()
-        val querySnapshot = db.collection("movies").get().await()
-
-        // Devolvemos una lista de URLs extraídas del snapshot
-        return querySnapshot.documents.mapNotNull { it.getString("url") }
     }
 }
