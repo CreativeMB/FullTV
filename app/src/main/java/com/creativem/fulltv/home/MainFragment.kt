@@ -1,15 +1,24 @@
 package com.creativem.fulltv.home
 
 
+import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
+import android.widget.ArrayAdapter
+import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ListView
 import android.widget.ProgressBar
+import android.widget.SearchView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -18,6 +27,7 @@ import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
+import androidx.leanback.widget.SearchBar
 import androidx.lifecycle.lifecycleScope
 import com.creativem.fulltv.R
 import com.creativem.fulltv.databinding.MainFragmentBinding
@@ -88,7 +98,9 @@ class MainFragment : BrowseSupportFragment() {
                         val intent = Intent(requireContext(), Nosotros::class.java)
                         startActivity(intent)
                     }
-                    "Configuracion" -> {
+
+                    "Buscar Pelicula" -> {
+                        buscarPeliculaDialogo()
                         Toast.makeText(requireContext(), "Configuracion", Toast.LENGTH_SHORT).show()
                     }
                     "Cerrar Sesión" -> {
@@ -123,6 +135,9 @@ class MainFragment : BrowseSupportFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+
+
 
         view.setBackgroundColor(defaultBackgroundColor)
 
@@ -239,10 +254,10 @@ class MainFragment : BrowseSupportFragment() {
         agregarALista(peliculasInactivas, "ALQUILER")
         // Agrega el menú aquí, después de cargar las películas
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("Pago", "Configuracion", "Cerrar Sesión")
+        val menuItems = listOf("Pago", "Buscar Pelicula", "Cerrar Sesión")
         val menuIcons = listOf(
             R.drawable.pago,
-            R.drawable.ic_settings,
+            R.drawable.buscar,
             R.drawable.ic_shuffle
         )
 
@@ -340,6 +355,79 @@ class MainFragment : BrowseSupportFragment() {
                 updateMovieList(emptyList(), emptyList()) // Limpia las listas si no hay datos
             }
         }
+    }
+    private fun buscarPeliculaDialogo() {
+        // Creamos el layout para el diálogo usando un EditText y ListView
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_search_tv, null)
+        val searchEditText = dialogView.findViewById<EditText>(R.id.search_edit_text)
+        val searchResultsView = dialogView.findViewById<ListView>(R.id.list_view)
+
+        // Lista de películas para la búsqueda
+        val movieList = mutableListOf<Movie>()
+        val filteredMovieList = mutableListOf<Movie>() // Nueva lista para películas filtradas
+
+        // Adaptador para los resultados de búsqueda
+        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, filteredMovieList.map { it.title })
+        searchResultsView.adapter = adapter
+
+        // Cargar las películas desde Firestore
+        CoroutineScope(Dispatchers.Main).launch {
+            val (peliculasValidas, peliculasInvalidas) = firestoreRepository.obtenerPeliculas()
+            movieList.clear()
+            movieList.addAll(peliculasValidas + peliculasInvalidas)
+            filteredMovieList.clear() // Limpiar la lista filtrada
+            filteredMovieList.addAll(movieList) // Agregar todas las películas inicialmente
+            adapter.clear()
+            adapter.addAll(filteredMovieList.map { it.title }) // Actualiza el adaptador con los títulos
+            adapter.notifyDataSetChanged()
+        }
+
+        // Crear el AlertDialog
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("Buscar Película")
+            .setView(dialogView)
+            .setPositiveButton("Cerrar") { dialog, _ -> dialog.dismiss() }
+            .create()
+
+        dialog.show()
+
+        // Mueve esto aquí para asegurar que el diálogo esté visible
+        searchEditText.requestFocus()
+
+        // Listener para la entrada en el EditText
+        searchEditText.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val query = s.toString()
+                val filteredList = movieList.filter { movie ->
+                    movie.title.contains(query, ignoreCase = true)
+                }
+                filteredMovieList.clear() // Limpiar la lista filtrada
+                filteredMovieList.addAll(filteredList) // Agregar solo los filtrados
+                adapter.clear()
+                adapter.addAll(filteredMovieList.map { it.title }) // Actualiza el adaptador con los títulos filtrados
+                adapter.notifyDataSetChanged()
+            }
+
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        // Listener para detectar clic en los elementos de la lista
+        searchResultsView.setOnItemClickListener { _, _, position, _ ->
+            val selectedMovie = filteredMovieList[position] // Obtén la película seleccionada de la lista filtrada
+            irAlReproductor(selectedMovie) // Llama a la función para ir al reproductor
+            dialog.dismiss() // Cierra el diálogo después de seleccionar
+        }
+    }
+
+    private fun irAlReproductor(movie: Movie) {
+        val intent = Intent(context, PlayerActivity::class.java).apply {
+            putExtra("EXTRA_STREAM_URL", movie.streamUrl)  // Pasa el URL del stream
+            putExtra("EXTRA_MOVIE_TITLE", movie.title)     // Pasa el título de la película
+            putExtra("EXTRA_MOVIE_YEAR", movie.year)       // Pasa el año de la película
+        }
+        startActivity(intent) // Inicia la actividad del reproductor
     }
 
 }
