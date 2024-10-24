@@ -2,7 +2,6 @@ package com.creativem.fulltv.home
 
 
 import android.app.AlertDialog
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
@@ -12,13 +11,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ListView
 import android.widget.ProgressBar
-import android.widget.SearchView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -27,7 +24,6 @@ import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
-import androidx.leanback.widget.SearchBar
 import androidx.lifecycle.lifecycleScope
 import com.creativem.fulltv.R
 import com.creativem.fulltv.databinding.MainFragmentBinding
@@ -101,7 +97,6 @@ class MainFragment : BrowseSupportFragment() {
 
                     "Buscar Pelicula" -> {
                         buscarPeliculaDialogo()
-                        Toast.makeText(requireContext(), "Configuracion", Toast.LENGTH_SHORT).show()
                     }
                     "Cerrar Sesión" -> {
                         cerrarSesion() // Llama al método de cerrar sesión
@@ -357,10 +352,11 @@ class MainFragment : BrowseSupportFragment() {
         }
     }
     private fun buscarPeliculaDialogo() {
-        // Creamos el layout para el diálogo usando un EditText y ListView
-        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_search_tv, null)
+        // Creamos el layout para el diálogo usando un EditText, ProgressBar y ListView
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.buscador, null)
         val searchEditText = dialogView.findViewById<EditText>(R.id.search_edit_text)
         val searchResultsView = dialogView.findViewById<ListView>(R.id.list_view)
+        val progressBar = dialogView.findViewById<ProgressBar>(R.id.progress_bar) // ProgressBar
 
         // Lista de películas para la búsqueda
         val movieList = mutableListOf<Movie>()
@@ -369,6 +365,18 @@ class MainFragment : BrowseSupportFragment() {
         // Adaptador para los resultados de búsqueda
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, filteredMovieList.map { it.title })
         searchResultsView.adapter = adapter
+
+        // Crear el AlertDialog
+        val dialog = AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .create()
+
+        dialog.show()
+
+        // Muestra el ProgressBar y oculta el EditText y la lista al principio
+        progressBar.visibility = View.VISIBLE
+        searchEditText.visibility = View.GONE
+        searchResultsView.visibility = View.GONE
 
         // Cargar las películas desde Firestore
         CoroutineScope(Dispatchers.Main).launch {
@@ -379,20 +387,14 @@ class MainFragment : BrowseSupportFragment() {
             filteredMovieList.addAll(movieList) // Agregar todas las películas inicialmente
             adapter.clear()
             adapter.addAll(filteredMovieList.map { it.title }) // Actualiza el adaptador con los títulos
+
+            // Oculta el ProgressBar y muestra el EditText y el ListView cuando los datos estén listos
+            progressBar.visibility = View.GONE
+            searchEditText.visibility = View.VISIBLE
+            searchResultsView.visibility = View.VISIBLE
+
             adapter.notifyDataSetChanged()
         }
-
-        // Crear el AlertDialog
-        val dialog = AlertDialog.Builder(requireContext())
-            .setTitle("Buscar Película")
-            .setView(dialogView)
-            .setPositiveButton("Cerrar") { dialog, _ -> dialog.dismiss() }
-            .create()
-
-        dialog.show()
-
-        // Mueve esto aquí para asegurar que el diálogo esté visible
-        searchEditText.requestFocus()
 
         // Listener para la entrada en el EditText
         searchEditText.addTextChangedListener(object : TextWatcher {

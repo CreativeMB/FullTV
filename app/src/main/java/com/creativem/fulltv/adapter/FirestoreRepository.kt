@@ -54,62 +54,60 @@ class FirestoreRepository {
             Pair(emptyList(), emptyList())
         }
     }
-//   suspend fun isUrlValid(url: String?): Boolean {
-//        if (url == null) return false
-//
-//        return withContext(Dispatchers.IO) { // Usa Dispatchers.IO para E/S
-//            try {
-//                (URL(url).openConnection() as HttpURLConnection).run {
-//                    requestMethod = "HEAD"
-//                    connectTimeout = 1500 // Ajusta el tiempo de espera según tus necesidades
-//                    readTimeout = 1500
-//                    responseCode in 200..299
-//                }
-//            } catch (e: Exception) {
-//                false
-//            }
-//        }
-//    }
+  suspend fun isUrlValid(url: String?): Boolean {
+        if (url == null) return false
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(8000, TimeUnit.MILLISECONDS)
-        .readTimeout(8000, TimeUnit.MILLISECONDS)
-        .writeTimeout(8000, TimeUnit.MILLISECONDS)
-        .connectionPool(ConnectionPool(50, 1, TimeUnit.MINUTES)) // Reutilizar conexiones
-        .dispatcher(Dispatcher(Executors.newFixedThreadPool(8))) // Procesar validaciones en paralelo
-        .build()
-
-    suspend fun isUrlValid(url: String?): Boolean {
-        if (url.isNullOrEmpty()) return false
-
-        val validUrl = if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            "https://$url"
-        } else {
-            url
-        }
-
-        return withContext(Dispatchers.IO) {
-
+        return withContext(Dispatchers.IO) { // Usa Dispatchers.IO para E/S
             try {
-                val request = Request.Builder()
-                    .url(validUrl)
-                    .head()
-                    .build()
-
-                val result = httpClient.newCall(request).execute().use { response ->
-                    response.isSuccessful && response.code in 200..299
+                (URL(url).openConnection() as HttpURLConnection).run {
+                    requestMethod = "HEAD"
+                    connectTimeout = 2500 // Ajusta el tiempo de espera según tus necesidades
+                    readTimeout = 2500
+                    responseCode in 200..299
                 }
-
-                result
-            } catch (e: IOException) {
-                Log.e("FirestoreRepository", "Error de conexión: $validUrl", e)
-                false
-            } catch (e: IllegalArgumentException) {
-                Log.e("FirestoreRepository", "URL malformada: $validUrl", e)
+            } catch (e: Exception) {
                 false
             }
         }
     }
+//    private val httpClient = OkHttpClient.Builder()
+//        .connectTimeout(500, TimeUnit.MILLISECONDS)
+//        .readTimeout(500, TimeUnit.MILLISECONDS)
+//        .writeTimeout(500, TimeUnit.MILLISECONDS)
+//        .connectionPool(ConnectionPool(50, 1, TimeUnit.MINUTES)) // Reutilizar conexiones
+//        .dispatcher(Dispatcher(Executors.newFixedThreadPool(32))) // Procesar validaciones en paralelo
+//        .build()
+//
+//    suspend fun isUrlValid(url: String?): Boolean {
+//        if (url.isNullOrEmpty()) return false
+//
+//        val validUrl = if (!url.startsWith("http://") && !url.startsWith("https://")) {
+//            "https://$url"
+//        } else {
+//            url
+//        }
+//
+//        return withContext(Dispatchers.IO) {
+//            try {
+//                val request = Request.Builder()
+//                    .url(validUrl)
+//                    .head()
+//                    .build()
+//
+//                val result = httpClient.newCall(request).execute().use { response ->
+//                    response.isSuccessful && response.code in 200..299
+//                }
+//
+//                result
+//            } catch (e: IOException) {
+//                Log.e("FirestoreRepository", "Error de conexión: $validUrl", e)
+//                false
+//            } catch (e: IllegalArgumentException) {
+//                Log.e("FirestoreRepository", "URL malformada: $validUrl", e)
+//                false
+//            }
+//        }
+//    }
         // Función para obtener el nombre de usuario
     suspend fun obtenerNombreUsuario(usuarioId: String): String {
         return withContext(Dispatchers.IO) {
