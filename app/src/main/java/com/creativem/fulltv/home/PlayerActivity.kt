@@ -250,7 +250,7 @@ class PlayerActivity : AppCompatActivity() {
             // Validar la URL en Firestore antes de reproducir
             if (!isUrlValidInFirestore(streamUrl)) {
                 // Si la URL no es válida, muestra un diálogo de error
-                showErrorDialog(ulsvideo = streamUrl, movieTitle = "Título de la Película", movieYear = "2024")
+                showErrorDialog(ulsvideo = streamUrl, movieTitle, movieYear)
                 return@launch
             }
 
