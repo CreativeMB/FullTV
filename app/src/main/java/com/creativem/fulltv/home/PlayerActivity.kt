@@ -120,7 +120,7 @@ class PlayerActivity : AppCompatActivity() {
         // Inicializa el RecyclerView
         initializeRecyclerView()
         // Inicializa el SeekBar desde el binding
-
+        actualizarTiempo()
         player = ExoPlayer.Builder(this).build()
         binding.reproductor.player = player
         initializePlayer()
@@ -183,6 +183,7 @@ class PlayerActivity : AppCompatActivity() {
         }
         showControlsAndResetTimer() // Mostrar controles al inicio
         handler.postDelayed(runnableActualizar, updateInterval)
+        actualizarTiempo()
     }
 
     private fun mostarpélis() {
@@ -301,7 +302,8 @@ class PlayerActivity : AppCompatActivity() {
                             }
                         }
                     })
-
+                                       // Añade el listener del reproductor
+                    exoPlayer.addListener(playerListener)
                     // Inicia la reproducción automáticamente
                     exoPlayer.playWhenReady = true
                 }
