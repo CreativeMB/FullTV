@@ -16,6 +16,7 @@
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/main_fragmen_view"
         android:name="com.creativem.fulltv.home.MainFragment"
+
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 

@@ -15,7 +15,7 @@ class CardPresenter: Presenter(){
         val cardView = ImageCardView(parent.context).apply {
             isFocusable = true
             isFocusableInTouchMode = true
-            setMainImageDimensions(200, 250)
+            setMainImageDimensions(240, 340)
             // cardLayoutTheme = R.style.DefaultCardTheme // Estilo opcional
         }
         return ViewHolder(cardView)

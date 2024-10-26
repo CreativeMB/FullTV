@@ -1,6 +1,5 @@
 package com.creativem.fulltv.home
 
-
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
@@ -127,12 +126,8 @@ class MainFragment : BrowseSupportFragment() {
         startActivity(intent)
         requireActivity().finish() // Finaliza la actividad actual si es necesario
     }
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-
-
 
         view.setBackgroundColor(defaultBackgroundColor)
 
@@ -181,98 +176,60 @@ class MainFragment : BrowseSupportFragment() {
             actualizarUsuario("Usuario Desconocido", 0) // Actualiza la UI con información predeterminada
         }
     }
-
     // Sobrescribir el método onResume para actualizar la información del usuario
     override fun onResume() {
         super.onResume()
         actualizarUsuarioInfo() // Actualiza la información del usuario cada vez que el fragmento se vuelve visible
     }
-
     // Función para actualizar el nombre de usuario y la cantidad de Castv
     fun actualizarUsuario(usuario: String, cantidadCastv: Int) {
         binding.textUsuario.text = "$usuario"
         binding.textCastv.text = "Castv: $:$cantidadCastv"
     }
 
-   fun cargarPeliculas() {
-        // Oculta la interfaz mientras se carga la biblioteca
-        binding.linearLayout.visibility = View.GONE // Oculta cualquier vista que quieras ocultar (ej. RecyclerView)
+fun cargarPeliculas() {
+    binding.linearLayout.visibility = View.GONE
+    Glide.with(requireContext())
+        .load("https://png.pngtree.com/thumb_back/fh260/background/20230328/pngtree-stage-shining-lights-background-image_2118261.jpg")
+        .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
+        .centerCrop()
+        .into(binding.mainBackgroundImage)
+    binding.mainBackgroundImage.alpha = 1.0f
 
-        Glide.with(requireContext())
-            .load("https://ejemplo.com/imagen.jpg")
-            .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
-            .centerCrop()
-            .into(binding.mainBackgroundImage)
+    mostrarCarga("Actualizando biblioteca en línea...")
 
-        binding.mainBackgroundImage.alpha = 1.0f
-
-        // Mostrar la vista de carga
-        mostrarCarga("Actualizando biblioteca en línea...")
-
-        // Lanza una coroutine en el contexto Main
-        viewLifecycleOwner.lifecycleScope.launch {
-            // Obtén las películas actualizadas dentro de la coroutine
-            val (peliculasActivas, peliculasInactivas) = firestoreRepository.obtenerPeliculas()
-
-            // Supongamos que también obtienes el nombre de usuario y la cantidad de Castv
-            val usuarioId = FirebaseAuth.getInstance().currentUser?.uid // Obtén el ID del usuario autenticado
-            val nombreUsuario: String
-            val cantidadCastv: Int
-
-            if (usuarioId != null) {
-                nombreUsuario = firestoreRepository.obtenerNombreUsuario(usuarioId) // Obtiene el nombre de usuario
-                cantidadCastv = firestoreRepository.obtenerCantidadCastv(usuarioId) // Obtiene la cantidad de Castv
-            } else {
-                nombreUsuario = "Usuario Desconocido"
-                cantidadCastv = 0
-            }
-
-            // Ocultar la vista de carga una vez que se cargan los datos
-            ocultarCarga()
-
-            // Muestra nuevamente la vista oculta
-            binding.linearLayout.visibility = View.VISIBLE // Muestra la vista oculta (ej. RecyclerView)
-
-            // Llama a updateMovieList para agregar las películas a la lista
-            updateMovieList(peliculasActivas, peliculasInactivas)
-
-            // Actualiza el nombre de usuario y la cantidad de Castv
-            actualizarUsuario(nombreUsuario, cantidadCastv)
-        }
+    viewLifecycleOwner.lifecycleScope.launch {
+        val peliculas = firestoreRepository.obtenerPeliculasCompleta() // Obtenemos toda la colección
+        // Ordenamos por fecha de publicación, siendo la primera la última actualizada
+        val peliculasOrdenadas = peliculas.sortedByDescending { it.createdAt }
+        ocultarCarga()
+        binding.linearLayout.visibility = View.VISIBLE
+        updateMovieList(peliculasOrdenadas)
     }
+}
 
-    // Actualiza la función updateMovieList()
-    private fun updateMovieList(peliculasActivas: List<Movie>, peliculasInactivas: List<Movie>) {
-        // Actualiza la lista de películas en la interfaz de usuario
-        rowsAdapter.clear() // Limpia la lista actual
-        agregarALista(peliculasActivas, "CARTELERA")
-        agregarALista(peliculasInactivas, "ALQUILER")
-        // Agrega el menú aquí, después de cargar las películas
+    private fun updateMovieList(peliculas: List<Movie>) {
+        rowsAdapter.clear()
+        agregarALista(peliculas, "Contenido")
+
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
         val menuItems = listOf("Pago", "Buscar Pelicula", "Cerrar Sesión")
-        val menuIcons = listOf(
-            R.drawable.pago,
-            R.drawable.buscar,
-            R.drawable.ic_shuffle
-        )
+        val menuIcons = listOf(R.drawable.pago, R.drawable.buscar, R.drawable.ic_shuffle)
 
-        for (i in menuItems.indices) {
-            val menuItem = MenuItem(menuItems[i], menuIcons[i])
-            menuAdapter.add(menuItem)
+        menuItems.forEachIndexed { i, item ->
+            menuAdapter.add(MenuItem(item, menuIcons[i]))
         }
 
-        val headerItem = HeaderItem(3, "MENU")
-        val listRow = ListRow(headerItem, menuAdapter) // Crea la fila del menú
+        rowsAdapter.add(ListRow(HeaderItem(3, "MENU"), menuAdapter))
+        rowsAdapter.notifyArrayItemRangeChanged(rowsAdapter.size() - 1, 1)
+    }
 
-        // Calcula la posición para insertar la fila del menú
-        val position = rowsAdapter.size() // Obtén la posición usando `rowsAdapter.size`
-
-        // Agrega la fila del menú al adaptador
-        rowsAdapter.add(position, listRow)
-
-        // Notifica la inserción de la fila al adaptador de filas
-        rowsAdapter.notifyArrayItemRangeChanged(position, 1)
-
+    private fun agregarALista(movies: List<Movie>, titulo: String) {
+        val cardPresenter = CardPresenter()
+        val listRowAdapter = ArrayObjectAdapter(cardPresenter).apply {
+            addAll(0, movies)
+        }
+        rowsAdapter.add(ListRow(HeaderItem(0, titulo), listRowAdapter))
     }
 
     private fun cargarImagenDeFondo(url: String) {
@@ -281,14 +238,6 @@ class MainFragment : BrowseSupportFragment() {
             .centerCrop()
             .transition(DrawableTransitionOptions.withCrossFade(1000))
             .into(binding.mainBackgroundImage)
-    }
-
-    private fun agregarALista(movies: List<Movie>, titulo: String) {
-        val cardPresenter = CardPresenter() // Asegúrate de que CardPresenter esté implementado
-        val listRowAdapter = ArrayObjectAdapter(cardPresenter)
-        listRowAdapter.addAll(0, movies)
-        val headerItem = HeaderItem(0, titulo)
-        rowsAdapter.add(ListRow(headerItem, listRowAdapter))
     }
 
     private fun mostrarCarga(mensaje: String = "Cargando...") {
@@ -304,7 +253,7 @@ class MainFragment : BrowseSupportFragment() {
         binding.mainBackgroundImage.setImageDrawable(null)
         view?.setBackgroundColor(defaultBackgroundColor)
     }
-    // Método para escuchar cambios en Firestore y actualizar la lista de películas
+
     private fun escucharCambiosEnPeliculas() {
         firestoreRepository.obtenerPeliculasRef().addSnapshotListener { snapshot, error ->
             if (error != null) {
@@ -314,40 +263,20 @@ class MainFragment : BrowseSupportFragment() {
             }
 
             if (snapshot != null && !snapshot.isEmpty) {
-                // Mapeamos los documentos a objetos Movie
                 val peliculas = snapshot.documents.mapNotNull { doc ->
-                    doc.toObject(Movie::class.java)?.copy(id = doc.id)
-                }
-
-                // Validamos las URLs de las películas en una corrutina
-                lifecycleScope.launch {
-                    val peliculasValidas = mutableListOf<Movie>()
-                    val peliculasInvalidas = mutableListOf<Movie>()
-
-                    // Validamos cada URL individualmente
-                    peliculas.forEach { pelicula ->
-                        val isValid = firestoreRepository.isUrlValid(pelicula.streamUrl)
-                        if (isValid) {
-                            peliculasValidas.add(pelicula)
-                        } else {
-                            peliculasInvalidas.add(pelicula)
-                        }
+                    doc.toObject(Movie::class.java)?.run {
+                        this.copy(id = doc.id)
                     }
-
-                    // Ordenar las listas por fecha de publicación, de más reciente a más antiguo
-                    val peliculasOrdenadasValidas = peliculasValidas.sortedByDescending { it.createdAt }
-                    val peliculasOrdenadasInvalidas = peliculasInvalidas.sortedByDescending { it.createdAt }
-
-                    // Actualizamos la lista de películas en la interfaz
-                    updateMovieList(peliculasOrdenadasValidas, peliculasOrdenadasInvalidas)
-                    actualizarUsuarioInfo()
                 }
+
+                val peliculasOrdenadas = peliculas.sortedByDescending { it.createdAt }
+                updateMovieList(peliculasOrdenadas) // Elimina el segundo parámetro
+                actualizarUsuarioInfo()
 
             } else {
-                // Si no hay datos en el snapshot
                 Log.d("MainFragment", "No se encontraron películas.")
                 Toast.makeText(requireContext(), "No hay películas disponibles", Toast.LENGTH_SHORT).show()
-                updateMovieList(emptyList(), emptyList()) // Limpia las listas si no hay datos
+                updateMovieList(emptyList()) // Llama con solo una lista vacía si no hay datos
             }
         }
     }
@@ -356,11 +285,11 @@ class MainFragment : BrowseSupportFragment() {
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.buscador, null)
         val searchEditText = dialogView.findViewById<EditText>(R.id.search_edit_text)
         val searchResultsView = dialogView.findViewById<ListView>(R.id.list_view)
-        val progressBar = dialogView.findViewById<ProgressBar>(R.id.progress_bar) // ProgressBar
+        val progressBar = dialogView.findViewById<ProgressBar>(R.id.progress_bar)
 
         // Lista de películas para la búsqueda
         val movieList = mutableListOf<Movie>()
-        val filteredMovieList = mutableListOf<Movie>() // Nueva lista para películas filtradas
+        val filteredMovieList = mutableListOf<Movie>() // Lista para almacenar películas filtradas
 
         // Adaptador para los resultados de búsqueda
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, filteredMovieList.map { it.title })
@@ -378,15 +307,16 @@ class MainFragment : BrowseSupportFragment() {
         searchEditText.visibility = View.GONE
         searchResultsView.visibility = View.GONE
 
-        // Cargar las películas desde Firestore
+        // Cargar todas las películas desde Firestore sin validaciones
         CoroutineScope(Dispatchers.Main).launch {
-            val (peliculasValidas, peliculasInvalidas) = firestoreRepository.obtenerPeliculas()
+            val peliculas = firestoreRepository.obtenerPeliculasCompleta() // Obtenemos todas las películas sin filtrar
             movieList.clear()
-            movieList.addAll(peliculasValidas + peliculasInvalidas)
-            filteredMovieList.clear() // Limpiar la lista filtrada
-            filteredMovieList.addAll(movieList) // Agregar todas las películas inicialmente
+            movieList.addAll(peliculas)
+            filteredMovieList.clear()
+            filteredMovieList.addAll(movieList)
+
             adapter.clear()
-            adapter.addAll(filteredMovieList.map { it.title }) // Actualiza el adaptador con los títulos
+            adapter.addAll(filteredMovieList.map { it.title })
 
             // Oculta el ProgressBar y muestra el EditText y el ListView cuando los datos estén listos
             progressBar.visibility = View.GONE
@@ -395,7 +325,6 @@ class MainFragment : BrowseSupportFragment() {
 
             adapter.notifyDataSetChanged()
         }
-
         // Listener para la entrada en el EditText
         searchEditText.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -405,10 +334,10 @@ class MainFragment : BrowseSupportFragment() {
                 val filteredList = movieList.filter { movie ->
                     movie.title.contains(query, ignoreCase = true)
                 }
-                filteredMovieList.clear() // Limpiar la lista filtrada
-                filteredMovieList.addAll(filteredList) // Agregar solo los filtrados
+                filteredMovieList.clear()
+                filteredMovieList.addAll(filteredList)
                 adapter.clear()
-                adapter.addAll(filteredMovieList.map { it.title }) // Actualiza el adaptador con los títulos filtrados
+                adapter.addAll(filteredMovieList.map { it.title })
                 adapter.notifyDataSetChanged()
             }
 
@@ -417,12 +346,11 @@ class MainFragment : BrowseSupportFragment() {
 
         // Listener para detectar clic en los elementos de la lista
         searchResultsView.setOnItemClickListener { _, _, position, _ ->
-            val selectedMovie = filteredMovieList[position] // Obtén la película seleccionada de la lista filtrada
-            irAlReproductor(selectedMovie) // Llama a la función para ir al reproductor
+            val selectedMovie = filteredMovieList[position]
+            irAlReproductor(selectedMovie)
             dialog.dismiss() // Cierra el diálogo después de seleccionar
         }
     }
-
     private fun irAlReproductor(movie: Movie) {
         val intent = Intent(context, PlayerActivity::class.java).apply {
             putExtra("EXTRA_STREAM_URL", movie.streamUrl)  // Pasa el URL del stream

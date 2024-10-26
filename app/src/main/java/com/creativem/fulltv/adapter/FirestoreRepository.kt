@@ -3,9 +3,7 @@ package com.creativem.fulltv.adapter
 import android.util.Log
 import com.creativem.fulltv.data.Movie
 import com.google.firebase.firestore.CollectionReference
-import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.tasks.await
@@ -14,20 +12,14 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.Executors
 
 class FirestoreRepository {
     private val firestore = FirebaseFirestore.getInstance()
     private val peliculasCollection = firestore.collection("movies")
-
+    private val db = FirebaseFirestore.getInstance()
     // Pool de conexiones para reutilizar conexiones HTTP
     private val connectionPool = Executors.newFixedThreadPool(8).asCoroutineDispatcher()
 
@@ -54,29 +46,19 @@ class FirestoreRepository {
             Pair(emptyList(), emptyList())
         }
     }
-//  suspend fun isUrlValid(url: String?): Boolean {
-//        if (url == null) return false
-//
-//        return withContext(Dispatchers.IO) { // Usa Dispatchers.IO para E/S
-//            try {
-//                (URL(url).openConnection() as HttpURLConnection).run {
-//                    requestMethod = "HEAD"
-//                    connectTimeout = 2500 // Ajusta el tiempo de espera según tus necesidades
-//                    readTimeout = 2500
-//                    responseCode in 200..299
-//                }
-//            } catch (e: Exception) {
-//                false
-//            }
-//        }
-//    }
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(500, TimeUnit.MILLISECONDS)
-        .readTimeout(500, TimeUnit.MILLISECONDS)
-        .writeTimeout(500, TimeUnit.MILLISECONDS)
-        .connectionPool(ConnectionPool(50, 1, TimeUnit.MINUTES)) // Reutilizar conexiones
-        .dispatcher(Dispatcher(Executors.newFixedThreadPool(32))) // Procesar validaciones en paralelo
-        .build()
+private val httpClient = OkHttpClient.Builder()
+    .connectTimeout(15, TimeUnit.SECONDS)  // Aumenta el tiempo de espera de conexión
+    .readTimeout(20, TimeUnit.SECONDS)     // Aumenta el tiempo de espera de lectura
+    .writeTimeout(20, TimeUnit.SECONDS)    // Aumenta el tiempo de espera de escritura
+    .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES)) // Aumenta el tamaño del pool de conexiones
+    .dispatcher(Dispatcher(Executors.newFixedThreadPool(4))) // Mantiene la configuración de hilos
+    .retryOnConnectionFailure(true)         // Permitir reintentos
+    .addInterceptor { chain ->
+        val request = chain.request()
+        Log.d("OkHttp", "Sending request to ${request.url}")
+        chain.proceed(request)
+    }
+    .build()
 
     suspend fun isUrlValid(url: String?): Boolean {
         if (url.isNullOrEmpty()) return false
@@ -91,14 +73,12 @@ class FirestoreRepository {
             try {
                 val request = Request.Builder()
                     .url(validUrl)
-                    .head()
+                    .get()  // Cambiar a GET para mejor verificación
                     .build()
 
-                val result = httpClient.newCall(request).execute().use { response ->
-                    response.isSuccessful && response.code in 200..299
-                }
+                val response = httpClient.newCall(request).execute()
 
-                result
+                response.isSuccessful && response.code in 200..299
             } catch (e: IOException) {
                 Log.e("FirestoreRepository", "Error de conexión: $validUrl", e)
                 false
@@ -146,6 +126,18 @@ class FirestoreRepository {
 
     // Función para obtener la referencia de la colección de películas
     fun obtenerPeliculasRef(): CollectionReference {
-        return firestore.collection("movies")
+        return db.collection("movies") // Asegúrate de que este nombre coincida con tu colección en Firestore
+    }
+
+    suspend fun obtenerPeliculasCompleta(): List<Movie> {
+        return try {
+            val snapshot = db.collection("movies") // Nombre de la colección en Firestore
+                .get()
+                .await()
+            snapshot.documents.mapNotNull { it.toObject(Movie::class.java) }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
     }
 }
