@@ -16,7 +16,7 @@ class CardPresenter: Presenter(){
             isFocusable = true
             isFocusableInTouchMode = true
             setMainImageDimensions(240, 340)
-            // cardLayoutTheme = R.style.DefaultCardTheme // Estilo opcional
+//             cardLayoutTheme = R.style.DefaultCardTheme // Estilo opcional
         }
         return ViewHolder(cardView)
     }

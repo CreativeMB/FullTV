@@ -40,7 +40,7 @@ import com.creativem.fulltv.adapter.CardPresenter
 import com.creativem.fulltv.adapter.FirestoreRepository
 import com.creativem.fulltv.menu.MenuPresenter
 import com.google.firebase.auth.FirebaseAuth
-
+import android.content.res.Resources
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
     private val firestoreRepository = FirestoreRepository()
@@ -207,11 +207,10 @@ fun cargarPeliculas() {
         updateMovieList(peliculasOrdenadas)
     }
 }
-
     private fun updateMovieList(peliculas: List<Movie>) {
         rowsAdapter.clear()
-        agregarALista(peliculas, "Contenido")
 
+        // Primero, agregamos el menú
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
         val menuItems = listOf("Pago", "Buscar Pelicula", "Cerrar Sesión")
         val menuIcons = listOf(R.drawable.pago, R.drawable.buscar, R.drawable.ic_shuffle)
@@ -220,16 +219,46 @@ fun cargarPeliculas() {
             menuAdapter.add(MenuItem(item, menuIcons[i]))
         }
 
-        rowsAdapter.add(ListRow(HeaderItem(3, "MENU"), menuAdapter))
-        rowsAdapter.notifyArrayItemRangeChanged(rowsAdapter.size() - 1, 1)
+        // Agregamos el menú al rowsAdapter
+        rowsAdapter.add(ListRow(HeaderItem(3, "Menu"), menuAdapter))
+
+        // Luego, agregamos el contenido de las películas
+        agregarALista(peliculas, "Contenido")
+
+        // Notificamos el cambio de rango si es necesario
+        rowsAdapter.notifyArrayItemRangeChanged(rowsAdapter.size() - 1, 1) // Actualiza el rango para el menú
     }
 
-    private fun agregarALista(movies: List<Movie>, titulo: String) {
+    // Nueva función para calcular el número de elementos por fila basado en el ancho de pantalla
+    private fun calcularElementosPorFila(): Int {
+        val displayMetrics = Resources.getSystem().displayMetrics
+        val anchoPantalla = displayMetrics.widthPixels
+        val anchoTarjeta = 240 // Define el ancho aproximado de cada tarjeta en píxeles
+        return (anchoPantalla / anchoTarjeta).coerceAtLeast(1) // Asegura al menos 1 elemento por fila
+    }
+
+    private fun agregarALista(peliculas: List<Movie>, titulo: String) {
         val cardPresenter = CardPresenter()
-        val listRowAdapter = ArrayObjectAdapter(cardPresenter).apply {
-            addAll(0, movies)
+        val elementosPorFila = calcularElementosPorFila()
+
+        // Dividir la lista en sublistas del tamaño calculado
+        val chunkedPeliculas = peliculas.chunked(elementosPorFila)
+
+        // Agregar el encabezado solo para la primera sublista
+        if (chunkedPeliculas.isNotEmpty()) {
+            val listRowAdapter = ArrayObjectAdapter(cardPresenter).apply {
+                addAll(0, chunkedPeliculas[0])
+            }
+            rowsAdapter.add(ListRow(HeaderItem(0, titulo), listRowAdapter))
         }
-        rowsAdapter.add(ListRow(HeaderItem(0, titulo), listRowAdapter))
+
+        // Agregar las sublistas restantes sin encabezado
+        chunkedPeliculas.drop(1).forEach { chunk ->
+            val listRowAdapter = ArrayObjectAdapter(cardPresenter).apply {
+                addAll(0, chunk)
+            }
+            rowsAdapter.add(ListRow(null, listRowAdapter))
+        }
     }
 
     private fun cargarImagenDeFondo(url: String) {
