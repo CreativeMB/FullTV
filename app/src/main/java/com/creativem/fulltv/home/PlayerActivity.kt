@@ -47,8 +47,7 @@ import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.creativem.fulltv.R
 import com.creativem.fulltv.adapter.FirestoreRepository
-import com.creativem.fulltv.data.Movie
-import com.creativem.fulltv.menu.MoviesMenuAdapter
+import com.creativem.fulltv.adapter.MoviesMenuAdapter
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext

@@ -1,4 +1,4 @@
-package com.creativem.fulltv.menu
+package com.creativem.fulltv.adapter
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup

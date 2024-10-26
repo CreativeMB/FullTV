@@ -94,10 +94,10 @@ class MainFragment : BrowseSupportFragment() {
                         startActivity(intent)
                     }
 
-                    "Buscar Pelicula" -> {
+                    "Buscar" -> {
                         buscarPeliculaDialogo()
                     }
-                    "Cerrar Sesión" -> {
+                    "Cerrar" -> {
                         cerrarSesion() // Llama al método de cerrar sesión
                     }
                     else -> {
@@ -212,8 +212,8 @@ fun cargarPeliculas() {
 
         // Primero, agregamos el menú
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("Pago", "Buscar Pelicula", "Cerrar Sesión")
-        val menuIcons = listOf(R.drawable.pago, R.drawable.buscar, R.drawable.ic_shuffle)
+        val menuItems = listOf("Pago", "Buscar", "Cerrar")
+        val menuIcons = listOf(R.drawable.pago, R.drawable.buscar, R.drawable.cerrrar)
 
         menuItems.forEachIndexed { i, item ->
             menuAdapter.add(MenuItem(item, menuIcons[i]))
