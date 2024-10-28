@@ -6,6 +6,7 @@
         <domain includeSubdomains="true">160.20.165.246</domain>
         <domain includeSubdomains="true">181.78.71.5</domain>
         <domain includeSubdomains="true">181.78.6.106</domain>
+        <domain includeSubdomains="true">filmaffinity.com</domain>
         <domain includeSubdomains="true">teleclub.xyz</domain>
     </domain-config>
 </network-security-config>

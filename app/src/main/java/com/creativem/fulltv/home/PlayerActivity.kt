@@ -87,6 +87,8 @@ class PlayerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        initializeRecyclerView() // Configura el RecyclerView con un adaptador vacío
+        loadMovies()
 
         auth = FirebaseAuth.getInstance()
         firestore = FirebaseFirestore.getInstance()
@@ -118,17 +120,17 @@ class PlayerActivity : AppCompatActivity() {
         relojCuston.startClock()
 
         firestore = Firebase.firestore
-        // Inicializa el RecyclerView
-        initializeRecyclerView()
-        // Inicializa el SeekBar desde el binding
+               // Inicializa el SeekBar desde el binding
         actualizarTiempo()
         player = ExoPlayer.Builder(this).build()
         binding.reproductor.player = player
         initializePlayer()
 
+
         val menupelis = binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis)
         menupelis.setOnClickListener {
             mostarpélis()
+
         }
         // Referencias a los botones
 
@@ -208,19 +210,18 @@ class PlayerActivity : AppCompatActivity() {
         // Cargar las películas desde Firestore
         loadMovies() // Llama al método que carga las películas
     }
-
     private fun loadMovies() {
         CoroutineScope(Dispatchers.Main).launch {
             val firestoreRepository = FirestoreRepository()
-            val (validMovies, invalidMovies) = firestoreRepository.obtenerPeliculas()
+            val (peliculasOrdenadasValidas, peliculasInvalidas) = firestoreRepository.obtenerPeliculas()
 
             // Log para verificar la cantidad de películas cargadas
-            Log.d("MoviesData", "Películas válidas: ${validMovies.size}, Películas inválidas: ${invalidMovies.size}")
+            Log.d("MoviesData", "Películas válidas ordenadas: ${peliculasOrdenadasValidas.size}, Películas inválidas: ${peliculasInvalidas.size}")
 
             // Actualizar el adaptador
             withContext(Dispatchers.Main) {
-                adapter.updateMovies(validMovies) // Esto ahora valida las URLs de nuevo
-                binding.recyclerMoviesMenu.visibility = if (validMovies.isNotEmpty()) View.GONE else View.VISIBLE
+                adapter.updateMovies(peliculasOrdenadasValidas)
+                // Aquí no cambiamos la visibilidad
             }
         }
     }

@@ -46,19 +46,19 @@ class FirestoreRepository {
             Pair(emptyList(), emptyList())
         }
     }
-private val httpClient = OkHttpClient.Builder()
-    .connectTimeout(15, TimeUnit.SECONDS)  // Aumenta el tiempo de espera de conexión
-    .readTimeout(20, TimeUnit.SECONDS)     // Aumenta el tiempo de espera de lectura
-    .writeTimeout(20, TimeUnit.SECONDS)    // Aumenta el tiempo de espera de escritura
-    .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES)) // Aumenta el tamaño del pool de conexiones
-    .dispatcher(Dispatcher(Executors.newFixedThreadPool(4))) // Mantiene la configuración de hilos
-    .retryOnConnectionFailure(true)         // Permitir reintentos
-    .addInterceptor { chain ->
-        val request = chain.request()
-        Log.d("OkHttp", "Sending request to ${request.url}")
-        chain.proceed(request)
-    }
-    .build()
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(500, TimeUnit.MILLISECONDS)  // Reducir tiempo de conexión
+        .readTimeout(500, TimeUnit.MILLISECONDS)    // Reducir tiempo de lectura
+        .writeTimeout(500, TimeUnit.MILLISECONDS)   // Reducir tiempo de escritura
+        .connectionPool(ConnectionPool(50, 1, TimeUnit.MINUTES)) // Reducir el tamaño del pool de conexiones
+        .dispatcher(Dispatcher(Executors.newFixedThreadPool(8))) // Aumentar los hilos para validar en paralelo
+        .retryOnConnectionFailure(true)       // Permitir reintentos
+        .addInterceptor { chain ->
+            val request = chain.request()
+            Log.d("OkHttp", "Sending request to ${request.url}")
+            chain.proceed(request)
+        }
+        .build()
 
     suspend fun isUrlValid(url: String?): Boolean {
         if (url.isNullOrEmpty()) return false
@@ -73,10 +73,9 @@ private val httpClient = OkHttpClient.Builder()
             try {
                 val request = Request.Builder()
                     .url(validUrl)
-                    .get()
+                    .head() // Usar HEAD en lugar de GET para solo verificar disponibilidad
                     .build()
 
-                // Usar `use` para asegurar que la respuesta se cierra correctamente
                 httpClient.newCall(request).execute().use { response ->
                     response.isSuccessful && response.code in 200..299
                 }

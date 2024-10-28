@@ -42,7 +42,7 @@
         android:layout_height="match_parent"
         android:layout_gravity="center_horizontal|start"
         android:clipToPadding="false"
-        android:visibility="visible"/>
+        android:visibility="invisible"/>
 
 
 </FrameLayout>
