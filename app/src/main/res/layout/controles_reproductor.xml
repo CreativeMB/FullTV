@@ -79,7 +79,7 @@
                     android:id="@+id/nombrePelicula"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textSize="25dp"
+                    android:textSize="18dp"
                     android:text="Nombre pelicula"
                     android:textStyle="bold"
                     android:textColor="@color/exo_button_color" />
@@ -135,13 +135,13 @@
                     app:tint="@color/exo_button_color" />
 
                 <ImageButton
-                    android:id="@id/settings"
+                    android:id="@id/pedidos"
                     android:layout_width="50dp"
                     android:layout_height="50dp"
                     android:scaleType="fitCenter"
                     android:background="@drawable/button_selector"
                     android:contentDescription="@string/exo_settings"
-                    android:src="@drawable/ic_settings"
+                    android:src="@drawable/pago"
                     android:stateListAnimator="@animator/exo_button_state_animator"
                     app:tint="@color/exo_button_color" />
 

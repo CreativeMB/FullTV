@@ -73,12 +73,13 @@ private val httpClient = OkHttpClient.Builder()
             try {
                 val request = Request.Builder()
                     .url(validUrl)
-                    .get()  // Cambiar a GET para mejor verificación
+                    .get()
                     .build()
 
-                val response = httpClient.newCall(request).execute()
-
-                response.isSuccessful && response.code in 200..299
+                // Usar `use` para asegurar que la respuesta se cierra correctamente
+                httpClient.newCall(request).execute().use { response ->
+                    response.isSuccessful && response.code in 200..299
+                }
             } catch (e: IOException) {
                 Log.e("FirestoreRepository", "Error de conexión: $validUrl", e)
                 false

@@ -4,5 +4,6 @@
     <item name="lista_pelis" type="id"/>
     <item name="home" type="id"/>
     <item name="settings" type="id"/>
+    <item name="pedidos" type="id"/>
     <item name="render" type="id"/>
 </resources>

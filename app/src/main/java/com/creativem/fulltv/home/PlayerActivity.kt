@@ -42,6 +42,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import kotlinx.coroutines.MainScope
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
 import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
@@ -101,6 +102,7 @@ class PlayerActivity : AppCompatActivity() {
             streamUrl = it.getStringExtra("EXTRA_STREAM_URL") ?: ""
             movieTitle = it.getStringExtra("EXTRA_MOVIE_TITLE") ?: "Título desconocido"
             movieYear = it.getStringExtra("EXTRA_MOVIE_YEAR") ?: ""
+            Log.d("PlayerActivity", "Cargando stream desde URL: $streamUrl")
             // Actualiza el TextView con el título
             nombrePeliculaTextView.text = movieTitle
         }
@@ -141,7 +143,11 @@ class PlayerActivity : AppCompatActivity() {
         shuffleButton.setOnClickListener {
             finish()
         }
-
+        // Botón pedidos
+        val pedidosButton: ImageButton = findViewById(R.id.pedidos)
+        pedidosButton.setOnClickListener {
+            showErrorDialog(streamUrl, movieTitle, movieYear)
+        }
         // Botón Pantalla Completa
         val renderButton: ImageButton = findViewById(R.id.render)
         renderButton.setOnClickListener {
@@ -244,23 +250,39 @@ class PlayerActivity : AppCompatActivity() {
     // Método para inicializar el reproductor de video
     @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
-        // Ejecuta la validación de la URL de forma asíncrona
+        // Verifica si la URL ya ha sido establecida
+        if (streamUrl.isEmpty()) {
+            Log.e("PlayerActivity", "No se recibió la URL de streaming.")
+            showErrorDialog("No se recibió la URL de streaming.", movieTitle, movieYear)
+            return
+        }
+
         CoroutineScope(Dispatchers.Main).launch {
-            // Validar la URL en Firestore antes de reproducir
-            if (!isUrlValidInFirestore(streamUrl)) {
-                // Si la URL no es válida, muestra un diálogo de error
+            // Validar la URL en Firestore de manera asíncrona
+            val isUrlValid = withContext(Dispatchers.IO) {
+                isUrlValidInFirestore(streamUrl)
+            }
+            Log.d("PlayerActivity", "La URL es válida en Firestore: $isUrlValid")
+
+            // Si la URL no es válida, muestra un diálogo de error
+            if (!isUrlValid) {
                 showErrorDialog(ulsvideo = streamUrl, movieTitle, movieYear)
                 return@launch
             }
+// Define el DataSource.Factory con headers personalizados
+            val dataSourceFactory = DefaultHttpDataSource.Factory().apply {
+                setDefaultRequestProperties(
+                    mapOf(
+                        "Authorization" to "Bearer y3r7YFqiFAobFLg_3RxOLg", // Cambia a 'Authorization' si es necesario
+                        "expires" to "1730080442"
+                    )
+                )
+            }
 
-            // Crea el DataSource.Factory
-            val dataSourceFactory = DefaultDataSource.Factory(this@PlayerActivity)
-
-            // Crea la MediaSourceFactory
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
             // Configura el LoadControl
             val loadControl = DefaultLoadControl.Builder()
-                // Define el tamaño objetivo del búfer (tamaño máximo)
                 .setTargetBufferBytes(8 * 1024 * 1024) // 8 MB
                 .setPrioritizeTimeOverSizeThresholds(false)
                 .build()
@@ -277,6 +299,7 @@ class PlayerActivity : AppCompatActivity() {
 
                     // Asocia el ExoPlayer con el PlayerView usando binding
                     binding.reproductor.player = exoPlayer
+                    Log.d("PlayerActivity", "URL asignada al reproductor: $streamUrl")
 
                     // Configura el MediaItem
                     val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
@@ -301,14 +324,14 @@ class PlayerActivity : AppCompatActivity() {
                             }
                         }
                     })
-                                       // Añade el listener del reproductor
+
+                    // Añade el listener del reproductor
                     exoPlayer.addListener(playerListener)
                     // Inicia la reproducción automáticamente
                     exoPlayer.playWhenReady = true
                 }
         }
     }
-
     // Listener para el reproductor
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -337,7 +360,7 @@ class PlayerActivity : AppCompatActivity() {
                 Player.STATE_ENDED -> {
                     Log.d("PlayerActivity", "Reproducción finalizada.")
                     isPlaybackActive = false // La reproducción ya no está activa
-
+                    showErrorDialog(streamUrl, movieTitle, movieYear)
                     // Si es un stream en vivo, intentar reconectar
                     if (isLiveStream) {
                         Log.d("PlayerActivity", "Transmisión en vivo finalizada. Intentando reconectar...")
@@ -366,11 +389,13 @@ class PlayerActivity : AppCompatActivity() {
                     Log.w("PlayerActivity", "Estado desconocido del reproductor: $playbackState")
                     // En caso de un estado desconocido, intenta reconectar si no hay actividad de reproducción
                     if (!isPlaybackActive && reconnectionAttempts < maxReconnectionAttempts) {
+                        Log.d("PlayerActivity", "Intentando reconectar debido a estado desconocido...")
                         intentarReconexion() // Llama al método de reconexión
                     }
                 }
             }
         }
+
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             // Cambia el comportamiento dependiendo si se está reproduciendo
@@ -503,7 +528,32 @@ class PlayerActivity : AppCompatActivity() {
                 finish() // Simula el botón de retroceso
             }
             .setNeutralButton("Alquilar Pelicula") { _, _ ->
-                enviarPedido()
+                val userId = auth.currentUser?.uid
+                if (userId != null) {
+                    // Verificar si la película ya existe para este usuario
+                    val query = firestore.collection("pedidosmovies")
+                        .whereEqualTo("title", movieTitle)
+                        .whereEqualTo("userId", userId)
+
+                    query.get().addOnSuccessListener { querySnapshot ->
+                        if (querySnapshot.isEmpty) {
+                            // La película NO está pedida, proceder con el pedido
+                            descontarPuntos(userId, movieYear.toLong(), hashMapOf()) { exito ->
+                                if (exito) {
+                                    enviarPedido() // Llamar a enviarPedido solo si no existe
+                                }
+                            }
+                        } else {
+                            // La película YA está pedida
+                            Toast.makeText(this, "Ya has pedido la película '$movieTitle'. Disfrútala!", Toast.LENGTH_LONG).show()
+                        }
+                    }.addOnFailureListener { e ->
+                        Log.e("Firestore", "Error al consultar: ${e.message}")
+                        Toast.makeText(this, "Error al consultar: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(this, "No hay usuario autenticado.", Toast.LENGTH_SHORT).show()
+                }
             }
             .show()
     }
@@ -536,10 +586,11 @@ class PlayerActivity : AppCompatActivity() {
                         .add(datos)
                         .addOnSuccessListener { documentReference ->
                             // Descontar puntos del usuario
-                            descontarPuntos(userId, movieYear.toLong(), datos)
-
-                            // *** Enviar notificación ***
-                            enviarCorreoNuevoPedido(movieTitle)
+                            descontarPuntos(userId, movieYear.toLong(), datos) { exito ->
+                                if (exito) {
+                                    enviarCorreoNuevoPedido(movieTitle)
+                                }
+                            }
                         }
                         .addOnFailureListener { e ->
                             Log.e("Firestore", "Error al agregar la película: ${e.message}")
@@ -553,7 +604,8 @@ class PlayerActivity : AppCompatActivity() {
                     Toast.makeText(this, "No hay usuario autenticado.", Toast.LENGTH_SHORT).show()
                 }
             } else {
-                // La película ya existe, mostrar mensaje y redirigir
+                // La película ya existe, mostrar mensaje y registrar en el log
+                Log.i("Firestore", "La película '$movieTitle' ya existe en la base de datos.")
                 Toast.makeText(
                     this,
                     "La película '$movieTitle' ya fue pedida; puedes alquilar más...",
@@ -600,7 +652,8 @@ class PlayerActivity : AppCompatActivity() {
     private fun descontarPuntos(
         userId: String,
         puntosADescontar: Long,
-        datos: HashMap<String, Any>
+        datos: HashMap<String, Any>,
+        callback: (Boolean) -> Unit
     ) {
         val userRef = firestore.collection("users").document(userId)
 
@@ -615,9 +668,7 @@ class PlayerActivity : AppCompatActivity() {
                         // Solo se ejecuta aquí si se han descontado puntos
                         Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT)
                             .show()
-                        val intent = Intent(this, Nosotros::class.java)
-                        startActivity(intent)
-                        finish()
+
                     }
                     .addOnFailureListener { e ->
                         Log.e("Firestore", "Error al descontar puntos: ${e.message}")
