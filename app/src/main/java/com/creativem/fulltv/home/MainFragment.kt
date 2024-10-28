@@ -233,7 +233,7 @@ fun cargarPeliculas() {
     private fun calcularElementosPorFila(): Int {
         val displayMetrics = Resources.getSystem().displayMetrics
         val anchoPantalla = displayMetrics.widthPixels
-        val anchoTarjeta = 240 // Define el ancho aproximado de cada tarjeta en píxeles
+        val anchoTarjeta = 170 // Define el ancho aproximado de cada tarjeta en píxeles
         return (anchoPantalla / anchoTarjeta).coerceAtLeast(1) // Asegura al menos 1 elemento por fila
     }
 
