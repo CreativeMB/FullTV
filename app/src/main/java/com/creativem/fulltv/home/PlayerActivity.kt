@@ -528,36 +528,29 @@ class PlayerActivity : AppCompatActivity() {
                 finish() // Simula el botón de retroceso
             }
             .setNeutralButton("Alquilar Pelicula") { _, _ ->
-                val userId = auth.currentUser?.uid
-                if (userId != null) {
-                    // Verificar si la película ya existe para este usuario
-                    val query = firestore.collection("pedidosmovies")
-                        .whereEqualTo("title", movieTitle)
-                        .whereEqualTo("userId", userId)
-
-                    query.get().addOnSuccessListener { querySnapshot ->
-                        if (querySnapshot.isEmpty) {
-                            // La película NO está pedida, proceder con el pedido
-                            descontarPuntos(userId, movieYear.toLong(), hashMapOf()) { exito ->
-                                if (exito) {
-                                    enviarPedido() // Llamar a enviarPedido solo si no existe
-                                }
-                            }
-                        } else {
-                            // La película YA está pedida
-                            Toast.makeText(this, "Ya has pedido la película '$movieTitle'. Disfrútala!", Toast.LENGTH_LONG).show()
-                        }
-                    }.addOnFailureListener { e ->
-                        Log.e("Firestore", "Error al consultar: ${e.message}")
-                        Toast.makeText(this, "Error al consultar: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
-                } else {
-                    Toast.makeText(this, "No hay usuario autenticado.", Toast.LENGTH_SHORT).show()
-                }
+                verificarYProcesarPedido()
             }
             .show()
     }
 
+    private fun verificarYProcesarPedido() {
+        val query = firestore.collection("pedidosmovies")
+            .whereEqualTo("title", movieTitle) // Solo se filtra por movieTitle
+
+        query.get().addOnSuccessListener { querySnapshot ->
+            if (querySnapshot.isEmpty) {
+                // La película NO está pedida (por ningún usuario), llamar a enviarPedido
+                enviarPedido()
+            } else {
+                // La película YA está pedida (por algún usuario)
+                Log.i("Firestore", "La película '$movieTitle' ya existe en la base de datos.")
+                Toast.makeText(this, "La película '$movieTitle' ya fue pedida; puedes alquilar más...", Toast.LENGTH_LONG).show()
+            }
+        }.addOnFailureListener { e ->
+            Log.e("Firestore", "Error al consultar: ${e.message}")
+            Toast.makeText(this, "Error al consultar: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
     private fun enviarPedido() {
         if (isProcessingOrder) {
             return // Salir si ya se está procesando un pedido
@@ -572,40 +565,54 @@ class PlayerActivity : AppCompatActivity() {
 
         query.get().addOnSuccessListener { querySnapshot ->
             if (querySnapshot.isEmpty) {
-                // La película no existe, agregarla y descontar puntos
+                // La película no existe, verificar puntos primero
                 val userId = auth.currentUser?.uid // Obtener el ID del usuario autenticado
                 if (userId != null) {
-                    val datos: HashMap<String, Any> = hashMapOf(
-                        "title" to movieTitle,
-                        "year" to movieYear,
-                        "userId" to userId // Agregar el userId a los datos de la película
-                    )
+                    // Convertir year de Movie a Int antes de pasarlo a verificarPuntos
+                    val costoPedido = movieYear.toIntOrNull() ?: 0 // Convertir a Int o asignar 0 si no se puede convertir
+                    verificarPuntos(userId, costoPedido) { tienePuntos ->
+                        if (tienePuntos) {
+                            // Si tiene puntos, proceder a agregar la película
+                            val datos: HashMap<String, Any> = hashMapOf(
+                                "title" to movieTitle,
+                                "year" to movieYear,
+                                "userId" to userId // Agregar el userId a los datos de la película
+                            )
 
-                    // Agregar la película a la colección
-                    firestore.collection("pedidosmovies")
-                        .add(datos)
-                        .addOnSuccessListener { documentReference ->
-                            // Descontar puntos del usuario
-                            descontarPuntos(userId, movieYear.toLong(), datos) { exito ->
-                                if (exito) {
+                            // Agregar la película a la colección
+                            firestore.collection("pedidosmovies")
+                                .add(datos)
+                                .addOnSuccessListener { documentReference ->
+                                    // Descontar puntos del usuario usando costoPedido
+                                    descontarPuntos(userId, costoPedido.toLong(), datos) // Convertir a Long
+                                    // Enviar notificación
                                     enviarCorreoNuevoPedido(movieTitle)
                                 }
-                            }
-                        }
-                        .addOnFailureListener { e ->
-                            Log.e("Firestore", "Error al agregar la película: ${e.message}")
+                                .addOnFailureListener { e ->
+                                    Log.e("Firestore", "Error al agregar la película: ${e.message}")
+                                    Toast.makeText(
+                                        this,
+                                        "Error al realizar el pedido: ${e.message}",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                        } else {
+                            // No tiene suficientes puntos, mostrar mensaje y redirigir
                             Toast.makeText(
                                 this,
-                                "Error al realizar el pedido: ${e.message}",
-                                Toast.LENGTH_SHORT
+                                "¡Ho! No tienes Saldo de CasTV para poder Alquilar.",
+                                Toast.LENGTH_LONG
                             ).show()
+                            val intent = Intent(this, Nosotros::class.java)
+                            startActivity(intent)
+                            finish()
                         }
+                    }
                 } else {
                     Toast.makeText(this, "No hay usuario autenticado.", Toast.LENGTH_SHORT).show()
                 }
             } else {
-                // La película ya existe, mostrar mensaje y registrar en el log
-                Log.i("Firestore", "La película '$movieTitle' ya existe en la base de datos.")
+                // La película ya existe, mostrar mensaje y redirigir
                 Toast.makeText(
                     this,
                     "La película '$movieTitle' ya fue pedida; puedes alquilar más...",
@@ -619,6 +626,20 @@ class PlayerActivity : AppCompatActivity() {
                 .show()
         }.addOnCompleteListener {
             isProcessingOrder = false // Restablecer el flag al finalizar
+        }
+    }
+
+    private fun verificarPuntos(userId: String, costo: Int, callback: (Boolean) -> Unit) {
+        val userRef = firestore.collection("users").document(userId)
+
+        userRef.get().addOnSuccessListener { userDocument ->
+            val puntosActuales = userDocument.getLong("puntos") ?: 0
+            // Usar el costo del pedido que se pasó
+            callback(puntosActuales >= costo) // Llama al callback con true si tiene suficientes puntos
+        }.addOnFailureListener { e ->
+            Log.e("Firestore", "Error al verificar puntos: ${e.message}")
+            Toast.makeText(this, "Error al verificar puntos: ${e.message}", Toast.LENGTH_SHORT).show()
+            callback(false) // En caso de error, asume que no tiene suficientes puntos
         }
     }
     // Método para enviar un correo
@@ -652,8 +673,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun descontarPuntos(
         userId: String,
         puntosADescontar: Long,
-        datos: HashMap<String, Any>,
-        callback: (Boolean) -> Unit
+        datos: HashMap<String, Any>
     ) {
         val userRef = firestore.collection("users").document(userId)
 
@@ -668,7 +688,9 @@ class PlayerActivity : AppCompatActivity() {
                         // Solo se ejecuta aquí si se han descontado puntos
                         Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT)
                             .show()
-
+                        val intent = Intent(this, Nosotros::class.java)
+                        startActivity(intent)
+                        finish()
                     }
                     .addOnFailureListener { e ->
                         Log.e("Firestore", "Error al descontar puntos: ${e.message}")
@@ -695,7 +717,6 @@ class PlayerActivity : AppCompatActivity() {
                 .show()
         }
     }
-
     override fun onPause() {
         super.onPause()
         player?.pause()
