@@ -9,7 +9,8 @@ data class Movie(
     var title: String = "",    // Título de la película, valor por defecto vacío
     var year: String = "", // Sinopsis o descripción de la película (antes contenido)
     var imageUrl: String = "", // URL de la imagen de la película
-    var streamUrl: String = "", // URL del stream para ver la película
+    var streamUrl: String = "",
+    var trailerUrl: String = "",// URL del stream para ver la película
     val createdAt: Timestamp = Timestamp.now(),
     val countdownMinutes: Int = 0
 )

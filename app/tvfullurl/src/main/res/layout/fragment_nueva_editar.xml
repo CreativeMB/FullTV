@@ -102,10 +102,27 @@
             android:hint="Señal en vivo Stream URL"
             android:inputType="textUri"
             android:textSize="18sp"
+            app:layout_constraintBottom_toTopOf="@+id/trailerUrlEditText"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/imageUrlEditText"/>
+
+        <EditText
+            android:id="@+id/trailerUrlEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="4dp"
+            android:hint="Trailer"
+            android:inputType="textUri"
+            android:textSize="18sp"
             app:layout_constraintBottom_toTopOf="@+id/uploadText"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/imageUrlEditText" />
+            app:layout_constraintTop_toBottomOf="@+id/streamUrlEditText" />
+
 
         <TextView
             android:id="@+id/uploadText"
@@ -124,7 +141,7 @@
             app:layout_constraintBottom_toTopOf="@+id/url"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/streamUrlEditText" />
+            app:layout_constraintTop_toBottomOf="@+id/trailerUrlEditText" />
 
         <TextView
             android:id="@+id/url"

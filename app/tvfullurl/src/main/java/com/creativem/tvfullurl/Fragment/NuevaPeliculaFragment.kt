@@ -34,7 +34,8 @@ class NuevaPeliculaFragment : Fragment() {
     private var year: String = ""
     private var imageUrl: String = ""
     private var streamUrl: String = ""
-    private var countdownMinutes: Int = 0
+    private var trailerUrl: String = ""
+
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -53,7 +54,8 @@ class NuevaPeliculaFragment : Fragment() {
             binding.yearEditText,
             binding.imageUrlEditText,
             binding.streamUrlEditText,
-            binding.validEditText
+            binding.validEditText,
+            binding.trailerUrlEditText
         )
         // Si estamos editando (es decir, si tenemos un movieId), cargar los datos de la película
         movieId?.let {
@@ -88,6 +90,7 @@ class NuevaPeliculaFragment : Fragment() {
                         binding.yearEditText.setText(it.year)
                         binding.imageUrlEditText.setText(it.imageUrl)
                         binding.streamUrlEditText.setText(it.streamUrl)
+                        binding.trailerUrlEditText.setText(it.trailerUrl)
                         binding.validEditText.setText(it.countdownMinutes.toString())
                         // Puedes cargar otros campos aquí
                     }
@@ -107,6 +110,7 @@ class NuevaPeliculaFragment : Fragment() {
             year = binding.yearEditText.text.toString(),
             imageUrl = binding.imageUrlEditText.text.toString(),
             streamUrl = binding.streamUrlEditText.text.toString(),
+            trailerUrl = binding.trailerUrlEditText.text.toString(),
             createdAt = Timestamp.now(),
             countdownMinutes = binding.validEditText.text.toString().toIntOrNull() ?: 0
         )
@@ -163,6 +167,7 @@ class NuevaPeliculaFragment : Fragment() {
         year = binding.yearEditText.text.toString().trim()
         imageUrl = binding.imageUrlEditText.text.toString().trim()
         streamUrl = binding.streamUrlEditText.text.toString().trim()
+        trailerUrl = binding.trailerUrlEditText.text.toString().trim()
 
         // Verificar si los campos están completos
         if (title.isEmpty() || year.isEmpty() || imageUrl.isEmpty()) {
@@ -189,6 +194,7 @@ class NuevaPeliculaFragment : Fragment() {
             "year" to year,
             "imageUrl" to imageUrl,
             "streamUrl" to streamUrl,
+            "trailerUrl" to trailerUrl,
             "createdAt" to Timestamp.now(),
             "countdownMinutes" to (binding.validEditText.text.toString().toIntOrNull() ?: 0)
         )
@@ -222,6 +228,7 @@ class NuevaPeliculaFragment : Fragment() {
         binding.yearEditText.text.clear()
         binding.imageUrlEditText.text.clear()
         binding.streamUrlEditText.text.clear()
+        binding.trailerUrlEditText.text.clear()
         binding.previewImageView.setImageResource(R.drawable.icono)
         binding.validEditText.text.clear()
     }
