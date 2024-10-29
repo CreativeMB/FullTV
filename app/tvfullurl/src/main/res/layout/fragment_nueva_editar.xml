@@ -22,23 +22,22 @@
             android:layout_marginBottom="4dp"
             android:contentDescription="Descripción de la imagen"
             android:src="@drawable/icono"
-            app:layout_constraintBottom_toTopOf="@+id/title"
+            app:layout_constraintBottom_toTopOf="@+id/validEditText"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <TextView
-            android:id="@+id/title"
-            android:layout_width="wrap_content"
+        <EditText
+            android:id="@+id/validEditText"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
             android:layout_marginStart="8dp"
-            android:layout_marginTop="1dp"
+            android:layout_marginTop="4dp"
             android:layout_marginEnd="8dp"
             android:layout_marginBottom="1dp"
-            android:text="Contenido"
-            android:textSize="20sp"
-            android:textStyle="bold"
+            android:hint="Minutos"
+            android:inputType="number"
+            android:textSize="18sp"
             app:layout_constraintBottom_toTopOf="@+id/titleEditText"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -58,7 +57,7 @@
             app:layout_constraintBottom_toTopOf="@+id/year_edit_text"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/title" />
+            app:layout_constraintTop_toBottomOf="@+id/validEditText" />
 
         <EditText
             android:id="@+id/year_edit_text"

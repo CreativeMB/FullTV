@@ -34,6 +34,7 @@ class NuevaPeliculaFragment : Fragment() {
     private var year: String = ""
     private var imageUrl: String = ""
     private var streamUrl: String = ""
+    private var countdownMinutes: Int = 0
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -51,7 +52,8 @@ class NuevaPeliculaFragment : Fragment() {
             binding.titleEditText,
             binding.yearEditText,
             binding.imageUrlEditText,
-            binding.streamUrlEditText
+            binding.streamUrlEditText,
+            binding.validEditText
         )
         // Si estamos editando (es decir, si tenemos un movieId), cargar los datos de la película
         movieId?.let {
@@ -86,6 +88,7 @@ class NuevaPeliculaFragment : Fragment() {
                         binding.yearEditText.setText(it.year)
                         binding.imageUrlEditText.setText(it.imageUrl)
                         binding.streamUrlEditText.setText(it.streamUrl)
+                        binding.validEditText.setText(it.countdownMinutes.toString())
                         // Puedes cargar otros campos aquí
                     }
                 }
@@ -104,7 +107,8 @@ class NuevaPeliculaFragment : Fragment() {
             year = binding.yearEditText.text.toString(),
             imageUrl = binding.imageUrlEditText.text.toString(),
             streamUrl = binding.streamUrlEditText.text.toString(),
-            createdAt = Timestamp.now()
+            createdAt = Timestamp.now(),
+            countdownMinutes = binding.validEditText.text.toString().toIntOrNull() ?: 0
         )
 
         db.collection("movies").add(newMovie)
@@ -185,7 +189,8 @@ class NuevaPeliculaFragment : Fragment() {
             "year" to year,
             "imageUrl" to imageUrl,
             "streamUrl" to streamUrl,
-            "createdAt" to Timestamp.now()  // Marcar como actualizado
+            "createdAt" to Timestamp.now(),
+            "countdownMinutes" to (binding.validEditText.text.toString().toIntOrNull() ?: 0)
         )
 
         // Usar update() para modificar el documento existente
@@ -218,6 +223,7 @@ class NuevaPeliculaFragment : Fragment() {
         binding.imageUrlEditText.text.clear()
         binding.streamUrlEditText.text.clear()
         binding.previewImageView.setImageResource(R.drawable.icono)
+        binding.validEditText.text.clear()
     }
 
     override fun onPause() {
