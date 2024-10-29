@@ -9,17 +9,15 @@ import com.bumptech.glide.Glide
 import com.creativem.fulltv.home.PlayerActivity
 import com.creativem.fulltv.R
 import com.creativem.fulltv.data.Movie
-import java.text.SimpleDateFormat
-import java.util.Locale
 import java.util.concurrent.TimeUnit
-import kotlin.math.max
+
 
 class CardPresenter: Presenter(){
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val cardView = ImageCardView(parent.context).apply {
             isFocusable = true
             isFocusableInTouchMode = true
-            setMainImageDimensions(160, 220)
+            setMainImageDimensions(190, 260)
         }
         return ViewHolder(cardView)
     }
@@ -58,7 +56,7 @@ class CardPresenter: Presenter(){
         // Verificar si el tiempo transcurrido es mayor o igual al tiempo de countdown
         if (movie.countdownMinutes <= 0 || timeElapsed >= countdownDurationMillis) {
             // Si ha pasado el tiempo o el countdown es 0, mostrar cero
-            cardView.contentText = "$casText${movie.year} Min-00:00"
+            cardView.contentText = "$casText${movie.year} | Min-00:00"
         } else {
             // Calcular el tiempo restante
             val remainingTimeMillis = countdownDurationMillis - timeElapsed
@@ -74,16 +72,16 @@ class CardPresenter: Presenter(){
                         val secondsRemaining = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
 
                         // Actualizar el contentText para incluir la cuenta regresiva
-                        cardView.contentText = "$casText${movie.year} Min -%02d:%02d".format(minutesRemaining, secondsRemaining)
+                        cardView.contentText = "$casText${movie.year} | Min-%02d:%02d".format(minutesRemaining, secondsRemaining)
                     }
 
                     override fun onFinish() {
-                        cardView.contentText = "$casText${movie.year} Min-00:00"
+                        cardView.contentText = "$casText${movie.year} | Min-00:00"
                     }
                 }.start()
             } else {
                 // Si el tiempo restante es cero o negativo, mostrar 00:00
-                cardView.contentText = "$casText${movie.year} Min-00:00"
+                cardView.contentText = "$casText${movie.year} | Min-00:00"
             }
         }
 
