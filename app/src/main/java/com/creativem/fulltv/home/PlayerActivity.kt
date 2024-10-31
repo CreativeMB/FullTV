@@ -270,15 +270,11 @@ class PlayerActivity : AppCompatActivity() {
                 showErrorDialog(ulsvideo = streamUrl, movieTitle, movieYear)
                 return@launch
             }
-// Define el DataSource.Factory con headers personalizados
-            val dataSourceFactory = DefaultHttpDataSource.Factory().apply {
-                setDefaultRequestProperties(
-                    mapOf(
-                        "Authorization" to "Bearer y3r7YFqiFAobFLg_3RxOLg", // Cambia a 'Authorization' si es necesario
-                        "expires" to "1730080442"
-                    )
-                )
-            }
+
+            val dataSourceFactory = DefaultHttpDataSource.Factory()
+                .setDefaultRequestProperties(mapOf("User-Agent" to "Mozilla/5.0"))
+                .setConnectTimeoutMs(30_000) // Tiempo de espera de conexión (30 segundos)
+                .setReadTimeoutMs(30_000) // Tiempo de espera de lectura (30 segundos)
 
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
