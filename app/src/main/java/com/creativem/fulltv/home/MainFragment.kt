@@ -41,6 +41,8 @@ import com.creativem.fulltv.adapter.FirestoreRepository
 import com.creativem.fulltv.menu.MenuPresenter
 import com.google.firebase.auth.FirebaseAuth
 import android.content.res.Resources
+import com.google.firebase.firestore.FirebaseFirestore
+
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
     private val firestoreRepository = FirestoreRepository()
@@ -152,28 +154,29 @@ class MainFragment : BrowseSupportFragment() {
             viewLifecycleOwner.lifecycleScope.launch {
                 val nombreUsuario = firestoreRepository.obtenerNombreUsuario(usuarioId)
                 val cantidadCastv = firestoreRepository.obtenerCantidadCastv(usuarioId)
-                actualizarUsuario(nombreUsuario, cantidadCastv) // Actualiza la UI con la información del usuario
+                val cantidadPeliculas = firestoreRepository.obtenerCantidadPeliculas()
+                actualizarUsuario(nombreUsuario, cantidadCastv, cantidadPeliculas) // Actualiza la UI con la información del usuario
             }
         } else {
             // Manejo de usuario no autenticado
             Log.e("MainFragment", "No hay usuario autenticado")
-            actualizarUsuario("Usuario Desconocido", 0) // Actualiza la UI con información predeterminada
+            actualizarUsuario("Usuario Desconocido", 0, 0)  // Actualiza la UI con información predeterminada
         }
     }
-    private fun actualizarUsuarioInfo() {
-        val usuarioId = FirebaseAuth.getInstance().currentUser?.uid // Obtén el ID del usuario autenticado
 
-        // Llama a obtenerNombreUsuario y obtenerCantidadCastv dentro de una coroutine
+    private fun actualizarUsuarioInfo() {
+        val usuarioId = FirebaseAuth.getInstance().currentUser?.uid
+
         if (usuarioId != null) {
             viewLifecycleOwner.lifecycleScope.launch {
                 val nombreUsuario = firestoreRepository.obtenerNombreUsuario(usuarioId)
                 val cantidadCastv = firestoreRepository.obtenerCantidadCastv(usuarioId)
-                actualizarUsuario(nombreUsuario, cantidadCastv) // Actualiza la UI con la información del usuario
+                val cantidadPeliculas = firestoreRepository.obtenerCantidadPeliculas() // Obtener cantidad de películas
+                actualizarUsuario(nombreUsuario, cantidadCastv, cantidadPeliculas) // Pasar cantidad de películas
             }
         } else {
-            // Manejo de usuario no autenticado
             Log.e("MainFragment", "No hay usuario autenticado")
-            actualizarUsuario("Usuario Desconocido", 0) // Actualiza la UI con información predeterminada
+            actualizarUsuario("Usuario Desconocido", 0, 0) // Información predeterminada
         }
     }
     // Sobrescribir el método onResume para actualizar la información del usuario
@@ -182,9 +185,9 @@ class MainFragment : BrowseSupportFragment() {
         actualizarUsuarioInfo() // Actualiza la información del usuario cada vez que el fragmento se vuelve visible
     }
     // Función para actualizar el nombre de usuario y la cantidad de Castv
-    fun actualizarUsuario(usuario: String, cantidadCastv: Int) {
-        binding.textUsuario.text = "$usuario"
-        binding.textCastv.text = "Castv: $:$cantidadCastv"
+    fun actualizarUsuario(usuario: String, cantidadCastv: Int, cantidadPeliculas: Int) {
+        binding.textUsuario.text = usuario
+        binding.textCastv.text = "Películas: $cantidadPeliculas | Castv: $cantidadCastv" // Mostrar ambos valores
     }
 
 fun cargarPeliculas() {

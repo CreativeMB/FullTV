@@ -140,4 +140,10 @@ class FirestoreRepository {
             emptyList()
         }
     }
+    // Método en el repositorio para contar la cantidad de películas
+    suspend fun obtenerCantidadPeliculas(): Int {
+        val peliculasCollection = FirebaseFirestore.getInstance().collection("movies")
+        val snapshot = peliculasCollection.get().await()
+        return snapshot.size()
+    }
 }
