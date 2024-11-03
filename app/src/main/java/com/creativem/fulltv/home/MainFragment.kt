@@ -41,6 +41,7 @@ import com.creativem.fulltv.adapter.FirestoreRepository
 import com.creativem.fulltv.menu.MenuPresenter
 import com.google.firebase.auth.FirebaseAuth
 import android.content.res.Resources
+import android.widget.ImageView
 import com.google.firebase.firestore.FirebaseFirestore
 
 class MainFragment : BrowseSupportFragment() {
@@ -50,12 +51,12 @@ class MainFragment : BrowseSupportFragment() {
     private lateinit var loadingText: TextView
     private lateinit var loadingContainer: FrameLayout
     private lateinit var binding: MainFragmentBinding
-    private val defaultBackgroundColor by lazy {
-        ContextCompat.getColor(
-            requireContext(),
-            R.color.tu_color_fondo
-        )
-    }
+//    private val defaultBackgroundColor by lazy {
+//        ContextCompat.getColor(
+//            requireContext(),
+//            R.color.tu_color_fondo
+//        )
+//    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -131,7 +132,9 @@ class MainFragment : BrowseSupportFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        view.setBackgroundColor(defaultBackgroundColor)
+//        view.setBackgroundColor(defaultBackgroundColor)
+        binding.mainBackgroundImage.setImageDrawable(null)
+
 
         adapter = rowsAdapter // Inicializa el adaptador
 
@@ -139,7 +142,7 @@ class MainFragment : BrowseSupportFragment() {
             if (item is Movie) {
                 cargarImagenDeFondo(item.imageUrl)
             } else {
-                restablecerColorFondo()
+//                restablecerColorFondo()
             }
         }
         escucharCambiosEnPeliculas()
@@ -193,11 +196,15 @@ class MainFragment : BrowseSupportFragment() {
 fun cargarPeliculas() {
     binding.linearLayout.visibility = View.GONE
     Glide.with(requireContext())
-        .load("https://png.pngtree.com/thumb_back/fh260/background/20230328/pngtree-stage-shining-lights-background-image_2118261.jpg")
+        .load("https://img1.wallspic.com/previews/4/4/7/8/7/178744/178744-cordillera_huayhuash-lake_carhuacocha-montana-ambiente-paisaje_natural-x750.jpg")
         .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
         .centerCrop()
         .into(binding.mainBackgroundImage)
-    binding.mainBackgroundImage.alpha = 1.0f
+
+    binding.mainBackgroundImage.apply {
+        alpha = 0.6f // Ajusta el nivel de transparencia
+        scaleType = ImageView.ScaleType.CENTER_CROP
+    }
 
     mostrarCarga("Actualizando biblioteca en línea...")
 
@@ -281,10 +288,10 @@ fun cargarPeliculas() {
         loadingContainer.visibility = View.GONE
     }
 
-    private fun restablecerColorFondo() {
-        binding.mainBackgroundImage.setImageDrawable(null)
-        view?.setBackgroundColor(defaultBackgroundColor)
-    }
+//    private fun restablecerColorFondo() {
+//        binding.mainBackgroundImage.setImageDrawable(null)
+//        view?.setBackgroundColor(defaultBackgroundColor)
+//    }
 
     private fun escucharCambiosEnPeliculas() {
         firestoreRepository.obtenerPeliculasRef().addSnapshotListener { snapshot, error ->
