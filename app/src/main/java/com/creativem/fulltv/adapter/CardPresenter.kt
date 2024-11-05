@@ -10,10 +10,10 @@ import com.creativem.fulltv.home.PlayerActivity
 import com.creativem.fulltv.R
 import com.creativem.fulltv.data.Movie
 import java.util.concurrent.TimeUnit
-
+import android.graphics.Color
+import android.widget.TextView
 
 class CardPresenter: Presenter(){
-
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val cardView = ImageCardView(parent.context).apply {
             isFocusable = true
@@ -49,6 +49,7 @@ class CardPresenter: Presenter(){
 
         if (movie.countdownMinutes <= 0 || timeElapsed >= countdownDurationMillis) {
             cardView.contentText = "$casText${movie.year} | Min-00:00"
+            cardView.setInfoAreaBackgroundColor(Color.parseColor("#006064"))
         } else {
             val remainingTimeMillis = countdownDurationMillis - timeElapsed
             cardViewHolder.countDownTimer = object : CountDownTimer(remainingTimeMillis, 1000) {
@@ -56,10 +57,13 @@ class CardPresenter: Presenter(){
                     val minutesRemaining = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished)
                     val secondsRemaining = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
                     cardView.contentText = "$casText${movie.year} | Min-%02d:%02d".format(minutesRemaining, secondsRemaining)
+                    // Cambiar el fondo del área de información a rojo mientras el temporizador está activo
+                    cardView.setInfoAreaBackgroundColor(Color.parseColor("#001f3f"))
                 }
 
                 override fun onFinish() {
                     cardView.contentText = "$casText${movie.year} | Min-00:00"
+                    cardView.setInfoAreaBackgroundColor(Color.parseColor("#3E2723"))
                 }
             }.start()
         }
