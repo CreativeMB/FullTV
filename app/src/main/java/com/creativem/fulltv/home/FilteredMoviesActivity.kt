@@ -47,7 +47,7 @@ class FilteredMoviesActivity : AppCompatActivity() {
 
     private fun initializeRecyclerView() {
         moviesMenuAdapter = MoviesMenuAdapter(mutableListOf()) { movie ->
-            startMoviePlayback(movie.streamUrl, movie.title)
+            startMoviePlayback(movie.streamUrl, movie.title, movie.year)
         }
         recyclerMoviesMenu.adapter = moviesMenuAdapter
     }
@@ -74,11 +74,11 @@ class FilteredMoviesActivity : AppCompatActivity() {
         }
     }
 
-    private fun startMoviePlayback(streamUrl: String, movieTitle: String) {
+    private fun startMoviePlayback(streamUrl: String, movieTitle: String,  movieYear: String) {
         val intent = Intent(this, PlayerActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra("EXTRA_STREAM_URL", streamUrl)
             putExtra("EXTRA_MOVIE_TITLE", movieTitle)
+            putExtra("EXTRA_MOVIE_YEAR", movieYear)
         }
         startActivity(intent)
     }
