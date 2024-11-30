@@ -92,6 +92,10 @@ class MainFragment : BrowseSupportFragment() {
             if (item is MenuItem) {
                 Log.d("MainFragment", "Menu item clicked: ${item.name}")
                 when (item.name) {
+                    "Cartelera" -> {
+                        val intent = Intent(requireContext(), FilteredMoviesActivity::class.java)
+                        startActivity(intent)
+                    }
                     "Pago" -> {
                         val intent = Intent(requireContext(), Nosotros::class.java)
                         startActivity(intent)
@@ -222,8 +226,8 @@ fun cargarPeliculas() {
 
         // Primero, agregamos el menú
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("Pago", "Buscar", "Cerrar")
-        val menuIcons = listOf(R.drawable.pago, R.drawable.buscar, R.drawable.cerrrar)
+        val menuItems = listOf("Cartelera","Pago", "Buscar", "Cerrar")
+        val menuIcons = listOf(R.drawable.cartelera,R.drawable.pago, R.drawable.buscar, R.drawable.cerrrar)
 
         menuItems.forEachIndexed { i, item ->
             menuAdapter.add(MenuItem(item, menuIcons[i]))
