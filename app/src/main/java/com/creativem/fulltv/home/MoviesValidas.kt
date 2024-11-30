@@ -17,7 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class FilteredMoviesActivity : AppCompatActivity() {
+class MoviesValidas : AppCompatActivity() {
 
     private lateinit var recyclerMoviesMenu: RecyclerView
     private lateinit var moviesMenuAdapter: MoviesMenuAdapter
@@ -26,7 +26,7 @@ class FilteredMoviesActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_filtered_movies)
+        setContentView(R.layout.movies_validas)
 
         recyclerMoviesMenu = findViewById(R.id.recycler_movies_menu)
         loadingGif = findViewById(R.id.loading_gif)
@@ -68,7 +68,7 @@ class FilteredMoviesActivity : AppCompatActivity() {
 
                 } else {
                     recyclerMoviesMenu.visibility = View.GONE
-                    Toast.makeText(this@FilteredMoviesActivity, "No hay películas válidas.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MoviesValidas, "No hay películas válidas.", Toast.LENGTH_SHORT).show()
                 }
             }
         }

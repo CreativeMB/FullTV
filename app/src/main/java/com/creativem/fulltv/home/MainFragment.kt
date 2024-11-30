@@ -17,7 +17,6 @@ import android.widget.ListView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.leanback.app.BrowseSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.HeaderItem
@@ -42,7 +41,6 @@ import com.creativem.fulltv.menu.MenuPresenter
 import com.google.firebase.auth.FirebaseAuth
 import android.content.res.Resources
 import android.widget.ImageView
-import com.google.firebase.firestore.FirebaseFirestore
 
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -93,7 +91,7 @@ class MainFragment : BrowseSupportFragment() {
                 Log.d("MainFragment", "Menu item clicked: ${item.name}")
                 when (item.name) {
                     "Cartelera" -> {
-                        val intent = Intent(requireContext(), FilteredMoviesActivity::class.java)
+                        val intent = Intent(requireContext(), MoviesValidas::class.java)
                         startActivity(intent)
                     }
                     "Pago" -> {

@@ -38,7 +38,7 @@
             android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".home.FilteredMoviesActivity"
+            android:name=".home.MoviesValidas"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
