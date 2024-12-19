@@ -49,7 +49,6 @@ class EditarPeliculaFragment : Fragment() {
     }
 
     private fun loadMovies() {
-        val simulatedUserId = "Pelicula a editar" // Usuario simulado
         movieList.clear() // Limpiar la lista antes de agregar nuevas películas
 
         db.collection("movies").get()
@@ -58,8 +57,6 @@ class EditarPeliculaFragment : Fragment() {
                     // Convertir el documento en un objeto Movie y agregar el ID y el userId simulado
                     val movie = document.toObject(Movie::class.java).copy(
                         id = document.id,
-                        userId = simulatedUserId, // Asignar el userId simulado
-                       nombre = simulatedUserId // Puedes agregar el nombre de usuario simulado aquí
                     )
                     movieList.add(movie) // Agregar la película a la lista
                 }

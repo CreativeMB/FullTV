@@ -16,20 +16,6 @@
         android:layout_height="match_parent"
         android:padding="2dp">
 
-        <!-- Nombre de usuario -->
-        <TextView
-            android:id="@+id/userNameTextView"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="16dp"
-            android:text="user"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/editButton" />
 
         <!-- Título de la película -->
         <TextView
@@ -40,10 +26,9 @@
             android:layout_marginTop="4dp"
             android:layout_marginEnd="16dp"
             android:text="Título de la Película"
-            android:textSize="18sp"
+            android:textSize="14sp"
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/userNameTextView"
             app:layout_constraintEnd_toStartOf="@+id/editButton" />
 
                 <!-- Año o Cast -->
@@ -54,7 +39,7 @@
             android:layout_marginStart="16dp"
             android:layout_marginEnd="16dp"
             android:text="Cast"
-            android:textSize="18sp"
+            android:textSize="12sp"
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/titleTextView"
