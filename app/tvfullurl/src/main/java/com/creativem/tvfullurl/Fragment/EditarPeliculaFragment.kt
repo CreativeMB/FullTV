@@ -59,7 +59,7 @@ class EditarPeliculaFragment : Fragment() {
                     val movie = document.toObject(Movie::class.java).copy(
                         id = document.id,
                         userId = simulatedUserId, // Asignar el userId simulado
-                        userName = simulatedUserId // Puedes agregar el nombre de usuario simulado aquí
+                       nombre = simulatedUserId // Puedes agregar el nombre de usuario simulado aquí
                     )
                     movieList.add(movie) // Agregar la película a la lista
                 }

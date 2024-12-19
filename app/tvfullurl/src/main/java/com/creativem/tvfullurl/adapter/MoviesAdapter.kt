@@ -38,7 +38,7 @@ class MoviesAdapter(
         // Asigna los datos a las vistas
         holder.titleTextView.text = movie.title
         holder.yearTextView.text = movie.year
-        holder.userNameTextView.text = movie.userName // Mostrar el nombre del usuario
+        holder.userNameTextView.text = movie.nombre // Mostrar el nombre del usuario
 
         // Configurar el botón de eliminar
         holder.deleteButton.setOnClickListener {
@@ -70,7 +70,7 @@ class MoviesAdapter(
         fun bind(movie: Movie) {
             titleTextView.text = movie.title
             yearTextView.text = movie.year
-            userNameTextView.text = movie.userName // Mostrar el nombre del usuario
+            userNameTextView.text = movie.nombre // Mostrar el nombre del usuario
         }
     }
 

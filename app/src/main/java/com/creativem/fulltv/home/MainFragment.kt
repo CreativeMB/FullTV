@@ -1,7 +1,9 @@
 package com.creativem.fulltv.home
 
 import android.app.AlertDialog
+
 import android.content.Intent
+import android.content.res.Resources
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -13,6 +15,7 @@ import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.ListView
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -23,24 +26,36 @@ import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
 import androidx.lifecycle.lifecycleScope
-import com.creativem.fulltv.R
-import com.creativem.fulltv.databinding.MainFragmentBinding
-import com.creativem.fulltv.data.Movie
-import com.creativem.fulltv.data.RelojCuston
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions
-import jp.wasabeef.glide.transformations.BlurTransformation
-import com.creativem.fulltv.menu.MenuItem
+import com.creativem.fulltv.R
 import com.creativem.fulltv.adapter.CardPresenter
 import com.creativem.fulltv.adapter.FirestoreRepository
+import com.creativem.fulltv.data.Movie
+import com.creativem.fulltv.data.RelojCuston
+import com.creativem.fulltv.databinding.MainFragmentBinding
+import com.creativem.fulltv.menu.MenuItem
 import com.creativem.fulltv.menu.MenuPresenter
 import com.google.firebase.auth.FirebaseAuth
-import android.content.res.Resources
-import android.widget.ImageView
+
+import com.google.firebase.firestore.FirebaseFirestore
+import jp.wasabeef.glide.transformations.BlurTransformation
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
+
+import com.android.volley.Response
+import com.android.volley.toolbox.JsonObjectRequest
+import com.android.volley.toolbox.Volley
+
+import org.json.JSONObject
+
+
+
+import android.widget.LinearLayout
+import android.text.InputType
 
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -49,6 +64,7 @@ class MainFragment : BrowseSupportFragment() {
     private lateinit var loadingText: TextView
     private lateinit var loadingContainer: FrameLayout
     private lateinit var binding: MainFragmentBinding
+
 //    private val defaultBackgroundColor by lazy {
 //        ContextCompat.getColor(
 //            requireContext(),
@@ -90,10 +106,15 @@ class MainFragment : BrowseSupportFragment() {
             if (item is MenuItem) {
                 Log.d("MainFragment", "Menu item clicked: ${item.name}")
                 when (item.name) {
+                    "Pedido" -> {
+                        mostrarDialogoPedido()
+                    }
+
                     "Cartelera" -> {
                         val intent = Intent(requireContext(), MoviesValidas::class.java)
                         startActivity(intent)
                     }
+
                     "Pago" -> {
                         val intent = Intent(requireContext(), Nosotros::class.java)
                         startActivity(intent)
@@ -102,11 +123,17 @@ class MainFragment : BrowseSupportFragment() {
                     "Buscar" -> {
                         buscarPeliculaDialogo()
                     }
+
                     "Cerrar" -> {
                         cerrarSesion() // Llama al método de cerrar sesión
                     }
+
                     else -> {
-                        Toast.makeText(requireContext(), "${item.name} seleccionado", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            requireContext(),
+                            "${item.name} seleccionado",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             } else if (item is Movie) {
@@ -120,6 +147,7 @@ class MainFragment : BrowseSupportFragment() {
 
         return view
     }
+
     // Agrega este método para cerrar sesión
     private fun cerrarSesion() {
         val auth = FirebaseAuth.getInstance()
@@ -127,10 +155,14 @@ class MainFragment : BrowseSupportFragment() {
         Toast.makeText(requireContext(), "Sesión cerrada", Toast.LENGTH_SHORT).show()
 
         // Aquí puedes redirigir al usuario a la pantalla de inicio de sesión o cualquier otra actividad
-        val intent = Intent(requireContext(), LoginActivity::class.java) // Cambia a tu actividad de inicio de sesión
+        val intent = Intent(
+            requireContext(),
+            LoginActivity::class.java
+        ) // Cambia a tu actividad de inicio de sesión
         startActivity(intent)
         requireActivity().finish() // Finaliza la actividad actual si es necesario
     }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -152,7 +184,8 @@ class MainFragment : BrowseSupportFragment() {
         actualizarUsuarioInfo()
 
         // Cargar información del usuario
-        val usuarioId = FirebaseAuth.getInstance().currentUser?.uid // Obtén el ID del usuario autenticado
+        val usuarioId =
+            FirebaseAuth.getInstance().currentUser?.uid // Obtén el ID del usuario autenticado
 
         // Llama a obtenerNombreUsuario y obtenerCantidadCastv dentro de una coroutine
         if (usuarioId != null) {
@@ -160,12 +193,20 @@ class MainFragment : BrowseSupportFragment() {
                 val nombreUsuario = firestoreRepository.obtenerNombreUsuario(usuarioId)
                 val cantidadCastv = firestoreRepository.obtenerCantidadCastv(usuarioId)
                 val cantidadPeliculas = firestoreRepository.obtenerCantidadPeliculas()
-                actualizarUsuario(nombreUsuario, cantidadCastv, cantidadPeliculas) // Actualiza la UI con la información del usuario
+                actualizarUsuario(
+                    nombreUsuario,
+                    cantidadCastv,
+                    cantidadPeliculas
+                ) // Actualiza la UI con la información del usuario
             }
         } else {
             // Manejo de usuario no autenticado
             Log.e("MainFragment", "No hay usuario autenticado")
-            actualizarUsuario("Usuario Desconocido", 0, 0)  // Actualiza la UI con información predeterminada
+            actualizarUsuario(
+                "Usuario Desconocido",
+                0,
+                0
+            )  // Actualiza la UI con información predeterminada
         }
     }
 
@@ -176,56 +217,72 @@ class MainFragment : BrowseSupportFragment() {
             viewLifecycleOwner.lifecycleScope.launch {
                 val nombreUsuario = firestoreRepository.obtenerNombreUsuario(usuarioId)
                 val cantidadCastv = firestoreRepository.obtenerCantidadCastv(usuarioId)
-                val cantidadPeliculas = firestoreRepository.obtenerCantidadPeliculas() // Obtener cantidad de películas
-                actualizarUsuario(nombreUsuario, cantidadCastv, cantidadPeliculas) // Pasar cantidad de películas
+                val cantidadPeliculas =
+                    firestoreRepository.obtenerCantidadPeliculas() // Obtener cantidad de películas
+                actualizarUsuario(
+                    nombreUsuario,
+                    cantidadCastv,
+                    cantidadPeliculas
+                ) // Pasar cantidad de películas
             }
         } else {
             Log.e("MainFragment", "No hay usuario autenticado")
             actualizarUsuario("Usuario Desconocido", 0, 0) // Información predeterminada
         }
     }
+
     // Sobrescribir el método onResume para actualizar la información del usuario
     override fun onResume() {
         super.onResume()
         actualizarUsuarioInfo() // Actualiza la información del usuario cada vez que el fragmento se vuelve visible
     }
+
     // Función para actualizar el nombre de usuario y la cantidad de Castv
     fun actualizarUsuario(usuario: String, cantidadCastv: Int, cantidadPeliculas: Int) {
         binding.textUsuario.text = usuario
-        binding.textCastv.text = "Películas: $cantidadPeliculas | Castv: $cantidadCastv" // Mostrar ambos valores
+        binding.textCastv.text =
+            "Películas: $cantidadPeliculas | Castv: $cantidadCastv" // Mostrar ambos valores
     }
 
-fun cargarPeliculas() {
-    binding.linearLayout.visibility = View.GONE
-    Glide.with(requireContext())
-        .load("https://img1.wallspic.com/previews/4/4/7/8/7/178744/178744-cordillera_huayhuash-lake_carhuacocha-montana-ambiente-paisaje_natural-x750.jpg")
-        .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
-        .centerCrop()
-        .into(binding.mainBackgroundImage)
+    fun cargarPeliculas() {
+        binding.linearLayout.visibility = View.GONE
+        Glide.with(requireContext())
+            .load("https://img1.wallspic.com/previews/4/4/7/8/7/178744/178744-cordillera_huayhuash-lake_carhuacocha-montana-ambiente-paisaje_natural-x750.jpg")
+            .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
+            .centerCrop()
+            .into(binding.mainBackgroundImage)
 
-    binding.mainBackgroundImage.apply {
-        alpha = 0.6f // Ajusta el nivel de transparencia
-        scaleType = ImageView.ScaleType.CENTER_CROP
+        binding.mainBackgroundImage.apply {
+            alpha = 0.6f // Ajusta el nivel de transparencia
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }
+
+        mostrarCarga("Actualizando biblioteca en línea...")
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            val peliculas =
+                firestoreRepository.obtenerPeliculasCompleta() // Obtenemos toda la colección
+            // Ordenamos por fecha de publicación, siendo la primera la última actualizada
+            val peliculasOrdenadas = peliculas.sortedByDescending { it.createdAt }
+            ocultarCarga()
+            binding.linearLayout.visibility = View.VISIBLE
+            updateMovieList(peliculasOrdenadas)
+        }
     }
 
-    mostrarCarga("Actualizando biblioteca en línea...")
-
-    viewLifecycleOwner.lifecycleScope.launch {
-        val peliculas = firestoreRepository.obtenerPeliculasCompleta() // Obtenemos toda la colección
-        // Ordenamos por fecha de publicación, siendo la primera la última actualizada
-        val peliculasOrdenadas = peliculas.sortedByDescending { it.createdAt }
-        ocultarCarga()
-        binding.linearLayout.visibility = View.VISIBLE
-        updateMovieList(peliculasOrdenadas)
-    }
-}
     private fun updateMovieList(peliculas: List<Movie>) {
         rowsAdapter.clear()
 
         // Primero, agregamos el menú
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("Cartelera","Pago", "Buscar", "Cerrar")
-        val menuIcons = listOf(R.drawable.cartelera,R.drawable.pago, R.drawable.buscar, R.drawable.cerrrar)
+        val menuItems = listOf("Pedido", "Cartelera", "Pago", "Buscar", "Cerrar")
+        val menuIcons = listOf(
+            R.drawable.cartelera,
+            R.drawable.cartelera,
+            R.drawable.pago,
+            R.drawable.buscar,
+            R.drawable.cerrrar
+        )
 
         menuItems.forEachIndexed { i, item ->
             menuAdapter.add(MenuItem(item, menuIcons[i]))
@@ -238,7 +295,10 @@ fun cargarPeliculas() {
         agregarALista(peliculas, "Contenido")
 
         // Notificamos el cambio de rango si es necesario
-        rowsAdapter.notifyArrayItemRangeChanged(rowsAdapter.size() - 1, 1) // Actualiza el rango para el menú
+        rowsAdapter.notifyArrayItemRangeChanged(
+            rowsAdapter.size() - 1,
+            1
+        ) // Actualiza el rango para el menú
     }
 
     // Nueva función para calcular el número de elementos por fila basado en el ancho de pantalla
@@ -299,7 +359,8 @@ fun cargarPeliculas() {
         firestoreRepository.obtenerPeliculasRef().addSnapshotListener { snapshot, error ->
             if (error != null) {
                 Log.e("MainFragment", "Error al escuchar cambios: ${error.message}")
-                Toast.makeText(requireContext(), "Error al cargar películas", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Error al cargar películas", Toast.LENGTH_SHORT)
+                    .show()
                 return@addSnapshotListener
             }
 
@@ -316,11 +377,13 @@ fun cargarPeliculas() {
 
             } else {
                 Log.d("MainFragment", "No se encontraron películas.")
-                Toast.makeText(requireContext(), "No hay películas disponibles", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "No hay películas disponibles", Toast.LENGTH_SHORT)
+                    .show()
                 updateMovieList(emptyList()) // Llama con solo una lista vacía si no hay datos
             }
         }
     }
+
     private fun buscarPeliculaDialogo() {
         // Creamos el layout para el diálogo usando un EditText, ProgressBar y ListView
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.buscador, null)
@@ -333,7 +396,10 @@ fun cargarPeliculas() {
         val filteredMovieList = mutableListOf<Movie>() // Lista para almacenar películas filtradas
 
         // Adaptador para los resultados de búsqueda
-        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, filteredMovieList.map { it.title })
+        val adapter = ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_list_item_1,
+            filteredMovieList.map { it.title })
         searchResultsView.adapter = adapter
 
         // Crear el AlertDialog
@@ -350,7 +416,8 @@ fun cargarPeliculas() {
 
         // Cargar todas las películas desde Firestore sin validaciones
         CoroutineScope(Dispatchers.Main).launch {
-            val peliculas = firestoreRepository.obtenerPeliculasCompleta() // Obtenemos todas las películas sin filtrar
+            val peliculas =
+                firestoreRepository.obtenerPeliculasCompleta() // Obtenemos todas las películas sin filtrar
             movieList.clear()
             movieList.addAll(peliculas)
             filteredMovieList.clear()
@@ -392,6 +459,7 @@ fun cargarPeliculas() {
             dialog.dismiss() // Cierra el diálogo después de seleccionar
         }
     }
+
     private fun irAlReproductor(movie: Movie) {
         val intent = Intent(context, PlayerActivity::class.java).apply {
             putExtra("EXTRA_STREAM_URL", movie.streamUrl)  // Pasa el URL del stream
@@ -399,6 +467,228 @@ fun cargarPeliculas() {
             putExtra("EXTRA_MOVIE_YEAR", movie.year)       // Pasa el año de la película
         }
         startActivity(intent) // Inicia la actividad del reproductor
+    }
+
+    // Mostrar el diálogo para realizar un pedido
+    private fun mostrarDialogoPedido() {
+        // Crear el AlertDialog.Builder
+        val builder = AlertDialog.Builder(requireContext())
+        builder.setTitle("Solicitar Película")
+
+        // Crear un LinearLayout para contener el TextView y el EditText
+        val layout = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 32, 32, 16)
+
+            // Crear un TextView para indicar al usuario cómo debe ingresar el pedido
+            val indicacionTextView = TextView(requireContext()).apply {
+                text = "Por favor, ingrese el título y Año estreno de la película que desea ver.\n" +
+                        "Recuerde, no se pueden ingresar películas con menos de 1 meses de estreno."
+                textSize = 16f
+                setPadding(0, 0, 0, 16) // Espaciado inferior
+            }
+
+            // Crear el EditText para ingresar el pedido
+            val inputPedido = EditText(requireContext()).apply {
+                hint = "Moana 2 2024"
+                setMinLines(3) // Mínimo de 3 líneas visibles
+                setMaxLines(5) // Máximo de 5 líneas visibles
+                isSingleLine = false // Permite múltiples líneas
+                setInputType(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE) // Establece tipo de texto multílínea
+                setPadding(16, 16, 16, 16) // Espaciado interno
+            }
+
+            // Agregar el TextView y el EditText al LinearLayout
+            addView(indicacionTextView)
+            addView(inputPedido)
+        }
+
+        // Declarar inputPedido fuera del apply para accederlo luego
+        val inputPedido = layout.getChildAt(1) as EditText
+
+        // Establecer el layout como la vista del AlertDialog
+        builder.setView(layout)
+
+        // Botones del diálogo
+        builder.setPositiveButton("Enviar") { _, _ ->
+            val pedido = inputPedido.text.toString().trim()
+            if (pedido.isNotEmpty()) {
+                subirPedidoAFirestore(pedido)
+            } else {
+                Toast.makeText(requireContext(), "Debe ingresar un pedido", Toast.LENGTH_SHORT).show()
+            }
+        }
+        builder.setNegativeButton("Cancelar") { dialog, _ ->
+            dialog.dismiss()
+        }
+
+        // Mostrar el diálogo
+        builder.create().show()
+    }
+
+
+    // Subir el pedido a Firestore
+    private fun subirPedidoAFirestore(pedido: String) {
+        val auth = FirebaseAuth.getInstance()
+        val db = FirebaseFirestore.getInstance()
+
+        val userId = auth.currentUser?.uid
+
+        if (userId != null) {
+            val userRef = db.collection("users").document(userId)
+
+            // Obtener datos del usuario
+            userRef.get().addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val nombreUsuario = document.getString("nombre") ?: "Nombre no disponible"
+                    val emailUsuario = document.getString("email") ?: "Email no disponible"
+                    val puntosActuales = document.getLong("puntos")?.toInt() ?: 0
+
+                    val puntosDescontar = 20 // Establecemos el valor de los puntos a descontar
+
+                    if (puntosActuales >= puntosDescontar) {
+                        // Mostrar mensaje de confirmación
+                        val mensaje = """
+                        Usuario: $nombreUsuario
+                        Email: $emailUsuario
+                        Saldo CasTV: $puntosActuales
+                        Valor CasTV: $puntosDescontar
+                        Pedido: $pedido
+                 
+                    """.trimIndent()
+
+                        AlertDialog.Builder(requireContext())
+                            .setTitle("Confirmar Pedido")
+                            .setMessage(mensaje)
+                            .setPositiveButton("Confirmar") { _, _ ->
+                                // Crear el pedido con más campos
+                                val pedidoData = hashMapOf(
+                                    "title" to pedido,
+                                    "userId" to userId,
+                                    "email" to emailUsuario,
+                                    "nombre" to nombreUsuario,
+                                    "year" to puntosDescontar.toString() // Agregar el campo de puntos a descontar
+                                )
+
+                                // Subir pedido a la colección
+                                db.collection("pedidosmovies").add(pedidoData)
+                                    .addOnSuccessListener {
+                                        // Descontar puntos
+                                        descontarPuntos(userId, puntosDescontar)
+                                        enviarCorreoNuevoPedido(pedido)
+                                        Toast.makeText(
+                                            requireContext(),
+                                            "Pedido enviado correctamente",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Toast.makeText(
+                                            requireContext(),
+                                            "Error al enviar pedido: ${e.message}",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                            }
+                            .setNegativeButton("Cancelar") { dialog, _ ->
+                                dialog.dismiss()
+                            }
+                            .show()
+                    } else {
+                        Toast.makeText(
+                            requireContext(),
+                            "No tienes suficientes puntos",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } else {
+                    Toast.makeText(requireContext(), "Usuario no encontrado", Toast.LENGTH_SHORT)
+                        .show()
+                }
+            }.addOnFailureListener { e ->
+                Toast.makeText(
+                    requireContext(),
+                    "Error al obtener usuario: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        } else {
+            Toast.makeText(requireContext(), "Usuario no autenticado", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+
+    // Descontar puntos del usuario
+    private fun descontarPuntos(userId: String, puntosADescontar: Int) {
+        val db = FirebaseFirestore.getInstance()
+        val userRef = db.collection("users").document(userId)
+
+        // Obtener puntos actuales y actualizar
+        userRef.get().addOnSuccessListener { document ->
+            if (document.exists()) {
+                val puntosActuales = document.getLong("puntos")?.toInt() ?: 0
+
+                if (puntosActuales >= puntosADescontar) {
+                    // Actualizar los puntos
+                    userRef.update("puntos", puntosActuales - puntosADescontar)
+                        .addOnSuccessListener {
+                            Toast.makeText(
+                                requireContext(),
+                                "Pedido enviado y puntos descontados",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(
+                                requireContext(),
+                                "Error al descontar puntos: ${e.message}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                } else {
+                    Toast.makeText(
+                        requireContext(),
+                        "No tienes suficientes puntos para esta acción",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } else {
+                Toast.makeText(requireContext(), "Usuario no encontrado", Toast.LENGTH_SHORT).show()
+            }
+        }.addOnFailureListener { e ->
+            Toast.makeText(
+                requireContext(),
+                "Error al obtener usuario: ${e.message}",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+    // Método para enviar un correo
+    private fun enviarCorreoNuevoPedido(pedido: String) {
+        // Crear un objeto JSON para el correo
+        val emailData = mapOf(
+            "to" to "fulltvurl@gmail.com", // Cambia esto por el correo del destinatario
+            "subject" to "$pedido",
+            "text" to "PAGADA: $pedido"
+        )
+
+        // Hacer la solicitud POST al servidor que envía el correo
+        val url = "https://fulltvurl.glitch.me/sendEmail" // Cambia esto por la URL de tu servidor
+
+        // Usar Volley para hacer la solicitud
+        val requestQueue = Volley.newRequestQueue(requireContext()) // Contexto de tu actividad
+
+        val jsonObjectRequest = object : JsonObjectRequest(
+            Method.POST, url, JSONObject(emailData),
+            Response.Listener { response ->
+                Log.d("Email", "Correo enviado exitosamente: ${response.toString()}")
+            },
+            Response.ErrorListener { error ->
+                Log.e("Email", "Error al enviar el correo: ${error.message}")
+            }
+        ) {}
+
+        requestQueue.add(jsonObjectRequest)
     }
 
 }

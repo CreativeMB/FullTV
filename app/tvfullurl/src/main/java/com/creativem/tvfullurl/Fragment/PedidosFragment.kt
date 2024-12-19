@@ -1,6 +1,5 @@
 package com.creativem.tvfullurl.Fragment
 
-import android.app.NotificationManager
 import android.os.Bundle
 import android.util.Log
 import androidx.fragment.app.Fragment
@@ -8,12 +7,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.core.app.NotificationCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.cineflexurl.modelo.Movie
-import com.creativem.tvfullurl.R
-import com.creativem.tvfullurl.adapter.MoviesAdapter
+import com.creativem.tvfullurl.adapter.PedidosAdapter
 import com.creativem.tvfullurl.databinding.FragmentPedidosBinding
+import com.creativem.tvfullurl.modelo.User
 import com.google.android.gms.tasks.Task
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
@@ -23,11 +21,10 @@ import com.google.firebase.firestore.QuerySnapshot
 class PedidosFragment : Fragment() {
     private lateinit var binding: FragmentPedidosBinding
 
-    private lateinit var moviesAdapter: MoviesAdapter
-    private var movieList: MutableList<Movie> = mutableListOf()
+    private lateinit var pedidosAdapter: PedidosAdapter
+    private var movieList: MutableList<Movie> = mutableListOf() // Lista de películas
 
     private lateinit var db: FirebaseFirestore
-
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -38,6 +35,7 @@ class PedidosFragment : Fragment() {
 
         iniciarRecycler()
         cargarPedidos()
+
         // Configurar el SearchView
         binding.searchView.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
@@ -45,7 +43,7 @@ class PedidosFragment : Fragment() {
             }
 
             override fun onQueryTextChange(newText: String?): Boolean {
-                moviesAdapter.filter(newText.orEmpty())
+                pedidosAdapter.filter(newText.orEmpty())
                 return true
             }
         })
@@ -54,100 +52,84 @@ class PedidosFragment : Fragment() {
     }
 
     private fun cargarPedidos() {
-        movieList.clear()
+        movieList.clear() // Limpiar la lista actual
 
-        db.collection("pedidosmovies").get()
+        db.collection("pedidosmovies").get() // Obtener los documentos de la colección "pedidosmovies"
             .addOnCompleteListener { task: Task<QuerySnapshot> ->
                 if (task.isSuccessful) {
-                    val userIds = mutableListOf<String>()
+                    // Aquí directamente accedemos a los documentos de la colección
                     for (document in task.result!!) {
-                        val movie: Movie = document.toObject(Movie::class.java).copy(id = document.id)
-                        userIds.add(movie.userId)
-                        movieList.add(movie) // Aquí solo agregamos la película sin el usuario de prueba
+                        // Accedemos solo a los campos necesarios
+                        val nombre = document.getString("nombre") ?: ""
+                        val email = document.getString("email") ?: ""
+                        val title = document.getString("title") ?: ""
+                        var year = document.getString("year") ?: ""
 
+                        // Agregar la palabra "CasTV" antes del año
+                        year = "CasTV: $year"
+
+                        val id = document.id
+                        // Creamos un objeto Movie con solo los campos necesarios
+                        val movie = Movie(
+                            id = id,
+                            nombre = nombre,
+                            email = email,
+                            title = title,
+                            year = year
+                        )
+                        movieList.add(movie) // Agregar la película a la lista
                     }
-                    Log.d("PedidosFragment", "Películas cargadas: ${movieList.size}") // Log de verificación
-                    cargarNombresUsuarios(userIds) // Cargar nombres de usuario después de cargar las películas
-
-                    // Notificar al adaptador aquí
-                    moviesAdapter.notifyDataSetChanged() // Aquí puedes notificar el cambio también
+                    // Actualizamos el adaptador con la nueva lista de películas
+                    pedidosAdapter.updateMovieList(movieList)
                 } else {
-                    Log.e("PedidosMovies", "Error getting documents: ", task.exception)
+                    Log.e("PedidosFragment", "Error getting documents: ", task.exception)
                 }
             }
             .addOnFailureListener { e ->
-                Log.e("PedidosMovies", "Error loading movies", e)
+                Log.e("PedidosFragment", "Error loading pedidos", e)
             }
-    }
-
-    private fun cargarNombresUsuarios(userIds: List<String>) {
-        val filteredUserIds = userIds.filter { it.isNotEmpty() }
-
-        if (filteredUserIds.isEmpty()) return
-        db.collection("users")
-            .whereIn(FieldPath.documentId(), filteredUserIds)
-            .get()
-            .addOnSuccessListener { documents ->
-                val userNamesMap = mutableMapOf<String, String>()
-                for (document in documents) {
-                    val userId = document.id
-                    val userName = document.getString("nombre") ?: "Usuario desconocido"
-                    userNamesMap[userId] = userName
-                }
-
-                actualizarNombresUsuariosEnPeliculas(userNamesMap)
-
-                // Actualiza la lista del adaptador con la nueva lista de películas
-                moviesAdapter.updateMovieList(movieList) // Actualiza el adaptador
-            }
-            .addOnFailureListener { e ->
-                Log.e("users", "Error al cargar nombres de usuarios", e)
-            }
-    }
-
-    private fun actualizarNombresUsuariosEnPeliculas(userNamesMap: Map<String, String>) {
-        // Actualizar los nombres de usuario en la lista de películas
-        for (movie in movieList) {
-            val userName = userNamesMap[movie.userId] ?: "Usuario desconocido"
-            movie.userName = userName // Asigna el nombre de usuario correspondiente
-        }
-
-        // Notificar al adaptador que los datos han cambiado
-        moviesAdapter.notifyDataSetChanged()
     }
 
     private fun iniciarRecycler() {
-        moviesAdapter = MoviesAdapter(
+        pedidosAdapter = PedidosAdapter(
             movieList,
             onDeleteClick = { movieId ->
                 deletePedido(movieId)
-            },
-            onEditClick = { movieId ->
-            },
-            isEditable = false
+            }
         )
         binding.recyclerViewPedidos.apply {
             layoutManager = LinearLayoutManager(requireContext())
-            adapter = moviesAdapter
+            adapter = pedidosAdapter
+        }
+    }
+
+    private fun deletePedido(pedidoId: String) {
+        val db = FirebaseFirestore.getInstance()
+
+        if (pedidoId.isEmpty()) {
+            Toast.makeText(requireContext(), "ID de pedido no válido", Toast.LENGTH_SHORT).show()
+            return
         }
 
-    }
+        // Referencia al documento específico dentro de la colección "pedidosmovies"
+        val pedidoRef = db.collection("pedidosmovies").document(pedidoId)
 
-
-    private fun deletePedido(movieId: String) {
-        db.collection("pedidosmovies").document(movieId).delete()
+        // Eliminar el documento
+        pedidoRef.delete()
             .addOnSuccessListener {
-                Toast.makeText(requireContext(), "Pedido eliminado", Toast.LENGTH_SHORT).show()
-                cargarPedidos() // Recargar películas después de eliminar
+                // Mostrar mensaje de éxito
+                Toast.makeText(requireContext(), "Pedido eliminado correctamente", Toast.LENGTH_SHORT).show()
+
+                // Eliminar el item de la lista local
+                val movieToRemove = movieList.find { it.id == pedidoId }
+                movieList.remove(movieToRemove)
+
+                // Actualizar el RecyclerView
+                pedidosAdapter.notifyDataSetChanged()
             }
             .addOnFailureListener { e ->
-                Toast.makeText(
-                    requireContext(),
-                    "Error al eliminar la película",
-                    Toast.LENGTH_SHORT
-                ).show()
-                Log.e("PedidosMovies", "Error deleting movie", e)
+                // Mostrar mensaje de error
+                Toast.makeText(requireContext(), "Error al eliminar pedido: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
-
 }
