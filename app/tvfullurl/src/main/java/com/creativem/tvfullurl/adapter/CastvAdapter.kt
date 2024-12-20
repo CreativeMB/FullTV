@@ -1,11 +1,16 @@
 package com.creativem.tvfullurl.adapter
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.creativem.tvfullurl.R
 import com.creativem.tvfullurl.modelo.User
@@ -47,6 +52,23 @@ class CastvAdapter(
         holder.userName.text = user.nombre
         holder.userEmail.text = user.email
         holder.userPoints.setText(user.puntos.toString())
+
+        // Maneja el clic en el email
+        holder.userEmail.setOnClickListener {
+            val email = user.email
+            if (email.isNotEmpty()) {
+                // Copiar el email al portapapeles
+                val clipboard = holder.itemView.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Email", email)
+                clipboard.setPrimaryClip(clip)
+
+                // Notificar al usuario que el correo se ha copiado
+                Toast.makeText(holder.itemView.context, "Correo copiado al portapapeles", Toast.LENGTH_SHORT).show()
+            } else {
+                Log.e("PedidosAdapter", "Email vacío")
+                Toast.makeText(holder.itemView.context, "El correo electrónico no está disponible", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         // Acción para editar puntos (al hacer clic en la imagen de editar)
         holder.editImage.setOnClickListener {
