@@ -477,9 +477,9 @@ class MainFragment : BrowseSupportFragment() {
 
             // Crear un TextView para indicar al usuario cómo debe ingresar el pedido
             val indicacionTextView = TextView(requireContext()).apply {
-                text = "Por favor, ingrese el título y Año estreno de la película que desea ver.\n" +
-                        "Recuerde, no se pueden ingresar películas con menos de 1 meses de estreno."
-                textSize = 16f
+                text = "Por favor, ingrese el título y Año de estreno.\n" +
+                        "Recuerde; no se pueden Alquilar películas con menos de un mes de estreno."
+                textSize = 14f
                 setPadding(0, 0, 0, 16) // Espaciado inferior
             }
 
