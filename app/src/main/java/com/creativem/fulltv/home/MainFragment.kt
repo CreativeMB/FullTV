@@ -277,7 +277,7 @@ class MainFragment : BrowseSupportFragment() {
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
         val menuItems = listOf("Pedido", "Cartelera", "Pago", "Buscar", "Cerrar")
         val menuIcons = listOf(
-            R.drawable.cartelera,
+            R.drawable.pedido,
             R.drawable.cartelera,
             R.drawable.pago,
             R.drawable.buscar,
@@ -349,11 +349,6 @@ class MainFragment : BrowseSupportFragment() {
     private fun ocultarCarga() {
         loadingContainer.visibility = View.GONE
     }
-
-//    private fun restablecerColorFondo() {
-//        binding.mainBackgroundImage.setImageDrawable(null)
-//        view?.setBackgroundColor(defaultBackgroundColor)
-//    }
 
     private fun escucharCambiosEnPeliculas() {
         firestoreRepository.obtenerPeliculasRef().addSnapshotListener { snapshot, error ->
