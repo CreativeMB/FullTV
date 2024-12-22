@@ -61,17 +61,40 @@
                     android:textSize="22sp" />
             </LinearLayout>
 
-            <!-- Fila de Nombre de Usuario -->
-            <TextView
-                android:id="@+id/textUsuario"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="top|end"
-                android:layout_marginEnd="8dp"
-                android:text="Nombre del Usuario"
-                android:textColor="@color/lb_tv_white"
-                android:textSize="18sp"
-                android:layout_marginTop="8dp" />
+                android:orientation="horizontal"
+                android:layout_gravity="end"
+                android:layout_marginTop="4dp">
+
+                <TextView
+                    android:id="@+id/textUsuario"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:text="Nombre del Usuario"
+                    android:textColor="@color/lb_tv_white"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:id="@+id/useronline"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textColor="#4CAF50"
+                    android:textSize="18sp"
+                    android:layout_marginEnd="10dp" />
+
+                <TextView
+                    android:id="@+id/useroff"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textColor="@color/colorSeekBar"
+                    android:textSize="18sp"
+                    android:layout_marginEnd="10dp"/>
+            </LinearLayout>
 
             <!-- Fila de Cantidad de Castv -->
             <TextView

@@ -49,13 +49,13 @@ import kotlinx.coroutines.launch
 import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
-
 import org.json.JSONObject
-
-
-
 import android.widget.LinearLayout
 import android.text.InputType
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -65,12 +65,9 @@ class MainFragment : BrowseSupportFragment() {
     private lateinit var loadingContainer: FrameLayout
     private lateinit var binding: MainFragmentBinding
 
-//    private val defaultBackgroundColor by lazy {
-//        ContextCompat.getColor(
-//            requireContext(),
-//            R.color.tu_color_fondo
-//        )
-//    }
+    // Declarar las listas de UIDs (Strings)
+    val usuariosConectados = mutableListOf<String>()
+    val usuariosDesconectados = mutableListOf<String>()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -79,6 +76,99 @@ class MainFragment : BrowseSupportFragment() {
     ): View? {
         // Inflar el layout de BrowseSupportFragment
         val view = super.onCreateView(inflater, container, savedInstanceState)
+
+
+        val realtimeDbRef = FirebaseDatabase.getInstance().getReference("usuarios_conectados")
+
+        val currentUserUid = FirebaseAuth.getInstance().currentUser?.uid
+
+        if (currentUserUid != null) {
+            val userStatusRef = realtimeDbRef.child(currentUserUid)
+
+            // Escuchar cambios en la conexión
+            val connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected")
+            connectedRef.addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val connected = snapshot.getValue(Boolean::class.java) ?: false
+                    if (connected) {
+                        // El usuario está conectado, actualizar estado a true
+                        userStatusRef.setValue(true)
+                            .addOnSuccessListener { Log.d("Connection", "Estado actualizado a conectado") }
+                            .addOnFailureListener { e -> Log.e("Connection", "Error al actualizar estado", e) }
+
+                        // Configurar la desconexión automática cuando el usuario pierda conexión
+                        userStatusRef.onDisconnect().setValue(false)
+                            .addOnSuccessListener { Log.d("Connection", "Estado de desconexión configurado") }
+                            .addOnFailureListener { e -> Log.e("Connection", "Error al configurar desconexión", e) }
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("Connection", "Error al escuchar conexión: ${error.message}")
+                }
+            })
+        } else {
+            Log.e("Connection", "Usuario no autenticado")
+        }
+
+        if (currentUserUid != null) {
+            val userStatusRef = realtimeDbRef.child(currentUserUid)
+
+            // Escuchar cambios en la conexión
+            val connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected")
+            connectedRef.addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val connected = snapshot.getValue(Boolean::class.java) ?: false
+                    if (connected) {
+                        // El usuario está conectado, actualizar estado a true
+                        userStatusRef.setValue(true)
+                            .addOnSuccessListener { Log.d("Connection", "Estado actualizado a conectado") }
+                            .addOnFailureListener { e -> Log.e("Connection", "Error al actualizar estado", e) }
+
+                        // Configurar la desconexión automática cuando el usuario pierda conexión
+                        userStatusRef.onDisconnect().setValue(false)
+                            .addOnSuccessListener { Log.d("Connection", "Estado de desconexión configurado") }
+                            .addOnFailureListener { e -> Log.e("Connection", "Error al configurar desconexión", e) }
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("Connection", "Error al escuchar conexión: ${error.message}")
+                }
+            })
+        } else {
+            Log.e("Connection", "Usuario no autenticado")
+        }
+
+        // Escuchar los cambios en los usuarios conectados y desconectados
+        realtimeDbRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                usuariosConectados.clear()
+                usuariosDesconectados.clear()
+
+                for (userSnapshot in snapshot.children) {
+                    // Obtener el valor de conexión (true/false) para cada usuario
+                    val conectado = userSnapshot.getValue(Boolean::class.java) ?: false
+
+                    // Agregar el usuario a la lista según su estado de conexión
+                    if (conectado) {
+                        usuariosConectados.add(userSnapshot.key ?: "")  // Agregar solo el UID
+                    } else {
+                        usuariosDesconectados.add(userSnapshot.key ?: "")  // Agregar solo el UID
+                    }
+                }
+
+                // Actualizar los TextViews con el número de usuarios conectados y desconectados
+                binding.useronline.text = "| ${usuariosConectados.size}"
+                binding.useroff.text = "| ${usuariosDesconectados.size}"
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("Connection", "Error al escuchar los usuarios: ${error.message}")
+            }
+        })
+
+
 
         // Inflar el layout principal
         binding = MainFragmentBinding.bind(requireActivity().findViewById(R.id.main))
@@ -241,7 +331,7 @@ class MainFragment : BrowseSupportFragment() {
     fun actualizarUsuario(usuario: String, cantidadCastv: Int, cantidadPeliculas: Int) {
         binding.textUsuario.text = usuario
         binding.textCastv.text =
-            "Películas: $cantidadPeliculas | Castv: $cantidadCastv" // Mostrar ambos valores
+            "Películas: $cantidadPeliculas | CasTV: $cantidadCastv" // Mostrar ambos valores
     }
 
     fun cargarPeliculas() {

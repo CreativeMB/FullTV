@@ -14,6 +14,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.creativem.fulltv.R
 import com.creativem.fulltv.adapter.Main
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
 
 class LoginActivity : AppCompatActivity() {
@@ -21,7 +22,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
     private lateinit var googleSignInClient: GoogleSignInClient
     private lateinit var firestore: FirebaseFirestore
-
+    private lateinit var database: FirebaseDatabase
     companion object {
         private const val RC_SIGN_IN = 9001
         private const val TAG = "LoginActivity"
@@ -186,12 +187,33 @@ class LoginActivity : AppCompatActivity() {
                     userRef.set(user)
                         .addOnSuccessListener {
                             Log.d(TAG, "Usuario registrado con éxito.")
+                            // Agregar también al Realtime Database
+                            addUserToRealtimeDatabase(userId, nombre, email)
                         }
                 }
             }
             .addOnFailureListener { e ->
                 Log.w(TAG, "Error al obtener documento: ", e)
                 Toast.makeText(this, "Error al obtener usuario.", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun addUserToRealtimeDatabase(userId: String, nombre: String, email: String?) {
+        val user = hashMapOf(
+            "nombre" to nombre,
+            "email" to email,
+            "puntos" to 10 // Valor inicial de puntos
+        )
+
+        val databaseRef = database.reference.child("users").child(userId)
+
+        databaseRef.setValue(user)
+            .addOnSuccessListener {
+                Log.d(TAG, "Usuario agregado a Realtime Database.")
+            }
+            .addOnFailureListener { e ->
+                Log.w(TAG, "Error al agregar usuario a Realtime Database.", e)
+                Toast.makeText(this, "Error al agregar usuario a Realtime Database.", Toast.LENGTH_SHORT).show()
             }
     }
 }
