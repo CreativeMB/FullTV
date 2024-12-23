@@ -159,8 +159,8 @@ class MainFragment : BrowseSupportFragment() {
                 }
 
                 // Actualizar los TextViews con el número de usuarios conectados y desconectados
-                binding.useronline.text = "| ${usuariosConectados.size}"
-                binding.useroff.text = "| ${usuariosDesconectados.size}"
+                binding.useronline.text = "ON-${usuariosConectados.size}"
+                binding.useroff.text = "OFF-${usuariosDesconectados.size}"
             }
 
             override fun onCancelled(error: DatabaseError) {
