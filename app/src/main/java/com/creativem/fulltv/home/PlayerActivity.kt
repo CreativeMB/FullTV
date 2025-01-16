@@ -500,7 +500,7 @@ class PlayerActivity : AppCompatActivity() {
         val qrtjText = dialogView.findViewById<TextView>(R.id.qrtjText)
 
         qrneqiText.text = "QR bancos colombianos"
-        qepseText.text = "QR WhatsApp"
+        qepseText.text = "Soporte"
         qrtjText.text = "QR TJ Credito"
         // Configura el mensaje
         messageText.text = "Pelicula: $movieTitle\nPrecio CasTV: $$movieYear\n" +
@@ -509,11 +509,11 @@ class PlayerActivity : AppCompatActivity() {
                 "\nPaquete Plata $5.000(Castv: 50)\n" +
                 "Paquete Bronce $10.000(Castv: 120)\n" +
                 "Paquete Oro $20.000(Castv: 250\n" +
-                "Comprobante de pago WhatsApp(+573028667672)"
+                "Activa su paquete en boton Recarga"
 
         // Opcional: Cambia las imágenes si es necesario
         firstImage.setImageResource(R.drawable.qrbancos)
-        secondImage.setImageResource(R.drawable.qrwhatsapp)
+        secondImage.setImageResource(R.drawable.qrtelegram)
         thirdImage.setImageResource(R.drawable.qrtarjeta)
 
         // Crea el AlertDialog
