@@ -16,9 +16,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Disfruta de las mejores películas de manera rápida y sencilla.\n Compra uno de nuestros paquetes en COP\nPaquete Plata $5.000(Castv: 50)\nPaquete Bronce $10.000(Castv: 120) \nPaquete Oro $20.000(Castv: 250)\n Pago Facil con los QR recarga su paquete, enviar comprovante de pago a WhatsApp. (+573028667672) ¡Podrás reproducirla en múltiples dispositivos! Contenido disponible por Tenporizador en minutos\n\n
-        Puedes seleccionar cualquier película disponible o através pedidos En breve, estará lista para ver.\n\n
-        Al formar parte de nuestra comunidad, el contenido que alquiles estará disponible para todos, sin restricciones. Vive una experiencia de cine sin complicaciones, desde la comodidad de tu hogar."
+            android:text="Disfruta de las mejores películas de manera rápida y sencilla, Compra uno de nuestros paquetes en COP
+            \nPaquete Plata $5.000(Castv: 50)
+            \nPaquete Bronce $10.000(Castv: 120)
+            \nPaquete Oro $20.000(Castv: 250)
+            \nPaga Facil con los QR, Activar tu paquete enviando Numero de referencia o comprobante de pago por el boton Recarga.
+            \n¡Podrás reproducirla en múltiples dispositivos! Contenido disponible por Tenporizador en minutos
+            \nPuedes Alquilar en la pantalla principal o através del boton pedidos la pelicula que quieras; En breve estará lista para ver.
+            \nAl formar parte de nuestra comunidad, el contenido que alquiles estará disponible para todos, sin restricciones. Vive una experiencia de cine sin complicaciones, desde la comodidad de tu hogar."
         android:textColor="#FFFFFF"
         android:textSize="18sp"
         android:textAlignment="center"
@@ -68,13 +73,13 @@
                 <ImageView
                     android:layout_width="150dp"
                     android:layout_height="150dp"
-                    android:src="@drawable/qrwhatsapp"
+                    android:src="@drawable/qrtelegram"
                     android:contentDescription="Imagen 2" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="QR WhatsApp"
+                    android:text="Soporte"
                     android:textColor="#FFFFFF"
                     android:textAlignment="center"
                     android:gravity="center" />

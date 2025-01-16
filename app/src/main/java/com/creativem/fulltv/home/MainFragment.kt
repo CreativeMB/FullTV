@@ -4,6 +4,7 @@ import android.app.AlertDialog
 
 import android.content.Intent
 import android.content.res.Resources
+import android.graphics.Typeface
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -196,11 +197,17 @@ class MainFragment : BrowseSupportFragment() {
             if (item is MenuItem) {
                 Log.d("MainFragment", "Menu item clicked: ${item.name}")
                 when (item.name) {
+                    "Buscar" -> {
+                        buscarPeliculaDialogo()
+                    }
                     "Pedido" -> {
                         mostrarDialogoPedido()
                     }
+                    "Recarga" -> {
+                        activarpaquete()
+                    }
 
-                    "Cartelera" -> {
+                    "En Linea" -> {
                         val intent = Intent(requireContext(), MoviesValidas::class.java)
                         startActivity(intent)
                     }
@@ -208,10 +215,6 @@ class MainFragment : BrowseSupportFragment() {
                     "Pago" -> {
                         val intent = Intent(requireContext(), Nosotros::class.java)
                         startActivity(intent)
-                    }
-
-                    "Buscar" -> {
-                        buscarPeliculaDialogo()
                     }
 
                     "Cerrar" -> {
@@ -365,12 +368,13 @@ class MainFragment : BrowseSupportFragment() {
 
         // Primero, agregamos el menú
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("Pedido", "Cartelera", "Pago", "Buscar", "Cerrar")
+        val menuItems = listOf("Buscar", "Pedido","Recarga", "En Linea", "Pago", "Cerrar")
         val menuIcons = listOf(
+            R.drawable.buscar,
             R.drawable.pedido,
+            R.drawable.activacion,
             R.drawable.cartelera,
             R.drawable.pago,
-            R.drawable.buscar,
             R.drawable.cerrrar
         )
 
@@ -775,5 +779,133 @@ class MainFragment : BrowseSupportFragment() {
 
         requestQueue.add(jsonObjectRequest)
     }
+    private fun activarpaquete() {
+        // Crear el AlertDialog.Builder
+        val builder = AlertDialog.Builder(requireContext())
+        builder.setTitle("Activacion de Paquete")
+
+        // Crear un LinearLayout para contener el TextView y el EditText
+        val layout = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 32, 32, 16)
+
+            // Crear un TextView para indicar al usuario cómo debe ingresar el pedido
+            val indicacionTextView = TextView(requireContext()).apply {
+                text = "Numero de referencia o numero de comprobante de pago\n" +
+                        "Ejemplo: Paquete Plata M7275019"
+                textSize = 14f
+                setPadding(0, 0, 0, 16) // Espaciado inferior
+            }
+
+            // Crear el EditText para ingresar el pedido
+            val inputPedido = EditText(requireContext()).apply {
+                hint = "Paquete Plata M7275019"
+                setSingleLine(true) // Permitir solo una línea
+                setTypeface(null, Typeface.BOLD) // Establecer el texto en negrita
+                setPadding(16, 16, 16, 16) // Espaciado interno
+            }
+
+            // Agregar el TextView y el EditText al LinearLayout
+            addView(indicacionTextView)
+            addView(inputPedido)
+        }
+
+        // Declarar inputPedido fuera del apply para accederlo luego
+        val inputPedido = layout.getChildAt(1) as EditText
+
+        // Establecer el layout como la vista del AlertDialog
+        builder.setView(layout)
+
+        // Botones del diálogo
+        builder.setPositiveButton("Registrar") { _, _ ->
+            val pedido = inputPedido.text.toString().trim()
+            if (pedido.isNotEmpty()) {
+                comprobantepago(pedido)
+            } else {
+                Toast.makeText(requireContext(), "Debe ingresar numero de referencia o numero de comprobante de pago", Toast.LENGTH_SHORT).show()
+            }
+        }
+        builder.setNegativeButton("Cancelar") { dialog, _ ->
+            dialog.dismiss()
+        }
+
+        // Mostrar el diálogo
+        builder.create().show()
+    }
+
+    // Subir el comprobante de pago a Firestore
+    private fun comprobantepago(pedido: String) {
+        val auth = FirebaseAuth.getInstance()
+        val db = FirebaseFirestore.getInstance()
+
+        val userId = auth.currentUser?.uid
+
+        if (userId != null) {
+            val userRef = db.collection("users").document(userId)
+
+            // Obtener datos del usuario
+            userRef.get().addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val nombreUsuario = document.getString("nombre") ?: "Nombre no disponible"
+                    val emailUsuario = document.getString("email") ?: "Email no disponible"
+                    val puntosActuales = document.getLong("puntos")?.toInt() ?: 0
+
+                    val mensaje = """
+                    Usuario: $nombreUsuario
+                    Email: $emailUsuario
+                    Saldo CasTV: $puntosActuales
+                    Pedido: $pedido
+                """.trimIndent()
+
+                    AlertDialog.Builder(requireContext())
+                        .setTitle("Confirmar Activacion de paquete")
+                        .setMessage(mensaje)
+                        .setPositiveButton("Registrar") { _, _ ->
+                            // Crear el pedido sin descontar puntos
+                            val pedidoData = hashMapOf(
+                                "title" to pedido,
+                                "userId" to userId,
+                                "email" to emailUsuario,
+                                "nombre" to nombreUsuario
+                            )
+
+                            // Subir pedido a la colección
+                            db.collection("pedidosmovies").add(pedidoData)
+                                .addOnSuccessListener {
+                                    enviarCorreoNuevoPedido(pedido)
+                                    Toast.makeText(
+                                        requireContext(),
+                                        "Actualisaremos tu saldo",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                .addOnFailureListener { e ->
+                                    Toast.makeText(
+                                        requireContext(),
+                                        "Error al enviar pedido: ${e.message}",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                        }
+                        .setNegativeButton("Cancelar") { dialog, _ ->
+                            dialog.dismiss()
+                        }
+                        .show()
+                } else {
+                    Toast.makeText(requireContext(), "Usuario no encontrado", Toast.LENGTH_SHORT)
+                        .show()
+                }
+            }.addOnFailureListener { e ->
+                Toast.makeText(
+                    requireContext(),
+                    "Error al obtener usuario: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        } else {
+            Toast.makeText(requireContext(), "Usuario no autenticado", Toast.LENGTH_SHORT).show()
+        }
+    }
+
 
 }
