@@ -26,9 +26,9 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:ellipsize="end"
-            android:maxLines="1"
+            android:maxLines="2"
             android:textAlignment="center"
             android:textColor="@color/lb_tv_white"
-            android:textSize="16sp" />
+            android:textSize="10sp" />
     </LinearLayout>
 </androidx.cardview.widget.CardView>

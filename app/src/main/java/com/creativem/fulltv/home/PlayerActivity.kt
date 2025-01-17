@@ -509,7 +509,7 @@ class PlayerActivity : AppCompatActivity() {
                 "\nPaquete Plata $5.000(Castv: 50)\n" +
                 "Paquete Bronce $10.000(Castv: 120)\n" +
                 "Paquete Oro $20.000(Castv: 250\n" +
-                "Activa su paquete en boton Recarga"
+                "Activa por el boton Activar Paquete"
 
         // Opcional: Cambia las imágenes si es necesario
         firstImage.setImageResource(R.drawable.qrbancos)

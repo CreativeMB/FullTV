@@ -12,6 +12,7 @@ import com.creativem.fulltv.data.Movie
 import java.util.concurrent.TimeUnit
 import android.graphics.Color
 import android.widget.TextView
+import java.lang.reflect.Field
 
 class CardPresenter: Presenter(){
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
@@ -31,6 +32,25 @@ class CardPresenter: Presenter(){
         val casText = "$"
         cardView.titleText = movie.title
         cardView.contentText = "$casText${movie.year}"
+
+        // Usar reflexión para obtener las vistas internas de ImageCardView
+        try {
+            val titleTextView: TextView = getTextViewFromCard(cardView, "mTitleView")
+            val contentTextView: TextView = getTextViewFromCard(cardView, "mContentView")
+
+            // Modificar el tamaño y color del texto
+            titleTextView.apply {
+                textSize = 9f  // Cambiar el tamaño del texto
+                setTextColor(Color.WHITE)  // Cambiar el color del texto
+            }
+
+            contentTextView.apply {
+                textSize = 8f  // Cambiar el tamaño del texto
+                setTextColor(Color.GREEN)  // Cambiar el color del texto
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()  // Manejo de errores
+        }
 
         // Cancelar cualquier temporizador anterior en este ViewHolder
         cardViewHolder.countDownTimer?.cancel()
@@ -84,5 +104,11 @@ class CardPresenter: Presenter(){
 
     inner class CardViewHolder(view: ImageCardView) : ViewHolder(view) {
         var countDownTimer: CountDownTimer? = null
+    }
+    // Función para obtener el TextView de ImageCardView usando reflexión
+    private fun getTextViewFromCard(cardView: ImageCardView, fieldName: String): TextView {
+        val field: Field = cardView.javaClass.getDeclaredField(fieldName)
+        field.isAccessible = true  // Permitir acceso a campos privados
+        return field.get(cardView) as TextView
     }
 }

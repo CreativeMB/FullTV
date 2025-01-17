@@ -197,27 +197,27 @@ class MainFragment : BrowseSupportFragment() {
             if (item is MenuItem) {
                 Log.d("MainFragment", "Menu item clicked: ${item.name}")
                 when (item.name) {
-                    "Buscar" -> {
+                    "Buscar\nPelicula" -> {
                         buscarPeliculaDialogo()
                     }
-                    "Pedido" -> {
+                    "Pedir\nPelicula" -> {
                         mostrarDialogoPedido()
                     }
-                    "Recarga" -> {
+                    "Activar\nPaquete" -> {
                         activarpaquete()
                     }
 
-                    "En Linea" -> {
+                    "Pele\nGratis" -> {
                         val intent = Intent(requireContext(), MoviesValidas::class.java)
                         startActivity(intent)
                     }
 
-                    "Pago" -> {
+                    "¿Como\nPago?" -> {
                         val intent = Intent(requireContext(), Nosotros::class.java)
                         startActivity(intent)
                     }
 
-                    "Cerrar" -> {
+                    "Cerrar\nCuenta" -> {
                         cerrarSesion() // Llama al método de cerrar sesión
                     }
 
@@ -368,7 +368,7 @@ class MainFragment : BrowseSupportFragment() {
 
         // Primero, agregamos el menú
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("Buscar", "Pedido","Recarga", "En Linea", "Pago", "Cerrar")
+        val menuItems = listOf("Buscar\nPelicula", "Pedir\nPelicula","Activar\nPaquete", "Pele\nGratis", "¿Como\nPago?", "Cerrar\nCuenta")
         val menuIcons = listOf(
             R.drawable.buscar,
             R.drawable.pedido,
