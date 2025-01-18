@@ -52,11 +52,12 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
     implementation ("com.github.bumptech.glide:glide:4.15.1")
     annotationProcessor ("com.github.bumptech.glide:compiler:4.15.1")
-    implementation ("com.google.firebase:firebase-firestore:24.0.0")
-
-
+    implementation ("com.google.firebase:firebase-firestore:24.5.0")
+    implementation ("com.google.firebase:firebase-database:20.0.3")
 
 
 }
