@@ -39,7 +39,7 @@ class CastvFragment : Fragment() {
 
         iniciarRecycler()
         cargarUsuarios()
-
+        verificarEstadosDeConexion()
         // Configurar el SearchView para filtrar usuarios
         binding.searchView.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
@@ -72,6 +72,58 @@ class CastvFragment : Fragment() {
             .addOnFailureListener { e ->
                 Log.e("Users", "Error loading users", e)
             }
+    }
+    private fun verificarEstadosDeConexion() {
+        // Referencia al nodo 'usuarios_conectados' en Realtime Database
+        val realtimeDb = FirebaseDatabase.getInstance().reference.child("usuarios_conectados")
+
+        // Log para verificar que estamos accediendo al nodo correcto
+        Log.d("Conexion", "Accediendo al nodo 'usuarios_conectados' de Realtime Database.")
+
+        // Obtener los estados de conexión
+        realtimeDb.get().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val snapshot = task.result
+                // Verificar si el snapshot tiene datos
+                if (snapshot != null && snapshot.exists()) {
+                    val estadosDeConexion = mutableMapOf<String, Boolean>()
+
+                    // Log para verificar la cantidad de datos obtenidos
+                    Log.d("Conexion", "Datos obtenidos: ${snapshot.childrenCount} usuarios.")
+
+                    // Iterar sobre cada entrada para construir el mapa de estados de conexión
+                    for (userSnapshot in snapshot.children) {
+                        val userId = userSnapshot.key
+                        val isOnline = userSnapshot.getValue(Boolean::class.java) ?: false
+
+                        // Log para verificar el estado de cada usuario
+                        Log.d("Conexion", "Usuario ID: $userId, Estado de Conexión: $isOnline")
+
+                        if (userId != null) {
+                            estadosDeConexion[userId] = isOnline
+                        }
+                    }
+
+                    // Actualizar `isOnline` para cada usuario en `userList`
+                    for (user in userList) {
+                        // Log para verificar si el estado de conexión se ha actualizado
+                        Log.d("Conexion", "Actualizando estado de conexión para ${user.nombre} (${user.id}): ${estadosDeConexion[user.id] ?: false}")
+                        user.isOnline = estadosDeConexion[user.id] ?: false
+                    }
+
+                    // Notificar al adaptador que los datos han cambiado
+                    castvAdapter.notifyDataSetChanged()
+                    Log.d("Conexion", "Adaptador notificado: Datos actualizados.")
+
+                } else {
+                    Log.e("Conexion", "No se encontraron datos en Realtime Database.")
+                }
+            } else {
+                Log.e("Conexion", "Error al obtener estados de conexión.", task.exception)
+            }
+        }.addOnFailureListener { e ->
+            Log.e("Conexion", "Error al verificar los estados de conexión.", e)
+        }
     }
 
     // Iniciar el RecyclerView

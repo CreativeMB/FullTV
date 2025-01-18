@@ -8,6 +8,7 @@ data class User(
     val nombre: String = "",  // Cambiado de 'name' a 'nombre'
     var title: String = "",
     val puntos: Int = 0,      // Cambiado de 'points' a 'puntos'
-    val id: String = "",       // Para almacenar el ID del documento
-    val createdAt: Timestamp? = null
+    val id: String = "",      // Para almacenar el ID del documento
+    val createdAt: Timestamp? = null,
+    var isOnline: Boolean = false
 )
