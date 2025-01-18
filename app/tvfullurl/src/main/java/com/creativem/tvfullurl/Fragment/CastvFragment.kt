@@ -103,6 +103,33 @@ class CastvFragment : Fragment() {
             }
     }
 
+//    private fun deleteUsers(userId: String) {
+//        val db = FirebaseFirestore.getInstance()
+//        val realtimeDb = FirebaseDatabase.getInstance().reference
+//
+//        // Eliminar el usuario de Firestore
+//        db.collection("users").document(userId).delete()
+//            .addOnSuccessListener {
+//                Toast.makeText(requireContext(), "Usuario eliminado de Firestore", Toast.LENGTH_SHORT).show()
+//
+//                // Eliminar el usuario de Realtime Database
+//                realtimeDb.child("usuarios_conectados").child(userId).removeValue()
+//                    .addOnSuccessListener {
+//                        Toast.makeText(requireContext(), "Usuario eliminado de Realtime Database", Toast.LENGTH_SHORT).show()
+//                        cargarUsuarios() // Recargar usuarios después de eliminar
+//                    }
+//                    .addOnFailureListener { e ->
+//                        Toast.makeText(requireContext(), "Error al eliminar de Realtime Database", Toast.LENGTH_SHORT).show()
+//                        Log.e("Usuarios", "Error eliminando usuario de Realtime Database", e)
+//                    }
+//            }
+//            .addOnFailureListener { e ->
+//                Toast.makeText(requireContext(), "Error al eliminar el usuario de Firestore", Toast.LENGTH_SHORT).show()
+//                Log.e("Usuarios", "Error eliminando usuario de Firestore", e)
+//            }
+//    }
+
+
     // Eliminar un usuario de Firestore
     private fun deleteUsers(userId: String) {
         db.collection("users").document(userId).delete()

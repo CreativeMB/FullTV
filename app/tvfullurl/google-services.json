@@ -81,6 +81,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "942582178550-eb054p3lc9i1vlg1muqohe80a2eto1eu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.creativem.fulltv",
+            "certificate_hash": "d1c1a6c5634aa98ba951ddffe9b15eb63271a728"
+          }
+        },
+        {
           "client_id": "942582178550-rltqmtr1383ie39612hq250h40djbusi.apps.googleusercontent.com",
           "client_type": 3
         }
