@@ -40,12 +40,14 @@ class CardPresenter: Presenter(){
 
             // Modificar el tamaño y color del texto
             titleTextView.apply {
-                textSize = 9f  // Cambiar el tamaño del texto
+                textSize = 16f  // Cambiar el tamaño del texto
+                maxLines = 3
                 setTextColor(Color.WHITE)  // Cambiar el color del texto
             }
 
             contentTextView.apply {
-                textSize = 8f  // Cambiar el tamaño del texto
+                textSize = 12f  // Cambiar el tamaño del texto
+                maxLines = 3
                 setTextColor(Color.GREEN)  // Cambiar el color del texto
             }
         } catch (e: Exception) {

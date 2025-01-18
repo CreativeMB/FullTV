@@ -207,7 +207,7 @@ class MainFragment : BrowseSupportFragment() {
                         activarpaquete()
                     }
 
-                    "Pele\nGratis" -> {
+                    "Pelis\nGratis" -> {
                         val intent = Intent(requireContext(), MoviesValidas::class.java)
                         startActivity(intent)
                     }
@@ -368,7 +368,7 @@ class MainFragment : BrowseSupportFragment() {
 
         // Primero, agregamos el menú
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("Buscar\nPelicula", "Pedir\nPelicula","Activar\nPaquete", "Pele\nGratis", "¿Como\nPago?", "Cerrar\nCuenta")
+        val menuItems = listOf("Buscar\nPelicula", "Pedir\nPelicula","Activar\nPaquete", "Pelis\nGratis", "¿Como\nPago?", "Cerrar\nCuenta")
         val menuIcons = listOf(
             R.drawable.buscar,
             R.drawable.pedido,

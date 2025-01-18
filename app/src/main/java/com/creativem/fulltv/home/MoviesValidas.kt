@@ -28,6 +28,7 @@ class MoviesValidas : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.movies_validas)
 
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         recyclerMoviesMenu = findViewById(R.id.recycler_movies_menu)
         loadingGif = findViewById(R.id.loading_gif)
         progressBar = findViewById(R.id.progress_bar)
