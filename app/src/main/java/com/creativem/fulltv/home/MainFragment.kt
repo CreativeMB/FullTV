@@ -1,11 +1,14 @@
 package com.creativem.fulltv.home
 
 import android.app.AlertDialog
+import android.app.Dialog
 
 import android.content.Intent
 import android.content.res.Resources
 import android.graphics.Typeface
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
@@ -53,10 +56,13 @@ import com.android.volley.toolbox.Volley
 import org.json.JSONObject
 import android.widget.LinearLayout
 import android.text.InputType
+import android.widget.ImageButton
+import com.google.firebase.Firebase
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.storage.storage
 
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -275,7 +281,7 @@ class MainFragment : BrowseSupportFragment() {
         escucharCambiosEnPeliculas()
         cargarPeliculas()
         actualizarUsuarioInfo()
-
+        mostrarPublicidad()
         // Cargar información del usuario
         val usuarioId =
             FirebaseAuth.getInstance().currentUser?.uid // Obtén el ID del usuario autenticado
@@ -791,15 +797,15 @@ class MainFragment : BrowseSupportFragment() {
 
             // Crear un TextView para indicar al usuario cómo debe ingresar el pedido
             val indicacionTextView = TextView(requireContext()).apply {
-                text = "Numero de referencia o numero de comprobante de pago\n" +
-                        "Ejemplo: Paquete Plata M7275019"
+                text = "Nombre Completo titular de Cuenta que realizo el pago y fecha\n" +
+                        "Ejemplo: Ernesto Dias 01/02/25: Paquete Plata"
                 textSize = 14f
                 setPadding(0, 0, 0, 16) // Espaciado inferior
             }
 
             // Crear el EditText para ingresar el pedido
             val inputPedido = EditText(requireContext()).apply {
-                hint = "Paquete Plata M7275019"
+                hint = "Ernesto Dias 01/02/25: Paquete Plata"
                 setSingleLine(true) // Permitir solo una línea
                 setTypeface(null, Typeface.BOLD) // Establecer el texto en negrita
                 setPadding(16, 16, 16, 16) // Espaciado interno
@@ -906,6 +912,38 @@ class MainFragment : BrowseSupportFragment() {
             Toast.makeText(requireContext(), "Usuario no autenticado", Toast.LENGTH_SHORT).show()
         }
     }
+    private fun mostrarPublicidad() {
+        val dialog = Dialog(requireContext())
+        dialog.setContentView(R.layout.pulicidad)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent) // Fondo transparente
+        dialog.setCancelable(false) // Evita cerrar tocando fuera del diálogo
 
+        val imgPublicidad = dialog.findViewById<ImageView>(R.id.imgPublicidad)
+        val btnCerrar = dialog.findViewById<ImageButton>(R.id.btnCerrar)
 
+        // Ruta fija en Firebase Storage
+        val storageRef = Firebase.storage.reference.child("FulltvPublicidad/1.jpg")
+
+        // Obtener URL actualizada de Firebase Storage
+        storageRef.downloadUrl.addOnSuccessListener { uri ->
+            Glide.with(requireContext())
+                .load(uri.toString()) // Cargar la imagen actualizada
+                .into(imgPublicidad)
+        }.addOnFailureListener {
+            Toast.makeText(requireContext(), "Error al cargar la imagen", Toast.LENGTH_SHORT).show()
+        }
+
+        // Botón para cerrar manualmente
+        btnCerrar.setOnClickListener { dialog.dismiss() }
+
+        // Cerrar automáticamente en 5 segundos
+        Handler(Looper.getMainLooper()).postDelayed({
+            dialog.dismiss()
+        }, 20000)
+
+        // Mostrar el diálogo
+        dialog.show()
+    }
 }
+
+
