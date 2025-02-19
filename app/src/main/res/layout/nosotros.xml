@@ -11,27 +11,45 @@
         android:orientation="vertical"
         android:gravity="center">
 
-        <!-- Texto grande centrado en la parte inferior -->
-        <TextView
-            android:layout_width="wrap_content"
+        <TableLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Disfruta de las mejores películas de manera rápida y sencilla, Compra uno de nuestros paquetes en COP
-            \nPaquete Plata $5.000(Castv: 50)
-            \nPaquete Bronce $10.000(Castv: 120)
-            \nPaquete Oro $20.000(Castv: 250)
-            \nPaga Facil con la llave \n@tobiasm9833 \nActivar tu paquete enviando Fecha y Nombre titular de la cuenta de pago, por el boton Activar Paquete.
-            \n¡Podrás reproducirla en múltiples dispositivos! Contenido disponible por Tenporizador en minutos(900) despues de actualizada notificacion telegram o email.
-            \nPuedes Alquilar en la pantalla principal o através del boton pedidos la pelicula que quieras; En breve estará lista para ver.
-            \nAl formar parte de nuestra comunidad, el contenido que alquiles estará disponible para todos, sin restricciones. Vive una experiencia de cine sin complicaciones, desde la comodidad de tu hogar.
-            \nSigue nuestro canal de notificaciones de telegram en su movil para no perderse el contenido disponible alquilado de nuestra comunidad"
-        android:textColor="#FFFFFF"
-        android:textSize="18sp"
-        android:textAlignment="center"
-        android:gravity="center"
-        android:layout_gravity="bottom"
-        android:padding="10dp"/>
+            android:padding="16dp"
+            android:stretchColumns="1"
+            android:gravity="center">
 
+            <TableRow>
+                <TextView
+                    android:id="@+id/col1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:lineSpacingExtra="6sp"
+                    android:textAlignment="center" />
+
+                <TextView
+                    android:id="@+id/col2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:lineSpacingExtra="6sp"
+                    android:textAlignment="center" />
+
+                <TextView
+                    android:id="@+id/col3"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:lineSpacingExtra="6sp"
+                    android:textAlignment="center" />
+            </TableRow>
+        </TableLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -39,7 +57,7 @@
             android:orientation="horizontal"
             android:gravity="center"
             android:layout_gravity="bottom">
-                        <!-- Segunda imagen con título -->
+
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
