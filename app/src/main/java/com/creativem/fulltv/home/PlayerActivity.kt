@@ -212,7 +212,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun initializeRecyclerView() {
         // Crear el adaptador inicialmente con una lista vacía
         adapter = MoviesMenuAdapter(mutableListOf()) { movie ->
-            startMoviePlayback(movie.streamUrl, movie.title)
+            startMoviePlayback(movie.streamUrl, movie.title, movie.year)
         }
         binding.recyclerMoviesMenu.adapter = adapter
         binding.recyclerMoviesMenu.layoutManager = LinearLayoutManager(this@PlayerActivity)
@@ -249,13 +249,14 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     // Método para iniciar la reproducción de la película
-    private fun startMoviePlayback(streamUrl: String, movieTitle: String) {
+    private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieYear: String) {
         // Crea un Intent para abrir PlayerActivity
         val intent = Intent(this, PlayerActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP) // Limpia la pila de actividades
         // Envía la URL de transmisión y el título de la película como extras
         intent.putExtra("EXTRA_STREAM_URL", streamUrl)
         intent.putExtra("EXTRA_MOVIE_TITLE", movieTitle)
+        intent.putExtra("EXTRA_MOVIE_YEAR", movieYear)
         // Inicia la actividad de reproducción
         startActivity(intent)
     }
@@ -485,7 +486,7 @@ class PlayerActivity : AppCompatActivity() {
             delay(waitTime) // Espera el tiempo calculado
             // Intenta reiniciar la reproducción
             if (streamUrl != null) {
-                startMoviePlayback(streamUrl, movieTitle) // Llama al método de inicio
+                startMoviePlayback(streamUrl, movieTitle, movieYear) // Llama al método de inicio
                 isReconnecting = false // Indica que no se está reconectando
             }
         }
