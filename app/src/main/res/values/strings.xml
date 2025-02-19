@@ -19,24 +19,25 @@
     <string name="exo_download_removing">Eliminando Descarga</string>
     <string name="columna_1">
     <![CDATA[
-    <b>🎬 Disfruta de las mejores películas</b><br><br>
+    🎬 Disfruta las mejores películas en casa con amigos y familia. Comparte la app y ve el mismo contenido alquilado juntos, sin importar la distancia.<br>
     📦 <b>Paquetes (COP):</b><br>
-    Plata: $5.000 (Castv: 50) <br>
-    Bronce: $10.000 (Castv: 120) <br>
-    Oro: $20.000 (Castv: 250) <br>
+   <b> Plata: $5.000</b> (Castv: 50) <br>
+   <b> Bronce: $10.000</b> (Castv: 120) <br>
+    <b>Oro: $20.000</b> (Castv: 250)
     ]]>
 </string>
 
     <string name="columna_2">
     <![CDATA[
-    💳 <b>Paga fácil:</b> @tobiasm9833 <br>
-    ✅ <b>Activación:</b><br>
-    Enviar <b>Fecha y Nombre</b> del titular <br>
+    💳 <b>Paga fácil:</b> Busca en tu app bancaria la opción Pagar con Llave, ingresa <b>@tobiasm9833</b> y sigue las instrucciones.<br>
+    ✅ <b>Activación de Paquetes:</b><br>
+    Enviar <b>Fecha y Nombre</b> del titular de la cuenta <br>
     por el botón <b>Activar Paquete</b>.<br>
     📺 <b>Beneficios:</b><br>
     ✔ Multi dispositivos<br>
     ✔ Temporizador: <b>900 min</b><br>
     ✔ Notificación <b>Telegram/Email</b><br>
+    🎬 Como parte de nuestra comunidad, el contenido alquilado está disponible para todos, sin límites de cantidad ni distancia. ¡Disfrútalo y compártelo sin restricciones!
     ]]>
 </string>
 
@@ -44,10 +45,10 @@
     <![CDATA[
     🎥 <b>Cómo alquilar:</b><br>
     Desde <b>pantalla principal</b><br>
-    o botón <b>Pedidos</b>.<br><br>
-    🌟 <b>Únete a nuestra comunidad</b><br>
+    o botón <b>Pedidos</b>.<br>
+    🌟 <b>Únete a nuestra comunidad y invita asus amigos</b><br>
     📢 <b>Canal de Telegram</b><br>
-    para recibir notificaciones.
+    Para recibir notificaciones del contenido alquilado y disponible en linea
     ]]>
 </string>
 

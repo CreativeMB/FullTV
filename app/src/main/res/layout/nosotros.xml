@@ -2,6 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:background="@color/colorPrimary"
     android:padding="16dp">
 
@@ -19,92 +20,110 @@
             android:gravity="center">
 
             <TableRow>
-                <TextView
-                    android:id="@+id/col1"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textColor="#FFFFFF"
-                    android:textSize="18sp"
-                    android:lineSpacingExtra="6sp"
-                    android:textAlignment="center" />
 
-                <TextView
-                    android:id="@+id/col2"
+                <!-- Primera Tarjeta -->
+                <androidx.cardview.widget.CardView
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:textColor="#FFFFFF"
-                    android:textSize="18sp"
-                    android:lineSpacingExtra="6sp"
-                    android:textAlignment="center" />
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="6dp"
+                    android:layout_margin="4dp"
+                    app:cardBackgroundColor="#E91E63">
 
-                <TextView
-                    android:id="@+id/col3"
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:id="@+id/col1"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Soporte"
+                            android:textColor="#000000"
+                            android:textSize="16sp"
+                            android:padding="8dp"
+                            android:gravity="start"/>
+
+                        <ImageView
+                            android:layout_width="250dp"
+                            android:layout_height="250dp"
+                            android:src="@drawable/qrtelegram"
+                            android:contentDescription="Soporte"
+                            android:layout_gravity="center_horizontal"
+                            android:layout_marginTop="8dp"/>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- Segunda Tarjeta -->
+                <androidx.cardview.widget.CardView
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:textColor="#FFFFFF"
-                    android:textSize="18sp"
-                    android:lineSpacingExtra="6sp"
-                    android:textAlignment="center" />
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="6dp"
+                    android:layout_margin="4dp"
+                    app:cardBackgroundColor="#00BCD4">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:id="@+id/col2"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Columna 2"
+                            android:textColor="#000000"
+                            android:textSize="16sp"
+                            android:padding="8dp"
+                            android:gravity="start"/>
+
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- Tercera Tarjeta -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="6dp"
+                    android:layout_margin="4dp"
+                    app:cardBackgroundColor="#FF9800">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:id="@+id/col3"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Notificación"
+                            android:textColor="#000000"
+                            android:textSize="16sp"
+                            android:padding="8dp"
+                            android:gravity="start"/>
+
+                        <ImageView
+                            android:layout_width="250dp"
+                            android:layout_height="250dp"
+                            android:src="@drawable/qrcontenido"
+                            android:contentDescription="Notificación"
+                            android:layout_gravity="center_horizontal"
+                            android:layout_marginTop="8dp"/>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
             </TableRow>
         </TableLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_gravity="bottom">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center">
-
-                <ImageView
-                    android:layout_width="150dp"
-                    android:layout_height="150dp"
-                    android:src="@drawable/qrtelegram"
-                    android:contentDescription="Imagen 2" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Soporte"
-                    android:textColor="#FFFFFF"
-                    android:textAlignment="center"
-                    android:gravity="center" />
-            </LinearLayout>
-
-
-            <!-- cuarta imagen con título -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center">
-
-                <ImageView
-                    android:layout_width="150dp"
-                    android:layout_height="150dp"
-                    android:src="@drawable/qrcontenido"
-                    android:contentDescription="Imagen 4" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Notificacion"
-                    android:textColor="#FFFFFF"
-                    android:textAlignment="center"
-                    android:gravity="center" />
-            </LinearLayout>
-
-        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>
