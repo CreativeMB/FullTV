@@ -71,7 +71,7 @@ class MainFragment : BrowseSupportFragment() {
     private lateinit var loadingText: TextView
     private lateinit var loadingContainer: FrameLayout
     private lateinit var binding: MainFragmentBinding
-
+    private val db = FirebaseFirestore.getInstance()
     // Declarar las listas de UIDs (Strings)
     val usuariosConectados = mutableListOf<String>()
     val usuariosDesconectados = mutableListOf<String>()
@@ -265,7 +265,7 @@ class MainFragment : BrowseSupportFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-//        view.setBackgroundColor(defaultBackgroundColor)
+        obtenerNoticia()
         binding.mainBackgroundImage.setImageDrawable(null)
 
 
@@ -368,6 +368,25 @@ class MainFragment : BrowseSupportFragment() {
             updateMovieList(peliculasOrdenadas)
         }
     }
+
+    private fun obtenerNoticia() {
+        val db = FirebaseFirestore.getInstance()
+        val noticiaRef = db.collection("noticia").document("us4vaaf0VPezu9vuc4ns")
+
+        noticiaRef.get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val mensaje = document.getString("noticia") ?: "No hay noticia disponible"
+                    binding.txtNoticia.text = mensaje
+                } else {
+                    binding.txtNoticia.text = "No hay Actualizacion"
+                }
+            }
+            .addOnFailureListener {
+                binding.txtNoticia.text = "Error Actualizacion"
+            }
+    }
+
 
     private fun updateMovieList(peliculas: List<Movie>) {
         rowsAdapter.clear()
