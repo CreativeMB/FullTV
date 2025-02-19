@@ -1,6 +1,7 @@
 package com.creativem.fulltv.home
 
 import android.annotation.SuppressLint
+import android.app.MediaRouteButton
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
@@ -56,10 +57,11 @@ import org.json.JSONObject
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.text.Spannable
-import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
+
+
 
 
 class PlayerActivity : AppCompatActivity() {
@@ -93,6 +95,8 @@ class PlayerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+
         initializeRecyclerView() // Configura el RecyclerView con un adaptador vacío
         loadMovies()
 
@@ -216,6 +220,8 @@ class PlayerActivity : AppCompatActivity() {
         // Cargar las películas desde Firestore
         loadMovies() // Llama al método que carga las películas
     }
+
+
     private fun loadMovies() {
         CoroutineScope(Dispatchers.Main).launch {
             val firestoreRepository = FirestoreRepository()
