@@ -35,13 +35,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import android.text.format.DateUtils
-import android.widget.ImageView
 import android.widget.Toast
 import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import kotlinx.coroutines.MainScope
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
@@ -55,6 +53,14 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
 import org.json.JSONObject
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
+
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -487,48 +493,76 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
-        // Infla el layout personalizado para el diálogo
         val dialogView = layoutInflater.inflate(R.layout.alert_reproductor, null)
-
-        // Encuentra los componentes dentro del layout
         val messageText = dialogView.findViewById<TextView>(R.id.messageText)
-        val firstImage = dialogView.findViewById<ImageView>(R.id.firstImage)
-        val secondImage = dialogView.findViewById<ImageView>(R.id.secondImage)
-        val thirdImage = dialogView.findViewById<ImageView>(R.id.thirdImage)
-        val qrneqiText = dialogView.findViewById<TextView>(R.id.qrneqiText)
-        val qepseText = dialogView.findViewById<TextView>(R.id.qepseText)
-        val qrtjText = dialogView.findViewById<TextView>(R.id.qrtjText)
+        val linkNosotros = dialogView.findViewById<TextView>(R.id.linkNosotros)
 
-        qrneqiText.text = "QR bancos colombianos"
-        qepseText.text = "Soporte"
-        qrtjText.text = "QR TJ Credito"
-        // Configura el mensaje
-        messageText.text = "Pelicula: $movieTitle\nPrecio CasTV: $$movieYear\n" +
-                "Estara en linea en Breve estamos disponibles 24/7\n" +
-                "\nSi no tienes saldo recuerda recargar en COP" +
-                "\nPaquete Plata $5.000(Castv: 50)\n" +
-                "Paquete Bronce $10.000(Castv: 120)\n" +
-                "Paquete Oro $20.000(Castv: 250\n" +
-                "Activa por el boton Activar Paquete"
+        val spannable = SpannableStringBuilder()
 
-        // Opcional: Cambia las imágenes si es necesario
-        firstImage.setImageResource(R.drawable.qrbancos)
-        secondImage.setImageResource(R.drawable.qrtelegram)
-        thirdImage.setImageResource(R.drawable.qrtarjeta)
+        // Primera línea: "Película: <Título>"
+        val movieInfo = "Película: $movieTitle\n"
+        spannable.append(movieInfo)
 
-        // Crea el AlertDialog
-        AlertDialog.Builder(this)
-            .setTitle("¡Alquila Tu Peli!")
-            .setView(dialogView) // Aplica el layout personalizado
+        // Resaltar "Película:" en rojo y más grande
+        val peliculaTexto = "Película:"
+        val peliculaIndex = spannable.indexOf(peliculaTexto)
+        spannable.setSpan(ForegroundColorSpan(Color.RED), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(RelativeSizeSpan(1.3f), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        // Resaltar el título de la película en rojo y más grande
+        val tituloIndex = peliculaIndex + peliculaTexto.length + 1
+        spannable.setSpan(ForegroundColorSpan(Color.BLUE), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(RelativeSizeSpan(1.4f), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        // Segunda línea: "Precio CasTV: $<Año>"
+        val precioInfo = "Precio CasTV: $$movieYear\n"  // Aquí el $ está dentro del String
+        spannable.append(precioInfo)
+
+        // Resaltar "Precio CasTV:" en azul y más grande
+        val precioTexto = "Precio CasTV:"
+        val precioIndex = spannable.indexOf(precioTexto)
+        spannable.setSpan(ForegroundColorSpan(Color.RED), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(RelativeSizeSpan(1.3f), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        // Ubicamos el índice del número sin incluir el $
+        val precioValorIndex = precioIndex + precioTexto.length + 2 // +2 para saltar "$ "
+        spannable.setSpan(ForegroundColorSpan(Color.BLUE), precioValorIndex, precioValorIndex + movieYear.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(RelativeSizeSpan(1.4f), precioValorIndex, precioValorIndex + movieYear.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        // Agregar las demás líneas sin perder formato
+        spannable.append("\nEstará en línea en breve. Estamos disponibles 24/7")
+        spannable.append("\nSi no tienes saldo recuerda recargar en COP")
+
+        // Aplicar el texto formateado al TextView
+        messageText.text = spannable
+
+        // Configurar el enlace a la actividad "Nosotros"
+        linkNosotros.text = "Más información aquí"
+        linkNosotros.setTextColor(Color.GRAY)
+        linkNosotros.paintFlags = linkNosotros.paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
+        linkNosotros.setOnClickListener {
+            val intent = Intent(this, Nosotros::class.java)
+            startActivity(intent)
+        }
+
+        val alertDialog = AlertDialog.Builder(this)
+            .setTitle("¡Alquila Tu Pelicula!")
+            .setView(dialogView)
             .setPositiveButton("Volver al contenido") { dialog, _ ->
-                dialog.dismiss() // Cierra el diálogo
-                finish() // Simula el botón de retroceso
+                dialog.dismiss()
+                finish()
             }
             .setNeutralButton("Alquilar Pelicula") { _, _ ->
                 verificarYProcesarPedido()
             }
-            .show()
+            .create() // Asegurar que se crea antes de modificar el fondo
+
+        alertDialog.window?.setBackgroundDrawable(ColorDrawable(Color.parseColor("#FF9800")))
+
+        alertDialog.show() // Mostrar después de aplicar el fondo
     }
+
+
 
     private fun verificarYProcesarPedido() {
         val query = firestore.collection("pedidosmovies")
