@@ -3,6 +3,7 @@ package com.creativem.fulltv.tv
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -53,6 +54,7 @@ class PlayertvActivity : AppCompatActivity() {
     private val playbackStartTime = AtomicLong(0)
     private var lastKnownPosition: Long = 0
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityPlayerBinding.inflate(layoutInflater)
@@ -98,6 +100,14 @@ class PlayertvActivity : AppCompatActivity() {
 
         val shuffleButton: ImageButton = findViewById(R.id.home)
         shuffleButton.setOnClickListener {
+            player?.let {
+                it.playWhenReady = false  // Detiene la reproducción inmediata
+                it.stop() // Asegura que el audio se detenga
+                it.clearMediaItems() // Limpia la lista de reproducción
+                it.release() // Libera los recursos
+            }
+            player = null // Elimina la referencia
+
             finish()
         }
         val pedidosButton: ImageButton = findViewById(R.id.pedidos)

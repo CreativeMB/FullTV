@@ -56,6 +56,7 @@ import kotlin.math.pow
 import org.json.JSONObject
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.media.MediaPlayer
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
@@ -89,6 +90,7 @@ class PlayerActivity : AppCompatActivity() {
     private var isPlaybackActive = false // Indica si la reproducción ha sido activa
     private val playbackStartTime = AtomicLong(0) // Tiempo en que inicia la reproducción
     private var lastKnownPosition: Long = 0 // Para guardar la última posición conocida
+
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -153,6 +155,14 @@ class PlayerActivity : AppCompatActivity() {
         // Botón Shuffle
         val shuffleButton: ImageButton = findViewById(R.id.home)
         shuffleButton.setOnClickListener {
+            player?.let {
+                it.playWhenReady = false  // Detiene la reproducción inmediata
+                it.stop() // Asegura que el audio se detenga
+                it.clearMediaItems() // Limpia la lista de reproducción
+                it.release() // Libera los recursos
+            }
+            player = null // Elimina la referencia
+
             finish()
         }
         // Botón pedidos
@@ -670,86 +680,6 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-
-
-//    private fun enviarPedido() {
-//        if (isProcessingOrder) {
-//            return // Salir si ya se está procesando un pedido
-//        }
-//
-//        isProcessingOrder = true // Marcar como procesando
-//
-//        // Crear una consulta para buscar la película por título y año
-//        val query = firestore.collection("pedidosmovies")
-//            .whereEqualTo("title", movieTitle)
-//            .whereEqualTo("year", movieYear)
-//
-//        query.get().addOnSuccessListener { querySnapshot ->
-//            if (querySnapshot.isEmpty) {
-//                // La película no existe, verificar puntos primero
-//                val userId = auth.currentUser?.uid // Obtener el ID del usuario autenticado
-//                if (userId != null) {
-//                    // Convertir year de Movie a Int antes de pasarlo a verificarPuntos
-//                    val costoPedido = movieYear.toIntOrNull() ?: 0 // Convertir a Int o asignar 0 si no se puede convertir
-//                    verificarPuntos(userId, costoPedido) { tienePuntos ->
-//                        if (tienePuntos) {
-//                            // Si tiene puntos, proceder a agregar la película
-//                            val datos: HashMap<String, Any> = hashMapOf(
-//                                "title" to movieTitle,
-//                                "year" to movieYear,
-//                                "userId" to userId // Agregar el userId a los datos de la película
-//                            )
-//
-//                            // Agregar la película a la colección
-//                            firestore.collection("pedidosmovies")
-//                                .add(datos)
-//                                .addOnSuccessListener { documentReference ->
-//                                    // Descontar puntos del usuario usando costoPedido
-//                                    descontarPuntos(userId, costoPedido.toLong(), datos) // Convertir a Long
-//                                    // Enviar notificación
-//                                    enviarCorreoNuevoPedido(movieTitle)
-//                                }
-//                                .addOnFailureListener { e ->
-//                                    Log.e("Firestore", "Error al agregar la película: ${e.message}")
-//                                    Toast.makeText(
-//                                        this,
-//                                        "Error al realizar el pedido: ${e.message}",
-//                                        Toast.LENGTH_SHORT
-//                                    ).show()
-//                                }
-//                        } else {
-//                            // No tiene suficientes puntos, mostrar mensaje y redirigir
-//                            Toast.makeText(
-//                                this,
-//                                "¡Ho! No tienes Saldo de CasTV para poder Alquilar.",
-//                                Toast.LENGTH_LONG
-//                            ).show()
-//                            val intent = Intent(this, Nosotros::class.java)
-//                            startActivity(intent)
-//                            finish()
-//                        }
-//                    }
-//                } else {
-//                    Toast.makeText(this, "No hay usuario autenticado.", Toast.LENGTH_SHORT).show()
-//                }
-//            } else {
-//                // La película ya existe, mostrar mensaje y redirigir
-//                Toast.makeText(
-//                    this,
-//                    "La película '$movieTitle' ya fue pedida; puedes alquilar más...",
-//                    Toast.LENGTH_LONG
-//                ).show()
-//                finish()
-//            }
-//        }.addOnFailureListener { e ->
-//            Log.e("Firestore", "Error al consultar la película: ${e.message}")
-//            Toast.makeText(this, "Error al consultar la película: ${e.message}", Toast.LENGTH_SHORT)
-//                .show()
-//        }.addOnCompleteListener {
-//            isProcessingOrder = false // Restablecer el flag al finalizar
-//        }
-//    }
-
     private fun verificarPuntos(userId: String, costo: Int, callback: (Boolean) -> Unit) {
         val userRef = firestore.collection("users").document(userId)
 
@@ -862,8 +792,6 @@ class PlayerActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         releasePlayer()
-        player = null
-
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
