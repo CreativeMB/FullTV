@@ -57,6 +57,8 @@ import org.json.JSONObject
 import android.widget.LinearLayout
 import android.text.InputType
 import android.widget.ImageButton
+import com.creativem.fulltv.enlinea.PeliculasValidas
+import com.creativem.fulltv.tv.TvActivity
 import com.google.firebase.Firebase
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -214,12 +216,16 @@ class MainFragment : BrowseSupportFragment() {
                     }
 
                     "Pelis\nGratis" -> {
-                        val intent = Intent(requireContext(), MoviesValidas::class.java)
+                        val intent = Intent(requireContext(), PeliculasValidas::class.java)
                         startActivity(intent)
                     }
 
                     "¿Como\nPago?" -> {
                         val intent = Intent(requireContext(), Nosotros::class.java)
+                        startActivity(intent)
+                    }
+                    "TV\nGratis" -> {
+                        val intent = Intent(requireContext(), TvActivity::class.java)
                         startActivity(intent)
                     }
 
@@ -393,13 +399,14 @@ class MainFragment : BrowseSupportFragment() {
 
         // Primero, agregamos el menú
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("Buscar\nPelicula", "Pedir\nPelicula","Activar\nPaquete", "Pelis\nGratis", "¿Como\nPago?", "Cerrar\nCuenta")
+        val menuItems = listOf("Buscar\nPelicula", "Pedir\nPelicula","Activar\nPaquete", "Pelis\nGratis", "¿Como\nPago?","TV\nGratis", "Cerrar\nCuenta")
         val menuIcons = listOf(
             R.drawable.buscar,
             R.drawable.pedido,
             R.drawable.activacion,
             R.drawable.cartelera,
             R.drawable.pago,
+            R.drawable.tv,
             R.drawable.cerrrar
         )
 

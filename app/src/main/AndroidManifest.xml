@@ -29,7 +29,27 @@
             android:exported="false"
             android:screenOrientation="landscape"/>
         <activity
+            android:name=".tv.TvActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"/>
+        <activity
+            android:name=".enlinea.PeliculasValidas"
+            android:exported="false"
+            android:screenOrientation="landscape"/>
+        <activity
             android:name=".home.MainFragment"
+            android:exported="false"
+            android:windowSoftInputMode="stateHidden|adjustPan"
+            android:screenOrientation="landscape"
+            tools:ignore="Instantiatable" />
+        <activity
+            android:name=".tv.TvFragment"
+            android:exported="false"
+            android:windowSoftInputMode="stateHidden|adjustPan"
+            android:screenOrientation="landscape"
+            tools:ignore="Instantiatable" />
+        <activity
+            android:name=".enlinea.PeliculasFragment"
             android:exported="false"
             android:windowSoftInputMode="stateHidden|adjustPan"
             android:screenOrientation="landscape"
@@ -38,12 +58,17 @@
             android:name=".home.Nosotros"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
         <activity
             android:name=".home.MoviesValidas"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".home.PlayerActivity"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+        <activity
+            android:name=".tv.PlayertvActivity"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity

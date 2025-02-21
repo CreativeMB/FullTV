@@ -12,6 +12,7 @@
         android:layout_height="wrap_content"
         android:text="Iniciando sesión con Google..."
         android:textSize="30sp"
+        android:textStyle="bold"
         android:textColor="@color/colorFocused" />
 
 </LinearLayout>
