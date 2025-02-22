@@ -30,23 +30,47 @@ class TvFragment : RowsSupportFragment() {
     }
 
     private fun loadTvChannels() {
-        val listRowAdapter = ArrayObjectAdapter(CardPresenterTV())
-
-        db.collection("tv") // Cargar desde la colección "fragment_tv" en Firebase
+        db.collection("tv")
             .orderBy("createdAt")
             .get()
             .addOnSuccessListener { documents ->
+                val canales = mutableListOf<Movie>()
+
                 for (document in documents) {
-                    val channel = document.toObject(Movie::class.java) // Mapeo a Movie
-                    listRowAdapter.add(channel)
+                    val channel = document.toObject(Movie::class.java)
+                    canales.add(channel)
                 }
-                if (listRowAdapter.size() > 0) {
-                    val header = HeaderItem(0, "Canales en Vivo")
-                    channels.add(ListRow(header, listRowAdapter))
+
+                if (canales.isNotEmpty()) {
+                    organizarEnFilas(canales)
+                } else {
+                    Log.e("TvFragment", "No hay canales válidos.")
                 }
             }
             .addOnFailureListener { e ->
                 Log.e("TvFragment", "Error cargando canales", e)
             }
+    }
+
+    private fun calcularElementosPorFila(): Int {
+        val displayMetrics = android.content.res.Resources.getSystem().displayMetrics
+        val anchoPantalla = displayMetrics.widthPixels
+        val anchoTarjeta = 200
+        return (anchoPantalla / anchoTarjeta).coerceAtLeast(1)
+    }
+
+    private fun organizarEnFilas(canales: List<Movie>) {
+        val cardPresenter = CardPresenterTV()
+        val elementosPorFila = calcularElementosPorFila()
+        val chunkedCanales = canales.chunked(elementosPorFila)
+
+        chunkedCanales.forEachIndexed { index, chunk ->
+            val listRowAdapter = ArrayObjectAdapter(cardPresenter).apply {
+                addAll(0, chunk)
+            }
+
+            val header = if (index == 0) HeaderItem(0, "Canales en Vivo Gratis") else null
+            channels.add(ListRow(header, listRowAdapter))
+        }
     }
 }
