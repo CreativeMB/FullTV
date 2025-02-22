@@ -135,10 +135,14 @@ class TvFragment : Fragment() {
             }
     }
 
+    override fun onPause() {
+        super.onPause()
+        clearFields()
+    }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        clearFields() // Limpiar los campos de texto cuando el fragmento se destruye
+        clearFields()
     }
 
     private fun clearFields() {
