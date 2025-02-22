@@ -53,6 +53,7 @@ class PlayertvActivity : AppCompatActivity() {
     private var isPlaybackActive = false
     private val playbackStartTime = AtomicLong(0)
     private var lastKnownPosition: Long = 0
+    private var url: String = "https://tuenlace.com/stream.m3u8" // 🔹 Agrega la URL aquí
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -261,6 +262,12 @@ class PlayertvActivity : AppCompatActivity() {
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            // 🔹 Reiniciar el reproductor tras un error
+            player?.stop()
+            player?.clearMediaItems()
+            player?.setMediaItem(MediaItem.fromUri(url)) // Reemplaza con la URL actualizada
+            player?.prepare()
+            player?.play()
             Log.e("PlayertvActivity", "Error en el reproductor: ${error.message} - Código: ${error.errorCode}")
             Toast.makeText(this@PlayertvActivity, "Error de reproducción", Toast.LENGTH_SHORT).show()
         }
