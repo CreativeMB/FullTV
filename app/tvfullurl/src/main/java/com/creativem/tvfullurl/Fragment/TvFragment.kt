@@ -77,36 +77,30 @@ class TvFragment : Fragment() {
                 "createdAt" to com.google.firebase.Timestamp.now()
             )
 
-            // Añadir un nuevo documento con un ID único generado automáticamente por Firebase
             firestore.collection("tv")
                 .add(tvData)
                 .addOnSuccessListener { documentReference ->
-                    val documentId = documentReference.id // Obtienes el ID del documento creado
+                    val documentId = documentReference.id
 
-                    // Ahora, actualiza el documento para agregar el userId (ID del documento generado por Firebase)
                     val updateData = hashMapOf(
-                        "userId" to documentId // Agregamos el userId como el ID del documento
+                        "userId" to documentId
                     )
 
-                    // Actualizar el documento con el userId
                     documentReference.update(updateData as Map<String, Any>)
                         .addOnSuccessListener {
                             Toast.makeText(context, "Datos subidos correctamente", Toast.LENGTH_SHORT).show()
 
-                            // Ahora que tienes el ID, puedes almacenar el nuevo Movie
-                            val newMovie = Movie(documentId, title, imageUrl, streamUrl)  // Asegúrate de pasar el documentId
+                            val newMovie = Movie(documentId, title, imageUrl, streamUrl)
 
                             // Agregar el nuevo item a la lista y notificar al adaptador
                             movieList.add(newMovie)
 
-                            // Usar notifyItemInserted con el índice correcto
-                            val position = movieList.size - 1
-                            pedidosAdapter.notifyItemInserted(position)
-
-                            // Si usas un método que actualiza la lista completa, puedes usar notifyDataSetChanged()
-                            // pedidosAdapter.notifyDataSetChanged()
-
-                            // Limpiar los campos después de agregar
+                            // Asegúrate de agregar un elemento en la lista correctamente y notificar al adaptador
+//                            val newMovie = Movie(documentId, title, imageUrl, streamUrl)
+                            movieList.add(newMovie)  // Agregar el nuevo elemento
+                            activity?.runOnUiThread {
+                                pedidosAdapter.notifyItemInserted(movieList.size - 1)  // Notificar la inserción
+                            }
                             clearFields()
                         }
                         .addOnFailureListener { e ->
@@ -127,23 +121,23 @@ class TvFragment : Fragment() {
             .get()
             .addOnSuccessListener { documents ->
                 if (!documents.isEmpty) {
+                    // Obtiene la lista de items mapeada
                     val tvList = documents.map { doc ->
-                        // Obtener el ID del documento
                         val documentId = doc.id
-
-                        // Mapear los datos de cada documento a un objeto (como Movie en tu adaptador)
                         val title = doc.getString("title") ?: "Título no disponible"
 
-
-                        // Verificación de los datos antes de crear el objeto Movie
-                        Log.d("loadData", "Title: $title")
-
-                        // Agregar el ID del documento al objeto Movie
+                        // Crear el objeto Movie
                         Movie(id = documentId, title = title)
                     }
 
-                    // Actualiza el adaptador con la lista de películas
-                    pedidosAdapter.updateMovieList(tvList)
+                    // Verificar si ya existe algún dato en la lista
+                    val currentSize = movieList.size
+
+                    // Agregar los nuevos items a la lista existente
+                    movieList.addAll(tvList)
+
+                    // Notificar al adaptador de que se han agregado nuevos items
+                    pedidosAdapter.notifyItemRangeInserted(currentSize, tvList.size)
                 } else {
                     Toast.makeText(context, "No hay datos disponibles", Toast.LENGTH_SHORT).show()
                 }
@@ -152,6 +146,7 @@ class TvFragment : Fragment() {
                 Toast.makeText(context, "Error al cargar los datos: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
+
 
 
     private fun clearFields() {
@@ -165,37 +160,25 @@ class TvFragment : Fragment() {
 
         val db = FirebaseFirestore.getInstance()
 
-        // Verificar si el ID del documento está vacío
         if (documentId.isEmpty()) {
             Toast.makeText(requireContext(), "ID de documento no válido", Toast.LENGTH_SHORT).show()
             return
         }
 
-        // Referencia al documento en la colección "tv" utilizando el ID del documento
         val pedidoRef = db.collection("tv").document(documentId)
 
-        // Eliminar el documento
         pedidoRef.delete()
             .addOnSuccessListener {
-                // Mostrar mensaje de éxito
                 Toast.makeText(requireContext(), "Pedido eliminado correctamente", Toast.LENGTH_SHORT).show()
 
-                // Encontrar el index del item en la lista
                 val positionToRemove = movieList.indexOfFirst { it.id == documentId }
 
                 if (positionToRemove != -1) {
-                    // Eliminar el item de la lista local
                     movieList.removeAt(positionToRemove)
-
-                    // Notificar al adaptador que se eliminó un item
                     pedidosAdapter.notifyItemRemoved(positionToRemove)
                 }
-
-                // Si es necesario, se puede volver a notificar el cambio completo (aunque no es la mejor opción por performance)
-                // pedidosAdapter.notifyDataSetChanged()
             }
             .addOnFailureListener { e ->
-                // Mostrar mensaje de error si falla
                 Toast.makeText(requireContext(), "Error al eliminar pedido: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
