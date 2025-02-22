@@ -61,12 +61,10 @@
 
         <activity
             android:name=".home.PlayerActivity"
-            android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".tv.PlayertvActivity"
-            android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity

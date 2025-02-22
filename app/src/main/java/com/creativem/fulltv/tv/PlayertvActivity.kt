@@ -3,7 +3,6 @@ package com.creativem.fulltv.tv
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -28,14 +27,14 @@ import com.creativem.fulltv.data.RelojCuston
 import com.creativem.fulltv.adapter.MoviesMenuAdapter
 import kotlinx.coroutines.*
 import android.text.format.DateUtils
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultHttpDataSource
 import com.creativem.fulltv.R
 import com.creativem.fulltv.databinding.ActivityPlayerBinding
 import com.creativem.fulltv.home.Nosotros
-import java.util.concurrent.atomic.AtomicLong
-
 
 class PlayertvActivity : AppCompatActivity() {
 
@@ -50,10 +49,6 @@ class PlayertvActivity : AppCompatActivity() {
     private lateinit var runnableOcultar: Runnable
     private val hideControlsDelay: Long = 10000 // 10 segundos
     private val updateInterval: Long = 1000 // 1 segundo
-    private var isPlaybackActive = false
-    private val playbackStartTime = AtomicLong(0)
-    private var lastKnownPosition: Long = 0
-    private var url: String = "https://tuenlace.com/stream.m3u8" // 🔹 Agrega la URL aquí
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,7 +56,7 @@ class PlayertvActivity : AppCompatActivity() {
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-
+        binding.reproductor.keepScreenOn = true
         initializeRecyclerView()
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -198,7 +193,12 @@ class PlayertvActivity : AppCompatActivity() {
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
         val loadControl = DefaultLoadControl.Builder()
-            .setTargetBufferBytes(8 * 1024 * 1024)
+            .setBufferDurationsMs(
+                40_000,  // Min Buffer
+                100_000, // Max Buffer
+                10_000,  // Min Playback Buffer
+                10_000   // Min Rebuffer
+            )
             .setPrioritizeTimeOverSizeThresholds(false)
             .build()
 
@@ -221,36 +221,63 @@ class PlayertvActivity : AppCompatActivity() {
                 exoPlayer.playWhenReady = true
             }
     }
+    private val reconectarRunnable = Runnable {
+        if (player?.playbackState == Player.STATE_BUFFERING) {
+            Log.e("PlayertvActivity", "Buffering prolongado, intentando reconectar...")
 
-    private val playerListener = object : Player.Listener {
+            // 🔹 Evitar pantalla negra: mantener el mismo reproductor y solo reintentar cargar
+            player?.stop() // Detiene la reproducción
+            player?.clearMediaItems() // Limpia la lista de reproducción
+            val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+            player?.setMediaItem(mediaItem)
+            player?.prepare() // 🔄 Volver a cargar
+            player?.playWhenReady = true
+            reiniciarReproductor()
+        }
+    }
+    private var bufferingStartTime: Long = 0
+    private val maxBufferingTimeMillis = 3000
+    private var consecutiveBufferingAttempts = 0
+    private val maxBufferingAttempts = 3
+    private var isBuffering = false
+    private val playerListener = @UnstableApi
+    object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
                 Player.STATE_BUFFERING -> {
-                    Log.d("PlayertvActivity", "Reproductor almacenando en búfer...")
-                    mostrarBuffer()
+                    isBuffering = true
+                    consecutiveBufferingAttempts++
+                    if (consecutiveBufferingAttempts >= maxBufferingAttempts) {
+                        Log.w("PlayertvActivity", "Muchos intentos de buffering consecutivos, reiniciando...")
+                        reiniciarReproductor()
+                        consecutiveBufferingAttempts = 0
+                    }
                 }
                 Player.STATE_READY -> {
-                    Log.d("PlayertvActivity", "Reproductor en estado READY")
-                    isPlaybackActive = true
-                    playbackStartTime.set(System.currentTimeMillis())
-                    if (lastKnownPosition > 0) {
-                        player?.seekTo(lastKnownPosition)
-                        lastKnownPosition = 0
-                    }
-                    actualizarTiempo()
+                    consecutiveBufferingAttempts = 0
+                    isBuffering = false
+
+                    // Eliminamos la llamada a actualizarTiempo() inmediata
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        actualizarTiempo()  //Llamada única y optimizada
+                        mostrarBuffer()     //Llamada única y optimizada
+                    }, 250) //Experimenta con diferentes valores de retraso (250ms o menos)
+
                 }
                 Player.STATE_ENDED -> {
-                    Log.d("PlayertvActivity", "Reproducción finalizada.")
-                    isPlaybackActive = false
-                    handler.removeCallbacks(runnable)
+                    Log.d("PlayertvActivity", "Reproducción finalizada, reiniciando...")
+                    reiniciarReproductor()
                 }
                 Player.STATE_IDLE -> {
-                    Log.d("PlayertvActivity", "Reproductor en estado IDLE.")
-                    isPlaybackActive = false
-                    handler.removeCallbacks(runnable)
+                    Log.d("PlayertvActivity", "Reproductor en estado IDLE, intentando recuperar...")
+                    reiniciarReproductor()
                 }
-                else -> Log.w("PlayertvActivity", "Estado desconocido del reproductor: $playbackState")
             }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            Log.e("PlayertvActivity", "Error de reproducción: ${error.message}, código: ${error.errorCode}, tipo de error: ${error.cause?.javaClass?.simpleName}", error)
+            reiniciarReproductor()
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -261,18 +288,25 @@ class PlayertvActivity : AppCompatActivity() {
             }
         }
 
-        override fun onPlayerError(error: PlaybackException) {
-            // 🔹 Reiniciar el reproductor tras un error
-            player?.stop()
-            player?.clearMediaItems()
-            player?.setMediaItem(MediaItem.fromUri(url)) // Reemplaza con la URL actualizada
-            player?.prepare()
-            player?.play()
-            Log.e("PlayertvActivity", "Error en el reproductor: ${error.message} - Código: ${error.errorCode}")
-            Toast.makeText(this@PlayertvActivity, "Error de reproducción", Toast.LENGTH_SHORT).show()
+        @SuppressLint("UnsafeOptInUsageError")
+        override fun onPositionDiscontinuity(reason: Int) {
+            Log.w("PlayertvActivity", "Discontinuidad de posición: $reason")
         }
+
+
+        override fun onIsLoadingChanged(isLoading: Boolean) {
+            Log.d("PlayertvActivity", "Está cargando: $isLoading")
+        }
+
     }
 
+    private fun reiniciarReproductor() {
+        Log.d("PlayertvActivity", "Reiniciando el reproductor...")
+        player?.release()  // Libera el reproductor actual
+        player = null  // Elimina referencia
+        handler.removeCallbacksAndMessages(null) // Detiene cualquier proceso en espera
+        initializePlayer()  // Vuelve a iniciar ExoPlayer
+    }
     private fun mostrarBuffer() {
         val bufferedPercentage = player?.bufferedPercentage ?: 0
         val bufferedData = (bufferedPercentage / 100.0) * (2 * 1024)
@@ -330,6 +364,7 @@ class PlayertvActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
+        super.onBackPressed()
         if (binding.recyclerMoviesMenu.visibility == View.VISIBLE) {
             binding.recyclerMoviesMenu.visibility = View.GONE
         } else {
@@ -360,6 +395,8 @@ class PlayertvActivity : AppCompatActivity() {
     }
 
     private var currentAspectRatioMode = 0
+
+    @OptIn(UnstableApi::class)
     private fun cycleAspectRatio() {
         val playerView = binding.reproductor
         val aspectRatios = listOf(
@@ -389,7 +426,18 @@ class PlayertvActivity : AppCompatActivity() {
                     val progress = (posicionActual.toFloat() / duracionTotal * 100).toInt()
                     seekBar.progress = progress
                     handler.postDelayed(runnableActualizar, updateInterval)
+                    handleBuffering()
                 }
+            }
+        }
+    }
+    private fun handleBuffering() {
+        if (bufferingStartTime != 0L) {
+            val bufferingDuration = System.currentTimeMillis() - bufferingStartTime
+            if (bufferingDuration > maxBufferingTimeMillis) {
+                Log.w("PlayertvActivity", "Buffering prolongado ($bufferingDuration ms), intentando reiniciar...")
+                reiniciarReproductor()
+                bufferingStartTime = 0L
             }
         }
     }
