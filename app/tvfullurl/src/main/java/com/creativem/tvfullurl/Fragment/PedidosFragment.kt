@@ -36,6 +36,8 @@ class PedidosFragment : Fragment() {
         iniciarRecycler()
         cargarPedidos()
 
+
+
         // Configurar el SearchView
         binding.searchView.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
@@ -106,21 +108,22 @@ class PedidosFragment : Fragment() {
     private fun deletePedido(pedidoId: String) {
         val db = FirebaseFirestore.getInstance()
 
+        // Verificar que el ID del pedido no esté vacío
         if (pedidoId.isEmpty()) {
             Toast.makeText(requireContext(), "ID de pedido no válido", Toast.LENGTH_SHORT).show()
             return
         }
 
-        // Referencia al documento específico dentro de la colección "pedidosmovies"
-        val pedidoRef = db.collection("pedidosmovies").document(pedidoId)
+        // Referencia al documento específico dentro de la colección "tv"
+        val pedidoRef = db.collection("tv").document(pedidoId)
 
-        // Eliminar el documento
+        // Eliminar el documento de la colección "tv"
         pedidoRef.delete()
             .addOnSuccessListener {
                 // Mostrar mensaje de éxito
                 Toast.makeText(requireContext(), "Pedido eliminado correctamente", Toast.LENGTH_SHORT).show()
 
-                // Eliminar el item de la lista local
+                // Eliminar el item de la lista local (si es necesario)
                 val movieToRemove = movieList.find { it.id == pedidoId }
                 movieList.remove(movieToRemove)
 
@@ -132,4 +135,5 @@ class PedidosFragment : Fragment() {
                 Toast.makeText(requireContext(), "Error al eliminar pedido: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
+
 }

@@ -27,7 +27,8 @@
                 android:layout_height="wrap_content"
                 android:text="Nombre del Usuario"
                 android:textSize="12sp"
-                android:layout_marginBottom="4dp" />
+                android:layout_marginBottom="4dp"
+                 />
 
             <!-- Línea para Año y Correo -->
             <LinearLayout
@@ -43,7 +44,8 @@
                     android:layout_height="wrap_content"
                     android:text="CasTV"
                     android:textSize="12sp"
-                    android:layout_marginEnd="10dp" />
+                    android:layout_marginEnd="10dp"
+                     />
 
                 <!-- Correo del Usuario -->
                 <TextView
@@ -56,7 +58,8 @@
                     android:textSize="18sp"
                     android:clickable="true"
                     android:focusable="true"
-                    android:background="?android:attr/selectableItemBackground"/>
+                    android:background="?android:attr/selectableItemBackground"
+                     />
             </LinearLayout>
 
             <!-- Título del Pedido en negrita -->

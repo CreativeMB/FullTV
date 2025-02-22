@@ -15,10 +15,10 @@
       </SelectionState>
       <SelectionState runConfigName="app.tvfullurl">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2025-01-18T20:42:35.265732800Z">
+        <DropdownSelection timestamp="2025-02-22T00:54:09.859629600Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\Oficina\.android\avd\Medium_Phone.avd" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\Oficina\.android\avd\Pixel_8a_API_35.avd" />
             </handle>
           </Target>
         </DropdownSelection>
