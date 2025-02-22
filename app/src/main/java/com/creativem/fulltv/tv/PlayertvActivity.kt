@@ -49,7 +49,8 @@ class PlayertvActivity : AppCompatActivity() {
     private lateinit var runnableOcultar: Runnable
     private val hideControlsDelay: Long = 10000 // 10 segundos
     private val updateInterval: Long = 1000 // 1 segundo
-
+    private var playerReleased = false
+    private val playerHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -221,20 +222,7 @@ class PlayertvActivity : AppCompatActivity() {
                 exoPlayer.playWhenReady = true
             }
     }
-    private val reconectarRunnable = Runnable {
-        if (player?.playbackState == Player.STATE_BUFFERING) {
-            Log.e("PlayertvActivity", "Buffering prolongado, intentando reconectar...")
 
-            // 🔹 Evitar pantalla negra: mantener el mismo reproductor y solo reintentar cargar
-            player?.stop() // Detiene la reproducción
-            player?.clearMediaItems() // Limpia la lista de reproducción
-            val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
-            player?.setMediaItem(mediaItem)
-            player?.prepare() // 🔄 Volver a cargar
-            player?.playWhenReady = true
-            reiniciarReproductor()
-        }
-    }
     private var bufferingStartTime: Long = 0
     private val maxBufferingTimeMillis = 3000
     private var consecutiveBufferingAttempts = 0
@@ -243,40 +231,55 @@ class PlayertvActivity : AppCompatActivity() {
     private val playerListener = @UnstableApi
     object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
-            when (playbackState) {
-                Player.STATE_BUFFERING -> {
-                    isBuffering = true
-                    consecutiveBufferingAttempts++
-                    if (consecutiveBufferingAttempts >= maxBufferingAttempts) {
-                        Log.w("PlayertvActivity", "Muchos intentos de buffering consecutivos, reiniciando...")
-                        reiniciarReproductor()
-                        consecutiveBufferingAttempts = 0
+            playerHandler.post {
+                when (playbackState) {
+                    Player.STATE_BUFFERING -> {
+                        isBuffering = true
+                        consecutiveBufferingAttempts++
+                        if (consecutiveBufferingAttempts >= maxBufferingAttempts) {
+                            Log.w(
+                                "PlayertvActivity",
+                                "Muchos intentos de buffering consecutivos, reiniciando..."
+                            )
+                            reiniciarReproductor()
+                            consecutiveBufferingAttempts = 0
+                        }
                     }
-                }
-                Player.STATE_READY -> {
-                    consecutiveBufferingAttempts = 0
-                    isBuffering = false
 
-                    // Eliminamos la llamada a actualizarTiempo() inmediata
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        actualizarTiempo()  //Llamada única y optimizada
-                        mostrarBuffer()     //Llamada única y optimizada
-                    }, 250) //Experimenta con diferentes valores de retraso (250ms o menos)
+                    Player.STATE_READY -> {
+                        consecutiveBufferingAttempts = 0
+                        isBuffering = false
 
-                }
-                Player.STATE_ENDED -> {
-                    Log.d("PlayertvActivity", "Reproducción finalizada, reiniciando...")
-                    reiniciarReproductor()
-                }
-                Player.STATE_IDLE -> {
-                    Log.d("PlayertvActivity", "Reproductor en estado IDLE, intentando recuperar...")
-                    reiniciarReproductor()
+                        // Eliminamos la llamada a actualizarTiempo() inmediata
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            actualizarTiempo()  //Llamada única y optimizada
+                            mostrarBuffer()     //Llamada única y optimizada
+                        }, 250) //Experimenta con diferentes valores de retraso (250ms o menos)
+
+                    }
+
+                    Player.STATE_ENDED -> {
+                        Log.d("PlayertvActivity", "Reproducción finalizada, reiniciando...")
+                        reiniciarReproductor()
+                    }
+
+                    Player.STATE_IDLE -> {
+                        Log.d(
+                            "PlayertvActivity",
+                            "Reproductor en estado IDLE, intentando recuperar..."
+                        )
+                        reiniciarReproductor()
+                    }
                 }
             }
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            Log.e("PlayertvActivity", "Error de reproducción: ${error.message}, código: ${error.errorCode}, tipo de error: ${error.cause?.javaClass?.simpleName}", error)
+            Log.e(
+                "PlayertvActivity",
+                "Error de reproducción: ${error.message}, código: ${error.errorCode}, tipo de error: ${error.cause?.javaClass?.simpleName}",
+                error
+            )
             reiniciarReproductor()
         }
 
@@ -307,6 +310,7 @@ class PlayertvActivity : AppCompatActivity() {
         handler.removeCallbacksAndMessages(null) // Detiene cualquier proceso en espera
         initializePlayer()  // Vuelve a iniciar ExoPlayer
     }
+
     private fun mostrarBuffer() {
         val bufferedPercentage = player?.bufferedPercentage ?: 0
         val bufferedData = (bufferedPercentage / 100.0) * (2 * 1024)
@@ -320,22 +324,28 @@ class PlayertvActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        player?.pause()
-        handler.removeCallbacks(runnable)
+        releasePlayer()
+        playerHandler.removeCallbacksAndMessages(null) // Limpiar todos los mensajes del Handler
     }
 
     override fun onResume() {
         super.onResume()
-        player?.playWhenReady = true
-        if (player?.isPlaying == true) {
-            handler.postDelayed(runnable, updateInterval)
+        if (player == null && !playerReleased) {
+            player = ExoPlayer.Builder(this).build()
+            binding.reproductor.player = player
+            initializePlayer()
         }
     }
 
+
     private fun releasePlayer() {
-        player?.removeListener(playerListener)
-        player?.release()
-        player = null
+        if (!playerReleased) {
+            player?.removeListener(playerListener)
+            player?.release()
+            player = null
+            playerReleased = true
+            Log.d("PlayertvActivity", "Reproductor liberado")
+        }
     }
 
     override fun onDestroy() {
@@ -431,11 +441,15 @@ class PlayertvActivity : AppCompatActivity() {
             }
         }
     }
+
     private fun handleBuffering() {
         if (bufferingStartTime != 0L) {
             val bufferingDuration = System.currentTimeMillis() - bufferingStartTime
             if (bufferingDuration > maxBufferingTimeMillis) {
-                Log.w("PlayertvActivity", "Buffering prolongado ($bufferingDuration ms), intentando reiniciar...")
+                Log.w(
+                    "PlayertvActivity",
+                    "Buffering prolongado ($bufferingDuration ms), intentando reiniciar..."
+                )
                 reiniciarReproductor()
                 bufferingStartTime = 0L
             }
@@ -453,18 +467,22 @@ class PlayertvActivity : AppCompatActivity() {
                 mostarpélis()
                 true
             }
+
             KeyEvent.KEYCODE_PAGE_UP -> {
                 mostarpélis()
                 true
             }
+
             KeyEvent.KEYCODE_PAGE_DOWN -> {
                 mostarpélis()
                 true
             }
+
             174 -> {
                 mostarpélis()
                 true
             }
+
             else -> super.onKeyDown(keyCode, event)
         }
     }

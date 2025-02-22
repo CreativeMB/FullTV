@@ -27,7 +27,6 @@
         <activity
             android:name=".adapter.Main"
             android:exported="false"
-            android:screenOrientation="landscape"
            />
         <activity
             android:name=".tv.TvActivity"
