@@ -32,7 +32,7 @@ class TvFragment : RowsSupportFragment() {
     private fun loadTvChannels() {
         val listRowAdapter = ArrayObjectAdapter(CardPresenterTV())
 
-        db.collection("fragment_tv") // Cargar desde la colección "fragment_tv" en Firebase
+        db.collection("tv") // Cargar desde la colección "fragment_tv" en Firebase
             .orderBy("createdAt")
             .get()
             .addOnSuccessListener { documents ->
