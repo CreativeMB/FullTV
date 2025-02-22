@@ -81,16 +81,25 @@ class TvFragment : Fragment() {
             firestore.collection("tv")
                 .add(tvData)
                 .addOnSuccessListener { documentReference ->
-                    val documentId = documentReference.id
+                    documentReference.get()
+                        .addOnSuccessListener { documentSnapshot ->
+                            val documentId = documentSnapshot.id
+                            val newTitle = documentSnapshot.getString("title") ?: "Sin título"
+                            val newImageUrl = documentSnapshot.getString("imageUrl") ?: ""
+                            val newStreamUrl = documentSnapshot.getString("streamUrl") ?: ""
 
-                    val newMovie = Movie(documentId, title, imageUrl, streamUrl)
+                            val newMovie = Movie(
+                                id = documentId,
+                                title = newTitle,  // Asegurar que este es el título
+                                imageUrl = newImageUrl,
+                                streamUrl = newStreamUrl
+                            )
 
-                    // Agregar el nuevo item a la lista y notificar al adaptador
-                    movieList.add(newMovie)
-                    activity?.runOnUiThread {
-                        moviesAdapter.notifyItemInserted(movieList.size - 1)  // Notificar la inserción
-                    }
-                    clearFields()
+                            movieList.add(newMovie)
+                            moviesAdapter.notifyItemInserted(movieList.size - 1)
+
+                            clearFields()
+                        }
                 }
                 .addOnFailureListener { e ->
                     Toast.makeText(context, "Error al subir los datos: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -99,6 +108,7 @@ class TvFragment : Fragment() {
             Toast.makeText(context, "Por favor, llena todos los campos", Toast.LENGTH_SHORT).show()
         }
     }
+
 
     private fun loadDataFromFirebase() {
         firestore.collection("tv")
@@ -182,15 +192,15 @@ class TvFragment : Fragment() {
         imageUrlEditText.setText(movie.imageUrl)
         streamUrlEditText.setText(movie.streamUrl)
 
-        // Cambiar el texto del botón de creación a "Guardar cambios" para indicar que estamos en modo de edición
+        // Cambiar el texto del botón a "Guardar cambios"
         createButton.text = "Guardar cambios"
 
-        // Establecer un OnClickListener para guardar los cambios cuando el usuario presiona el botón
+        // Limpiar cualquier OnClickListener anterior y asignar uno nuevo
         createButton.setOnClickListener {
-            // Llamar al método para actualizar los datos en Firebase
             updateMovieInFirebase(movie)
         }
     }
+
     private fun updateMovieInFirebase(movie: Movie) {
         val updatedTitle = titleEditText.text.toString().trim()
         val updatedImageUrl = imageUrlEditText.text.toString().trim()
@@ -201,7 +211,7 @@ class TvFragment : Fragment() {
                 "title" to updatedTitle,
                 "imageUrl" to updatedImageUrl,
                 "streamUrl" to updatedStreamUrl,
-                "createdAt" to com.google.firebase.Timestamp.now() // Mantener la fecha de creación actualizada
+                "createdAt" to com.google.firebase.Timestamp.now()
             )
 
             firestore.collection("tv").document(movie.id)
@@ -220,9 +230,10 @@ class TvFragment : Fragment() {
                         moviesAdapter.notifyItemChanged(positionToUpdate)
                     }
 
-                    // Limpiar los campos y cambiar el botón de nuevo a "Crear"
+                    // Limpiar los campos y restablecer el botón para crear nuevos elementos
                     clearFields()
                     createButton.text = "Crear"
+                    createButton.setOnClickListener { uploadDataToFirebase() } // Restaura la función original
                 }
                 .addOnFailureListener { e ->
                     Toast.makeText(context, "Error al actualizar la película: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -231,4 +242,5 @@ class TvFragment : Fragment() {
             Toast.makeText(context, "Por favor, llena todos los campos", Toast.LENGTH_SHORT).show()
         }
     }
+
 }
