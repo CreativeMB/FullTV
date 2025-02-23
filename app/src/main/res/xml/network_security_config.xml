@@ -8,5 +8,6 @@
         <domain includeSubdomains="true">181.78.6.106</domain>
         <domain includeSubdomains="true">filmaffinity.com</domain>
         <domain includeSubdomains="true">teleclub.xyz</domain>
+        <domain includeSubdomains="true">coninfo.net</domain>
     </domain-config>
 </network-security-config>

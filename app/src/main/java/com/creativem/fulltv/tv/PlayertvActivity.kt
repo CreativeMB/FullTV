@@ -187,6 +187,7 @@ class PlayertvActivity : AppCompatActivity() {
         }
 
         val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
             .setDefaultRequestProperties(mapOf("User-Agent" to "Mozilla/5.0"))
             .setConnectTimeoutMs(30_000)
             .setReadTimeoutMs(30_000)
