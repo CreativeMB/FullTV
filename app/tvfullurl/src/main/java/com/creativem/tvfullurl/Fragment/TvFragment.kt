@@ -25,41 +25,48 @@ class TvFragment : Fragment() {
     private lateinit var createButton: Button
     private lateinit var recyclerView: RecyclerView
     private lateinit var moviesAdapter: MoviesAdapter
-    private var movieList: MutableList<Movie> = mutableListOf() // Lista de películas
+    private var movieList: MutableList<Movie> = mutableListOf()
+    private var isEditing = false
+    private var currentEditingMovieId: String? = null // Para rastrear la edición
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
+    ): View {
         val binding = FragmentTvBinding.inflate(inflater, container, false)
 
         firestore = FirebaseFirestore.getInstance()
 
-        // Inicializar las vistas
+        // Inicializar vistas
         titleEditText = binding.titleEditText
         imageUrlEditText = binding.imageUrlEditText
         streamUrlEditText = binding.streamUrlEditText
         createButton = binding.createButton
         recyclerView = binding.recyclerViewTV
 
-        // Configurar el RecyclerView
+        // Configurar RecyclerView
         recyclerView.layoutManager = LinearLayoutManager(context)
 
-        // Crear el adaptador y pasar las acciones de eliminación y edición
-        moviesAdapter = MoviesAdapter(movieList,
+        // Crear adaptador con funciones de edición y eliminación
+        moviesAdapter = MoviesAdapter(
+            movieList,
             onDeleteClick = { movieId -> deleteMovie(movieId) },
             onEditClick = { movie -> editMovie(movie) },
-            isEditable = true // Ajustar si deseas habilitar la edición
+            isEditable = true
         )
 
         recyclerView.adapter = moviesAdapter
 
-        // Establecer el clic del botón para subir los datos a Firebase
+        // Botón de agregar/editar
         createButton.setOnClickListener {
-            uploadDataToFirebase()
+            if (isEditing) {
+                currentEditingMovieId?.let { movieId -> updateMovieInFirebase(movieId) }
+            } else {
+                uploadDataToFirebase()
+            }
         }
 
-        // Cargar los datos desde Firebase
+        // Cargar datos de Firestore
         loadDataFromFirebase()
 
         return binding.root
@@ -81,25 +88,17 @@ class TvFragment : Fragment() {
             firestore.collection("tv")
                 .add(tvData)
                 .addOnSuccessListener { documentReference ->
-                    documentReference.get()
-                        .addOnSuccessListener { documentSnapshot ->
-                            val documentId = documentSnapshot.id
-                            val newTitle = documentSnapshot.getString("title") ?: "Sin título"
-                            val newImageUrl = documentSnapshot.getString("imageUrl") ?: ""
-                            val newStreamUrl = documentSnapshot.getString("streamUrl") ?: ""
+                    val newMovie = Movie(
+                        id = documentReference.id,
+                        title = title,
+                        imageUrl = imageUrl,
+                        streamUrl = streamUrl
+                    )
+                    Toast.makeText(context, "Nuevo Canal Cargado", Toast.LENGTH_SHORT).show()
+                    movieList.add(newMovie)
+                    moviesAdapter.notifyItemInserted(movieList.size - 1)
 
-                            val newMovie = Movie(
-                                id = documentId,
-                                title = newTitle,  // Asegurar que este es el título
-                                imageUrl = newImageUrl,
-                                streamUrl = newStreamUrl
-                            )
-
-                            movieList.add(newMovie)
-                            moviesAdapter.notifyItemInserted(movieList.size - 1)
-
-                            clearFields()
-                        }
+                    clearFields()
                 }
                 .addOnFailureListener { e ->
                     Toast.makeText(context, "Error al subir los datos: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -109,49 +108,93 @@ class TvFragment : Fragment() {
         }
     }
 
-
     private fun loadDataFromFirebase() {
         firestore.collection("tv")
             .get()
             .addOnSuccessListener { documents ->
-                if (!documents.isEmpty) {
-                    // Mapeamos los documentos a la lista de Movie incluyendo todos los campos
-                    val tvList = documents.map { doc ->
-                        val documentId = doc.id
-                        val title = doc.getString("title") ?: "Título no disponible"
-                        val imageUrl = doc.getString("imageUrl") ?: "URL de imagen no disponible"
-                        val streamUrl = doc.getString("streamUrl") ?: "URL de stream no disponible"
-
-                        Log.d("loadDataFromFirebase", "Title: $title, ImageUrl: $imageUrl, StreamUrl: $streamUrl")
-
-                        Movie(id = documentId, title = title, imageUrl = imageUrl, streamUrl = streamUrl)
-
-                    }
-
-                    // Verificar si ya existe algún dato en la lista
-                    val currentSize = movieList.size
-
-                    // Agregar los nuevos items a la lista existente
-                    movieList.addAll(tvList)
-
-                    // Notificar al adaptador de que se han agregado nuevos items
-                    moviesAdapter.notifyItemRangeInserted(currentSize, tvList.size)
-                } else {
-                    Toast.makeText(context, "No hay datos disponibles", Toast.LENGTH_SHORT).show()
+                movieList.clear() // Limpiar lista antes de agregar nuevos datos
+                for (doc in documents) {
+                    val movie = Movie(
+                        id = doc.id,
+                        title = doc.getString("title") ?: "Título no disponible",
+                        imageUrl = doc.getString("imageUrl") ?: "",
+                        streamUrl = doc.getString("streamUrl") ?: ""
+                    )
+                    movieList.add(movie)
                 }
+
+                moviesAdapter.notifyDataSetChanged()
             }
             .addOnFailureListener { e ->
                 Toast.makeText(context, "Error al cargar los datos: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
 
-    override fun onPause() {
-        super.onPause()
-        clearFields()
+    private fun deleteMovie(movieId: String) {
+        firestore.collection("tv").document(movieId)
+            .delete()
+            .addOnSuccessListener {
+                val positionToRemove = movieList.indexOfFirst { it.id == movieId }
+                if (positionToRemove != -1) {
+                    movieList.removeAt(positionToRemove)
+                    moviesAdapter.notifyItemRemoved(positionToRemove)
+                }
+                Toast.makeText(context, "Canal eliminado", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(context, "Error al eliminar: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
+    private fun editMovie(movie: Movie) {
+        titleEditText.setText(movie.title)
+        imageUrlEditText.setText(movie.imageUrl)
+        streamUrlEditText.setText(movie.streamUrl)
+
+        createButton.text = "Guardar cambios"
+        isEditing = true
+        currentEditingMovieId = movie.id
+    }
+
+    private fun updateMovieInFirebase(movieId: String) {
+        val updatedTitle = titleEditText.text.toString().trim()
+        val updatedImageUrl = imageUrlEditText.text.toString().trim()
+        val updatedStreamUrl = streamUrlEditText.text.toString().trim()
+
+        if (updatedTitle.isNotEmpty() && updatedImageUrl.isNotEmpty() && updatedStreamUrl.isNotEmpty()) {
+            val updatedMovieData = hashMapOf(
+                "title" to updatedTitle,
+                "imageUrl" to updatedImageUrl,
+                "streamUrl" to updatedStreamUrl
+            )
+
+            firestore.collection("tv").document(movieId)
+                .update(updatedMovieData as Map<String, Any>)
+                .addOnSuccessListener {
+                    val positionToUpdate = movieList.indexOfFirst { it.id == movieId }
+                    if (positionToUpdate != -1) {
+                        movieList[positionToUpdate] = movieList[positionToUpdate].copy(
+                            title = updatedTitle,
+                            imageUrl = updatedImageUrl,
+                            streamUrl = updatedStreamUrl
+                        )
+                        moviesAdapter.notifyItemChanged(positionToUpdate)
+                    }
+                    resetEditingMode()
+                    Toast.makeText(context, "Canal actualizado", Toast.LENGTH_SHORT).show()
+                }
+                .addOnFailureListener { e ->
+                    Toast.makeText(context, "Error al actualizar: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+        } else {
+            Toast.makeText(context, "Llena todos los campos", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun resetEditingMode() {
+        isEditing = false
+        currentEditingMovieId = null
+        createButton.text = "Crear"
         clearFields()
     }
 
@@ -161,86 +204,15 @@ class TvFragment : Fragment() {
         streamUrlEditText.text.clear()
     }
 
-    private fun deleteMovie(movieId: String) {
-        Log.d("deleteMovie", "ID del documento a eliminar: $movieId")
-
-        if (movieId.isEmpty()) {
-            Toast.makeText(requireContext(), "ID de documento no válido", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val pedidoRef = firestore.collection("tv").document(movieId)
-
-        pedidoRef.delete()
-            .addOnSuccessListener {
-                Toast.makeText(requireContext(), "Película eliminada correctamente", Toast.LENGTH_SHORT).show()
-
-                val positionToRemove = movieList.indexOfFirst { it.id == movieId }
-
-                if (positionToRemove != -1) {
-                    movieList.removeAt(positionToRemove)
-                    moviesAdapter.notifyItemRemoved(positionToRemove)
-                }
-            }
-            .addOnFailureListener { e ->
-                Toast.makeText(requireContext(), "Error al eliminar la película: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+    override fun onResume() {
+        super.onResume()
+        clearFields()
+        resetEditingMode()
     }
-    private fun editMovie(movie: Movie) {
-        // Llenar los campos con los datos actuales de la película
-        titleEditText.setText(movie.title)
-        imageUrlEditText.setText(movie.imageUrl)
-        streamUrlEditText.setText(movie.streamUrl)
-
-        // Cambiar el texto del botón a "Guardar cambios"
-        createButton.text = "Guardar cambios"
-
-        // Limpiar cualquier OnClickListener anterior y asignar uno nuevo
-        createButton.setOnClickListener {
-            updateMovieInFirebase(movie)
-        }
-    }
-
-    private fun updateMovieInFirebase(movie: Movie) {
-        val updatedTitle = titleEditText.text.toString().trim()
-        val updatedImageUrl = imageUrlEditText.text.toString().trim()
-        val updatedStreamUrl = streamUrlEditText.text.toString().trim()
-
-        if (updatedTitle.isNotEmpty() && updatedImageUrl.isNotEmpty() && updatedStreamUrl.isNotEmpty()) {
-            val updatedMovieData = hashMapOf(
-                "title" to updatedTitle,
-                "imageUrl" to updatedImageUrl,
-                "streamUrl" to updatedStreamUrl,
-                "createdAt" to com.google.firebase.Timestamp.now()
-            )
-
-            firestore.collection("tv").document(movie.id)
-                .set(updatedMovieData)
-                .addOnSuccessListener {
-                    Toast.makeText(context, "Película actualizada correctamente", Toast.LENGTH_SHORT).show()
-
-                    // Actualizar los datos de la película en la lista local
-                    val positionToUpdate = movieList.indexOfFirst { it.id == movie.id }
-                    if (positionToUpdate != -1) {
-                        movieList[positionToUpdate] = movie.copy(
-                            title = updatedTitle,
-                            imageUrl = updatedImageUrl,
-                            streamUrl = updatedStreamUrl
-                        )
-                        moviesAdapter.notifyItemChanged(positionToUpdate)
-                    }
-
-                    // Limpiar los campos y restablecer el botón para crear nuevos elementos
-                    clearFields()
-                    createButton.text = "Crear"
-                    createButton.setOnClickListener { uploadDataToFirebase() } // Restaura la función original
-                }
-                .addOnFailureListener { e ->
-                    Toast.makeText(context, "Error al actualizar la película: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-        } else {
-            Toast.makeText(context, "Por favor, llena todos los campos", Toast.LENGTH_SHORT).show()
-        }
+    override fun onStop() {
+        super.onStop()
+        clearFields()
+        resetEditingMode()
     }
 
 }

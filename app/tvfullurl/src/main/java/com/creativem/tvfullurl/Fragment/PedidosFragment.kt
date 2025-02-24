@@ -115,9 +115,9 @@ class PedidosFragment : Fragment() {
         }
 
         // Referencia al documento específico dentro de la colección "tv"
-        val pedidoRef = db.collection("tv").document(pedidoId)
+        val pedidoRef = db.collection("pedidosmovies").document(pedidoId)
 
-        // Eliminar el documento de la colección "tv"
+        // Eliminar el documento de la colección "pedidosmovies"
         pedidoRef.delete()
             .addOnSuccessListener {
                 // Mostrar mensaje de éxito
