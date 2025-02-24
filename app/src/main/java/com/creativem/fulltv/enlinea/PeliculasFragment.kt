@@ -1,17 +1,19 @@
 package com.creativem.fulltv.enlinea
 
+import android.content.Intent
 import android.content.res.Resources
 import android.os.Bundle
-import android.util.DisplayMetrics
 import android.util.Log
 import android.view.View
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.*
 import com.creativem.fulltv.R
 import com.creativem.fulltv.adapter.FirestoreRepository
 import com.creativem.fulltv.data.Movie
-import com.creativem.fulltv.tv.CardPresenterTV
+import com.creativem.fulltv.adapter.CardPresenter  // Cambio aquí
+import com.creativem.fulltv.home.PlayerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -24,12 +26,17 @@ class PeliculasFragment : RowsSupportFragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+
+
         adapter = channels
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.colorPrimary))
+
+        setOnItemViewClickedListener(ItemViewClickedListener())
 
         // Referencias a los elementos de carga
         progressBar = requireActivity().findViewById(R.id.progressBar)
@@ -75,7 +82,7 @@ class PeliculasFragment : RowsSupportFragment() {
     }
 
     private fun agregarALista(peliculas: List<Movie>, titulo: String) {
-        val cardPresenter = CardPresenterTV()
+        val cardPresenter = CardPresenter() // Cambio aquí
         val elementosPorFila = calcularElementosPorFila()
         val chunkedPeliculas = peliculas.chunked(elementosPorFila)
 
@@ -88,4 +95,30 @@ class PeliculasFragment : RowsSupportFragment() {
             channels.add(ListRow(header, listRowAdapter))
         }
     }
+
+    private inner class ItemViewClickedListener : OnItemViewClickedListener {
+        override fun onItemClicked(
+            itemViewHolder: Presenter.ViewHolder?,
+            item: Any?,
+            rowViewHolder: RowPresenter.ViewHolder?,
+            row: Row?
+        ) {
+            if (item is Movie) { // Si es una película, abre PlayerActivity
+                val intent = Intent(context, PlayerActivity::class.java).apply {
+                    putExtra("EXTRA_STREAM_URL", item.streamUrl)
+                    putExtra("EXTRA_MOVIE_TITLE", item.title) // Título de la película
+                    putExtra("EXTRA_MOVIE_YEAR", item.year) // Año de la película
+                }
+                startActivity(intent)
+            } else { // Si es otro tipo de elemento, muestra un mensaje
+                Toast.makeText(
+                    requireContext(),
+                    "Elemento seleccionado: $item",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+
 }

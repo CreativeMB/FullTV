@@ -33,8 +33,11 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultHttpDataSource
 import com.creativem.fulltv.R
+import com.creativem.fulltv.data.Movie
 import com.creativem.fulltv.databinding.ActivityPlayerBinding
 import com.creativem.fulltv.home.Nosotros
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.toObjects
 
 class PlayertvActivity : AppCompatActivity() {
 
@@ -43,7 +46,8 @@ class PlayertvActivity : AppCompatActivity() {
     private lateinit var movieTitle: String
     private var movieYear: String = ""
     private lateinit var binding: ActivityPlayerBinding
-    private lateinit var adapter: MoviesMenuAdapter
+    private lateinit var adapter: TvAdapter
+
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var runnableActualizar: Runnable
     private lateinit var runnableOcultar: Runnable
@@ -154,20 +158,48 @@ class PlayertvActivity : AppCompatActivity() {
     }
 
     private fun mostarpélis() {
-        binding.recyclerMoviesMenu.visibility =
-            if (binding.recyclerMoviesMenu.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        binding.recyclerViewTv.visibility =
+            if (binding.recyclerViewTv.visibility == View.VISIBLE) View.GONE else View.VISIBLE
     }
 
     private fun initializeRecyclerView() {
-        adapter = MoviesMenuAdapter(mutableListOf()) { movie ->
+        adapter = TvAdapter(this, mutableListOf()) { movie ->
             startMoviePlayback(movie.streamUrl, movie.title, movie.year)
         }
-        binding.recyclerMoviesMenu.adapter = adapter
-        binding.recyclerMoviesMenu.layoutManager = LinearLayoutManager(this)
-        //loadMovies() //Comentado porque no se necesita cargar películas en este caso.
+
+        binding.recyclerViewTv.adapter = adapter
+        binding.recyclerViewTv.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
+
+        // Asegurar alineación a la izquierda
+        binding.recyclerViewTv.layoutDirection = View.LAYOUT_DIRECTION_LTR
+        binding.recyclerViewTv.setPadding(16, 16, 0, 16) // Margen izquierdo
+
+        loadTvCollection() // Cargar la colección de TV
     }
 
-    //Función loadMovies() se ha omitido ya que no se está utilizando en este reproductor simplificado.
+    private fun loadTvCollection() {
+        val db = FirebaseFirestore.getInstance()
+
+        db.collection("tv")
+            .get()
+            .addOnSuccessListener { documents ->
+                val tvList = documents.map { doc ->
+                    Movie(
+                        title = doc.getString("title") ?: "Sin título",
+                        imageUrl = doc.getString("imageUrl") ?: "", // URL de la miniatura
+                        streamUrl = doc.getString("streamUrl") ?: "" // URL del streaming
+                    )
+                }
+                updateRecyclerView(tvList) // Actualizar RecyclerView con la nueva lista
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Error cargando TV: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun updateRecyclerView(tvList: List<Movie>) {
+        adapter.updateData(tvList) // ✅ Ahora actualizamos la lista en vez de reemplazar el adaptador
+    }
 
     private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieYear: String) {
         val intent = Intent(this, PlayertvActivity::class.java)
@@ -376,8 +408,8 @@ class PlayertvActivity : AppCompatActivity() {
 
     override fun onBackPressed() {
         super.onBackPressed()
-        if (binding.recyclerMoviesMenu.visibility == View.VISIBLE) {
-            binding.recyclerMoviesMenu.visibility = View.GONE
+        if (binding.recyclerViewTv.visibility == View.VISIBLE) {
+            binding.recyclerViewTv.visibility = View.GONE
         } else {
             finish()
         }
