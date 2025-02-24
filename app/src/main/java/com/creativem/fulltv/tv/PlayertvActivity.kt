@@ -28,6 +28,7 @@ import com.creativem.fulltv.adapter.MoviesMenuAdapter
 import kotlinx.coroutines.*
 import android.text.format.DateUtils
 import androidx.annotation.OptIn
+import androidx.appcompat.app.AlertDialog
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -113,9 +114,22 @@ class PlayertvActivity : AppCompatActivity() {
         }
         val pedidosButton: ImageButton = findViewById(R.id.pedidos)
         pedidosButton.setOnClickListener {
-            val intent = Intent(this, Nosotros::class.java)
-            startActivity(intent)
+            val alertDialog = AlertDialog.Builder(this)
+                .setTitle("Acceso Gratuito")
+                .setMessage("Estos son canales de TV en vivo disponibles de forma gratuita como cortesía de la comunidad. El apoyo económico para mantener la plataforma se recauda a través del acceso a las películas.")
+                .setPositiveButton("Entendido") { dialog, _ ->
+                    dialog.dismiss()
+                }
+                .create()
+
+            alertDialog.setOnShowListener {
+                alertDialog.window?.setBackgroundDrawableResource(R.color.exo_progress_color) // Reemplaza con tu color
+            }
+
+            alertDialog.show()
+
         }
+
 
         val renderButton: ImageButton = findViewById(R.id.render)
         renderButton.setOnClickListener {
