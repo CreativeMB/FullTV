@@ -65,6 +65,7 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.storage.storage
+import kotlinx.coroutines.delay
 
 class MainFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -288,6 +289,40 @@ class MainFragment : BrowseSupportFragment() {
         cargarPeliculas()
         actualizarUsuarioInfo()
         mostrarPublicidad()
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            // Esperar hasta que el RecyclerView de Leanback esté listo
+            delay(1000)
+            Log.d("DEBUG", "Tamaño de rowsAdapter: ${rowsAdapter.size()}")
+
+            if (rowsAdapter.size() > 0 && rowsAdapter.get(0) is ListRow) {
+                val firstRow = rowsAdapter.get(0) as ListRow
+                Log.d("DEBUG", "Tamaño del adapter de la primera fila: ${firstRow.adapter.size()}")
+
+                if (firstRow.adapter.size() > 0) {
+                    requireActivity().runOnUiThread {
+                        setSelectedPosition(0, true, object : ListRowPresenter.SelectItemViewHolderTask(0) {
+                            override fun run(holder: androidx.leanback.widget.Presenter.ViewHolder?) {
+                                super.run(holder)
+                                Log.d("DEBUG", "Seleccionado primer elemento de la primera lista")
+
+                                holder?.view?.post {
+                                    holder.view.performClick() // Primer clic
+                                    Log.d("DEBUG", "Primer clic realizado")
+
+                                    holder.view.postDelayed({
+                                        holder.view.performClick() // Segundo clic (doble clic)
+                                        Log.d("DEBUG", "Segundo clic realizado")
+                                    }, 200) // Pequeño retraso para simular doble clic
+                                }
+                            }
+                        })
+                    }
+                }
+            }
+        }
+
+
         // Cargar información del usuario
         val usuarioId =
             FirebaseAuth.getInstance().currentUser?.uid // Obtén el ID del usuario autenticado

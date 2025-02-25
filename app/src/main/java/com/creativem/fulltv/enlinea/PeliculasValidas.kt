@@ -1,6 +1,8 @@
 package com.creativem.fulltv.enlinea
 
 import android.os.Bundle
+import android.view.WindowManager
+import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import com.creativem.fulltv.R
 
@@ -17,5 +19,13 @@ class PeliculasValidas : FragmentActivity() {
                 .replace(R.id.peliculasvalidas, PeliculasFragment()) // Usa el ID correcto
                 .commit()
         }
+        // Mantener la pantalla encendida
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_FULLSCREEN,
+            WindowManager.LayoutParams.FLAG_FULLSCREEN
+        )
     }
 }
