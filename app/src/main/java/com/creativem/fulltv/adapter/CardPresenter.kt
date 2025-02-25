@@ -40,9 +40,12 @@ class CardPresenter: Presenter(){
 
             // Modificar el tamaño y color del texto
             titleTextView.apply {
-                textSize = 16f  // Cambiar el tamaño del texto
+                textSize = 16f
                 maxLines = 3
-                setTextColor(Color.WHITE)  // Cambiar el color del texto
+                setTextColor(Color.WHITE)
+                setLines(3) // 🔹 Asegura que siempre sean 3 líneas visibles
+                setLineSpacing(1f, 1f) // 🔹 Ajusta el espaciado entre líneas
+                text = if (text.isNullOrEmpty()) "\n\n" else text // 🔹 Agrega espacios si está vacío
             }
 
             contentTextView.apply {
