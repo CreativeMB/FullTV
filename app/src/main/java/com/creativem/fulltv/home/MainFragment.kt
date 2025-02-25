@@ -974,21 +974,21 @@ class MainFragment : BrowseSupportFragment() {
         }
     }
     private fun mostrarPublicidad() {
-        val dialog = Dialog(requireContext())
+        val dialog = Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen)
         dialog.setContentView(R.layout.pulicidad)
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent) // Fondo transparente
-        dialog.setCancelable(false) // Evita cerrar tocando fuera del diálogo
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent) // Fondo negro para mejor visualización
+        dialog.setCancelable(false)
 
         val imgPublicidad = dialog.findViewById<ImageView>(R.id.imgPublicidad)
         val btnCerrar = dialog.findViewById<ImageButton>(R.id.btnCerrar)
 
-        // Ruta fija en Firebase Storage
+        // Ruta en Firebase Storage
         val storageRef = Firebase.storage.reference.child("FulltvPublicidad/1.jpg")
 
-        // Obtener URL actualizada de Firebase Storage
+        // Cargar imagen con Glide
         storageRef.downloadUrl.addOnSuccessListener { uri ->
             Glide.with(requireContext())
-                .load(uri.toString()) // Cargar la imagen actualizada
+                .load(uri.toString())
                 .into(imgPublicidad)
         }.addOnFailureListener {
             Toast.makeText(requireContext(), "Error al cargar la imagen", Toast.LENGTH_SHORT).show()
@@ -997,10 +997,10 @@ class MainFragment : BrowseSupportFragment() {
         // Botón para cerrar manualmente
         btnCerrar.setOnClickListener { dialog.dismiss() }
 
-        // Cerrar automáticamente en 5 segundos
+        // Cerrar automáticamente en 10 segundos
         Handler(Looper.getMainLooper()).postDelayed({
             dialog.dismiss()
-        }, 20000)
+        }, 10000)
 
         // Mostrar el diálogo
         dialog.show()
