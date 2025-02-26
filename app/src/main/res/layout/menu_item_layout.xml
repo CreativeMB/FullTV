@@ -7,7 +7,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="center"
-        android:background="@color/colorPrimary"
+        android:background="#FFEB3B"
         android:orientation="vertical"
         android:padding="8dp">
 
@@ -28,7 +28,8 @@
             android:ellipsize="end"
             android:maxLines="2"
             android:textAlignment="center"
-            android:textColor="@color/lb_tv_white"
-            android:textSize="10sp" />
+            android:textStyle="bold"
+            android:textColor="@color/colorhover2"
+            android:textSize="14sp" />
     </LinearLayout>
 </androidx.cardview.widget.CardView>

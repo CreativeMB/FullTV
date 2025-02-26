@@ -33,6 +33,7 @@
             android:textSize="30sp"
             android:textStyle="bold"
             android:gravity="center"/>
+
     </LinearLayout>
 
 </FrameLayout>

@@ -229,7 +229,6 @@ class MainFragment : BrowseSupportFragment() {
                         val intent = Intent(requireContext(), TvActivity::class.java)
                         startActivity(intent)
                     }
-
                     "Cerrar\nCuenta" -> {
                         cerrarSesion() // Llama al método de cerrar sesión
                     }
@@ -387,7 +386,7 @@ class MainFragment : BrowseSupportFragment() {
     fun cargarPeliculas() {
         binding.linearLayout.visibility = View.GONE
         Glide.with(requireContext())
-            .load("https://img1.wallspic.com/previews/4/4/7/8/7/178744/178744-cordillera_huayhuash-lake_carhuacocha-montana-ambiente-paisaje_natural-x750.jpg")
+            .load("https://p4.wallpaperbetter.com/wallpaper/175/985/284/abstract-3d-digital-art-dark-wallpaper-preview.jpg")
             .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
             .centerCrop()
             .into(binding.mainBackgroundImage)
@@ -434,14 +433,14 @@ class MainFragment : BrowseSupportFragment() {
 
         // Primero, agregamos el menú
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("Buscar\nPelicula", "Pedir\nPelicula","Activar\nPaquete", "Pelis\nGratis", "¿Como\nPago?","TV\nGratis", "Cerrar\nCuenta")
+        val menuItems = listOf("TV\nGratis", "Pelis\nGratis", "Pedir\nPelicula", "Buscar\nPelicula", "Activar\nPaquete", "¿Como\nPago?", "Cerrar\nCuenta")
         val menuIcons = listOf(
-            R.drawable.buscar,
-            R.drawable.pedido,
-            R.drawable.activacion,
-            R.drawable.cartelera,
-            R.drawable.pago,
             R.drawable.tv,
+            R.drawable.cartelera,
+            R.drawable.pedido,
+            R.drawable.buscar,
+            R.drawable.activacion,
+            R.drawable.pago,
             R.drawable.cerrrar
         )
 
@@ -450,10 +449,10 @@ class MainFragment : BrowseSupportFragment() {
         }
 
         // Agregamos el menú al rowsAdapter
-        rowsAdapter.add(ListRow(HeaderItem(3, "Menu"), menuAdapter))
+        rowsAdapter.add(ListRow(HeaderItem(3, "Opciones"), menuAdapter))
 
         // Luego, agregamos el contenido de las películas
-        agregarALista(peliculas, "Contenido")
+        agregarALista(peliculas, "Alquila Pelicula")
 
         // Notificamos el cambio de rango si es necesario
         rowsAdapter.notifyArrayItemRangeChanged(
