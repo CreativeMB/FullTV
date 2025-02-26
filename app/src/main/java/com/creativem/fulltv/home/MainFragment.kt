@@ -973,38 +973,60 @@ class MainFragment : BrowseSupportFragment() {
             Toast.makeText(requireContext(), "Usuario no autenticado", Toast.LENGTH_SHORT).show()
         }
     }
+    private var publicidadDialog: Dialog? = null
+
     private fun mostrarPublicidad() {
-        val dialog = Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-        dialog.setContentView(R.layout.pulicidad)
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent) // Fondo negro para mejor visualización
-        dialog.setCancelable(false)
+        if (!isAdded) return // Evitar que se ejecute si el fragmento ya no está adjunto
 
-        val imgPublicidad = dialog.findViewById<ImageView>(R.id.imgPublicidad)
-        val btnCerrar = dialog.findViewById<ImageButton>(R.id.btnCerrar)
+        publicidadDialog = Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen).apply {
+            setContentView(R.layout.pulicidad)
+            window?.setBackgroundDrawableResource(android.R.color.transparent)
+            setCancelable(false)
 
-        // Ruta en Firebase Storage
-        val storageRef = Firebase.storage.reference.child("FulltvPublicidad/1.jpg")
+            val imgPublicidad = findViewById<ImageView>(R.id.imgPublicidad)
+            val btnCerrar = findViewById<ImageButton>(R.id.btnCerrar)
 
-        // Cargar imagen con Glide
-        storageRef.downloadUrl.addOnSuccessListener { uri ->
-            Glide.with(requireContext())
-                .load(uri.toString())
-                .into(imgPublicidad)
-        }.addOnFailureListener {
-            Toast.makeText(requireContext(), "Error al cargar la imagen", Toast.LENGTH_SHORT).show()
+            val storageRef = Firebase.storage.reference.child("FulltvPublicidad/1.jpg")
+
+            storageRef.downloadUrl.addOnSuccessListener { uri ->
+                if (isAdded) { // Verificar antes de cargar la imagen
+                    Glide.with(requireContext())
+                        .load(uri.toString())
+                        .into(imgPublicidad)
+                }
+            }.addOnFailureListener {
+                if (isAdded) {
+                    Toast.makeText(requireContext(), "Error al cargar la imagen", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            btnCerrar.setOnClickListener {
+                dismissDialog()
+            }
+
+            // Cerrar automáticamente en 10 segundos
+            Handler(Looper.getMainLooper()).postDelayed({
+                dismissDialog()
+            }, 10000)
+
+            show()
         }
-
-        // Botón para cerrar manualmente
-        btnCerrar.setOnClickListener { dialog.dismiss() }
-
-        // Cerrar automáticamente en 10 segundos
-        Handler(Looper.getMainLooper()).postDelayed({
-            dialog.dismiss()
-        }, 10000)
-
-        // Mostrar el diálogo
-        dialog.show()
     }
+
+    // Método seguro para cerrar el diálogo
+    private fun dismissDialog() {
+        if (isAdded && publicidadDialog?.isShowing == true) {
+            publicidadDialog?.dismiss()
+            publicidadDialog = null
+        }
+    }
+
+    // Asegurar que el diálogo se cierre correctamente si el fragmento se destruye
+    override fun onDestroyView() {
+        dismissDialog()
+        super.onDestroyView()
+    }
+
 }
 
 
