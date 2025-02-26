@@ -19,6 +19,7 @@ class CardPresenterTV : Presenter() {
             isFocusableInTouchMode = true
             setMainImageDimensions(180, 140)
             setInfoAreaBackgroundColor(Color.parseColor("#006064"))
+
         }
         return ViewHolder(cardView)
     }
@@ -35,11 +36,11 @@ class CardPresenterTV : Presenter() {
             // Modificar el tamaño y color del texto
             titleTextView.apply {
                 textSize = 16f
-                maxLines = 3
+                maxLines = 2
                 setTextColor(Color.WHITE)
-                setLines(3) // 🔹 Asegura que siempre sean 3 líneas visibles
+                setLines(2) // 🔹 Asegura que siempre sean 3 líneas visibles
                 setLineSpacing(1f, 1f) // 🔹 Ajusta el espaciado entre líneas
-                text = if (text.isNullOrEmpty()) "\n\n" else text // 🔹 Agrega espacios si está vacío
+                text = if (text.isNullOrEmpty()) "\n" else text // 🔹 Agrega espacios si está vacío
             }
 
             // Cargar imagen con Glide
