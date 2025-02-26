@@ -53,7 +53,7 @@ class CardPresenterTV : Presenter() {
 
             setOnClickListener {
                 val context = it.context
-                val intent = Intent(context, PlayertvActivity::class.java).apply {
+                val intent = Intent(context, PlayerTv::class.java).apply {
                     putExtra("EXTRA_STREAM_URL", item.streamUrl)
                     putExtra("EXTRA_MOVIE_TITLE", item.title)
                 }

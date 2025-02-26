@@ -94,7 +94,7 @@ class CardPresenter: Presenter(){
 
         cardView.setOnClickListener {
             val context = viewHolder.view.context
-            val intent = Intent(context, PlayerActivity::class.java)
+            val intent = Intent(context, PlayerPeliculas::class.java)
             intent.putExtra("EXTRA_STREAM_URL", movie.streamUrl)
             context.startActivity(intent)
         }

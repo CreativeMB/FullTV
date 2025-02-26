@@ -1,38 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/peliculasvalidas"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/colorPrimary">
-
-    <androidx.fragment.app.FragmentContainerView
-        android:id="@+id/peliculasvalidas"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <!-- Contenedor para centrar ambos elementos -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:orientation="vertical">
-
-        <ProgressBar
-            android:id="@+id/progressBar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            style="?android:attr/progressBarStyleLarge"
-            android:indeterminate="true"/>
-
-        <TextView
-            android:id="@+id/loadingText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Cargando películas en línea disponibles para ver ya..."
-            android:textColor="@color/colorFocused"
-            android:textSize="30sp"
-            android:textStyle="bold"
-            android:gravity="center"/>
-    </LinearLayout>
-
-</FrameLayout>
+    android:layout_height="match_parent" />

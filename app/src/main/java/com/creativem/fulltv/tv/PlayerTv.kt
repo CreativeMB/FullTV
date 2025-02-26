@@ -23,7 +23,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.creativem.fulltv.principal.RelojCuston
+import com.creativem.fulltv.principal.Reloj
 import kotlinx.coroutines.*
 import android.text.format.DateUtils
 import androidx.annotation.OptIn
@@ -34,17 +34,17 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultHttpDataSource
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
-import com.creativem.fulltv.databinding.ActivityPlayerBinding
+import com.creativem.fulltv.databinding.PlayerBinding
 import com.google.firebase.firestore.FirebaseFirestore
 
-class PlayertvActivity : AppCompatActivity() {
+class PlayerTv : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
     private var streamUrl: String = ""
     private lateinit var movieTitle: String
     private var movieYear: String = ""
-    private lateinit var binding: ActivityPlayerBinding
-    private lateinit var adapter: TvAdapter
+    private lateinit var binding: PlayerBinding
+    private lateinit var adapter: TvMenuAdapter
 
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var runnableActualizar: Runnable
@@ -56,7 +56,7 @@ class PlayertvActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityPlayerBinding.inflate(layoutInflater)
+        binding = PlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         binding.reproductor.keepScreenOn = true
@@ -68,19 +68,19 @@ class PlayertvActivity : AppCompatActivity() {
             streamUrl = it.getStringExtra("EXTRA_STREAM_URL") ?: ""
             movieTitle = it.getStringExtra("EXTRA_MOVIE_TITLE") ?: "Título desconocido"
             movieYear = it.getStringExtra("EXTRA_MOVIE_YEAR") ?: ""
-            Log.d("PlayertvActivity", "Cargando stream desde URL: $streamUrl")
+            Log.d("PlayerTv", "Cargando stream desde URL: $streamUrl")
             nombrePeliculaTextView.text = movieTitle
         }
 
         if (streamUrl.isEmpty()) {
-            Log.e("PlayertvActivity", "No se recibió la URL de streaming.")
+            Log.e("PlayerTv", "No se recibió la URL de streaming.")
             Toast.makeText(this, "No se recibió la URL de streaming.", Toast.LENGTH_SHORT).show()
             return
         }
         val textHora = binding.textHora
         val textfecha = binding.textfecha
-        val relojCuston = RelojCuston(textHora, textfecha)
-        relojCuston.startClock()
+        val reloj = Reloj(textHora, textfecha)
+        reloj.startClock()
 
         actualizarTiempo()
         player = ExoPlayer.Builder(this).build()
@@ -174,7 +174,7 @@ class PlayertvActivity : AppCompatActivity() {
     }
 
     private fun initializeRecyclerView() {
-        adapter = TvAdapter(this, mutableListOf()) { movie ->
+        adapter = TvMenuAdapter(this, mutableListOf()) { movie ->
             startMoviePlayback(movie.streamUrl, movie.title, movie.year)
         }
 
@@ -213,7 +213,7 @@ class PlayertvActivity : AppCompatActivity() {
     }
 
     private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieYear: String) {
-        val intent = Intent(this, PlayertvActivity::class.java)
+        val intent = Intent(this, PlayerTv::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         intent.putExtra("EXTRA_STREAM_URL", streamUrl)
         intent.putExtra("EXTRA_MOVIE_TITLE", movieTitle)
@@ -224,7 +224,7 @@ class PlayertvActivity : AppCompatActivity() {
     @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
         if (streamUrl.isEmpty()) {
-            Log.e("PlayertvActivity", "No se recibió la URL de streaming.")
+            Log.e("PlayerTv", "No se recibió la URL de streaming.")
             Toast.makeText(this, "No se recibió la URL de streaming.", Toast.LENGTH_SHORT).show()
             return
         }
@@ -258,7 +258,7 @@ class PlayertvActivity : AppCompatActivity() {
             .build().also { exoPlayer ->
                 binding.reproductor.player = exoPlayer
                 binding.reproductor.useController = false
-                Log.d("PlayertvActivity", "URL asignada al reproductor: $streamUrl")
+                Log.d("PlayerTv", "URL asignada al reproductor: $streamUrl")
                 val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
                 exoPlayer.setMediaItem(mediaItem)
                 exoPlayer.prepare()
@@ -282,7 +282,7 @@ class PlayertvActivity : AppCompatActivity() {
                         consecutiveBufferingAttempts++
                         if (consecutiveBufferingAttempts >= maxBufferingAttempts) {
                             Log.w(
-                                "PlayertvActivity",
+                                "PlayerTv",
                                 "Muchos intentos de buffering consecutivos, reiniciando..."
                             )
                             reiniciarReproductor()
@@ -303,13 +303,13 @@ class PlayertvActivity : AppCompatActivity() {
                     }
 
                     Player.STATE_ENDED -> {
-                        Log.d("PlayertvActivity", "Reproducción finalizada, reiniciando...")
+                        Log.d("PlayerTv", "Reproducción finalizada, reiniciando...")
                         reiniciarReproductor()
                     }
 
                     Player.STATE_IDLE -> {
                         Log.d(
-                            "PlayertvActivity",
+                            "PlayerTv",
                             "Reproductor en estado IDLE, intentando recuperar..."
                         )
                         reiniciarReproductor()
@@ -320,7 +320,7 @@ class PlayertvActivity : AppCompatActivity() {
 
         override fun onPlayerError(error: PlaybackException) {
             Log.e(
-                "PlayertvActivity",
+                "PlayerTv",
                 "Error de reproducción: ${error.message}, código: ${error.errorCode}, tipo de error: ${error.cause?.javaClass?.simpleName}",
                 error
             )
@@ -337,18 +337,18 @@ class PlayertvActivity : AppCompatActivity() {
 
         @SuppressLint("UnsafeOptInUsageError")
         override fun onPositionDiscontinuity(reason: Int) {
-            Log.w("PlayertvActivity", "Discontinuidad de posición: $reason")
+            Log.w("PlayerTv", "Discontinuidad de posición: $reason")
         }
 
 
         override fun onIsLoadingChanged(isLoading: Boolean) {
-            Log.d("PlayertvActivity", "Está cargando: $isLoading")
+            Log.d("PlayerTv", "Está cargando: $isLoading")
         }
 
     }
 
     private fun reiniciarReproductor() {
-        Log.d("PlayertvActivity", "Reiniciando el reproductor...")
+        Log.d("PlayerTv", "Reiniciando el reproductor...")
         player?.release()  // Libera el reproductor actual
         player = null  // Elimina referencia
         handler.removeCallbacksAndMessages(null) // Detiene cualquier proceso en espera
@@ -388,7 +388,7 @@ class PlayertvActivity : AppCompatActivity() {
             player?.release()
             player = null
             playerReleased = true
-            Log.d("PlayertvActivity", "Reproductor liberado")
+            Log.d("PlayerTv", "Reproductor liberado")
         }
     }
 
@@ -491,7 +491,7 @@ class PlayertvActivity : AppCompatActivity() {
             val bufferingDuration = System.currentTimeMillis() - bufferingStartTime
             if (bufferingDuration > maxBufferingTimeMillis) {
                 Log.w(
-                    "PlayertvActivity",
+                    "PlayerTv",
                     "Buffering prolongado ($bufferingDuration ms), intentando reiniciar..."
                 )
                 reiniciarReproductor()

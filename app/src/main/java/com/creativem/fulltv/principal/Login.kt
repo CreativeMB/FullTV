@@ -16,7 +16,7 @@ import com.creativem.fulltv.R
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
 
-class LoginActivity : AppCompatActivity() {
+class Login : AppCompatActivity() {
 
     private lateinit var auth: FirebaseAuth
     private lateinit var googleSignInClient: GoogleSignInClient
@@ -24,7 +24,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var database: FirebaseDatabase
     companion object {
         private const val RC_SIGN_IN = 9001
-        private const val TAG = "LoginActivity"
+        private const val TAG = "Login"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -237,7 +237,7 @@ class LoginActivity : AppCompatActivity() {
 //import com.creativem.fulltv.R
 //import com.creativem.fulltv.principal.Main
 //import com.google.firebase.firestore.FirebaseFirestore
-//class LoginActivity : AppCompatActivity() {
+//class Login : AppCompatActivity() {
 //
 //    private lateinit var auth: FirebaseAuth
 //    private lateinit var googleSignInClient: GoogleSignInClient
@@ -245,7 +245,7 @@ class LoginActivity : AppCompatActivity() {
 //
 //    companion object {
 //        private const val RC_SIGN_IN = 9001
-//        private const val TAG = "LoginActivity"
+//        private const val TAG = "Login"
 //    }
 //
 //    override fun onCreate(savedInstanceState: Bundle?) {

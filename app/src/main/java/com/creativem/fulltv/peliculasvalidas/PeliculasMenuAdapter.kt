@@ -10,10 +10,10 @@ import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 
-class MoviesMenuAdapter(
+class PeliculasMenuAdapter(
     private val movieList: MutableList<Movie>,
     private val onMovieClick: (Movie) -> Unit
-) : RecyclerView.Adapter<MoviesMenuAdapter.SmallMovieViewHolder>() {
+) : RecyclerView.Adapter<PeliculasMenuAdapter.SmallMovieViewHolder>() {
 
     private var selectedPosition = RecyclerView.NO_POSITION
 
@@ -44,7 +44,7 @@ class MoviesMenuAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SmallMovieViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.movie_menu_item, parent, false)
+            .inflate(R.layout.item_menu_peliculas_validas, parent, false)
         return SmallMovieViewHolder(view)
     }
 

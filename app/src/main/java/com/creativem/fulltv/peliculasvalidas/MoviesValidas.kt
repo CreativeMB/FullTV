@@ -11,8 +11,8 @@ package com.creativem.fulltv.peliculasvalidas//package com.creativem.fulltv.peli
 //import androidx.recyclerview.widget.GridLayoutManager
 //import androidx.recyclerview.widget.RecyclerView
 //import com.creativem.fulltv.R
-//import com.creativem.fulltv.peliculas.FirestoreRepository
-//import com.creativem.fulltv.peliculasvalidas.MoviesMenuAdapter
+//import com.creativem.fulltv.peliculas.Validaciones
+//import com.creativem.fulltv.peliculasvalidas.PeliculasMenuAdapter
 //import kotlinx.coroutines.CoroutineScope
 //import kotlinx.coroutines.Dispatchers
 //import kotlinx.coroutines.launch
@@ -21,7 +21,7 @@ package com.creativem.fulltv.peliculasvalidas//package com.creativem.fulltv.peli
 //class MoviesValidas : AppCompatActivity() {
 //
 //    private lateinit var recyclerMoviesMenu: RecyclerView
-//    private lateinit var moviesMenuAdapter: MoviesMenuAdapter
+//    private lateinit var moviesMenuAdapter: PeliculasMenuAdapter
 //    private lateinit var progressBar: ProgressBar
 //    private lateinit var loadingGif: ImageView
 //
@@ -48,7 +48,7 @@ package com.creativem.fulltv.peliculasvalidas//package com.creativem.fulltv.peli
 //    }
 //
 //    private fun initializeRecyclerView() {
-//        moviesMenuAdapter = MoviesMenuAdapter(mutableListOf()) { movie ->
+//        moviesMenuAdapter = PeliculasMenuAdapter(mutableListOf()) { movie ->
 //            startMoviePlayback(movie.streamUrl, movie.title, movie.year)
 //        }
 //        recyclerMoviesMenu.adapter = moviesMenuAdapter
@@ -58,7 +58,7 @@ package com.creativem.fulltv.peliculasvalidas//package com.creativem.fulltv.peli
 //        progressBar.visibility = View.VISIBLE // Mostrar ProgressBar al inicio
 //        loadingGif.visibility = View.VISIBLE   // Mostrar GIF al inicio
 //        CoroutineScope(Dispatchers.IO).launch {
-//            val firestoreRepository = FirestoreRepository()
+//            val firestoreRepository = Validaciones()
 //            val (peliculasOrdenadasValidas, _) = firestoreRepository.obtenerPeliculas()
 //
 //            withContext(Dispatchers.Main) {
@@ -78,7 +78,7 @@ package com.creativem.fulltv.peliculasvalidas//package com.creativem.fulltv.peli
 //
 //    private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieYear: String) {
 //        Log.d("MoviesValidas", "streamUrl: $streamUrl, movieTitle: $movieTitle, movieYear: $movieYear") // Verificar datos
-//        val intent = Intent(this, PlayerActivity::class.java).apply {
+//        val intent = Intent(this, PlayerPeliculas::class.java).apply {
 //            putExtra("EXTRA_STREAM_URL", streamUrl)
 //            putExtra("EXTRA_MOVIE_TITLE", movieTitle)
 //            putExtra("EXTRA_MOVIE_YEAR", movieYear)

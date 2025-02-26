@@ -25,8 +25,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.creativem.fulltv.databinding.ActivityPlayerBinding
-import com.creativem.fulltv.principal.RelojCuston
+import com.creativem.fulltv.principal.Reloj
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.FirebaseFirestore
@@ -45,7 +44,7 @@ import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.creativem.fulltv.R
-import com.creativem.fulltv.peliculasvalidas.MoviesMenuAdapter
+import com.creativem.fulltv.peliculasvalidas.PeliculasMenuAdapter
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -58,22 +57,23 @@ import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
+import com.creativem.fulltv.databinding.PlayerBinding
 import com.creativem.fulltv.principal.Nosotros
 
 
-class PlayerActivity : AppCompatActivity() {
+class PlayerPeliculas : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
     private var streamUrl: String = ""
     private lateinit var movieTitle: String
     private var movieYear: String = ""
     private var isLiveStream = false
-    private lateinit var binding: ActivityPlayerBinding
-    private lateinit var adapter: MoviesMenuAdapter
+    private lateinit var binding: PlayerBinding
+    private lateinit var adapter: PeliculasMenuAdapter
     private lateinit var moviesCollection: CollectionReference
     private lateinit var firestore: FirebaseFirestore
     private lateinit var auth: FirebaseAuth
-    private lateinit var relojhora: RelojCuston
+    private lateinit var relojhora: Reloj
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var runnableActualizar: Runnable
     private lateinit var runnableOcultar: Runnable
@@ -91,7 +91,7 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityPlayerBinding.inflate(layoutInflater)
+        binding = PlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
 
@@ -112,20 +112,20 @@ class PlayerActivity : AppCompatActivity() {
             streamUrl = it.getStringExtra("EXTRA_STREAM_URL") ?: ""
             movieTitle = it.getStringExtra("EXTRA_MOVIE_TITLE") ?: "Título desconocido"
             movieYear = it.getStringExtra("EXTRA_MOVIE_YEAR") ?: ""
-            Log.d("PlayerActivity", "Cargando stream desde URL: $streamUrl")
+            Log.d("PlayerPeliculas", "Cargando stream desde URL: $streamUrl")
             // Actualiza el TextView con el título
             nombrePeliculaTextView.text = movieTitle
         }
 
         if (streamUrl.isEmpty()) {
-            Log.e("PlayerActivity", "No se recibió la URL de streaming.")
+            Log.e("PlayerPeliculas", "No se recibió la URL de streaming.")
             showErrorDialog("No se recibió la URL de streaming.", movieTitle, movieYear)
             return
         }
         val textHora = binding.textHora
         val textfecha = binding.textfecha
-        val relojCuston = RelojCuston(textHora, textfecha)
-        relojCuston.startClock()
+        val reloj = Reloj(textHora, textfecha)
+        reloj.startClock()
 
         firestore = Firebase.firestore
                // Inicializa el SeekBar desde el binding
@@ -210,18 +210,18 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun mostarpélis() {
-        Log.e("PlayerActivity", "clki menupelis")
+        Log.e("PlayerPeliculas", "clki menupelis")
         binding.recyclerMoviesMenu.visibility =
             if (binding.recyclerMoviesMenu.visibility == View.VISIBLE) View.GONE else View.VISIBLE
     }
 
     private fun initializeRecyclerView() {
         // Crear el adaptador inicialmente con una lista vacía
-        adapter = MoviesMenuAdapter(mutableListOf()) { movie ->
+        adapter = PeliculasMenuAdapter(mutableListOf()) { movie ->
             startMoviePlayback(movie.streamUrl, movie.title, movie.year)
         }
         binding.recyclerMoviesMenu.adapter = adapter
-        binding.recyclerMoviesMenu.layoutManager = LinearLayoutManager(this@PlayerActivity)
+        binding.recyclerMoviesMenu.layoutManager = LinearLayoutManager(this@PlayerPeliculas)
 
         // Cargar las películas desde Firestore
         loadMovies() // Llama al método que carga las películas
@@ -230,8 +230,8 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun loadMovies() {
         CoroutineScope(Dispatchers.Main).launch {
-            val firestoreRepository = FirestoreRepository()
-            val (peliculasOrdenadasValidas, peliculasInvalidas) = firestoreRepository.obtenerPeliculas()
+            val validaciones = Validaciones()
+            val (peliculasOrdenadasValidas, peliculasInvalidas) = validaciones.obtenerPeliculas()
 
             // Log para verificar la cantidad de películas cargadas
             Log.d("MoviesData", "Películas válidas ordenadas: ${peliculasOrdenadasValidas.size}, Películas inválidas: ${peliculasInvalidas.size}")
@@ -249,15 +249,15 @@ class PlayerActivity : AppCompatActivity() {
         return if (url.isNullOrEmpty()) {
             false
         } else {
-            // Llama al método en tu FirestoreRepository para validar la URL
-            FirestoreRepository().isUrlValid(url) // Ajusta esto según tu implementación
+            // Llama al método en tu Validaciones para validar la URL
+            Validaciones().isUrlValid(url) // Ajusta esto según tu implementación
         }
     }
 
     // Método para iniciar la reproducción de la película
     private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieYear: String) {
-        // Crea un Intent para abrir PlayerActivity
-        val intent = Intent(this, PlayerActivity::class.java)
+        // Crea un Intent para abrir PlayerPeliculas
+        val intent = Intent(this, PlayerPeliculas::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP) // Limpia la pila de actividades
         // Envía la URL de transmisión y el título de la película como extras
         intent.putExtra("EXTRA_STREAM_URL", streamUrl)
@@ -272,7 +272,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun initializePlayer() {
         // Verifica si la URL ya ha sido establecida
         if (streamUrl.isEmpty()) {
-            Log.e("PlayerActivity", "No se recibió la URL de streaming.")
+            Log.e("PlayerPeliculas", "No se recibió la URL de streaming.")
             showErrorDialog("No se recibió la URL de streaming.", movieTitle, movieYear)
             return
         }
@@ -282,7 +282,7 @@ class PlayerActivity : AppCompatActivity() {
             val isUrlValid = withContext(Dispatchers.IO) {
                 isUrlValidInFirestore(streamUrl)
             }
-            Log.d("PlayerActivity", "La URL es válida en Firestore: $isUrlValid")
+            Log.d("PlayerPeliculas", "La URL es válida en Firestore: $isUrlValid")
 
             // Si la URL no es válida, muestra un diálogo de error
             if (!isUrlValid) {
@@ -304,10 +304,10 @@ class PlayerActivity : AppCompatActivity() {
                 .build()
 
             // Crea el reproductor
-            player = ExoPlayer.Builder(this@PlayerActivity)
+            player = ExoPlayer.Builder(this@PlayerPeliculas)
                 .setLoadControl(loadControl)
                 .setRenderersFactory(
-                    DefaultRenderersFactory(this@PlayerActivity)
+                    DefaultRenderersFactory(this@PlayerPeliculas)
                         .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
                 ) // Esto habilita FFmpeg
                 .setMediaSourceFactory(mediaSourceFactory)
@@ -315,7 +315,7 @@ class PlayerActivity : AppCompatActivity() {
 
                     // Asocia el ExoPlayer con el PlayerView usando binding
                     binding.reproductor.player = exoPlayer
-                    Log.d("PlayerActivity", "URL asignada al reproductor: $streamUrl")
+                    Log.d("PlayerPeliculas", "URL asignada al reproductor: $streamUrl")
 
                     // Configura el MediaItem
                     val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
@@ -333,9 +333,9 @@ class PlayerActivity : AppCompatActivity() {
                                 timeline.getWindow(0, window)
                                 // Determina si la ventana es en vivo
                                 if (window.isLive) {
-                                    Log.d("PlayerActivity", "Es una transmisión en vivo")
+                                    Log.d("PlayerPeliculas", "Es una transmisión en vivo")
                                 } else {
-                                    Log.d("PlayerActivity", "Es un video pregrabado")
+                                    Log.d("PlayerPeliculas", "Es un video pregrabado")
                                 }
                             }
                         }
@@ -353,12 +353,12 @@ class PlayerActivity : AppCompatActivity() {
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
                 Player.STATE_BUFFERING -> {
-                    Log.d("PlayerActivity", "Reproductor almacenando en búfer...")
+                    Log.d("PlayerPeliculas", "Reproductor almacenando en búfer...")
                     mostrarBuffer() // Muestra el estado del búfer
                 }
 
                 Player.STATE_READY -> {
-                    Log.d("PlayerActivity", "Reproductor en estado READY")
+                    Log.d("PlayerPeliculas", "Reproductor en estado READY")
                     isPlaybackActive = true // Indica que la reproducción está activa
                     playbackStartTime.set(System.currentTimeMillis()) // Guarda el tiempo de inicio
                     reconnectionAttempts = 0 // Reinicia los intentos de reconexión
@@ -374,38 +374,38 @@ class PlayerActivity : AppCompatActivity() {
                 }
 
                 Player.STATE_ENDED -> {
-                    Log.d("PlayerActivity", "Reproducción finalizada.")
+                    Log.d("PlayerPeliculas", "Reproducción finalizada.")
                     isPlaybackActive = false // La reproducción ya no está activa
                     showErrorDialog(streamUrl, movieTitle, movieYear)
                     // Si es un stream en vivo, intentar reconectar
                     if (isLiveStream) {
-                        Log.d("PlayerActivity", "Transmisión en vivo finalizada. Intentando reconectar...")
+                        Log.d("PlayerPeliculas", "Transmisión en vivo finalizada. Intentando reconectar...")
                         intentarReconexion() // Llama al método de reconexión
                     } else {
-                        Log.d("PlayerActivity", "Deteniendo actualizaciones de tiempo.")
+                        Log.d("PlayerPeliculas", "Deteniendo actualizaciones de tiempo.")
                         handler.removeCallbacks(runnable) // Detiene el runnable
                     }
                 }
 
                 Player.STATE_IDLE -> {
-                    Log.d("PlayerActivity", "Reproductor en estado IDLE.")
+                    Log.d("PlayerPeliculas", "Reproductor en estado IDLE.")
                     isPlaybackActive = false // La reproducción ya no está activa
 
                     // Si es un stream en vivo, intentar reconectar
                     if (isLiveStream) {
-                        Log.d("PlayerActivity", "Intentando reconectar transmisión en vivo...")
+                        Log.d("PlayerPeliculas", "Intentando reconectar transmisión en vivo...")
                         intentarReconexion() // Llama al método de reconexión
                     } else {
-                        Log.d("PlayerActivity", "No hay reproducción activa.")
+                        Log.d("PlayerPeliculas", "No hay reproducción activa.")
                         handler.removeCallbacks(runnable) // Detiene el runnable
                     }
                 }
 
                 else -> {
-                    Log.w("PlayerActivity", "Estado desconocido del reproductor: $playbackState")
+                    Log.w("PlayerPeliculas", "Estado desconocido del reproductor: $playbackState")
                     // En caso de un estado desconocido, intenta reconectar si no hay actividad de reproducción
                     if (!isPlaybackActive && reconnectionAttempts < maxReconnectionAttempts) {
-                        Log.d("PlayerActivity", "Intentando reconectar debido a estado desconocido...")
+                        Log.d("PlayerPeliculas", "Intentando reconectar debido a estado desconocido...")
                         intentarReconexion() // Llama al método de reconexión
                     }
                 }
@@ -423,7 +423,7 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            Log.e("PlayerActivity", "Error en el reproductor: ${error.message} - Código: ${error.errorCode}")
+            Log.e("PlayerPeliculas", "Error en el reproductor: ${error.message} - Código: ${error.errorCode}")
 
             // Intenta la reconexión solo si el error es recuperable y la reproducción ha sido activa
             if (isRecoverableError(error) && isPlaybackActive) {
@@ -506,7 +506,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
-        val dialogView = layoutInflater.inflate(R.layout.alert_reproductor, null)
+        val dialogView = layoutInflater.inflate(R.layout.player_alerdialogo, null)
         val messageText = dialogView.findViewById<TextView>(R.id.messageText)
         val linkNosotros = dialogView.findViewById<TextView>(R.id.linkNosotros)
 
@@ -868,12 +868,12 @@ class PlayerActivity : AppCompatActivity() {
                     binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido)
                 val tiempototal = binding.reproductor.findViewById<TextView>(R.id.tiempototal)
                 val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
-                Log.d("PlayerActivity", "actualizarTiempo() llamado")
+                Log.d("PlayerPeliculas", "actualizarTiempo() llamado")
 
                 val posicionActual = player?.currentPosition ?: 0
                 val duracionTotal = player?.duration ?: 0
                 Log.d(
-                    "PlayerActivity",
+                    "PlayerPeliculas",
                     "Posición actual: $posicionActual, Duración total: $duracionTotal"
                 )
 
@@ -883,13 +883,13 @@ class PlayerActivity : AppCompatActivity() {
                 if (duracionTotal > 0) {
                     val progress = (posicionActual.toFloat() / duracionTotal * 100).toInt()
                     seekBar.progress = progress
-                    Log.d("PlayerActivity", "SeekBar progress: $progress")
+                    Log.d("PlayerPeliculas", "SeekBar progress: $progress")
 
                     handler.postDelayed(runnableActualizar, updateInterval)
                 }
             }
         } else {
-            Log.d("PlayerActivity", "El reproductor no está listo o no está reproduciendo")
+            Log.d("PlayerPeliculas", "El reproductor no está listo o no está reproduciendo")
         }
     }
 

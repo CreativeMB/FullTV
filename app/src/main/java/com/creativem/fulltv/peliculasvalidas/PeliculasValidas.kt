@@ -11,12 +11,12 @@ class PeliculasValidas : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.peliculas_validas) // Asegúrate de que existe este XML
+        setContentView(R.layout.fragment_peliculas_validas) // Asegúrate de que existe este XML
 
         // Cargar el fragmento en el contenedor si no está agregado
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
-                .replace(R.id.peliculasvalidas, PeliculasFragment()) // Usa el ID correcto
+                .replace(R.id.peliculasvalidas, PeliculasValidasFragment()) // Usa el ID correcto
                 .commit()
         }
         // Mantener la pantalla encendida

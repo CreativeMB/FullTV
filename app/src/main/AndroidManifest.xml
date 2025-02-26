@@ -28,7 +28,7 @@
             android:exported="false"
            />
         <activity
-            android:name=".tv.TvActivity"
+            android:name=".tv.Tv"
             android:exported="false"
             />
         <activity
@@ -36,7 +36,7 @@
             android:exported="false"
             />
         <activity
-            android:name=".peliculas.MainFragment"
+            android:name=".peliculas.PeliculasFragment"
             android:exported="false"
             android:windowSoftInputMode="stateHidden|adjustPan"
 
@@ -48,7 +48,7 @@
 
             tools:ignore="Instantiatable" />
         <activity
-            android:name=".peliculasvalidas.PeliculasFragment"
+            android:name=".peliculasvalidas.PeliculasValidasFragment"
             android:exported="false"
             android:windowSoftInputMode="stateHidden|adjustPan"
 
@@ -58,15 +58,15 @@
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
 
         <activity
-            android:name=".peliculas.PlayerActivity"
+            android:name=".peliculas.PlayerPeliculas"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".tv.PlayertvActivity"
+            android:name=".tv.PlayerTv"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".principal.LoginActivity"
+            android:name=".principal.Login"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"
             android:exported="true">
 

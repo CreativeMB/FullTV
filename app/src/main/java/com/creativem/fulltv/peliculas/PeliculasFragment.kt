@@ -35,8 +35,7 @@ import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
-import com.creativem.fulltv.principal.RelojCuston
-import com.creativem.fulltv.databinding.MainFragmentBinding
+import com.creativem.fulltv.principal.Reloj
 import com.creativem.fulltv.menu.MenuItem
 import com.creativem.fulltv.menu.MenuPresenter
 import com.google.firebase.auth.FirebaseAuth
@@ -55,10 +54,11 @@ import org.json.JSONObject
 import android.widget.LinearLayout
 import android.text.InputType
 import android.widget.ImageButton
+import com.creativem.fulltv.databinding.FragmentPeliculasBinding
 import com.creativem.fulltv.peliculasvalidas.PeliculasValidas
-import com.creativem.fulltv.principal.LoginActivity
+import com.creativem.fulltv.principal.Login
 import com.creativem.fulltv.principal.Nosotros
-import com.creativem.fulltv.tv.TvActivity
+import com.creativem.fulltv.tv.Tv
 import com.google.firebase.Firebase
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -67,13 +67,13 @@ import com.google.firebase.database.ValueEventListener
 import com.google.firebase.storage.storage
 import kotlinx.coroutines.delay
 
-class MainFragment : BrowseSupportFragment() {
+class PeliculasFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
-    private val firestoreRepository = FirestoreRepository()
+    private val validaciones = Validaciones()
     private lateinit var progressBar: ProgressBar
     private lateinit var loadingText: TextView
     private lateinit var loadingContainer: FrameLayout
-    private lateinit var binding: MainFragmentBinding
+    private lateinit var binding: FragmentPeliculasBinding
     private val db = FirebaseFirestore.getInstance()
     // Declarar las listas de UIDs (Strings)
     val usuariosConectados = mutableListOf<String>()
@@ -181,7 +181,7 @@ class MainFragment : BrowseSupportFragment() {
 
 
         // Inflar el layout principal
-        binding = MainFragmentBinding.bind(requireActivity().findViewById(R.id.main))
+        binding = FragmentPeliculasBinding.bind(requireActivity().findViewById(R.id.main))
         // Inflar el layout de carga (loading overlay)
         loadingContainer =
             inflater.inflate(R.layout.loading_overlay, container, false) as FrameLayout
@@ -196,15 +196,15 @@ class MainFragment : BrowseSupportFragment() {
         // Iniciar el reloj
         val textHora = binding.textHora
         val textfecha = binding.textfecha
-        val relojCuston = RelojCuston(textHora, textfecha)
-        relojCuston.startClock()
+        val reloj = Reloj(textHora, textfecha)
+        reloj.startClock()
         // Agregar la vista de entrada a la vista principal
         (view as? ViewGroup)?.addView(loadingContainer)
 
         // Configura el listener de clics mrnu
         setOnItemViewClickedListener { _, item, _, _ ->
             if (item is MenuItem) {
-                Log.d("MainFragment", "Menu item clicked: ${item.name}")
+                Log.d("PeliculasValidasFragment", "Menu item clicked: ${item.name}")
                 when (item.name) {
                     "Buscar\nPelicula" -> {
                         buscarPeliculaDialogo()
@@ -226,7 +226,7 @@ class MainFragment : BrowseSupportFragment() {
                         startActivity(intent)
                     }
                     "TV\nGratis" -> {
-                        val intent = Intent(requireContext(), TvActivity::class.java)
+                        val intent = Intent(requireContext(), Tv::class.java)
                         startActivity(intent)
                     }
                     "Cerrar\nCuenta" -> {
@@ -242,7 +242,7 @@ class MainFragment : BrowseSupportFragment() {
                     }
                 }
             } else if (item is Movie) {
-                val intent = Intent(context, PlayerActivity::class.java)
+                val intent = Intent(context, PlayerPeliculas::class.java)
                 intent.putExtra("EXTRA_STREAM_URL", item.streamUrl)
                 intent.putExtra("EXTRA_MOVIE_TITLE", item.title) // Título de la película
                 intent.putExtra("EXTRA_MOVIE_YEAR", item.year) // Año de la película
@@ -262,7 +262,7 @@ class MainFragment : BrowseSupportFragment() {
         // Aquí puedes redirigir al usuario a la pantalla de inicio de sesión o cualquier otra actividad
         val intent = Intent(
             requireContext(),
-            LoginActivity::class.java
+            Login::class.java
         ) // Cambia a tu actividad de inicio de sesión
         startActivity(intent)
         requireActivity().finish() // Finaliza la actividad actual si es necesario
@@ -329,9 +329,9 @@ class MainFragment : BrowseSupportFragment() {
         // Llama a obtenerNombreUsuario y obtenerCantidadCastv dentro de una coroutine
         if (usuarioId != null) {
             viewLifecycleOwner.lifecycleScope.launch {
-                val nombreUsuario = firestoreRepository.obtenerNombreUsuario(usuarioId)
-                val cantidadCastv = firestoreRepository.obtenerCantidadCastv(usuarioId)
-                val cantidadPeliculas = firestoreRepository.obtenerCantidadPeliculas()
+                val nombreUsuario = validaciones.obtenerNombreUsuario(usuarioId)
+                val cantidadCastv = validaciones.obtenerCantidadCastv(usuarioId)
+                val cantidadPeliculas = validaciones.obtenerCantidadPeliculas()
                 actualizarUsuario(
                     nombreUsuario,
                     cantidadCastv,
@@ -340,7 +340,7 @@ class MainFragment : BrowseSupportFragment() {
             }
         } else {
             // Manejo de usuario no autenticado
-            Log.e("MainFragment", "No hay usuario autenticado")
+            Log.e("PeliculasValidasFragment", "No hay usuario autenticado")
             actualizarUsuario(
                 "Usuario Desconocido",
                 0,
@@ -354,10 +354,10 @@ class MainFragment : BrowseSupportFragment() {
 
         if (usuarioId != null) {
             viewLifecycleOwner.lifecycleScope.launch {
-                val nombreUsuario = firestoreRepository.obtenerNombreUsuario(usuarioId)
-                val cantidadCastv = firestoreRepository.obtenerCantidadCastv(usuarioId)
+                val nombreUsuario = validaciones.obtenerNombreUsuario(usuarioId)
+                val cantidadCastv = validaciones.obtenerCantidadCastv(usuarioId)
                 val cantidadPeliculas =
-                    firestoreRepository.obtenerCantidadPeliculas() // Obtener cantidad de películas
+                    validaciones.obtenerCantidadPeliculas() // Obtener cantidad de películas
                 actualizarUsuario(
                     nombreUsuario,
                     cantidadCastv,
@@ -365,7 +365,7 @@ class MainFragment : BrowseSupportFragment() {
                 ) // Pasar cantidad de películas
             }
         } else {
-            Log.e("MainFragment", "No hay usuario autenticado")
+            Log.e("PeliculasValidasFragment", "No hay usuario autenticado")
             actualizarUsuario("Usuario Desconocido", 0, 0) // Información predeterminada
         }
     }
@@ -400,7 +400,7 @@ class MainFragment : BrowseSupportFragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             val peliculas =
-                firestoreRepository.obtenerPeliculasCompleta() // Obtenemos toda la colección
+                validaciones.obtenerPeliculasCompleta() // Obtenemos toda la colección
             // Ordenamos por fecha de publicación, siendo la primera la última actualizada
             val peliculasOrdenadas = peliculas.sortedByDescending { it.createdAt }
             ocultarCarga()
@@ -511,9 +511,9 @@ class MainFragment : BrowseSupportFragment() {
     }
 
     private fun escucharCambiosEnPeliculas() {
-        firestoreRepository.obtenerPeliculasRef().addSnapshotListener { snapshot, error ->
+        validaciones.obtenerPeliculasRef().addSnapshotListener { snapshot, error ->
             if (error != null) {
-                Log.e("MainFragment", "Error al escuchar cambios: ${error.message}")
+                Log.e("PeliculasValidasFragment", "Error al escuchar cambios: ${error.message}")
                 Toast.makeText(requireContext(), "Error al cargar películas", Toast.LENGTH_SHORT)
                     .show()
                 return@addSnapshotListener
@@ -531,7 +531,7 @@ class MainFragment : BrowseSupportFragment() {
                 actualizarUsuarioInfo()
 
             } else {
-                Log.d("MainFragment", "No se encontraron películas.")
+                Log.d("PeliculasValidasFragment", "No se encontraron películas.")
                 Toast.makeText(requireContext(), "No hay películas disponibles", Toast.LENGTH_SHORT)
                     .show()
                 updateMovieList(emptyList()) // Llama con solo una lista vacía si no hay datos
@@ -572,7 +572,7 @@ class MainFragment : BrowseSupportFragment() {
         // Cargar todas las películas desde Firestore sin validaciones
         CoroutineScope(Dispatchers.Main).launch {
             val peliculas =
-                firestoreRepository.obtenerPeliculasCompleta() // Obtenemos todas las películas sin filtrar
+                validaciones.obtenerPeliculasCompleta() // Obtenemos todas las películas sin filtrar
             movieList.clear()
             movieList.addAll(peliculas)
             filteredMovieList.clear()
@@ -616,7 +616,7 @@ class MainFragment : BrowseSupportFragment() {
     }
 
     private fun irAlReproductor(movie: Movie) {
-        val intent = Intent(context, PlayerActivity::class.java).apply {
+        val intent = Intent(context, PlayerPeliculas::class.java).apply {
             putExtra("EXTRA_STREAM_URL", movie.streamUrl)  // Pasa el URL del stream
             putExtra("EXTRA_MOVIE_TITLE", movie.title)     // Pasa el título de la película
             putExtra("EXTRA_MOVIE_YEAR", movie.year)       // Pasa el año de la película

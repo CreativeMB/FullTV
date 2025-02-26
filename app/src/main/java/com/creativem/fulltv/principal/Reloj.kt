@@ -12,7 +12,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class RelojCuston(private val textViewHora: TextView, private val textViewFecha: TextView) {
+class Reloj(private val textViewHora: TextView, private val textViewFecha: TextView) {
 
     private val clockScope = CoroutineScope(Job() + Dispatchers.Main)
 

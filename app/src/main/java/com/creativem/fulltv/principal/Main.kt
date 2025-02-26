@@ -6,14 +6,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 
-import com.creativem.fulltv.databinding.MainFragmentBinding
+import com.creativem.fulltv.databinding.FragmentPeliculasBinding
 
 class Main : FragmentActivity() {
-    private lateinit var binding: MainFragmentBinding
+    private lateinit var binding: FragmentPeliculasBinding
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        binding = MainFragmentBinding.inflate(layoutInflater)
+        binding = FragmentPeliculasBinding.inflate(layoutInflater)
         setContentView(binding.root)
 // Mantener la pantalla encendida
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)

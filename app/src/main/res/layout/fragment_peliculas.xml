@@ -5,7 +5,7 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".peliculas.MainFragment">
+    tools:context=".peliculas.PeliculasFragment">
 
     <ImageView
         android:id="@+id/mainBackgroundImage"
@@ -15,7 +15,7 @@
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/main_fragmen_view"
-        android:name="com.creativem.fulltv.peliculas.MainFragment"
+        android:name="com.creativem.fulltv.peliculas.PeliculasFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 

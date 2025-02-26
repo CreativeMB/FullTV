@@ -12,16 +12,16 @@ import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 
-class TvAdapter(
+class TvMenuAdapter(
     private val context: Context,
     private var tvList: MutableList<Movie>,
     private val clickListener: (Movie) -> Unit // ✅ Función lambda para manejar clics
-) : RecyclerView.Adapter<TvAdapter.TvViewHolder>() {
+) : RecyclerView.Adapter<TvMenuAdapter.TvViewHolder>() {
 
     private var selectedPosition = RecyclerView.NO_POSITION
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TvViewHolder {
-        val view = LayoutInflater.from(context).inflate(R.layout.item_tv, parent, false)
+        val view = LayoutInflater.from(context).inflate(R.layout.item_menu_tv, parent, false)
         return TvViewHolder(view)
 
 

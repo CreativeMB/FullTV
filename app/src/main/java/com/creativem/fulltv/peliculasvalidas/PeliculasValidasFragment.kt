@@ -10,16 +10,16 @@ import androidx.core.content.ContextCompat
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.*
 import com.creativem.fulltv.R
-import com.creativem.fulltv.peliculas.FirestoreRepository
+import com.creativem.fulltv.peliculas.Validaciones
 import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.peliculas.CardPresenter  // Cambio aquí
-import com.creativem.fulltv.peliculas.PlayerActivity
+import com.creativem.fulltv.peliculas.PlayerPeliculas
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class PeliculasFragment : RowsSupportFragment() {
+class PeliculasValidasFragment : RowsSupportFragment() {
     private val channels = ArrayObjectAdapter(ListRowPresenter())
     private lateinit var progressBar: View
     private lateinit var loadingText: View
@@ -49,8 +49,8 @@ class PeliculasFragment : RowsSupportFragment() {
         mostrarCargando() // Mostrar la barra de progreso
 
         CoroutineScope(Dispatchers.IO).launch {
-            val firestoreRepository = FirestoreRepository()
-            val (peliculasOrdenadasValidas, _) = firestoreRepository.obtenerPeliculas()
+            val validaciones = Validaciones()
+            val (peliculasOrdenadasValidas, _) = validaciones.obtenerPeliculas()
 
             withContext(Dispatchers.Main) {
                 ocultarCargando() // Ocultar la barra de progreso
@@ -58,7 +58,7 @@ class PeliculasFragment : RowsSupportFragment() {
                 if (peliculasOrdenadasValidas.isNotEmpty()) {
                     agregarALista(peliculasOrdenadasValidas, "Películas en Línea Gratis disponibles para ver de forma ilimitada")
                 } else {
-                    Log.e("PeliculasFragment", "No hay películas válidas.")
+                    Log.e("PeliculasValidasFragment", "No hay películas válidas.")
                 }
             }
         }
@@ -103,8 +103,8 @@ class PeliculasFragment : RowsSupportFragment() {
             rowViewHolder: RowPresenter.ViewHolder?,
             row: Row?
         ) {
-            if (item is Movie) { // Si es una película, abre PlayerActivity
-                val intent = Intent(context, PlayerActivity::class.java).apply {
+            if (item is Movie) { // Si es una película, abre PlayerPeliculas
+                val intent = Intent(context, PlayerPeliculas::class.java).apply {
                     putExtra("EXTRA_STREAM_URL", item.streamUrl)
                     putExtra("EXTRA_MOVIE_TITLE", item.title) // Título de la película
                     putExtra("EXTRA_MOVIE_YEAR", item.year) // Año de la película

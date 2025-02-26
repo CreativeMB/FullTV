@@ -16,7 +16,7 @@ import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
 import java.util.concurrent.Executors
 
-class FirestoreRepository {
+class Validaciones {
     private val firestore = FirebaseFirestore.getInstance()
     private val peliculasCollection = firestore.collection("movies")
     private val db = FirebaseFirestore.getInstance()
@@ -80,10 +80,10 @@ class FirestoreRepository {
                     response.isSuccessful && response.code in 200..299
                 }
             } catch (e: IOException) {
-                Log.e("FirestoreRepository", "Error de conexión: $validUrl", e)
+                Log.e("Validaciones", "Error de conexión: $validUrl", e)
                 false
             } catch (e: IllegalArgumentException) {
-                Log.e("FirestoreRepository", "URL malformada: $validUrl", e)
+                Log.e("Validaciones", "URL malformada: $validUrl", e)
                 false
             }
         }
@@ -96,11 +96,11 @@ class FirestoreRepository {
                 return@withContext if (doc.exists()) {
                     doc.getString("nombre") ?: "Usuario Desconocido"
                 } else {
-                    Log.e("FirestoreRepository", "El documento no existe")
+                    Log.e("Validaciones", "El documento no existe")
                     "Usuario Desconocido"
                 }
             } catch (e: Exception) {
-                Log.e("FirestoreRepository", "Error obteniendo nombre de usuario", e)
+                Log.e("Validaciones", "Error obteniendo nombre de usuario", e)
                 "Error"
             }
         }
@@ -114,11 +114,11 @@ class FirestoreRepository {
                 return@withContext if (doc.exists()) {
                     doc.getLong("puntos")?.toInt() ?: 0
                 } else {
-                    Log.e("FirestoreRepository", "El documento no existe")
+                    Log.e("Validaciones", "El documento no existe")
                     0
                 }
             } catch (e: Exception) {
-                Log.e("FirestoreRepository", "Error obteniendo cantidad de Castv", e)
+                Log.e("Validaciones", "Error obteniendo cantidad de Castv", e)
                 0
             }
         }

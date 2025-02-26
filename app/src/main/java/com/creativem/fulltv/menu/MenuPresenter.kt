@@ -11,7 +11,7 @@ import com.creativem.fulltv.R
 class MenuPresenter : Presenter() {
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.menu_item_layout, parent, false)
+            .inflate(R.layout.item_menu_principal, parent, false)
 
         // Ajuste de tamaño dinámico
         val width = 180 // Ancho personalizado
