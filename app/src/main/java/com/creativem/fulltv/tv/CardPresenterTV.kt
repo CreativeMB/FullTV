@@ -8,7 +8,7 @@ import androidx.leanback.widget.ImageCardView
 import androidx.leanback.widget.Presenter
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
-import com.creativem.fulltv.data.Movie
+import com.creativem.fulltv.principal.Movie
 import java.lang.reflect.Field
 
 class CardPresenterTV : Presenter() {

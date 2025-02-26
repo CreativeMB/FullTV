@@ -1,4 +1,4 @@
-package com.creativem.fulltv.adapter
+package com.creativem.fulltv.principal
 
 import android.os.Bundle
 import android.view.WindowManager

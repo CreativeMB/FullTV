@@ -1,4 +1,4 @@
-package com.creativem.fulltv.data
+package com.creativem.fulltv.principal
 
 import android.os.Parcel
 import android.os.Parcelable

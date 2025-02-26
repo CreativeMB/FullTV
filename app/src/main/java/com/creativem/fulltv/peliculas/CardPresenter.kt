@@ -1,4 +1,4 @@
-package com.creativem.fulltv.adapter
+package com.creativem.fulltv.peliculas
 
 import android.content.Intent
 import android.os.CountDownTimer
@@ -6,9 +6,8 @@ import android.view.ViewGroup
 import androidx.leanback.widget.ImageCardView
 import androidx.leanback.widget.Presenter
 import com.bumptech.glide.Glide
-import com.creativem.fulltv.home.PlayerActivity
 import com.creativem.fulltv.R
-import com.creativem.fulltv.data.Movie
+import com.creativem.fulltv.principal.Movie
 import java.util.concurrent.TimeUnit
 import android.graphics.Color
 import android.widget.TextView

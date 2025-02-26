@@ -1,4 +1,4 @@
-package com.creativem.fulltv.adapter
+package com.creativem.fulltv.peliculasvalidas
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -8,7 +8,7 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
-import com.creativem.fulltv.data.Movie
+import com.creativem.fulltv.principal.Movie
 
 class MoviesMenuAdapter(
     private val movieList: MutableList<Movie>,

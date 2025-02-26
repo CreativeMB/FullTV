@@ -1,4 +1,4 @@
-package com.creativem.fulltv.data
+package com.creativem.fulltv.principal
 
 import android.annotation.SuppressLint
 import android.widget.TextView

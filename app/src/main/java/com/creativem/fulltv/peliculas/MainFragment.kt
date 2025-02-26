@@ -1,4 +1,4 @@
-package com.creativem.fulltv.home
+package com.creativem.fulltv.peliculas
 
 import android.app.AlertDialog
 import android.app.Dialog
@@ -34,10 +34,8 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions
 import com.creativem.fulltv.R
-import com.creativem.fulltv.adapter.CardPresenter
-import com.creativem.fulltv.adapter.FirestoreRepository
-import com.creativem.fulltv.data.Movie
-import com.creativem.fulltv.data.RelojCuston
+import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.RelojCuston
 import com.creativem.fulltv.databinding.MainFragmentBinding
 import com.creativem.fulltv.menu.MenuItem
 import com.creativem.fulltv.menu.MenuPresenter
@@ -57,7 +55,9 @@ import org.json.JSONObject
 import android.widget.LinearLayout
 import android.text.InputType
 import android.widget.ImageButton
-import com.creativem.fulltv.enlinea.PeliculasValidas
+import com.creativem.fulltv.peliculasvalidas.PeliculasValidas
+import com.creativem.fulltv.principal.LoginActivity
+import com.creativem.fulltv.principal.Nosotros
 import com.creativem.fulltv.tv.TvActivity
 import com.google.firebase.Firebase
 import com.google.firebase.database.DataSnapshot

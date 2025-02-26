@@ -1,4 +1,4 @@
-package com.creativem.fulltv.home
+package com.creativem.fulltv.principal
 
 import android.content.Intent
 import android.os.Bundle
@@ -13,7 +13,6 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.creativem.fulltv.R
-import com.creativem.fulltv.adapter.Main
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -222,7 +221,7 @@ class LoginActivity : AppCompatActivity() {
 
 
 
-//package com.creativem.fulltv.home
+//package com.creativem.fulltv.peliculas
 //
 //import android.content.Intent
 //import android.os.Bundle
@@ -236,7 +235,7 @@ class LoginActivity : AppCompatActivity() {
 //import com.google.firebase.auth.FirebaseAuth
 //import com.google.firebase.auth.GoogleAuthProvider
 //import com.creativem.fulltv.R
-//import com.creativem.fulltv.adapter.Main
+//import com.creativem.fulltv.principal.Main
 //import com.google.firebase.firestore.FirebaseFirestore
 //class LoginActivity : AppCompatActivity() {
 //

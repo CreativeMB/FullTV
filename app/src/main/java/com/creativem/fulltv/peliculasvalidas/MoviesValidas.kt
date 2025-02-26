@@ -1,4 +1,4 @@
-//package com.creativem.fulltv.home
+package com.creativem.fulltv.peliculasvalidas//package com.creativem.fulltv.peliculas
 //import android.content.Intent
 //import android.os.Bundle
 //import android.util.DisplayMetrics
@@ -11,8 +11,8 @@
 //import androidx.recyclerview.widget.GridLayoutManager
 //import androidx.recyclerview.widget.RecyclerView
 //import com.creativem.fulltv.R
-//import com.creativem.fulltv.adapter.FirestoreRepository
-//import com.creativem.fulltv.adapter.MoviesMenuAdapter
+//import com.creativem.fulltv.peliculas.FirestoreRepository
+//import com.creativem.fulltv.peliculasvalidas.MoviesMenuAdapter
 //import kotlinx.coroutines.CoroutineScope
 //import kotlinx.coroutines.Dispatchers
 //import kotlinx.coroutines.launch

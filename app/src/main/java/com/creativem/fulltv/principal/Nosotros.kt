@@ -1,8 +1,7 @@
-package com.creativem.fulltv.home
+package com.creativem.fulltv.principal
 
 import android.os.Bundle
 import android.view.View
-import android.view.WindowManager
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.text.HtmlCompat

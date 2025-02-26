@@ -23,8 +23,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.creativem.fulltv.data.RelojCuston
-import com.creativem.fulltv.adapter.MoviesMenuAdapter
+import com.creativem.fulltv.principal.RelojCuston
 import kotlinx.coroutines.*
 import android.text.format.DateUtils
 import androidx.annotation.OptIn
@@ -34,11 +33,9 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultHttpDataSource
 import com.creativem.fulltv.R
-import com.creativem.fulltv.data.Movie
+import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.databinding.ActivityPlayerBinding
-import com.creativem.fulltv.home.Nosotros
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.toObjects
 
 class PlayertvActivity : AppCompatActivity() {
 

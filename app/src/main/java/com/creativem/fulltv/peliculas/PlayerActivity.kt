@@ -1,7 +1,6 @@
-package com.creativem.fulltv.home
+package com.creativem.fulltv.peliculas
 
 import android.annotation.SuppressLint
-import android.app.MediaRouteButton
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
@@ -27,7 +26,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.fulltv.databinding.ActivityPlayerBinding
-import com.creativem.fulltv.data.RelojCuston
+import com.creativem.fulltv.principal.RelojCuston
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.FirebaseFirestore
@@ -46,8 +45,7 @@ import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.creativem.fulltv.R
-import com.creativem.fulltv.adapter.FirestoreRepository
-import com.creativem.fulltv.adapter.MoviesMenuAdapter
+import com.creativem.fulltv.peliculasvalidas.MoviesMenuAdapter
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -56,13 +54,11 @@ import kotlin.math.pow
 import org.json.JSONObject
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
-import android.media.MediaPlayer
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
-
-
+import com.creativem.fulltv.principal.Nosotros
 
 
 class PlayerActivity : AppCompatActivity() {

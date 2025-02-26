@@ -1,4 +1,4 @@
-package com.creativem.fulltv.enlinea
+package com.creativem.fulltv.peliculasvalidas
 
 import android.content.Intent
 import android.content.res.Resources
@@ -10,10 +10,10 @@ import androidx.core.content.ContextCompat
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.*
 import com.creativem.fulltv.R
-import com.creativem.fulltv.adapter.FirestoreRepository
-import com.creativem.fulltv.data.Movie
-import com.creativem.fulltv.adapter.CardPresenter  // Cambio aquí
-import com.creativem.fulltv.home.PlayerActivity
+import com.creativem.fulltv.peliculas.FirestoreRepository
+import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.peliculas.CardPresenter  // Cambio aquí
+import com.creativem.fulltv.peliculas.PlayerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

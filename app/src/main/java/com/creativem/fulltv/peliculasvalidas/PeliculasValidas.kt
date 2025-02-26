@@ -1,4 +1,4 @@
-package com.creativem.fulltv.enlinea
+package com.creativem.fulltv.peliculasvalidas
 
 import android.os.Bundle
 import android.view.WindowManager

@@ -7,7 +7,7 @@ import androidx.core.content.ContextCompat
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.*
 import com.creativem.fulltv.R
-import com.creativem.fulltv.data.Movie
+import com.creativem.fulltv.principal.Movie
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

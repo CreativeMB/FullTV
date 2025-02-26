@@ -24,7 +24,7 @@
         android:theme="@style/Theme.FullTV.tv"
         android:usesCleartextTraffic="true">
         <activity
-            android:name=".adapter.Main"
+            android:name=".principal.Main"
             android:exported="false"
            />
         <activity
@@ -32,11 +32,11 @@
             android:exported="false"
             />
         <activity
-            android:name=".enlinea.PeliculasValidas"
+            android:name=".peliculasvalidas.PeliculasValidas"
             android:exported="false"
             />
         <activity
-            android:name=".home.MainFragment"
+            android:name=".peliculas.MainFragment"
             android:exported="false"
             android:windowSoftInputMode="stateHidden|adjustPan"
 
@@ -48,17 +48,17 @@
 
             tools:ignore="Instantiatable" />
         <activity
-            android:name=".enlinea.PeliculasFragment"
+            android:name=".peliculasvalidas.PeliculasFragment"
             android:exported="false"
             android:windowSoftInputMode="stateHidden|adjustPan"
 
             tools:ignore="Instantiatable" />
         <activity
-            android:name=".home.Nosotros"
+            android:name=".principal.Nosotros"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
 
         <activity
-            android:name=".home.PlayerActivity"
+            android:name=".peliculas.PlayerActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
@@ -66,7 +66,7 @@
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".home.LoginActivity"
+            android:name=".principal.LoginActivity"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"
             android:exported="true">
 
