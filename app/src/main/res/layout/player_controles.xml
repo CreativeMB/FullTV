@@ -27,7 +27,7 @@
             <!-- Imagen de la película a la izquierda -->
             <ImageView
                 android:id="@+id/imagenPelicula"
-                android:layout_width="80dp"
+                android:layout_width="70dp"
                 android:layout_height="100dp"
                 android:contentDescription="Imagen de la película"
                 android:scaleType="fitCenter"
@@ -55,7 +55,7 @@
                     android:singleLine="true"
                     android:text="Nombre película"
                     android:textColor="@color/exo_button_color"
-                    android:textSize="16sp"
+                    android:textSize="25sp"
                     android:textStyle="bold" />
 
                 <!-- Barra de progreso -->

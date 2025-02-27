@@ -108,6 +108,7 @@ class PeliculasValidasFragment : RowsSupportFragment() {
                     putExtra("EXTRA_STREAM_URL", item.streamUrl)
                     putExtra("EXTRA_MOVIE_TITLE", item.title) // Título de la película
                     putExtra("EXTRA_MOVIE_YEAR", item.year) // Año de la película
+                    putExtra("EXTRA_MOVIE_IMAGE_URL", item.imageUrl)
                 }
                 startActivity(intent)
             } else { // Si es otro tipo de elemento, muestra un mensaje

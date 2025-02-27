@@ -15,6 +15,7 @@
         <ProgressBar
             android:id="@+id/progressBar"
             android:layout_width="wrap_content"
+            android:indeterminateTint="@color/redpersonalisado"
             android:layout_height="wrap_content" />
 
         <TextView
@@ -26,7 +27,7 @@
             android:text="Cargando..."
             android:textStyle="bold"
             android:gravity="center"
-            android:textColor="@color/colorFocused" />
+            android:textColor="@color/redpersonalisado" />
     </LinearLayout>
 
 

@@ -26,12 +26,14 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.fulltv.principal.Reloj
 import kotlinx.coroutines.*
 import android.text.format.DateUtils
+import android.widget.ImageView
 import androidx.annotation.OptIn
 import androidx.appcompat.app.AlertDialog
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultHttpDataSource
+import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.databinding.PlayerBinding
@@ -41,6 +43,7 @@ class PlayerTv : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
     private var streamUrl: String = ""
+    private var movieImageUrl: String = ""
     private lateinit var movieTitle: String
     private var movieYear: String = ""
     private lateinit var binding: PlayerBinding
@@ -64,12 +67,20 @@ class PlayerTv : AppCompatActivity() {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val nombrePeliculaTextView: TextView = findViewById(R.id.nombrePelicula)
+        val imagenPeliculaImageView: ImageView = findViewById(R.id.imagenPelicula)
         intent?.let {
             streamUrl = it.getStringExtra("EXTRA_STREAM_URL") ?: ""
             movieTitle = it.getStringExtra("EXTRA_MOVIE_TITLE") ?: "Título desconocido"
             movieYear = it.getStringExtra("EXTRA_MOVIE_YEAR") ?: ""
-            Log.d("PlayerTv", "Cargando stream desde URL: $streamUrl")
+            movieImageUrl = it.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
+
             nombrePeliculaTextView.text = movieTitle
+            Glide.with(this)
+                .load( movieImageUrl)
+                .placeholder(R.drawable.icono)
+                .error(R.drawable.icono)
+                .into(imagenPeliculaImageView)
+
         }
 
         if (streamUrl.isEmpty()) {
@@ -120,7 +131,7 @@ class PlayerTv : AppCompatActivity() {
                 .create()
 
             alertDialog.setOnShowListener {
-                alertDialog.window?.setBackgroundDrawableResource(R.color.exo_progress_color) // Reemplaza con tu color
+                alertDialog.window?.setBackgroundDrawableResource(R.color.textColorPrimary) // Reemplaza con tu color
             }
 
             alertDialog.show()
@@ -175,7 +186,7 @@ class PlayerTv : AppCompatActivity() {
 
     private fun initializeRecyclerView() {
         adapter = TvMenuAdapter(this, mutableListOf()) { movie ->
-            startMoviePlayback(movie.streamUrl, movie.title, movie.year)
+            startMoviePlayback(movie.streamUrl, movie.title, movie.year, movie.streamUrl)
         }
 
         binding.recyclerViewTv.adapter = adapter
@@ -212,12 +223,12 @@ class PlayerTv : AppCompatActivity() {
         adapter.updateData(tvList) // ✅ Ahora actualizamos la lista en vez de reemplazar el adaptador
     }
 
-    private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieYear: String) {
+    private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieYear: String,  movieImageUrl: String) {
         val intent = Intent(this, PlayerTv::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         intent.putExtra("EXTRA_STREAM_URL", streamUrl)
         intent.putExtra("EXTRA_MOVIE_TITLE", movieTitle)
-        intent.putExtra("EXTRA_MOVIE_YEAR", movieYear)
+        intent.putExtra("EXTRA_MOVIE_IMAGE_URL", movieImageUrl)
         startActivity(intent)
     }
 

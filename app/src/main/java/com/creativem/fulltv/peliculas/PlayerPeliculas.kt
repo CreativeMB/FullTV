@@ -57,16 +57,28 @@ import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
+import android.widget.ImageView
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.creativem.fulltv.databinding.PlayerBinding
 import com.creativem.fulltv.principal.Nosotros
+
+import android.graphics.drawable.Drawable
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.target.Target
 
 
 class PlayerPeliculas : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
     private var streamUrl: String = ""
-    private lateinit var movieTitle: String
+    private var movieImageUrl: String = ""
     private var movieYear: String = ""
+    private lateinit var movieTitle: String
     private var isLiveStream = false
     private lateinit var binding: PlayerBinding
     private lateinit var adapter: PeliculasMenuAdapter
@@ -105,22 +117,28 @@ class PlayerPeliculas : AppCompatActivity() {
 
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-// Referencia al TextView para el nombre de la película
+
         val nombrePeliculaTextView: TextView = findViewById(R.id.nombrePelicula)
-        // Recuperar los datos del Intent
+        val imagenPeliculaImageView: ImageView = findViewById(R.id.imagenPelicula)
+
         intent?.let {
             streamUrl = it.getStringExtra("EXTRA_STREAM_URL") ?: ""
             movieTitle = it.getStringExtra("EXTRA_MOVIE_TITLE") ?: "Título desconocido"
             movieYear = it.getStringExtra("EXTRA_MOVIE_YEAR") ?: ""
-            Log.d("PlayerPeliculas", "Cargando stream desde URL: $streamUrl")
-            // Actualiza el TextView con el título
-            nombrePeliculaTextView.text = movieTitle
-        }
+            movieImageUrl = it.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
 
-        if (streamUrl.isEmpty()) {
-            Log.e("PlayerPeliculas", "No se recibió la URL de streaming.")
-            showErrorDialog("No se recibió la URL de streaming.", movieTitle, movieYear)
-            return
+            nombrePeliculaTextView.text = movieTitle
+
+            Glide.with(this)
+                .load( movieImageUrl)
+                .placeholder(R.drawable.icono)
+                .error(R.drawable.icono)
+                .into(imagenPeliculaImageView)
+
+            if (streamUrl.isEmpty()) {
+                showErrorDialog("No se recibió la URL de streaming.", movieTitle, movieYear)
+                return
+            }
         }
         val textHora = binding.textHora
         val textfecha = binding.textfecha
@@ -218,7 +236,7 @@ class PlayerPeliculas : AppCompatActivity() {
     private fun initializeRecyclerView() {
         // Crear el adaptador inicialmente con una lista vacía
         adapter = PeliculasMenuAdapter(mutableListOf()) { movie ->
-            startMoviePlayback(movie.streamUrl, movie.title, movie.year)
+            startMoviePlayback(movie.streamUrl, movie.title, movie.year, movie.streamUrl)
         }
         binding.recyclerMoviesMenu.adapter = adapter
         binding.recyclerMoviesMenu.layoutManager = LinearLayoutManager(this@PlayerPeliculas)
@@ -254,8 +272,8 @@ class PlayerPeliculas : AppCompatActivity() {
         }
     }
 
-    // Método para iniciar la reproducción de la película
-    private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieYear: String) {
+
+    private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieYear: String, movieImageUrl: String) {
         // Crea un Intent para abrir PlayerPeliculas
         val intent = Intent(this, PlayerPeliculas::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP) // Limpia la pila de actividades
@@ -263,6 +281,7 @@ class PlayerPeliculas : AppCompatActivity() {
         intent.putExtra("EXTRA_STREAM_URL", streamUrl)
         intent.putExtra("EXTRA_MOVIE_TITLE", movieTitle)
         intent.putExtra("EXTRA_MOVIE_YEAR", movieYear)
+        intent.putExtra("EXTRA_MOVIE_IMAGE_URL", movieImageUrl)
         // Inicia la actividad de reproducción
         startActivity(intent)
     }
@@ -490,9 +509,9 @@ class PlayerPeliculas : AppCompatActivity() {
         // Inicia una corutina para manejar la reconexión
         CoroutineScope(Dispatchers.Main).launch {
             delay(waitTime) // Espera el tiempo calculado
-            // Intenta reiniciar la reproducción
-            if (streamUrl != null) {
-                startMoviePlayback(streamUrl, movieTitle, movieYear) // Llama al método de inicio
+            // Intenta reiniciar la reproducción solo si streamUrl no es nulo
+            streamUrl?.let { url ->
+                startMoviePlayback(url, movieTitle, movieYear, movieImageUrl) // Llama al método de inicio
                 isReconnecting = false // Indica que no se está reconectando
             }
         }
@@ -570,7 +589,9 @@ class PlayerPeliculas : AppCompatActivity() {
             }
             .create() // Asegurar que se crea antes de modificar el fondo
 
-        alertDialog.window?.setBackgroundDrawable(ColorDrawable(Color.parseColor("#FF9800")))
+        alertDialog.setOnShowListener {
+            alertDialog.window?.setBackgroundDrawableResource(R.color.textColorPrimary) // Reemplaza con tu color
+        }
 
         alertDialog.show() // Mostrar después de aplicar el fondo
     }
@@ -811,6 +832,7 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
+        super.onBackPressed()
         // Si el GridView es visible, simplemente ocultarlo
         if (binding.recyclerMoviesMenu.visibility == View.VISIBLE) {
             binding.recyclerMoviesMenu.visibility = View.GONE
@@ -849,6 +871,8 @@ class PlayerPeliculas : AppCompatActivity() {
 
     // Función para alternar entre pantalla completa y vista normal
     private var currentAspectRatioMode = 0
+
+    @OptIn(UnstableApi::class)
     private fun cycleAspectRatio() {
         val playerView = binding.reproductor
         val aspectRatios = listOf(

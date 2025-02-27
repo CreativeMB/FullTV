@@ -20,6 +20,7 @@
             android:id="@+id/progressBar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:indeterminateTint="@color/redpersonalisado"
             style="?android:attr/progressBarStyleLarge"
             android:indeterminate="true"/>
 
@@ -29,7 +30,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Cargando películas en línea disponibles para ver ya..."
-            android:textColor="@color/colorFocused"
+            android:textColor="@color/redpersonalisado"
             android:textSize="30sp"
             android:textStyle="bold"
             android:gravity="center"/>

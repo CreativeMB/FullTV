@@ -56,6 +56,7 @@ class CardPresenterTV : Presenter() {
                 val intent = Intent(context, PlayerTv::class.java).apply {
                     putExtra("EXTRA_STREAM_URL", item.streamUrl)
                     putExtra("EXTRA_MOVIE_TITLE", item.title)
+                    putExtra("EXTRA_MOVIE_IMAGE_URL", item.imageUrl)
                 }
                 context.startActivity(intent)
             }

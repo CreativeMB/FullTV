@@ -246,6 +246,7 @@ class PeliculasFragment : BrowseSupportFragment() {
                 intent.putExtra("EXTRA_STREAM_URL", item.streamUrl)
                 intent.putExtra("EXTRA_MOVIE_TITLE", item.title) // Título de la película
                 intent.putExtra("EXTRA_MOVIE_YEAR", item.year) // Año de la película
+                intent.putExtra("EXTRA_MOVIE_IMAGE_URL", item.imageUrl)
                 startActivity(intent)
             }
         }
