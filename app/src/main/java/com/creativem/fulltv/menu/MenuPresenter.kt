@@ -15,7 +15,7 @@ class MenuPresenter : Presenter() {
 
         // Ajuste de tamaño dinámico
         val width = 140 // Ancho personalizado
-        val height = 210 // Alto personalizado
+        val height = 180 // Alto personalizado
         view.layoutParams = ViewGroup.LayoutParams(width, height)
 
         return ViewHolder(view)
