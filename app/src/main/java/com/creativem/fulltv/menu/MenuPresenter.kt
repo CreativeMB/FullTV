@@ -14,8 +14,8 @@ class MenuPresenter : Presenter() {
             .inflate(R.layout.item_menu_principal, parent, false)
 
         // Ajuste de tamaño dinámico
-        val width = 180 // Ancho personalizado
-        val height = 240 // Alto personalizado
+        val width = 140 // Ancho personalizado
+        val height = 210 // Alto personalizado
         view.layoutParams = ViewGroup.LayoutParams(width, height)
 
         return ViewHolder(view)

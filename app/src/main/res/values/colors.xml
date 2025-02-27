@@ -7,6 +7,7 @@
     <color name="negro">#000000</color> <!-- Color para selección -->
     <color name="fondo">#2B2B2B</color>    <!-- Color para hover -->
     <color name="bordeitems">#FFD600</color>
+    <color name="redpersonalisado">#FC3D4C</color>
 
     <color name="tu_color_fondo">#580091EA</color>
     <color name="tu_color_barra">#FF0000</color>
