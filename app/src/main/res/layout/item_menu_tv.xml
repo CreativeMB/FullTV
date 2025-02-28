@@ -6,7 +6,7 @@
     android:padding="8dp">
 
     <ImageView
-        android:id="@+id/imgThumbnail"
+        android:id="@+id/imagenPelicula"
         android:layout_width="40dp"
         android:layout_height="30dp"
         android:scaleType="centerCrop"

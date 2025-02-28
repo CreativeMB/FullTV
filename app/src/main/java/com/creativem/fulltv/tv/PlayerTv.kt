@@ -186,7 +186,7 @@ class PlayerTv : AppCompatActivity() {
 
     private fun initializeRecyclerView() {
         adapter = TvMenuAdapter(this, mutableListOf()) { movie ->
-            startMoviePlayback(movie.streamUrl, movie.title, movie.year, movie.streamUrl)
+            startMoviePlayback(movie.streamUrl, movie.title, movie.imageUrl)
         }
 
         binding.recyclerViewTv.adapter = adapter
@@ -223,7 +223,7 @@ class PlayerTv : AppCompatActivity() {
         adapter.updateData(tvList) // ✅ Ahora actualizamos la lista en vez de reemplazar el adaptador
     }
 
-    private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieYear: String,  movieImageUrl: String) {
+    private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieImageUrl: String) {
         val intent = Intent(this, PlayerTv::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         intent.putExtra("EXTRA_STREAM_URL", streamUrl)

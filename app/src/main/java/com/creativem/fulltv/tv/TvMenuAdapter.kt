@@ -1,5 +1,6 @@
 package com.creativem.fulltv.tv
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
@@ -15,7 +16,7 @@ import com.creativem.fulltv.principal.Movie
 class TvMenuAdapter(
     private val context: Context,
     private var tvList: MutableList<Movie>,
-    private val clickListener: (Movie) -> Unit // ✅ Función lambda para manejar clics
+    private val clickListener: (Movie) -> Unit
 ) : RecyclerView.Adapter<TvMenuAdapter.TvViewHolder>() {
 
     private var selectedPosition = RecyclerView.NO_POSITION
@@ -23,22 +24,23 @@ class TvMenuAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TvViewHolder {
         val view = LayoutInflater.from(context).inflate(R.layout.item_menu_tv, parent, false)
         return TvViewHolder(view)
-
-
     }
 
-    override fun onBindViewHolder(holder: TvViewHolder, position: Int) {
+    override fun onBindViewHolder(holder: TvViewHolder, @SuppressLint("RecyclerView") position: Int) {
         val tvItem = tvList[position]
         holder.title.text = tvItem.title
 
-        // ✅ Cargar la imagen en miniatura con Glide
-        Glide.with(context)
-            .load(tvItem.imageUrl) // URL de la imagen
-            .placeholder(R.drawable.icono) // Imagen temporal mientras carga
-            .error(R.drawable.icono) // Imagen de error si falla la carga
-            .into(holder.thumbnail)
+        if (!tvItem.imageUrl.isNullOrEmpty()) {
+            Glide.with(holder.imageView.context)
+                .load(tvItem.imageUrl)
+                .placeholder(R.drawable.icono)
+                .error(R.drawable.icono)
+                .into(holder.imageView)
+        } else {
+            holder.imageView.setImageResource(R.drawable.icono)
+        }
 
-        // ✅ Cambiar color de fondo si el ítem está seleccionado
+        // ✅ Cambiar color si está seleccionado
         holder.itemView.setBackgroundColor(
             if (position == selectedPosition)
                 ContextCompat.getColor(context, R.color.colorhover2)
@@ -46,16 +48,17 @@ class TvMenuAdapter(
                 ContextCompat.getColor(context, R.color.colorNotSelected)
         )
 
-        // ✅ Detectar clic para cambiar el color de fondo y actualizar `selectedPosition`
+        // ✅ Click para seleccionar y enviar la película
         holder.itemView.setOnClickListener {
-            notifyItemChanged(selectedPosition) // Restablece el ítem previamente seleccionado
-            selectedPosition = position // Actualiza la nueva posición seleccionada
-            notifyItemChanged(selectedPosition) // Notifica el cambio en el nuevo ítem seleccionado
+            val previousSelected = selectedPosition
+            selectedPosition = position
+            notifyItemChanged(previousSelected) // Actualiza el anterior
+            notifyItemChanged(selectedPosition) // Actualiza el nuevo
 
-            clickListener(tvItem) // Llamamos la función de clic con el objeto Movie
+            clickListener(tvItem)
         }
 
-        // ✅ Detectar cuando el ítem gana o pierde el foco (para navegación con teclado/control remoto)
+        // ✅ Cambia color al recibir foco (para control remoto/teclado)
         holder.itemView.setOnFocusChangeListener { _, hasFocus ->
             holder.itemView.setBackgroundColor(
                 if (hasFocus) ContextCompat.getColor(context, R.color.colorhover2)
@@ -64,18 +67,17 @@ class TvMenuAdapter(
         }
     }
 
-
     override fun getItemCount(): Int = tvList.size
 
-    // ✅ Agregamos esta función para actualizar la lista de películas dinámicamente
+    // ✅ Método para actualizar la lista de películas
     fun updateData(newTvList: List<Movie>) {
-        tvList.clear()  // Limpiar lista actual
-        tvList.addAll(newTvList)  // Agregar nuevos elementos
-        notifyDataSetChanged()  // Notificar cambios al RecyclerView
+        tvList.clear()
+        tvList.addAll(newTvList)
+        notifyDataSetChanged()
     }
 
     class TvViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val thumbnail: ImageView = itemView.findViewById(R.id.imgThumbnail)
+        val imageView: ImageView = itemView.findViewById(R.id.imagenPelicula)
         val title: TextView = itemView.findViewById(R.id.tvTitle)
     }
 }
