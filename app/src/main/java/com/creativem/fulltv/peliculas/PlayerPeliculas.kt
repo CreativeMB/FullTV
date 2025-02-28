@@ -236,7 +236,7 @@ class PlayerPeliculas : AppCompatActivity() {
     private fun initializeRecyclerView() {
         // Crear el adaptador inicialmente con una lista vacía
         adapter = PeliculasMenuAdapter(mutableListOf()) { movie ->
-            startMoviePlayback(movie.streamUrl, movie.title, movie.year, movie.streamUrl)
+            startMoviePlayback(movie.streamUrl, movie.title, movie.year, movie.imageUrl)
         }
         binding.recyclerMoviesMenu.adapter = adapter
         binding.recyclerMoviesMenu.layoutManager = LinearLayoutManager(this@PlayerPeliculas)
