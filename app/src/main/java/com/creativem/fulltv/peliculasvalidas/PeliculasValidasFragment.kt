@@ -56,7 +56,8 @@ class PeliculasValidasFragment : RowsSupportFragment() {
                 ocultarCargando() // Ocultar la barra de progreso
 
                 if (peliculasOrdenadasValidas.isNotEmpty()) {
-                    agregarALista(peliculasOrdenadasValidas, "Películas en Línea Gratis disponibles para ver de forma ilimitada")
+                    agregarALista(peliculasOrdenadasValidas,  "🎉 ¡Acceso gratuito desbloqueado!\n" +
+                            "🔓 Películas que fueron alquiladas ahora están disponibles para ti sin límites.")
                 } else {
                     Log.e("PeliculasValidasFragment", "No hay películas válidas.")
                 }
