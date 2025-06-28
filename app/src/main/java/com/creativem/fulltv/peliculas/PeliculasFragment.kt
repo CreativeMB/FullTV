@@ -66,6 +66,18 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.storage.storage
 import kotlinx.coroutines.delay
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
+import android.app.DownloadManager
+import android.app.ProgressDialog
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.graphics.Color
+import android.net.Uri
+import android.os.Environment
+import androidx.core.content.FileProvider
+import java.io.File
+
 
 class PeliculasFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -228,6 +240,9 @@ class PeliculasFragment : BrowseSupportFragment() {
                     "TV\nGratis" -> {
                         val intent = Intent(requireContext(), Tv::class.java)
                         startActivity(intent)
+                    }
+                    "Descarga\nActualizacion" -> {
+                        descargarActualizacion()
                     }
                     "Cerrar\nCuenta" -> {
                         cerrarSesion() // Llama al método de cerrar sesión
@@ -419,7 +434,7 @@ class PeliculasFragment : BrowseSupportFragment() {
             .addOnSuccessListener { document ->
                 if (document.exists()) {
 
-                    // ✅ Banner principal (mensaje comunitario, CasTV, etc.)
+                    // ✅ Banner principal
                     val mensajeBanner = document.getString("banner") ?: ""
                     if (mensajeBanner.isNotBlank()) {
                         binding.txtBanner.apply {
@@ -435,24 +450,46 @@ class PeliculasFragment : BrowseSupportFragment() {
                     // ✅ Mensaje de actualización de versión
                     val mensajeActualizacion = document.getString("actualizacion") ?: ""
                     if (mensajeActualizacion.isNotBlank()) {
-                        binding.txtActualizacion.apply {
-                            text = mensajeActualizacion
-                            visibility = View.VISIBLE
-                            isSelected = true
-                            requestFocus()
+                        val textView = binding.txtActualizacion
+                        textView.text = mensajeActualizacion
+                        textView.visibility = View.VISIBLE
+                        textView.isSelected = true
+                        textView.requestFocus()
+
+                        // 🎨 Animación de cambio de color
+                        ObjectAnimator.ofArgb(
+                            textView,
+                            "textColor",
+                            Color.RED,
+                            Color.parseColor("#FF9800"), // Naranja
+                            Color.YELLOW,
+                            Color.GREEN,
+                            Color.BLUE,
+                            Color.parseColor("#4B0082"), // Índigo
+                            Color.parseColor("#EE82EE"), // Violeta
+                            Color.RED
+                        ).apply {
+                            duration = 4000L
+                            repeatCount = ValueAnimator.INFINITE
+                            repeatMode = ValueAnimator.RESTART
+                            start()
                         }
+// 📥 Al hacer clic, iniciar descarga con barra de progreso
+                        textView.setOnClickListener {
+                            descargarActualizacion()
+                        }
+
+
                     } else {
                         binding.txtActualizacion.visibility = View.GONE
                     }
 
                 } else {
-                    // Documento no existe
                     binding.txtBanner.visibility = View.GONE
                     binding.txtActualizacion.visibility = View.GONE
                 }
             }
             .addOnFailureListener {
-                // Error al obtener datos
                 binding.txtBanner.apply {
                     text = "Error al cargar banner"
                     visibility = View.VISIBLE
@@ -466,13 +503,88 @@ class PeliculasFragment : BrowseSupportFragment() {
             }
     }
 
+    private fun descargarActualizacion() {
+        val url = "https://github.com/CreativeMB/FullTV/releases/download/fulltv/FullTV_update.apk"
+        val fileName = "FullTV1.0.apk"
+        val apkFile = File(requireContext().getExternalFilesDir(null), fileName)
+
+        val progressBar = ProgressBar(requireContext()).apply {
+            isIndeterminate = true
+            visibility = View.VISIBLE
+        }
+
+        val progressDialog = AlertDialog.Builder(requireContext())
+            .setTitle("Descargando actualización")
+            .setMessage("Por favor espera mientras se descarga la nueva versión de FullTV.")
+            .setView(progressBar)
+            .setCancelable(false)
+            .create()
+
+        progressDialog.show()
+
+        val request = DownloadManager.Request(Uri.parse(url)).apply {
+            setTitle("Descargando FullTV")
+            setDescription("La actualización se está descargando...")
+            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            setDestinationUri(Uri.fromFile(apkFile))
+            setAllowedOverMetered(true)
+            setAllowedOverRoaming(true)
+        }
+
+        val downloadManager = requireContext().getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val downloadId = downloadManager.enqueue(request)
+
+        val handler = Handler(Looper.getMainLooper())
+        handler.post(object : Runnable {
+            override fun run() {
+                val query = DownloadManager.Query().setFilterById(downloadId)
+                val cursor = downloadManager.query(query)
+                if (cursor.moveToFirst()) {
+                    val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+
+                    if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                        progressDialog.dismiss()
+
+                        if (apkFile.exists()) {
+                            val apkUri = FileProvider.getUriForFile(
+                                requireContext(),
+                                "${requireContext().packageName}.provider",
+                                apkFile
+                            )
+
+                            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+
+                            try {
+                                startActivity(installIntent)
+                            } catch (e: Exception) {
+                                Toast.makeText(requireContext(), "No se pudo abrir el instalador", Toast.LENGTH_LONG).show()
+                            }
+                        } else {
+                            Toast.makeText(requireContext(), "❌ No se encontró el archivo APK", Toast.LENGTH_LONG).show()
+                        }
+                    } else if (status == DownloadManager.STATUS_FAILED) {
+                        progressDialog.dismiss()
+                        Toast.makeText(requireContext(), "❌ Error al descargar la actualización", Toast.LENGTH_LONG).show()
+                    } else {
+                        handler.postDelayed(this, 1000)
+                    }
+                }
+                cursor.close()
+            }
+        })
+    }
+
+
 
     private fun updateMovieList(peliculas: List<Movie>) {
         rowsAdapter.clear()
 
         // Primero, agregamos el menú
         val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("TV\nGratis", "Pelis\nGratis", "Pedir\nPelicula", "Buscar\nPelicula", "Activar\nPaquete", "¿Como\nPago?", "Cerrar\nCuenta")
+        val menuItems = listOf("TV\nGratis", "Pelis\nGratis", "Pedir\nPelicula", "Buscar\nPelicula", "Activar\nPaquete", "¿Como\nPago?", "Descarga\nActualizacion", "Cerrar\nCuenta")
         val menuIcons = listOf(
             R.drawable.tv,
             R.drawable.cartelera,
@@ -480,6 +592,7 @@ class PeliculasFragment : BrowseSupportFragment() {
             R.drawable.buscar,
             R.drawable.activacion,
             R.drawable.pago,
+            R.drawable.descarga,
             R.drawable.cerrrar
         )
 
