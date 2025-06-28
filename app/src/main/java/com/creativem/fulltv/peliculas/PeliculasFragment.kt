@@ -403,7 +403,7 @@ class PeliculasFragment : BrowseSupportFragment() {
     fun cargarPeliculas() {
         binding.linearLayout.visibility = View.GONE
         Glide.with(requireContext())
-            .load("https://cdn.pixabay.com/photo/2024/10/01/03/12/ai-generated-9087076_1280.jpg")
+            .load("https://cdn.pixabay.com/photo/2024/02/18/14/34/ai-generated-8581405_960_720.jpg")
             .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
             .centerCrop()
             .into(binding.mainBackgroundImage)
