@@ -505,7 +505,7 @@ class PeliculasFragment : BrowseSupportFragment() {
 
     private fun descargarActualizacion() {
         val url = "https://github.com/CreativeMB/FullTV/releases/download/fulltv/FullTV_update.apk"
-        val fileName = "FullTV1.0.apk"
+        val fileName = "FullTV_update.apk"
         val apkFile = File(requireContext().getExternalFilesDir(null), fileName)
 
         val progressBar = ProgressBar(requireContext()).apply {
