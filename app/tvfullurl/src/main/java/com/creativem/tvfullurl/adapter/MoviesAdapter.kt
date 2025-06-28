@@ -37,7 +37,7 @@ class MoviesAdapter(
 
         // Asigna los datos a las vistas
         holder.titleTextView.text = movie.title
-        holder.yearTextView.text = movie.year
+
 
 
         // Configurar el botón de eliminar
@@ -62,14 +62,14 @@ class MoviesAdapter(
 
     class MovieViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         var titleTextView: TextView = itemView.findViewById(R.id.titleTextView)
-        var yearTextView: TextView = itemView.findViewById(R.id.yearTextView)
+
 
         var deleteButton: TextView = itemView.findViewById(R.id.deleteButton)
         var editButton: TextView = itemView.findViewById(R.id.editButton)
 
         fun bind(movie: Movie) {
             titleTextView.text = movie.title
-            yearTextView.text = movie.year
+
 
         }
     }

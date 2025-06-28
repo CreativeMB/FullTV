@@ -1,11 +1,13 @@
 package com.creativem.tvfullurl
 
+
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.NavigationUI
 import androidx.navigation.ui.setupWithNavController
 import com.creativem.tvfullurl.databinding.PantallaPrincipalBinding
+
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: PantallaPrincipalBinding
@@ -33,4 +35,5 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
 }

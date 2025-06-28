@@ -4,68 +4,80 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="5dp"
-    app:cardElevation="10dp"
-    app:cardCornerRadius="8dp">
+    app:cardElevation="6dp"
+    app:cardCornerRadius="6dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="4dp">
 
-        <TextView
-            android:id="@+id/userName"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:text="Nombre del usuario" />
-        <TextView
-            android:id="@+id/userEmail"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:text="Email" />
-
-        <RelativeLayout
+        <!-- Primera fila: Nombre y puntos -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingVertical="2dp"
+            android:paddingHorizontal="4dp">
+
+            <TextView
+                android:id="@+id/userName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:text="Nombre del usuario"
+                android:layout_marginEnd="4dp" />
 
             <EditText
                 android:id="@+id/userPoints"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textSize="25dp"
+                android:textSize="18sp"
                 android:inputType="number"
                 android:textStyle="bold"
                 android:hint="Puntos"
-                android:layout_marginEnd="48dp"/>
+                android:background="@null"
+                android:padding="0dp"
+                android:layout_marginEnd="4dp" />
+        </LinearLayout>
 
-            <ImageView
-                android:id="@+id/deleteImage"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:src="@drawable/delete"
-                android:layout_marginStart="60dp"
-                android:contentDescription="Eliminar usuario"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"/>
+        <!-- Segunda fila: Email y botones -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingVertical="2dp"
+            android:paddingHorizontal="4dp">
+
+            <TextView
+                android:id="@+id/userEmail"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:text="Email" />
 
             <ImageView
                 android:id="@+id/editImage"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginBottom="12dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:src="@drawable/castv"
-                android:contentDescription="Eliminar usuario"
-                android:layout_toLeftOf="@id/deleteImage"
-                android:layout_centerVertical="true"
-                android:layout_marginEnd="8dp"/>
+                android:contentDescription="Editar usuario"
+                android:layout_marginEnd="40dp" />
 
-        </RelativeLayout>
+            <ImageView
+                android:id="@+id/deleteImage"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/delete"
+                android:contentDescription="Eliminar usuario" />
+        </LinearLayout>
 
     </LinearLayout>
-
 </androidx.cardview.widget.CardView>

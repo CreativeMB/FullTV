@@ -5,161 +5,127 @@
     android:layout_height="match_parent"
     android:fillViewport="true">
 
-
-    <!-- Contenedor del Fragmento -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/fragment_container"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" >
+        android:layout_height="wrap_content"
+        android:padding="8dp">
 
-        <ImageView
-            android:id="@+id/previewImageView"
-            android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="4dp"
-            android:contentDescription="Descripción de la imagen"
-            android:src="@drawable/icono"
-            app:layout_constraintBottom_toTopOf="@+id/validEditText"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <EditText
-            android:id="@+id/validEditText"
-            android:layout_width="match_parent"
+        <!-- Fila con Imagen a la izquierda y campos a la derecha (en vertical) -->
+        <LinearLayout
+            android:id="@+id/fila_contenido"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="1dp"
-            android:hint="Minutos"
-            android:inputType="number"
-            android:textSize="18sp"
-            app:layout_constraintBottom_toTopOf="@+id/titleEditText"
-            app:layout_constraintEnd_toEndOf="parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/previewImageView" />
+            app:layout_constraintEnd_toEndOf="parent">
 
-        <EditText
-            android:id="@+id/titleEditText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="4dp"
-            android:hint="Título"
-            android:inputType="text"
-            android:textSize="18sp"
-            app:layout_constraintBottom_toTopOf="@+id/year_edit_text"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/validEditText" />
+            <!-- Imagen a la izquierda -->
+            <ImageView
+                android:id="@+id/previewImageView"
+                android:layout_width="100dp"
+                android:layout_height="150dp"
+                android:adjustViewBounds="true"
+                android:scaleType="centerCrop"
+                android:src="@drawable/icono"
+                android:contentDescription="Imagen previa"
+                android:layout_marginEnd="8dp" />
 
-        <EditText
-            android:id="@+id/year_edit_text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="4dp"
-            android:hint="Castv valor"
-            android:inputType="number"
-            android:textSize="18sp"
-            app:layout_constraintBottom_toTopOf="@+id/imageUrlEditText"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/titleEditText" />
+            <!-- Columna: Título, Minutos, Valor -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
+                <EditText
+                    android:id="@+id/titleEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:hint="Título"
+                    android:inputType="text"
+                    android:textSize="16sp"
+                    android:layout_marginBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/validEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:hint="Minutos"
+                    android:inputType="number"
+                    android:textSize="16sp"
+                    android:layout_marginBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/year_edit_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:hint="Castv valor"
+                    android:inputType="number"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Campo: Imagen URL -->
         <EditText
             android:id="@+id/imageUrlEditText"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="4dp"
+            android:layout_marginTop="8dp"
             android:hint="Portada Imagen URL"
             android:inputType="textUri"
             android:textSize="18sp"
-            app:layout_constraintBottom_toTopOf="@+id/streamUrlEditText"
-            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/fila_contenido"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/year_edit_text" />
+            app:layout_constraintEnd_toEndOf="parent" />
 
+        <!-- Campo: Stream URL -->
         <EditText
             android:id="@+id/streamUrlEditText"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
             android:layout_marginTop="4dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="4dp"
             android:hint="Señal en vivo Stream URL"
             android:inputType="textUri"
             android:textSize="18sp"
-            app:layout_constraintBottom_toTopOf="@+id/trailerUrlEditText"
-            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/imageUrlEditText"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/imageUrlEditText"/>
+            app:layout_constraintEnd_toEndOf="parent" />
 
+        <!-- Campo: Trailer URL -->
         <EditText
             android:id="@+id/trailerUrlEditText"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
             android:layout_marginTop="4dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="4dp"
             android:hint="Trailer"
             android:inputType="textUri"
             android:textSize="18sp"
-            app:layout_constraintBottom_toTopOf="@+id/uploadText"
-            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/streamUrlEditText"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/streamUrlEditText" />
+            app:layout_constraintEnd_toEndOf="parent" />
 
-
+        <!-- Botón Enviar -->
         <TextView
             android:id="@+id/uploadText"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="4dp"
+            android:layout_marginTop="8dp"
             android:gravity="center"
-            android:padding="25dp"
+            android:padding="16dp"
             android:text="Enviar"
-            android:textSize="24sp"
+            android:textSize="20sp"
             android:textStyle="bold"
             android:background="@color/backgroundColor"
-            app:layout_constraintBottom_toTopOf="@+id/url"
-            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/trailerUrlEditText"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/trailerUrlEditText" />
+            app:layout_constraintEnd_toEndOf="parent" />
 
-        <TextView
-            android:id="@+id/url"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="8dp"
-            android:gravity="center"
-            android:padding="25dp"
-            android:text="ver video antes de enviarlo"
-            android:textSize="24sp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/uploadText" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
-
 </ScrollView>

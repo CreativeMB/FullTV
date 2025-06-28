@@ -62,9 +62,7 @@ class NuevaPeliculaFragment : Fragment() {
             loadMovieData(it)
         }
         listenerimagen()
-        // Llamar a las funciones necesarias
-//        binding.uploadText.setOnClickListener {  } // Llama a uploadMovie cuando se hace clic
-        binding.url.setOnClickListener { openWebPage("https://castr.com/hlsplayer/") } // Abre la página web
+
 
         binding.uploadText.setOnClickListener {
             if (movieId == null) {
@@ -122,6 +120,7 @@ class NuevaPeliculaFragment : Fragment() {
             }
             .addOnFailureListener {
                 Toast.makeText(requireContext(), "Error al guardar la película", Toast.LENGTH_SHORT).show()
+                clearFields()
             }
     }
 
@@ -153,13 +152,6 @@ class NuevaPeliculaFragment : Fragment() {
             }
         })
     }
-
-    private fun openWebPage(url: String) {
-        Log.d("openWebPage", "Intentando abrir la URL: $url")
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        startActivity(intent)
-    }
-
 
     private fun validarCampos(): Boolean {
         // Actualiza las variables globales con los valores de los campos
@@ -208,9 +200,11 @@ class NuevaPeliculaFragment : Fragment() {
                 Toast.makeText(
                     requireContext(),
                     "Película actualizada correctamente",
+
                     Toast.LENGTH_LONG
+
                 ).show()
-// Navegar de vuelta a EditarPeliculaFragment
+                clearFields()
                 findNavController().navigateUp()
             }
             .addOnFailureListener { e ->
@@ -232,11 +226,5 @@ class NuevaPeliculaFragment : Fragment() {
         binding.previewImageView.setImageResource(R.drawable.icono)
         binding.validEditText.text.clear()
     }
-
-    override fun onPause() {
-        super.onPause()
-        clearFields() // Limpia los campos al ocultar el Fragment
-    }
-
 
 }

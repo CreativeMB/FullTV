@@ -280,7 +280,7 @@ class PeliculasFragment : BrowseSupportFragment() {
 
         setOnItemViewSelectedListener { _, item, _, _ ->
             if (item is Movie) {
-                cargarImagenDeFondo(item.imageUrl)
+//                cargarImagenDeFondo(item.imageUrl)
             } else {
 //                restablecerColorFondo()
             }
@@ -387,7 +387,7 @@ class PeliculasFragment : BrowseSupportFragment() {
     fun cargarPeliculas() {
         binding.linearLayout.visibility = View.GONE
         Glide.with(requireContext())
-            .load("https://p4.wallpaperbetter.com/wallpaper/175/985/284/abstract-3d-digital-art-dark-wallpaper-preview.jpg")
+            .load("https://img.freepik.com/vector-gratis/fondo-hexagonal-oscuro-color-degradado_79603-1409.jpg?t=st=1751062759~exp=1751066359~hmac=2cd3f4f18a451aec565bea3477f16a000f54093917647ef3c1882945fa4ee7ba&w=826")
             .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
             .centerCrop()
             .into(binding.mainBackgroundImage)
@@ -466,7 +466,7 @@ class PeliculasFragment : BrowseSupportFragment() {
     private fun calcularElementosPorFila(): Int {
         val displayMetrics = Resources.getSystem().displayMetrics
         val anchoPantalla = displayMetrics.widthPixels
-        val anchoTarjeta = 200 // Define el ancho aproximado de cada tarjeta en píxeles
+        val anchoTarjeta = 250 // Define el ancho aproximado de cada tarjeta en píxeles
         return (anchoPantalla / anchoTarjeta).coerceAtLeast(1) // Asegura al menos 1 elemento por fila
     }
 
@@ -494,13 +494,13 @@ class PeliculasFragment : BrowseSupportFragment() {
         }
     }
 
-    private fun cargarImagenDeFondo(url: String) {
-        Glide.with(requireContext())
-            .load(url)
-            .centerCrop()
-            .transition(DrawableTransitionOptions.withCrossFade(1000))
-            .into(binding.mainBackgroundImage)
-    }
+//    private fun cargarImagenDeFondo(url: String) {
+//        Glide.with(requireContext())
+//            .load(url)
+//            .centerCrop()
+//            .transition(DrawableTransitionOptions.withCrossFade(1000))
+//            .into(binding.mainBackgroundImage)
+//    }
 
     private fun mostrarCarga(mensaje: String = "Cargando...") {
         loadingText.text = mensaje

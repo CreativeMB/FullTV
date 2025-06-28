@@ -10,62 +10,99 @@ import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 import java.util.concurrent.TimeUnit
 import android.graphics.Color
+import android.widget.FrameLayout
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import java.lang.reflect.Field
 
 class CardPresenter: Presenter(){
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
-        val cardView = ImageCardView(parent.context).apply {
+        val context = parent.context
+
+        // Contenedor externo que tendrá el borde y escala
+        val frameLayout = FrameLayout(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
             isFocusable = true
             isFocusableInTouchMode = true
-            setMainImageDimensions(190, 260)
         }
-        return CardViewHolder(cardView)
+
+        // Tarjeta real
+        val cardView = ImageCardView(context).apply {
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setMainImageDimensions(250, 300)
+
+            // 💡 Márgenes internos para mostrar borde exterior
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(15, 15, 15, 15)
+            }
+        }
+
+        frameLayout.addView(cardView)
+
+        // Resaltado visual al enfocar
+        frameLayout.setOnFocusChangeListener { view, hasFocus ->
+            view.background = if (hasFocus)
+                ContextCompat.getDrawable(context, R.drawable.card_focused_background)
+            else
+                null
+
+            val scale = if (hasFocus) 1.1f else 1f
+            view.animate().scaleX(scale).scaleY(scale).setDuration(150).start()
+        }
+
+        return CardViewHolder(frameLayout, cardView)
     }
 
     override fun onBindViewHolder(viewHolder: Presenter.ViewHolder, item: Any) {
+        val holder = viewHolder as CardViewHolder
+        val cardView = holder.cardView
         val movie = item as? Movie ?: return
-        val cardViewHolder = viewHolder as CardViewHolder
-        val cardView = cardViewHolder.view as ImageCardView
 
         val casText = "$"
         cardView.titleText = movie.title
         cardView.contentText = "$casText${movie.year}"
 
-        // Usar reflexión para obtener las vistas internas de ImageCardView
+        // Personalización de textos internos con reflexión
         try {
             val titleTextView: TextView = getTextViewFromCard(cardView, "mTitleView")
             val contentTextView: TextView = getTextViewFromCard(cardView, "mContentView")
 
-            // Modificar el tamaño y color del texto
             titleTextView.apply {
                 textSize = 16f
                 maxLines = 3
                 setTextColor(Color.WHITE)
-                setLines(3) // 🔹 Asegura que siempre sean 3 líneas visibles
-                setLineSpacing(1f, 1f) // 🔹 Ajusta el espaciado entre líneas
-                text = if (text.isNullOrEmpty()) "\n\n" else text // 🔹 Agrega espacios si está vacío
+                setLines(3)
+                setLineSpacing(1f, 1f)
+                text = if (text.isNullOrEmpty()) "\n\n" else text
             }
 
             contentTextView.apply {
-                textSize = 12f  // Cambiar el tamaño del texto
+                textSize = 12f
                 maxLines = 3
-                setTextColor(Color.GREEN)  // Cambiar el color del texto
+                setTextColor(Color.GREEN)
             }
         } catch (e: Exception) {
-            e.printStackTrace()  // Manejo de errores
+            e.printStackTrace()
         }
 
-        // Cancelar cualquier temporizador anterior en este ViewHolder
-        cardViewHolder.countDownTimer?.cancel()
+        // Cancelar temporizador anterior si existe
+        holder.countDownTimer?.cancel()
 
-        // Cargar la imagen con Glide
-        Glide.with(viewHolder.view.context)
+        // Cargar imagen
+        Glide.with(cardView.context)
             .load(movie.imageUrl)
             .centerCrop()
             .error(R.drawable.icono)
             .into(cardView.mainImageView)
 
+        // Temporizador y colores del infoArea
         val createdAtMillis = movie.createdAt?.toDate()?.time ?: 0
         val countdownDurationMillis = TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
         val currentTime = System.currentTimeMillis()
@@ -76,12 +113,14 @@ class CardPresenter: Presenter(){
             cardView.setInfoAreaBackgroundColor(Color.parseColor("#006064"))
         } else {
             val remainingTimeMillis = countdownDurationMillis - timeElapsed
-            cardViewHolder.countDownTimer = object : CountDownTimer(remainingTimeMillis, 1000) {
+            holder.countDownTimer = object : CountDownTimer(remainingTimeMillis, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
                     val minutesRemaining = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished)
                     val secondsRemaining = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
-                    cardView.contentText = "$casText${movie.year} | Min-%02d:%02d".format(minutesRemaining, secondsRemaining)
-                    // Cambiar el fondo del área de información a rojo mientras el temporizador está activo
+                    cardView.contentText = "$casText${movie.year} | Min-%02d:%02d".format(
+                        minutesRemaining,
+                        secondsRemaining
+                    )
                     cardView.setInfoAreaBackgroundColor(Color.parseColor("#001f3f"))
                 }
 
@@ -92,8 +131,8 @@ class CardPresenter: Presenter(){
             }.start()
         }
 
-        cardView.setOnClickListener {
-            val context = viewHolder.view.context
+        holder.view.setOnClickListener {
+            val context = cardView.context
             val intent = Intent(context, PlayerPeliculas::class.java)
             intent.putExtra("EXTRA_STREAM_URL", movie.streamUrl)
             context.startActivity(intent)
@@ -101,18 +140,18 @@ class CardPresenter: Presenter(){
     }
 
     override fun onUnbindViewHolder(viewHolder: Presenter.ViewHolder) {
-        val cardViewHolder = viewHolder as CardViewHolder
-        cardViewHolder.countDownTimer?.cancel()
-        cardViewHolder.countDownTimer = null
+        val holder = viewHolder as CardViewHolder
+        holder.countDownTimer?.cancel()
+        holder.countDownTimer = null
     }
 
-    inner class CardViewHolder(view: ImageCardView) : ViewHolder(view) {
+    inner class CardViewHolder(view: FrameLayout, val cardView: ImageCardView) : ViewHolder(view) {
         var countDownTimer: CountDownTimer? = null
     }
-    // Función para obtener el TextView de ImageCardView usando reflexión
+
     private fun getTextViewFromCard(cardView: ImageCardView, fieldName: String): TextView {
         val field: Field = cardView.javaClass.getDeclaredField(fieldName)
-        field.isAccessible = true  // Permitir acceso a campos privados
+        field.isAccessible = true
         return field.get(cardView) as TextView
     }
 }
