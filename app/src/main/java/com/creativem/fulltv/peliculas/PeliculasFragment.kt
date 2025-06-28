@@ -276,6 +276,7 @@ class PeliculasFragment : BrowseSupportFragment() {
         binding.mainBackgroundImage.setImageDrawable(null)
 
 
+
         adapter = rowsAdapter // Inicializa el adaptador
 
         setOnItemViewSelectedListener { _, item, _, _ ->
@@ -417,14 +418,51 @@ class PeliculasFragment : BrowseSupportFragment() {
         noticiaRef.get()
             .addOnSuccessListener { document ->
                 if (document.exists()) {
-                    val mensaje = document.getString("noticia") ?: "No hay noticia disponible"
-                    binding.txtNoticia.text = mensaje
+
+                    // ✅ Banner principal (mensaje comunitario, CasTV, etc.)
+                    val mensajeBanner = document.getString("banner") ?: ""
+                    if (mensajeBanner.isNotBlank()) {
+                        binding.txtBanner.apply {
+                            text = mensajeBanner
+                            visibility = View.VISIBLE
+                            isSelected = true
+                            requestFocus()
+                        }
+                    } else {
+                        binding.txtBanner.visibility = View.GONE
+                    }
+
+                    // ✅ Mensaje de actualización de versión
+                    val mensajeActualizacion = document.getString("actualizacion") ?: ""
+                    if (mensajeActualizacion.isNotBlank()) {
+                        binding.txtActualizacion.apply {
+                            text = mensajeActualizacion
+                            visibility = View.VISIBLE
+                            isSelected = true
+                            requestFocus()
+                        }
+                    } else {
+                        binding.txtActualizacion.visibility = View.GONE
+                    }
+
                 } else {
-                    binding.txtNoticia.text = "No hay Actualizacion"
+                    // Documento no existe
+                    binding.txtBanner.visibility = View.GONE
+                    binding.txtActualizacion.visibility = View.GONE
                 }
             }
             .addOnFailureListener {
-                binding.txtNoticia.text = "Error Actualizacion"
+                // Error al obtener datos
+                binding.txtBanner.apply {
+                    text = "Error al cargar banner"
+                    visibility = View.VISIBLE
+                    isSelected = true
+                }
+                binding.txtActualizacion.apply {
+                    text = "Error al cargar versión"
+                    visibility = View.VISIBLE
+                    isSelected = true
+                }
             }
     }
 
@@ -466,7 +504,7 @@ class PeliculasFragment : BrowseSupportFragment() {
     private fun calcularElementosPorFila(): Int {
         val displayMetrics = Resources.getSystem().displayMetrics
         val anchoPantalla = displayMetrics.widthPixels
-        val anchoTarjeta = 250 // Define el ancho aproximado de cada tarjeta en píxeles
+        val anchoTarjeta = 240 // Define el ancho aproximado de cada tarjeta en píxeles
         return (anchoPantalla / anchoTarjeta).coerceAtLeast(1) // Asegura al menos 1 elemento por fila
     }
 
@@ -1026,6 +1064,7 @@ class PeliculasFragment : BrowseSupportFragment() {
         dismissDialog()
         super.onDestroyView()
     }
+
 
 }
 

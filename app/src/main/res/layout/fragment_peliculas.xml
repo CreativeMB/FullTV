@@ -7,6 +7,8 @@
     android:layout_height="match_parent"
     tools:context=".peliculas.PeliculasFragment">
 
+
+
     <ImageView
         android:id="@+id/mainBackgroundImage"
         android:layout_width="match_parent"
@@ -18,113 +20,143 @@
         android:name="com.creativem.fulltv.peliculas.PeliculasFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+    <!-- Mensaje de Banner -->
+    <TextView
+        android:id="@+id/txtBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#7A282828"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:padding="8dp"
+        android:gravity="center_vertical"
+        android:singleLine="true"
+        android:ellipsize="marquee"
+        android:marqueeRepeatLimit="marquee_forever"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:scrollHorizontally="true"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/linearLayout"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="35dp"
+        android:orientation="vertical"
+        android:layout_gravity="end"
         android:background="#7A282828"
-        android:layout_marginEnd="20dp"
-        android:orientation="horizontal">
+        android:layout_marginTop="35dp"
+        android:layout_marginEnd="20dp">
 
-        <!-- Contenedor vertical para las tres filas -->
+        <!-- Fila principal: textos + imagen -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_gravity="end">
+            android:orientation="horizontal">
 
-            <!-- Fila de Fecha y Hora -->
+            <!-- Contenedor vertical para los datos -->
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:orientation="horizontal">
+                android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/textfecha"
+                <!-- Fecha y hora -->
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="TextView"
-                    android:layout_marginEnd="10dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/textfecha"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Fecha"
+                        android:textColor="@color/lb_tv_white"
+                        android:textSize="16sp"
+                        android:layout_marginEnd="10dp"/>
+
+                    <TextView
+                        android:id="@+id/textHora"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Hora"
+                        android:textSize="16sp"
+                        android:layout_marginEnd="10dp"/>
+                </LinearLayout>
+
+                <!-- Usuario y estados -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/textUsuario"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Usuario"
+                        android:textColor="@color/lb_tv_white"
+                        android:textSize="16sp"
+                        android:layout_marginEnd="8dp"/>
+
+                    <TextView
+                        android:id="@+id/useronline"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textColor="#00C505"
+                        android:textSize="16sp"
+                        android:layout_marginEnd="10dp"/>
+
+                    <TextView
+                        android:id="@+id/useroff"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textColor="@color/redpersonalisado"
+                        android:textSize="16sp"
+                        android:layout_marginEnd="10dp"/>
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/textCastv"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Cantidad de Castv"
                     android:textColor="@color/lb_tv_white"
-                    android:textSize="16sp" />
-
-                <TextView
-                    android:id="@+id/textHora"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="5dp"
-                    android:text="TextView"
-                    android:textSize="16sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_gravity="end">
-
-                <TextView
-                    android:id="@+id/textUsuario"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:text="Nombre del Usuario"
-                    android:textColor="@color/lb_tv_white"
-                    android:textSize="16sp" />
-
-                <TextView
-                    android:id="@+id/useronline"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textColor="#00C505"
-                    android:textSize="16sp"
-                    android:layout_marginEnd="10dp" />
-
-                <TextView
-                    android:id="@+id/useroff"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textColor="@color/redpersonalisado"
-                    android:textSize="16sp"
+                    android:textSize="14sp"
                     android:layout_marginEnd="10dp"/>
             </LinearLayout>
 
-            <!-- Fila de Cantidad de Castv -->
-            <TextView
-                android:id="@+id/textCastv"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="top|end"
-                android:layout_marginEnd="8dp"
-                android:text="Cantidad de Castv"
-                android:textColor="@color/lb_tv_white"
-                android:textSize="14sp" />
-            <TextView
-                android:id="@+id/txtNoticia"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:text="Actualizacion"
-                android:textSize="14sp"
-                android:textColor="@color/redpersonalisado"
-                android:gravity="center"
-                android:layout_marginEnd="8dp"/>
+            <!-- Imagen al lado derecho -->
+            <ImageView
+                android:layout_width="65dp"
+                android:layout_height="65dp"
+                android:background="@drawable/icono"
+                android:padding="10dp"
+                android:layout_gravity="top|end" />
         </LinearLayout>
 
-        <!-- Imagen al lado derecho, en la parte superior -->
-        <ImageView
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:background="@drawable/icono"
-            android:padding="20dp"
-            android:layout_gravity="top|end" />
+        <!-- Fila inferior: texto de actualización que ocupe toda la fila -->
+        <TextView
+            android:id="@+id/txtActualizacion"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Texto de actualización largo que se mueve debajo"
+            android:textColor="#E53935"
+            android:textSize="15sp"
+            android:gravity="center_vertical"
+            android:singleLine="true"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:scrollHorizontally="true"
+            android:visibility="visible"
+            android:background="#66000000" />
     </LinearLayout>
+
+
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/fragment_container"

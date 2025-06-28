@@ -8,6 +8,15 @@
         android:id="@+id/peliculasvalidas"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+    <TextView
+        android:id="@+id/mensajeTitulo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textAlignment="center"
+        android:textColor="@color/redpersonalisado"
+        android:textSize="18sp"
+        android:textStyle="bold"/>
 
     <!-- Contenedor para centrar ambos elementos -->
     <LinearLayout
@@ -28,7 +37,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="🎉 ¡Acceso gratuito desbloqueado!\n🔓 Películas que fueron alquiladas ahora están disponibles para ti sin límites.\n🍿 Disfrútalas cuando quieras."
+            android:text="Cargando...\n🎉 ¡Acceso gratuito desbloqueado!\n🔓 Películas que fueron alquiladas ahora están disponibles para ti sin límites.\n🍿 Disfrútalas cuando quieras."
             android:textColor="@color/redpersonalisado"
             android:textSize="26sp"
             android:textStyle="bold"

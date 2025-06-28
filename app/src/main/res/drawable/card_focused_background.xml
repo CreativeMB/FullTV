@@ -5,9 +5,9 @@
 
     <!-- Aumentamos grosor del borde -->
     <stroke
-        android:width="10dp"
-        android:color="#FF001E" />
+        android:width="20dp"
+        android:color="#C20091EA" />
 
-    <corners android:radius="4dp" />
+
 </shape>
 

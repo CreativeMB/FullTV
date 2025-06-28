@@ -56,8 +56,7 @@ class PeliculasValidasFragment : RowsSupportFragment() {
                 ocultarCargando() // Ocultar la barra de progreso
 
                 if (peliculasOrdenadasValidas.isNotEmpty()) {
-                    agregarALista(peliculasOrdenadasValidas,  "🎉 ¡Acceso gratuito desbloqueado!\n" +
-                            "🔓 Películas que fueron alquiladas ahora están disponibles para ti sin límites.")
+                    agregarALista(peliculasOrdenadasValidas,"🔓Gracias a la comunidad de FullTV, ahora puedes disfrutar estas películas gratis.")
                 } else {
                     Log.e("PeliculasValidasFragment", "No hay películas válidas.")
                 }
@@ -78,7 +77,7 @@ class PeliculasValidasFragment : RowsSupportFragment() {
     private fun calcularElementosPorFila(): Int {
         val displayMetrics = Resources.getSystem().displayMetrics
         val anchoPantalla = displayMetrics.widthPixels
-        val anchoTarjeta = 200
+        val anchoTarjeta = 240
         return (anchoPantalla / anchoTarjeta).coerceAtLeast(1)
     }
 
