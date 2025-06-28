@@ -403,7 +403,7 @@ class PeliculasFragment : BrowseSupportFragment() {
     fun cargarPeliculas() {
         binding.linearLayout.visibility = View.GONE
         Glide.with(requireContext())
-            .load("https://img.freepik.com/vector-gratis/fondo-hexagonal-oscuro-color-degradado_79603-1409.jpg?t=st=1751062759~exp=1751066359~hmac=2cd3f4f18a451aec565bea3477f16a000f54093917647ef3c1882945fa4ee7ba&w=826")
+            .load("https://cdn.pixabay.com/photo/2024/10/01/03/12/ai-generated-9087076_1280.jpg")
             .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
             .centerCrop()
             .into(binding.mainBackgroundImage)
