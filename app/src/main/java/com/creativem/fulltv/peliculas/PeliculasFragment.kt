@@ -403,7 +403,7 @@ class PeliculasFragment : BrowseSupportFragment() {
     fun cargarPeliculas() {
         binding.linearLayout.visibility = View.GONE
         Glide.with(requireContext())
-            .load("https://cdn.pixabay.com/photo/2024/02/18/14/34/ai-generated-8581405_960_720.jpg")
+            .load("https://cdn.pixabay.com/photo/2019/03/18/06/47/theater-4062452_1280.jpg")
             .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
             .centerCrop()
             .into(binding.mainBackgroundImage)
@@ -508,6 +508,11 @@ class PeliculasFragment : BrowseSupportFragment() {
         val fileName = "FullTV_update.apk"
         val apkFile = File(requireContext().getExternalFilesDir(null), fileName)
 
+        // 1️⃣ Eliminar archivo anterior si existe
+        if (apkFile.exists()) {
+            apkFile.delete()
+        }
+
         val progressBar = ProgressBar(requireContext()).apply {
             isIndeterminate = true
             visibility = View.VISIBLE
@@ -539,6 +544,7 @@ class PeliculasFragment : BrowseSupportFragment() {
             override fun run() {
                 val query = DownloadManager.Query().setFilterById(downloadId)
                 val cursor = downloadManager.query(query)
+
                 if (cursor.moveToFirst()) {
                     val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
 
@@ -559,6 +565,14 @@ class PeliculasFragment : BrowseSupportFragment() {
 
                             try {
                                 startActivity(installIntent)
+
+                                // 2️⃣ Eliminar archivo después de un pequeño retraso (opcional)
+                                handler.postDelayed({
+                                    if (apkFile.exists()) {
+                                        apkFile.delete()
+                                    }
+                                }, 5000)
+
                             } catch (e: Exception) {
                                 Toast.makeText(requireContext(), "No se pudo abrir el instalador", Toast.LENGTH_LONG).show()
                             }
@@ -572,10 +586,12 @@ class PeliculasFragment : BrowseSupportFragment() {
                         handler.postDelayed(this, 1000)
                     }
                 }
+
                 cursor.close()
             }
         })
     }
+
 
 
 
