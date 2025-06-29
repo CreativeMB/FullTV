@@ -65,7 +65,9 @@ import com.creativem.fulltv.principal.Nosotros
 
 import android.graphics.drawable.Drawable
 import androidx.annotation.OptIn
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.request.RequestListener
@@ -306,13 +308,30 @@ class PlayerPeliculas : AppCompatActivity() {
             val isUrlValid = withContext(Dispatchers.IO) {
                 isUrlValidInFirestore(streamUrl)
             }
-            Log.d("PlayerPeliculas", "La URL es válida en Firestore: $isUrlValid")
 
             // Si la URL no es válida, muestra un diálogo de error
             if (!isUrlValid) {
                 showErrorDialog(ulsvideo = streamUrl, movieTitle, movieYear)
                 return@launch
             }
+
+                      // TrackSelector para adaptar calidad de video
+            val trackSelector = DefaultTrackSelector(this@PlayerPeliculas).apply {
+                parameters = buildUponParameters()
+                    .setMaxVideoSize(640, 360) // permite 360p máximo (ideal para conexión lenta)
+                    .setForceLowestBitrate(true) // Forzar bitrate bajo en arranque
+                    .build()
+            }
+
+            // LoadControl personalizado con búfer aumentado
+            val loadControl = DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                    10_000,  // Min buffer para reproducción
+                    30_000,  // Max buffer
+                    1_500,   // Min buffer para reanudar
+                    5_000    // Búfer tras pausa
+                )
+                .build()
 
             val dataSourceFactory = DefaultHttpDataSource.Factory()
                 .setDefaultRequestProperties(mapOf("User-Agent" to "Mozilla/5.0"))
@@ -321,46 +340,49 @@ class PlayerPeliculas : AppCompatActivity() {
 
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
-            // Configura el LoadControl
-            val loadControl = DefaultLoadControl.Builder()
-                .setTargetBufferBytes(8 * 1024 * 1024) // 8 MB
-                .setPrioritizeTimeOverSizeThresholds(false)
-                .build()
 
             // Crea el reproductor
             player = ExoPlayer.Builder(this@PlayerPeliculas)
+                .setTrackSelector(trackSelector)
                 .setLoadControl(loadControl)
+                .setMediaSourceFactory(mediaSourceFactory)
                 .setRenderersFactory(
                     DefaultRenderersFactory(this@PlayerPeliculas)
                         .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
                 ) // Esto habilita FFmpeg
-                .setMediaSourceFactory(mediaSourceFactory)
-                .build().also { exoPlayer ->
 
+                .build().also { exoPlayer ->
                     // Asocia el ExoPlayer con el PlayerView usando binding
                     binding.reproductor.player = exoPlayer
-                    Log.d("PlayerPeliculas", "URL asignada al reproductor: $streamUrl")
 
                     // Configura el MediaItem
                     val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
-
                     // Prepara el ExoPlayer para la reproducción
                     exoPlayer.setMediaItem(mediaItem)
                     exoPlayer.prepare()
 
+                    // ⚠️ AQUÍ VA EL CÓDIGO PARA AUMENTAR CALIDAD AUTOMÁTICAMENTE
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        (exoPlayer.trackSelector as? DefaultTrackSelector)?.parameters =
+                            (exoPlayer.trackSelector as DefaultTrackSelector).buildUponParameters()
+                                .clearVideoSizeConstraints() // Quita el límite 360p
+                                .setForceLowestBitrate(false) // Permite calidad más alta
+                                .build()
+                        Log.d("PlayerPeliculas", "Parámetros del trackSelector actualizados para permitir mayor calidad.")
+                    }, 15000) // Espera 15 segundos antes de permitir subir calidad
+
+                    // Resto del listener y auto-play
+                    exoPlayer.addListener(playerListener)
+                    exoPlayer.playWhenReady = true
+
                     // Añade el listener del reproductor para detectar si es en vivo
                     exoPlayer.addListener(object : Player.Listener {
                         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
-                            // Verifica si hay ventanas en la línea de tiempo
                             if (timeline.windowCount > 0) {
                                 val window = Timeline.Window()
                                 timeline.getWindow(0, window)
-                                // Determina si la ventana es en vivo
-                                if (window.isLive) {
-                                    Log.d("PlayerPeliculas", "Es una transmisión en vivo")
-                                } else {
-                                    Log.d("PlayerPeliculas", "Es un video pregrabado")
-                                }
+                                isLiveStream = window.isLive
+                                Log.d("PlayerPeliculas", if (isLiveStream) "Transmisión en vivo" else "Video grabado")
                             }
                         }
                     })
@@ -434,8 +456,32 @@ class PlayerPeliculas : AppCompatActivity() {
                     }
                 }
             }
-        }
 
+        }
+        // Mostrar resolución al cambiar pista
+        @OptIn(UnstableApi::class)
+        override fun onTracksChanged(tracks: Tracks) {
+            val videoTrack = tracks.groups
+                .flatMap { group ->
+                    val trackGroup = group.mediaTrackGroup
+                    if (trackGroup != null) {
+                        (0 until trackGroup.length).map { index -> trackGroup.getFormat(index) }
+                    } else {
+                        emptyList()
+                    }
+                }
+                .firstOrNull { it.width > 0 && it.height > 0 }
+
+            videoTrack?.let {
+                val resolution = "${it.width}x${it.height}"
+                Toast.makeText(
+                    this@PlayerPeliculas,
+                    "Resolución: $resolution",
+                    Toast.LENGTH_SHORT
+                ).show()
+                Log.d("PlayerPeliculas", "Resolución actual: $resolution")
+            }
+        }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             // Cambia el comportamiento dependiendo si se está reproduciendo
