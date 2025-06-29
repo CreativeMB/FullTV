@@ -2,7 +2,6 @@ package com.creativem.fulltv.peliculas
 
 import android.app.AlertDialog
 import android.app.Dialog
-
 import android.content.Intent
 import android.content.res.Resources
 import android.graphics.Typeface
@@ -32,21 +31,16 @@ import androidx.leanback.widget.ListRowPresenter
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
-import com.bumptech.glide.request.RequestOptions
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.principal.Reloj
 import com.creativem.fulltv.menu.MenuItem
 import com.creativem.fulltv.menu.MenuPresenter
 import com.google.firebase.auth.FirebaseAuth
-
 import com.google.firebase.firestore.FirebaseFirestore
-import jp.wasabeef.glide.transformations.BlurTransformation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-
-
 import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
@@ -69,18 +63,14 @@ import kotlinx.coroutines.delay
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.app.DownloadManager
-import android.app.ProgressDialog
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.TransitionDrawable
 import android.net.Uri
-import android.os.Environment
 import androidx.core.content.FileProvider
 import java.io.File
-
 
 class PeliculasFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -1230,7 +1220,6 @@ class PeliculasFragment : BrowseSupportFragment() {
         if (!isAdded) return
 
         val rootView = requireActivity().findViewById<View>(R.id.main)
-
         val overlay = rootView.findViewById<View>(R.id.publicidadOverlay)
         val imgPublicidad = rootView.findViewById<ImageView>(R.id.imgPublicidad)
         val btnCerrar = rootView.findViewById<ImageButton>(R.id.btnCerrarPublicidad)
