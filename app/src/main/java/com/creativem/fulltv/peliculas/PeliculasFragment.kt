@@ -90,6 +90,7 @@ class PeliculasFragment : BrowseSupportFragment() {
     private lateinit var loadingContainer: FrameLayout
     private lateinit var binding: FragmentPeliculasBinding
     private val db = FirebaseFirestore.getInstance()
+
     // Declarar las listas de UIDs (Strings)
     val usuariosConectados = mutableListOf<String>()
     val usuariosDesconectados = mutableListOf<String>()
@@ -101,7 +102,11 @@ class PeliculasFragment : BrowseSupportFragment() {
     ): View? {
         // Inflar el layout de BrowseSupportFragment
         val view = super.onCreateView(inflater, container, savedInstanceState)
-
+        // Ya no inflar ni añadir loading_overlay
+        binding = FragmentPeliculasBinding.bind(requireActivity().findViewById(R.id.main))
+        loadingContainer = binding.loadingOverlay
+        progressBar = binding.progressBar
+        loadingText = binding.loadingText
 
         val realtimeDbRef = FirebaseDatabase.getInstance().getReference("usuarios_conectados")
 
@@ -194,15 +199,6 @@ class PeliculasFragment : BrowseSupportFragment() {
         })
 
 
-
-        // Inflar el layout principal
-        binding = FragmentPeliculasBinding.bind(requireActivity().findViewById(R.id.main))
-        // Inflar el layout de carga (loading overlay)
-        loadingContainer =
-            inflater.inflate(R.layout.loading_overlay, container, false) as FrameLayout
-        progressBar = loadingContainer.findViewById(R.id.progressBar)
-        loadingText = loadingContainer.findViewById(R.id.loadingText)
-
         // Establecer valores iniciales para nombre de usuario y cantidad de Castv
         binding.textUsuario.text = "users" // Cambia [Usuario] por el valor real
         binding.textCastv.text = "Castv" // Cambia el valor según corresponda
@@ -213,8 +209,7 @@ class PeliculasFragment : BrowseSupportFragment() {
         val textfecha = binding.textfecha
         val reloj = Reloj(textHora, textfecha)
         reloj.startClock()
-        // Agregar la vista de entrada a la vista principal
-        (view as? ViewGroup)?.addView(loadingContainer)
+
 
         // Configura el listener de clics mrnu
         setOnItemViewClickedListener { _, item, _, _ ->
@@ -1234,62 +1229,58 @@ class PeliculasFragment : BrowseSupportFragment() {
     private fun mostrarPublicidad() {
         if (!isAdded) return
 
-        publicidadDialog = Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen).apply {
-            setContentView(R.layout.pulicidad)
-            window?.setBackgroundDrawableResource(android.R.color.transparent)
-            setCancelable(false)
+        val rootView = requireActivity().findViewById<View>(R.id.main)
 
-            val imgPublicidad = findViewById<ImageView>(R.id.imgPublicidad)
-            val btnCerrar = findViewById<ImageButton>(R.id.btnCerrar)
-            val txtContador = findViewById<TextView>(R.id.txtContador)
+        val overlay = rootView.findViewById<View>(R.id.publicidadOverlay)
+        val imgPublicidad = rootView.findViewById<ImageView>(R.id.imgPublicidad)
+        val btnCerrar = rootView.findViewById<ImageButton>(R.id.btnCerrarPublicidad)
+        val txtContador = rootView.findViewById<TextView>(R.id.txtContadorPublicidad)
 
-            val folderRef = Firebase.storage.reference.child("FulltvPublicidad")
+        overlay.visibility = View.VISIBLE
+        txtContador.text = "10 s"
 
-            folderRef.listAll().addOnSuccessListener { listResult ->
-                val archivos = listResult.items
-                if (archivos.isNotEmpty()) {
-                    val imagenAleatoria = archivos.random()
+        val folderRef = Firebase.storage.reference.child("FulltvPublicidad")
 
-                    imagenAleatoria.downloadUrl.addOnSuccessListener { uri ->
-                        if (isAdded) {
-                            Glide.with(requireContext())
-                                .load(uri)
-                                .into(imgPublicidad)
-                        }
-                    }.addOnFailureListener {
-                        Toast.makeText(requireContext(), "Error al obtener imagen", Toast.LENGTH_SHORT).show()
+        folderRef.listAll().addOnSuccessListener { listResult ->
+            val archivos = listResult.items
+            if (archivos.isNotEmpty()) {
+                val imagenAleatoria = archivos.random()
+
+                imagenAleatoria.downloadUrl.addOnSuccessListener { uri ->
+                    if (isAdded) {
+                        Glide.with(requireContext())
+                            .load(uri)
+                            .into(imgPublicidad)
                     }
-                } else {
-                    Toast.makeText(requireContext(), "No hay imágenes en FulltvPublicidad", Toast.LENGTH_SHORT).show()
+                }.addOnFailureListener {
+                    Toast.makeText(requireContext(), "Error al obtener imagen", Toast.LENGTH_SHORT).show()
                 }
-            }.addOnFailureListener {
-                Toast.makeText(requireContext(), "Error al cargar publicidad", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(requireContext(), "No hay imágenes en FulltvPublicidad", Toast.LENGTH_SHORT).show()
             }
-
-            btnCerrar.setOnClickListener {
-                dismissDialog()
-            }
-
-            // ⏱ Contador regresivo de 7 segundos
-            var segundosRestantes = 10
-            txtContador.text = segundosRestantes.toString()
-
-            val handler = Handler(Looper.getMainLooper())
-            val runnable = object : Runnable {
-                override fun run() {
-                    segundosRestantes--
-                    if (segundosRestantes > 0) {
-                        txtContador.text = segundosRestantes.toString()
-                        handler.postDelayed(this, 1000)
-                    } else {
-                        dismissDialog()
-                    }
-                }
-            }
-            handler.postDelayed(runnable, 1000)
-
-            show()
+        }.addOnFailureListener {
+            Toast.makeText(requireContext(), "Error al cargar publicidad", Toast.LENGTH_SHORT).show()
         }
+
+        btnCerrar.setOnClickListener {
+            overlay.visibility = View.GONE
+        }
+
+        var segundosRestantes = 10
+        val handler = Handler(Looper.getMainLooper())
+        val runnable = object : Runnable {
+            override fun run() {
+                segundosRestantes--
+                if (segundosRestantes > 0) {
+                    txtContador.text = "$segundosRestantes s"
+                    handler.postDelayed(this, 1000)
+                } else {
+                    overlay.visibility = View.GONE
+                }
+            }
+        }
+
+        handler.postDelayed(runnable, 1000)
     }
 
 

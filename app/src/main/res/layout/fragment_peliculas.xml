@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
@@ -8,7 +9,6 @@
     android:focusable="true"
     android:descendantFocusability="afterDescendants"
     android:clipToPadding="false">
-
 
 
     <ImageView
@@ -81,7 +81,7 @@
                         android:text="Fecha"
                         android:textColor="@color/lb_tv_white"
                         android:textSize="16sp"
-                        android:layout_marginEnd="10dp"/>
+                        android:layout_marginEnd="10dp" />
 
                     <TextView
                         android:id="@+id/textHora"
@@ -89,7 +89,7 @@
                         android:layout_height="wrap_content"
                         android:text="Hora"
                         android:textSize="16sp"
-                        android:layout_marginEnd="10dp"/>
+                        android:layout_marginEnd="10dp" />
                 </LinearLayout>
 
 
@@ -106,7 +106,7 @@
                         android:text="Usuario"
                         android:textColor="@color/lb_tv_white"
                         android:textSize="16sp"
-                        android:layout_marginEnd="8dp"/>
+                        android:layout_marginEnd="8dp" />
 
                     <TextView
                         android:id="@+id/useronline"
@@ -115,7 +115,7 @@
                         android:text="0"
                         android:textColor="#00C505"
                         android:textSize="16sp"
-                        android:layout_marginEnd="10dp"/>
+                        android:layout_marginEnd="10dp" />
 
                     <TextView
                         android:id="@+id/useroff"
@@ -124,7 +124,7 @@
                         android:text="0"
                         android:textColor="@color/redpersonalisado"
                         android:textSize="16sp"
-                        android:layout_marginEnd="10dp"/>
+                        android:layout_marginEnd="10dp" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -132,14 +132,15 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="end"
                     android:orientation="horizontal">
-                <TextView
-                    android:id="@+id/textCastv"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Cantidad de Castv"
-                    android:textColor="@color/lb_tv_white"
-                    android:textSize="14sp"
-                    android:layout_marginEnd="10dp"/>
+
+                    <TextView
+                        android:id="@+id/textCastv"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Cantidad de Castv"
+                        android:textColor="@color/lb_tv_white"
+                        android:textSize="14sp"
+                        android:layout_marginEnd="10dp" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -151,26 +152,100 @@
                 android:padding="10dp"
                 android:layout_gravity="top|end" />
         </LinearLayout>
+
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end"
             android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/txtActualizacion"
+            <TextView
+                android:id="@+id/txtActualizacion"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:text="Actualización"
+                android:layout_gravity="end"
+                android:textColor="#E53935"
+                android:textSize="15sp"
+                android:visibility="visible" />
+        </LinearLayout>
+
+    </LinearLayout>
+    <!-- Overlay de Carga -->
+    <FrameLayout
+        android:id="@+id/loadingOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/colorPrimary"
+        android:visibility="gone"
+        android:elevation="10dp">
+
+        <ProgressBar
+            android:id="@+id/progressBar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:singleLine="true"
-            android:text="Actualización"
-            android:layout_gravity="end"
-            android:textColor="#E53935"
-            android:textSize="15sp"
-            android:visibility="visible" />
-    </LinearLayout>
+            android:layout_gravity="center"
+            style="?android:attr/progressBarStyleLarge"
+            android:indeterminateTint="@android:color/holo_red_dark" />
 
-    </LinearLayout>
+        <TextView
+            android:id="@+id/loadingText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cargando..."
+            android:textColor="@android:color/holo_red_dark"
+            android:layout_gravity="center|bottom"
+            android:layout_marginBottom="32dp"
+            android:textSize="40sp"
+            android:textStyle="bold" />
+    </FrameLayout>
 
+    <FrameLayout
+        android:id="@+id/publicidadOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:background="#CC000000">
+
+        <ImageView
+            android:id="@+id/imgPublicidad"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:orientation="horizontal"
+            android:padding="10dp"
+            android:background="@color/colorPrimary"
+            android:layout_marginTop="10dp"
+            android:layout_marginEnd="10dp">
+
+            <TextView
+                android:id="@+id/txtContadorPublicidad"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:text="5 S"
+                android:textColor="#E53935"
+                android:textSize="40sp"
+                android:gravity="center"
+                android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/btnCerrarPublicidad"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:background="@android:color/transparent"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                app:tint="#E53935"
+                android:scaleType="fitCenter" />
+
+        </LinearLayout>
+
+    </FrameLayout>
 
 
 
