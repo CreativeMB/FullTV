@@ -787,7 +787,8 @@ class PeliculasFragment : BrowseSupportFragment() {
         val intent = Intent(context, PlayerPeliculas::class.java).apply {
             putExtra("EXTRA_STREAM_URL", movie.streamUrl)  // Pasa el URL del stream
             putExtra("EXTRA_MOVIE_TITLE", movie.title)     // Pasa el título de la película
-            putExtra("EXTRA_MOVIE_YEAR", movie.year)       // Pasa el año de la película
+            putExtra("EXTRA_MOVIE_YEAR", movie.year)
+            putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)// Pasa el año de la película
         }
         startActivity(intent) // Inicia la actividad del reproductor
     }
