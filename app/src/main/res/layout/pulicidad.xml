@@ -9,18 +9,29 @@
         android:id="@+id/imgPublicidad"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:adjustViewBounds="true"
-        android:scaleType="fitCenter" />
+        android:scaleType="fitXY"
+        android:adjustViewBounds="true" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:padding="16dp">
 
-    <!-- Botón de Cerrar en la esquina superior derecha -->
-    <ImageButton
-        android:id="@+id/btnCerrar"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="16dp"
-        android:background="#050505"
-        android:padding="8dp"
-        android:src="@drawable/cerrrarp" />
+        <TextView
+            android:id="@+id/txtContador"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="7"
+            android:textColor="@android:color/white"
+            android:textSize="40sp"
+            android:layout_marginEnd="12dp"/>
+
+        <ImageButton
+            android:id="@+id/btnCerrar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/cerrrarp"/>
+    </LinearLayout>
+
 </FrameLayout>
