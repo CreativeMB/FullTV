@@ -4,7 +4,10 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".peliculas.PeliculasFragment">
+    tools:context=".peliculas.PeliculasFragment"
+    android:focusable="true"
+    android:descendantFocusability="afterDescendants"
+    android:clipToPadding="false">
 
 
 
@@ -13,6 +16,11 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop" />
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/fragment_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/main_fragmen_view"
@@ -164,10 +172,7 @@
     </LinearLayout>
 
 
-    <androidx.fragment.app.FragmentContainerView
-        android:id="@+id/fragment_container"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+
 
 
 </FrameLayout>

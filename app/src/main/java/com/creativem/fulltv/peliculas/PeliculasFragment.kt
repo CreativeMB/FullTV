@@ -73,6 +73,9 @@ import android.app.ProgressDialog
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Matrix
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.TransitionDrawable
 import android.net.Uri
 import android.os.Environment
 import androidx.core.content.FileProvider
@@ -264,6 +267,8 @@ class PeliculasFragment : BrowseSupportFragment() {
                 intent.putExtra("EXTRA_MOVIE_IMAGE_URL", item.imageUrl)
                 startActivity(intent)
             }
+
+
         }
 
         return view
@@ -288,17 +293,17 @@ class PeliculasFragment : BrowseSupportFragment() {
         super.onViewCreated(view, savedInstanceState)
 
         obtenerNoticia()
-        binding.mainBackgroundImage.setImageDrawable(null)
 
+        binding.mainBackgroundImage.setImageDrawable(null)
 
 
         adapter = rowsAdapter // Inicializa el adaptador
 
         setOnItemViewSelectedListener { _, item, _, _ ->
             if (item is Movie) {
-//                cargarImagenDeFondo(item.imageUrl)
+                cargarImagenDeFondo(item.imageUrl)
             } else {
-//                restablecerColorFondo()
+                establecerFondoPorDefecto()
             }
         }
         escucharCambiosEnPeliculas()
@@ -402,16 +407,7 @@ class PeliculasFragment : BrowseSupportFragment() {
 
     fun cargarPeliculas() {
         binding.linearLayout.visibility = View.GONE
-        Glide.with(requireContext())
-            .load("https://cdn.pixabay.com/photo/2019/03/18/06/47/theater-4062452_1280.jpg")
-            .apply(RequestOptions.bitmapTransform(BlurTransformation(15, 3)))
-            .centerCrop()
-            .into(binding.mainBackgroundImage)
-
-        binding.mainBackgroundImage.apply {
-            alpha = 0.6f // Ajusta el nivel de transparencia
-            scaleType = ImageView.ScaleType.CENTER_CROP
-        }
+        establecerFondoPorDefecto()
 
         mostrarCarga("Actualizando biblioteca en línea...")
 
@@ -425,6 +421,111 @@ class PeliculasFragment : BrowseSupportFragment() {
             updateMovieList(peliculasOrdenadas)
         }
     }
+    //fondo animado de colores
+    private var fondoActual: GradientDrawable? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var fondoAnimando = false
+    private var matrizX = 0f
+    private var direccion = 1
+    private var colorIndex = 0
+    private var brilloOverlayId: Int = View.generateViewId()
+
+    private val coloresFluorescentes = listOf(
+        intArrayOf(0x66FF5E3A.toInt(), 0x66FF2D55.toInt()), // verde claro a fucsia
+        intArrayOf(0x6690EE90.toInt(), 0x66DA70D6.toInt()), // verde pastel a violeta claro
+        intArrayOf(0x66FFD700.toInt(), 0x66FF69B4.toInt()), // dorado a rosa
+        intArrayOf(0x6640E0D0.toInt(), 0x66FF1493.toInt()), // turquesa a fucsia
+        intArrayOf(0x66ADD8E6.toInt(), 0x668A2BE2.toInt()), // celeste a violeta
+        intArrayOf(0x66FF4500.toInt(), 0x66DAA520.toInt()), // naranja fuerte a dorado suave
+        intArrayOf(0x664682B4.toInt(), 0x66E6E6FA.toInt()), // azul acero a lavanda
+        intArrayOf(0x66FF7F50.toInt(), 0x6600CED1.toInt()), // coral a azul claro
+        intArrayOf(0x66DC143C.toInt(), 0x669370DB.toInt()), // rojo rubí a lila
+        intArrayOf(0x66B0E0E6.toInt(), 0x66BA55D3.toInt())  // azul hielo a morado medio
+    )
+
+
+
+    private fun establecerFondoPorDefecto() {
+        if (fondoAnimando) return
+        fondoAnimando = true
+        handler.removeCallbacksAndMessages(null)
+
+        // 1. Cambios de colores rápidos
+        fun cambiarColores() {
+            val colores = coloresFluorescentes[colorIndex % coloresFluorescentes.size]
+            colorIndex++
+
+            val nuevo = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                colores
+            ).apply {
+                gradientType = GradientDrawable.LINEAR_GRADIENT
+            }
+
+            fondoActual?.let { anterior ->
+                val transicion = TransitionDrawable(arrayOf(anterior, nuevo))
+                binding.mainBackgroundImage.setImageDrawable(transicion)
+                transicion.isCrossFadeEnabled = true
+                transicion.startTransition(600)
+            } ?: run {
+                binding.mainBackgroundImage.setImageDrawable(nuevo)
+            }
+
+            binding.mainBackgroundImage.apply {
+                alpha = 0.9f
+                scaleType = ImageView.ScaleType.MATRIX
+            }
+
+            fondoActual = nuevo
+        }
+
+        cambiarColores()
+
+        handler.postDelayed(object : Runnable {
+            override fun run() {
+                cambiarColores()
+                handler.postDelayed(this, 1500)
+            }
+        }, 1500)
+
+        // 2. Movimiento escaneado
+        handler.post(object : Runnable {
+            override fun run() {
+                val matrix = Matrix().apply {
+                    matrizX += direccion * 1.5f
+                    if (matrizX > 120f || matrizX < -120f) direccion *= -1
+                    setTranslate(matrizX, 0f)
+                }
+
+                binding.mainBackgroundImage.imageMatrix = matrix
+                handler.postDelayed(this, 16)
+            }
+        })
+
+    }
+
+    private fun cargarImagenDeFondo(url: String?) {
+        handler.removeCallbacksAndMessages(null)
+        fondoAnimando = false
+
+        if (url.isNullOrEmpty()) {
+            establecerFondoPorDefecto()
+            return
+        }
+
+        Glide.with(requireContext())
+            .load(url)
+            .centerCrop()
+            .transition(DrawableTransitionOptions.withCrossFade(1000))
+            .error(R.drawable.icono)
+            .into(binding.mainBackgroundImage)
+
+        binding.mainBackgroundImage.apply {
+            alpha = 0.6f
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }
+    }
+
 
     private fun obtenerNoticia() {
         val db = FirebaseFirestore.getInstance()
@@ -441,7 +542,7 @@ class PeliculasFragment : BrowseSupportFragment() {
                             text = mensajeBanner
                             visibility = View.VISIBLE
                             isSelected = true
-                            requestFocus()
+
                         }
                     } else {
                         binding.txtBanner.visibility = View.GONE
@@ -454,7 +555,7 @@ class PeliculasFragment : BrowseSupportFragment() {
                         textView.text = mensajeActualizacion
                         textView.visibility = View.VISIBLE
                         textView.isSelected = true
-                        textView.requestFocus()
+
 
                         // 🎨 Animación de cambio de color
                         ObjectAnimator.ofArgb(
@@ -474,11 +575,6 @@ class PeliculasFragment : BrowseSupportFragment() {
                             repeatMode = ValueAnimator.RESTART
                             start()
                         }
-// 📥 Al hacer clic, iniciar descarga con barra de progreso
-                        textView.setOnClickListener {
-                            descargarActualizacion()
-                        }
-
 
                     } else {
                         binding.txtActualizacion.visibility = View.GONE
@@ -491,12 +587,12 @@ class PeliculasFragment : BrowseSupportFragment() {
             }
             .addOnFailureListener {
                 binding.txtBanner.apply {
-                    text = "Error al cargar banner"
+                    text = "No Hay Comunicado"
                     visibility = View.VISIBLE
                     isSelected = true
                 }
                 binding.txtActualizacion.apply {
-                    text = "Error al cargar versión"
+                    text = "Muy pronto Fecha de Actualizacion"
                     visibility = View.VISIBLE
                     isSelected = true
                 }
@@ -660,14 +756,6 @@ class PeliculasFragment : BrowseSupportFragment() {
             rowsAdapter.add(ListRow(null, listRowAdapter))
         }
     }
-
-//    private fun cargarImagenDeFondo(url: String) {
-//        Glide.with(requireContext())
-//            .load(url)
-//            .centerCrop()
-//            .transition(DrawableTransitionOptions.withCrossFade(1000))
-//            .into(binding.mainBackgroundImage)
-//    }
 
     private fun mostrarCarga(mensaje: String = "Cargando...") {
         loadingText.text = mensaje

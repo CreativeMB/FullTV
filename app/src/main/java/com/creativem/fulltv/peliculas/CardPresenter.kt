@@ -33,7 +33,7 @@ class CardPresenter: Presenter(){
         val cardView = ImageCardView(context).apply {
             isFocusable = true
             isFocusableInTouchMode = true
-            setMainImageDimensions(200, 230)
+            setMainImageDimensions(200, 280)
 
             // 💡 Márgenes internos para mostrar borde exterior
             layoutParams = FrameLayout.LayoutParams(
