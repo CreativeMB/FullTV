@@ -238,12 +238,17 @@ class PlayerPeliculas : AppCompatActivity() {
         adapter = PeliculasMenuAdapter(mutableListOf()) { movie ->
             startMoviePlayback(movie.streamUrl, movie.title, movie.year, movie.imageUrl)
         }
+
+        // Establecer el LayoutManager horizontal
+        binding.recyclerMoviesMenu.layoutManager =
+            LinearLayoutManager(this@PlayerPeliculas, LinearLayoutManager.HORIZONTAL, false)
+
         binding.recyclerMoviesMenu.adapter = adapter
-        binding.recyclerMoviesMenu.layoutManager = LinearLayoutManager(this@PlayerPeliculas)
 
         // Cargar las películas desde Firestore
-        loadMovies() // Llama al método que carga las películas
+        loadMovies()
     }
+
 
 
     private fun loadMovies() {
