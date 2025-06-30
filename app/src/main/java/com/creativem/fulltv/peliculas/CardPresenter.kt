@@ -60,7 +60,7 @@ class CardPresenter: Presenter(){
         return CardViewHolder(frameLayout, cardView)
     }
 
-    override fun onBindViewHolder(viewHolder: Presenter.ViewHolder, item: Any) {
+    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
         val holder = viewHolder as CardViewHolder
         val cardView = holder.cardView
         val movie = item as? Movie ?: return
@@ -96,14 +96,16 @@ class CardPresenter: Presenter(){
         holder.countDownTimer?.cancel()
 
         // Cargar imagen
-        Glide.with(cardView.context)
-            .load(movie.imageUrl)
-            .centerCrop()
-            .error(R.drawable.icono)
-            .into(cardView.mainImageView)
+        cardView.mainImageView?.let {
+            Glide.with(cardView.context)
+                .load(movie.imageUrl)
+                .centerCrop()
+                .error(R.drawable.icono)
+                .into(it)
+        }
 
         // Temporizador y colores del infoArea
-        val createdAtMillis = movie.createdAt?.toDate()?.time ?: 0
+        val createdAtMillis = movie.createdAt.toDate().time
         val countdownDurationMillis = TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
         val currentTime = System.currentTimeMillis()
         val timeElapsed = currentTime - createdAtMillis
@@ -139,7 +141,7 @@ class CardPresenter: Presenter(){
         }
     }
 
-    override fun onUnbindViewHolder(viewHolder: Presenter.ViewHolder) {
+    override fun onUnbindViewHolder(viewHolder: ViewHolder) {
         val holder = viewHolder as CardViewHolder
         holder.countDownTimer?.cancel()
         holder.countDownTimer = null
