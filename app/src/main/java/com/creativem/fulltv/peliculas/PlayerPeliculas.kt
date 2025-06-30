@@ -27,7 +27,6 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.fulltv.principal.Reloj
 import com.google.firebase.Firebase
-import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.CoroutineScope
@@ -52,28 +51,24 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
 import org.json.JSONObject
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
+
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.widget.ImageView
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
+
 import com.creativem.fulltv.databinding.PlayerBinding
 import com.creativem.fulltv.principal.Nosotros
 
-import android.graphics.drawable.Drawable
+
 import androidx.annotation.OptIn
-import androidx.media3.common.Tracks
+
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
-import com.bumptech.glide.load.DataSource
-import com.bumptech.glide.load.engine.GlideException
-import com.bumptech.glide.request.RequestListener
-import com.bumptech.glide.request.target.Target
 
 
+@Suppress("DEPRECATION")
 class PlayerPeliculas : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
@@ -84,10 +79,8 @@ class PlayerPeliculas : AppCompatActivity() {
     private var isLiveStream = false
     private lateinit var binding: PlayerBinding
     private lateinit var adapter: PeliculasMenuAdapter
-    private lateinit var moviesCollection: CollectionReference
     private lateinit var firestore: FirebaseFirestore
     private lateinit var auth: FirebaseAuth
-    private lateinit var relojhora: Reloj
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var runnableActualizar: Runnable
     private lateinit var runnableOcultar: Runnable
@@ -103,6 +96,7 @@ class PlayerPeliculas : AppCompatActivity() {
 
 
 
+    @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = PlayerBinding.inflate(layoutInflater)
@@ -138,7 +132,7 @@ class PlayerPeliculas : AppCompatActivity() {
                 .into(imagenPeliculaImageView)
 
             if (streamUrl.isEmpty()) {
-                showErrorDialog("No se recibió la URL de streaming.", movieTitle, movieYear)
+                showErrorDialog(movieTitle, movieYear)
                 return
             }
         }
@@ -157,7 +151,7 @@ class PlayerPeliculas : AppCompatActivity() {
 
         val menupelis = binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis)
         menupelis.setOnClickListener {
-            mostarpélis()
+            mostarpelis()
 
         }
         // Referencias a los botones
@@ -184,7 +178,7 @@ class PlayerPeliculas : AppCompatActivity() {
         // Botón pedidos
         val pedidosButton: ImageButton = findViewById(R.id.pedidos)
         pedidosButton.setOnClickListener {
-            showErrorDialog(streamUrl, movieTitle, movieYear)
+            showErrorDialog(movieTitle, movieYear)
         }
         // Botón Pantalla Completa
         val renderButton: ImageButton = findViewById(R.id.render)
@@ -229,7 +223,7 @@ class PlayerPeliculas : AppCompatActivity() {
         actualizarTiempo()
     }
 
-    private fun mostarpélis() {
+    private fun mostarpelis() {
         Log.e("PlayerPeliculas", "clki menupelis")
         binding.recyclerMoviesMenu.visibility =
             if (binding.recyclerMoviesMenu.visibility == View.VISIBLE) View.GONE else View.VISIBLE
@@ -298,8 +292,7 @@ class PlayerPeliculas : AppCompatActivity() {
     private fun initializePlayer() {
         // Verifica si la URL ya ha sido establecida
         if (streamUrl.isEmpty()) {
-            Log.e("PlayerPeliculas", "No se recibió la URL de streaming.")
-            showErrorDialog("No se recibió la URL de streaming.", movieTitle, movieYear)
+            showErrorDialog(movieTitle, movieYear)
             return
         }
 
@@ -308,11 +301,10 @@ class PlayerPeliculas : AppCompatActivity() {
             val isUrlValid = withContext(Dispatchers.IO) {
                 isUrlValidInFirestore(streamUrl)
             }
-            Log.d("PlayerPeliculas", "La URL es válida en Firestore: $isUrlValid")
 
             // Si la URL no es válida, muestra un diálogo de error
             if (!isUrlValid) {
-                showErrorDialog(ulsvideo = streamUrl, movieTitle, movieYear)
+                showErrorDialog(movieTitle, movieYear)
                 return@launch
             }
 
@@ -341,7 +333,6 @@ class PlayerPeliculas : AppCompatActivity() {
 
                     // Asocia el ExoPlayer con el PlayerView usando binding
                     binding.reproductor.player = exoPlayer
-                    Log.d("PlayerPeliculas", "URL asignada al reproductor: $streamUrl")
 
                     // Configura el MediaItem
                     val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
@@ -358,10 +349,10 @@ class PlayerPeliculas : AppCompatActivity() {
                                 val window = Timeline.Window()
                                 timeline.getWindow(0, window)
                                 // Determina si la ventana es en vivo
-                                if (window.isLive) {
-                                    Log.d("PlayerPeliculas", "Es una transmisión en vivo")
-                                } else {
-                                    Log.d("PlayerPeliculas", "Es un video pregrabado")
+                                when {
+                                    !window.isLive -> {
+
+                                    }
                                 }
                             }
                         }
@@ -379,12 +370,11 @@ class PlayerPeliculas : AppCompatActivity() {
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
                 Player.STATE_BUFFERING -> {
-                    Log.d("PlayerPeliculas", "Reproductor almacenando en búfer...")
                     mostrarBuffer() // Muestra el estado del búfer
                 }
 
                 Player.STATE_READY -> {
-                    Log.d("PlayerPeliculas", "Reproductor en estado READY")
+
                     isPlaybackActive = true // Indica que la reproducción está activa
                     playbackStartTime.set(System.currentTimeMillis()) // Guarda el tiempo de inicio
                     reconnectionAttempts = 0 // Reinicia los intentos de reconexión
@@ -400,38 +390,38 @@ class PlayerPeliculas : AppCompatActivity() {
                 }
 
                 Player.STATE_ENDED -> {
-                    Log.d("PlayerPeliculas", "Reproducción finalizada.")
+
                     isPlaybackActive = false // La reproducción ya no está activa
-                    showErrorDialog(streamUrl, movieTitle, movieYear)
+                    showErrorDialog(movieTitle, movieYear)
                     // Si es un stream en vivo, intentar reconectar
                     if (isLiveStream) {
-                        Log.d("PlayerPeliculas", "Transmisión en vivo finalizada. Intentando reconectar...")
+
                         intentarReconexion() // Llama al método de reconexión
                     } else {
-                        Log.d("PlayerPeliculas", "Deteniendo actualizaciones de tiempo.")
+
                         handler.removeCallbacks(runnable) // Detiene el runnable
                     }
                 }
 
                 Player.STATE_IDLE -> {
-                    Log.d("PlayerPeliculas", "Reproductor en estado IDLE.")
+
                     isPlaybackActive = false // La reproducción ya no está activa
 
                     // Si es un stream en vivo, intentar reconectar
                     if (isLiveStream) {
-                        Log.d("PlayerPeliculas", "Intentando reconectar transmisión en vivo...")
+
                         intentarReconexion() // Llama al método de reconexión
                     } else {
-                        Log.d("PlayerPeliculas", "No hay reproducción activa.")
+
                         handler.removeCallbacks(runnable) // Detiene el runnable
                     }
                 }
 
                 else -> {
-                    Log.w("PlayerPeliculas", "Estado desconocido del reproductor: $playbackState")
+
                     // En caso de un estado desconocido, intenta reconectar si no hay actividad de reproducción
                     if (!isPlaybackActive && reconnectionAttempts < maxReconnectionAttempts) {
-                        Log.d("PlayerPeliculas", "Intentando reconectar debido a estado desconocido...")
+
                         intentarReconexion() // Llama al método de reconexión
                     }
                 }
@@ -448,13 +438,13 @@ class PlayerPeliculas : AppCompatActivity() {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            Log.e("PlayerPeliculas", "Error en el reproductor: ${error.message} - Código: ${error.errorCode}")
+
 
             // Intenta la reconexión solo si el error es recuperable y la reproducción ha sido activa
             if (isRecoverableError(error) && isPlaybackActive) {
                 intentarReconexion() // Llama al método de reconexión
             } else if (!isPlaybackActive && reconnectionAttempts >= maxReconnectionAttempts) {
-                showErrorDialog(streamUrl, movieTitle, movieYear) // Muestra un diálogo de error
+                showErrorDialog(movieTitle, movieYear) // Muestra un diálogo de error
             }
         }
     }
@@ -492,7 +482,6 @@ class PlayerPeliculas : AppCompatActivity() {
             // Muestra un diálogo de error si no hay reproducción activa
             if (!isPlaybackActive) {
                 showErrorDialog(
-                    "No se pudo conectar al stream después de varios intentos.",
                     movieTitle,
                     movieYear
                 )
@@ -516,7 +505,7 @@ class PlayerPeliculas : AppCompatActivity() {
         CoroutineScope(Dispatchers.Main).launch {
             delay(waitTime) // Espera el tiempo calculado
             // Intenta reiniciar la reproducción solo si streamUrl no es nulo
-            streamUrl?.let { url ->
+            streamUrl.let { url ->
                 startMoviePlayback(url, movieTitle, movieYear, movieImageUrl) // Llama al método de inicio
                 isReconnecting = false // Indica que no se está reconectando
             }
@@ -530,7 +519,8 @@ class PlayerPeliculas : AppCompatActivity() {
         return networkInfo?.isConnected == true // Devuelve true si hay conexión
     }
 
-    private fun showErrorDialog(ulsvideo: String, movieTitle: String, movieYear: String) {
+    @SuppressLint("SetTextI18n")
+    private fun showErrorDialog(movieTitle: String, movieYear: String) {
         val dialogView = layoutInflater.inflate(R.layout.player_alerdialogo, null)
         val messageText = dialogView.findViewById<TextView>(R.id.messageText)
         val linkNosotros = dialogView.findViewById<TextView>(R.id.linkNosotros)
@@ -655,8 +645,8 @@ class PlayerPeliculas : AppCompatActivity() {
 
                             firestore.collection("pedidosmovies")
                                 .add(datos)
-                                .addOnSuccessListener { documentReference ->
-                                    descontarPuntos(userId, costoPedido.toLong(), datos)
+                                .addOnSuccessListener {
+                                    descontarPuntos(userId, costoPedido.toLong())
                                     enviarCorreoNuevoPedido(movieTitle)
                                     Toast.makeText(
                                         this,
@@ -721,7 +711,7 @@ class PlayerPeliculas : AppCompatActivity() {
         // Crear un objeto JSON para el correo
         val emailData = mapOf(
             "to" to "fulltvurl@gmail.com", // Cambia esto por el correo del destinatario
-            "subject" to "$movieTitle",
+            "subject" to movieTitle,
             "text" to "PAGADA: $movieTitle"
         )
 
@@ -734,7 +724,7 @@ class PlayerPeliculas : AppCompatActivity() {
         val jsonObjectRequest = object : JsonObjectRequest(
             Method.POST, url, JSONObject(emailData),
             Response.Listener { response ->
-                Log.d("Email", "Correo enviado exitosamente: ${response.toString()}")
+                Log.d("Email", "Correo enviado exitosamente: $response")
             },
             Response.ErrorListener { error ->
                 Log.e("Email", "Error al enviar el correo: ${error.message}")
@@ -746,8 +736,7 @@ class PlayerPeliculas : AppCompatActivity() {
 
     private fun descontarPuntos(
         userId: String,
-        puntosADescontar: Long,
-        datos: HashMap<String, Any>
+        puntosADescontar: Long
     ) {
         val userRef = firestore.collection("users").document(userId)
 
@@ -837,6 +826,7 @@ class PlayerPeliculas : AppCompatActivity() {
         }
     }
 
+    @Deprecated("This method has been deprecated in favor of using the\n      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.\n      The OnBackPressedDispatcher controls how back button events are dispatched\n      to one or more {@link OnBackPressedCallback} objects.")
     override fun onBackPressed() {
         super.onBackPressed()
         // Si el GridView es visible, simplemente ocultarlo
@@ -932,25 +922,25 @@ class PlayerPeliculas : AppCompatActivity() {
         Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
         return when (keyCode) {
             KeyEvent.KEYCODE_MENU -> {
-                mostarpélis()
+                mostarpelis()
                 true
             }
 
             KeyEvent.KEYCODE_PAGE_UP -> {
                 Log.d("KeyCodeTest", "Página Arriba presionada")
-                mostarpélis()
+                mostarpelis()
                 true
             }
 
             KeyEvent.KEYCODE_PAGE_DOWN -> {
                 Log.d("KeyCodeTest", "Página Abajo presionada")
-                mostarpélis()
+                mostarpelis()
                 true
             }
 
             174 -> { // Código del botón del control remoto
                 Log.d("KeyCodeTest", "Botón del control remoto (174) presionado")
-                mostarpélis()
+                mostarpelis()
                 true
             }
 
