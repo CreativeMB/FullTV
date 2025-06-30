@@ -161,14 +161,21 @@
 
             <TextView
                 android:id="@+id/txtActualizacion"
-                android:layout_width="wrap_content"
+                android:layout_width="300dp"
                 android:layout_height="wrap_content"
                 android:singleLine="true"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:scrollHorizontally="true"
                 android:text="Actualización"
                 android:layout_gravity="end"
                 android:textColor="#E53935"
                 android:textSize="15sp"
-                android:visibility="visible" />
+                android:visibility="visible"
+                android:padding="8dp" />
+
         </LinearLayout>
 
     </LinearLayout>
