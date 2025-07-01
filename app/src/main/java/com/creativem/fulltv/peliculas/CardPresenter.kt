@@ -10,6 +10,8 @@ import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 import java.util.concurrent.TimeUnit
 import android.graphics.Color
+import android.text.TextUtils
+import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -65,7 +67,7 @@ class CardPresenter: Presenter(){
         val cardView = holder.cardView
         val movie = item as? Movie ?: return
 
-        val casText = "$"
+        val casText = "CasTV $"
         cardView.titleText = movie.title
         cardView.contentText = "$casText${movie.year}"
 
@@ -75,19 +77,38 @@ class CardPresenter: Presenter(){
             val contentTextView: TextView = getTextViewFromCard(cardView, "mContentView")
 
             titleTextView.apply {
-                textSize = 16f
-                maxLines = 3
+                textSize = 12f
+                maxLines = 1
                 setTextColor(Color.WHITE)
-                setLines(1)
-                setLineSpacing(1f, 1f)
-                text = if (text.isNullOrEmpty()) "\n\n" else text
+                isSingleLine = true
+                ellipsize = TextUtils.TruncateAt.MARQUEE
+                marqueeRepeatLimit = -1
+                isFocusable = true
+                isFocusableInTouchMode = true
+                setHorizontallyScrolling(true)
+
+                setOnFocusChangeListener { v, hasFocus ->
+                    v.isSelected = hasFocus
+                }
             }
 
             contentTextView.apply {
-                textSize = 12f
-                maxLines = 2
+                textSize = 14f
+                maxLines = 1
                 setTextColor(Color.GREEN)
+                isSingleLine = true
+                ellipsize = TextUtils.TruncateAt.MARQUEE
+                marqueeRepeatLimit = -1
+                isFocusable = true
+                isFocusableInTouchMode = true
+                setHorizontallyScrolling(true)
+
+                setOnFocusChangeListener { v, hasFocus ->
+                    v.isSelected = hasFocus
+                }
+
             }
+
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -111,15 +132,18 @@ class CardPresenter: Presenter(){
         val timeElapsed = currentTime - createdAtMillis
 
         if (movie.countdownMinutes <= 0 || timeElapsed >= countdownDurationMillis) {
-            cardView.contentText = "$casText${movie.year} | M-00:00"
+            cardView.contentText = "$casText${movie.year}"
             cardView.setInfoAreaBackgroundColor(Color.parseColor("#006064"))
         } else {
             val remainingTimeMillis = countdownDurationMillis - timeElapsed
             holder.countDownTimer = object : CountDownTimer(remainingTimeMillis, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
-                    val minutesRemaining = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished)
+                    val hoursRemaining = TimeUnit.MILLISECONDS.toHours(millisUntilFinished)
+                    val minutesRemaining = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished) % 60
                     val secondsRemaining = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
-                    cardView.contentText = "$casText${movie.year} | M-%02d:%02d".format(
+
+                    cardView.contentText = "%02d:%02d:%02d".format(
+                        hoursRemaining,
                         minutesRemaining,
                         secondsRemaining
                     )
@@ -127,7 +151,7 @@ class CardPresenter: Presenter(){
                 }
 
                 override fun onFinish() {
-                    cardView.contentText = "$casText${movie.year} | M-00:00"
+                    cardView.contentText = "00:00:00"
                     cardView.setInfoAreaBackgroundColor(Color.parseColor("#3E2723"))
                 }
             }.start()

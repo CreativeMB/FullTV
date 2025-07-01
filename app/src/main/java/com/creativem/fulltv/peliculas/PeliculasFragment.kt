@@ -390,7 +390,7 @@ class PeliculasFragment : BrowseSupportFragment() {
     fun actualizarUsuario(usuario: String, cantidadCastv: Int, cantidadPeliculas: Int) {
         binding.textUsuario.text = usuario
         binding.textCastv.text =
-            "Películas: $cantidadPeliculas | CasTV: $cantidadCastv" // Mostrar ambos valores
+            "Películas: $cantidadPeliculas | CasTV $$cantidadCastv" // Mostrar ambos valores
     }
 
     fun cargarPeliculas() {
