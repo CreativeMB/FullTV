@@ -71,6 +71,9 @@ import android.graphics.drawable.TransitionDrawable
 import android.net.Uri
 import androidx.core.content.FileProvider
 import java.io.File
+import com.creativem.fulltv.BuildConfig
+
+
 
 class PeliculasFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -519,50 +522,84 @@ class PeliculasFragment : BrowseSupportFragment() {
         noticiaRef.get()
             .addOnSuccessListener { document ->
                 if (document.exists()) {
-
-                    // ✅ Banner principal
+                    val versionLocal = BuildConfig.VERSION_CODE
                     val mensajeBanner = document.getString("banner") ?: ""
-                    if (mensajeBanner.isNotBlank()) {
-                        binding.txtBanner.apply {
-                            text = mensajeBanner
-                            visibility = View.VISIBLE
-                            isSelected = true
+                    val versionRemota = document.getString("versionapk") ?: ""
 
-                        }
-                    } else {
-                        binding.txtBanner.visibility = View.GONE
+                    val mensajeFinalBanner = """
+                    $mensajeBanner
+
+                    📲 Versión instalada: $versionLocal
+                  
+                """.trimIndent()
+
+                    binding.txtBanner.apply {
+                        text = mensajeFinalBanner
+                        visibility = View.VISIBLE
+                        isSelected = true
                     }
 
-                    // ✅ Mensaje de actualización de versión
-                    val mensajeActualizacion = document.getString("actualizacion") ?: ""
-                    if (mensajeActualizacion.isNotBlank()) {
-                        val textView = binding.txtActualizacion
-                        textView.text = mensajeActualizacion
-                        textView.visibility = View.VISIBLE
-                        textView.isSelected = true
+                    // 🔁 Obtener lista de pedidos desde la colección "pedidosmovies"
+                    db.collection("pedidosmovies")
+                        .get()
+                        .addOnSuccessListener { result ->
+                            if (!result.isEmpty) {
+                                val listaPedidos = StringBuilder()
+                                for (pedido in result) {
+                                    val nombre = pedido.getString("nombre") ?: "Usuario desconocido"
+                                    val title = pedido.getString("title") ?: "Película desconocida"
+                                    listaPedidos.append("🎬 $nombre pidió: $title\n")
+                                }
 
+                                binding.txtActualizacion.apply {
+                                    text = listaPedidos.toString().trim()
+                                    visibility = View.VISIBLE
+                                    isSelected = true
 
-                        // 🎨 Animación de cambio de color
-                        ObjectAnimator.ofArgb(
-                            textView,
-                            "textColor",
-                            Color.RED,
-                            Color.parseColor("#FF9800"), // Naranja
-                            Color.YELLOW,
-                            Color.GREEN,
-                            Color.BLUE,
-                            Color.parseColor("#4B0082"), // Índigo
-                            Color.parseColor("#EE82EE"), // Violeta
-                            Color.RED
-                        ).apply {
-                            duration = 4000L
-                            repeatCount = ValueAnimator.INFINITE
-                            repeatMode = ValueAnimator.RESTART
-                            start()
+                                    // Animación de color
+                                    ObjectAnimator.ofArgb(
+                                        this,
+                                        "textColor",
+                                        Color.RED,
+                                        Color.parseColor("#FF9800"),
+                                        Color.YELLOW,
+                                        Color.GREEN,
+                                        Color.BLUE,
+                                        Color.parseColor("#4B0082"),
+                                        Color.parseColor("#EE82EE"),
+                                        Color.RED
+                                    ).apply {
+                                        duration = 4000L
+                                        repeatCount = ValueAnimator.INFINITE
+                                        repeatMode = ValueAnimator.RESTART
+                                        start()
+                                    }
+                                }
+                            } else {
+                                binding.txtActualizacion.apply {
+                                    text = "No hay pedidos aún."
+                                    visibility = View.VISIBLE
+                                }
+                            }
+                        }
+                        .addOnFailureListener {
+                            binding.txtActualizacion.apply {
+                                text = "Error al cargar los pedidos."
+                                visibility = View.VISIBLE
+                            }
                         }
 
-                    } else {
-                        binding.txtActualizacion.visibility = View.GONE
+                    // ✅ Mostrar diálogo si hay nueva versión
+                    if (versionRemota > versionLocal.toString()) {
+                        AlertDialog.Builder(requireContext())
+                            .setTitle("Nueva versión $versionRemota disponible")
+                            .setMessage("Actualiza ahora para mejorar el rendimiento, obtener nuevas funciones y disfrutar una mejor experiencia.")
+                            .setCancelable(false)
+                            .setPositiveButton("Actualizar") { _, _ ->
+                                descargarActualizacion()
+                            }
+                            .setNegativeButton("Cancelar", null)
+                            .show()
                     }
 
                 } else {
@@ -577,12 +614,14 @@ class PeliculasFragment : BrowseSupportFragment() {
                     isSelected = true
                 }
                 binding.txtActualizacion.apply {
-                    text = "Muy pronto Fecha de Actualizacion"
+                    text = "Muy pronto Fecha de Actualización"
                     visibility = View.VISIBLE
                     isSelected = true
                 }
             }
     }
+
+
 
     private fun descargarActualizacion() {
         val url = "https://github.com/CreativeMB/FullTV/releases/download/fulltv/FullTV_update.apk"

@@ -14,12 +14,13 @@ android {
         minSdk = 23
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0"
-        vectorDrawables {
-            useSupportLibrary = true
-        }
-
+        versionName = "1"
     }
+
+    buildFeatures {
+        buildConfig = true // 👈 Asegúrate que esto esté presente
+    }
+
 
     buildTypes {
         release {

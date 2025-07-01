@@ -78,14 +78,14 @@ class CardPresenter: Presenter(){
                 textSize = 16f
                 maxLines = 3
                 setTextColor(Color.WHITE)
-                setLines(3)
+                setLines(1)
                 setLineSpacing(1f, 1f)
                 text = if (text.isNullOrEmpty()) "\n\n" else text
             }
 
             contentTextView.apply {
                 textSize = 12f
-                maxLines = 3
+                maxLines = 2
                 setTextColor(Color.GREEN)
             }
         } catch (e: Exception) {
@@ -111,7 +111,7 @@ class CardPresenter: Presenter(){
         val timeElapsed = currentTime - createdAtMillis
 
         if (movie.countdownMinutes <= 0 || timeElapsed >= countdownDurationMillis) {
-            cardView.contentText = "$casText${movie.year} | Min-00:00"
+            cardView.contentText = "$casText${movie.year} | M-00:00"
             cardView.setInfoAreaBackgroundColor(Color.parseColor("#006064"))
         } else {
             val remainingTimeMillis = countdownDurationMillis - timeElapsed
@@ -119,7 +119,7 @@ class CardPresenter: Presenter(){
                 override fun onTick(millisUntilFinished: Long) {
                     val minutesRemaining = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished)
                     val secondsRemaining = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
-                    cardView.contentText = "$casText${movie.year} | Min-%02d:%02d".format(
+                    cardView.contentText = "$casText${movie.year} | M-%02d:%02d".format(
                         minutesRemaining,
                         secondsRemaining
                     )
@@ -127,7 +127,7 @@ class CardPresenter: Presenter(){
                 }
 
                 override fun onFinish() {
-                    cardView.contentText = "$casText${movie.year} | Min-00:00"
+                    cardView.contentText = "$casText${movie.year} | M-00:00"
                     cardView.setInfoAreaBackgroundColor(Color.parseColor("#3E2723"))
                 }
             }.start()
