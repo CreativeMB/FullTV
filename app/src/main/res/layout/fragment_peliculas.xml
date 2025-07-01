@@ -139,7 +139,7 @@
                         android:layout_height="wrap_content"
                         android:text="Cantidad de Castv"
                         android:textColor="@color/lb_tv_white"
-                        android:textSize="14sp"
+                        android:textSize="16sp"
                         android:layout_marginEnd="10dp" />
                 </LinearLayout>
             </LinearLayout>
@@ -172,7 +172,7 @@
                 android:text="Actualización"
                 android:layout_gravity="end"
                 android:textColor="#E53935"
-                android:textSize="15sp"
+                android:textSize="16sp"
                 android:visibility="visible"
                 android:padding="8dp" />
 
