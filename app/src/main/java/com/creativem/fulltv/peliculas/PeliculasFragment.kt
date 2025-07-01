@@ -530,7 +530,6 @@ class PeliculasFragment : BrowseSupportFragment() {
                     $mensajeBanner
 
                     📲 Versión instalada: $versionLocal
-                  
                 """.trimIndent()
 
                     binding.txtBanner.apply {
@@ -576,10 +575,8 @@ class PeliculasFragment : BrowseSupportFragment() {
                                     }
                                 }
                             } else {
-                                binding.txtActualizacion.apply {
-                                    text = "No hay pedidos aún."
-                                    visibility = View.VISIBLE
-                                }
+                                // No hay pedidos → ocultar el TextView
+                                binding.txtActualizacion.visibility = View.GONE
                             }
                         }
                         .addOnFailureListener {
