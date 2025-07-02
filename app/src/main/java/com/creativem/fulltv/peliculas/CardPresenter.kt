@@ -12,16 +12,17 @@ import java.util.concurrent.TimeUnit
 import android.graphics.Color
 import android.text.TextUtils
 import android.view.Gravity
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import java.lang.reflect.Field
 
 class CardPresenter: Presenter(){
+
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val context = parent.context
 
-        // Contenedor externo que tendrá el borde y escala
         val frameLayout = FrameLayout(context).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -31,13 +32,10 @@ class CardPresenter: Presenter(){
             isFocusableInTouchMode = true
         }
 
-        // Tarjeta real
         val cardView = ImageCardView(context).apply {
             isFocusable = true
             isFocusableInTouchMode = true
             setMainImageDimensions(200, 280)
-
-            // 💡 Márgenes internos para mostrar borde exterior
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -46,32 +44,48 @@ class CardPresenter: Presenter(){
             }
         }
 
-        frameLayout.addView(cardView)
+        val etiquetaValida = TextView(context).apply {
+            text = ""
+            setTextColor(Color.WHITE)
+            textSize = 10f
+            setPadding(8, 4, 8, 4)
+            gravity = Gravity.CENTER
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.END
+            ).apply {
+                setMargins(0, 8, 8, 0)
+            }
+            visibility = View.GONE
+        }
 
-        // Resaltado visual al enfocar
+        frameLayout.addView(cardView)
+        frameLayout.addView(etiquetaValida)
+
         frameLayout.setOnFocusChangeListener { view, hasFocus ->
             view.background = if (hasFocus)
                 ContextCompat.getDrawable(context, R.drawable.card_focused_background)
             else
                 null
-
             val scale = if (hasFocus) 1.1f else 1f
             view.animate().scaleX(scale).scaleY(scale).setDuration(150).start()
         }
 
-        return CardViewHolder(frameLayout, cardView)
+        return CardViewHolder(frameLayout, cardView, etiquetaValida)
     }
 
     override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
         val holder = viewHolder as CardViewHolder
         val cardView = holder.cardView
+        val etiquetaValida = holder.etiquetaValida
         val movie = item as? Movie ?: return
 
         val casText = "CasTV $"
         cardView.titleText = movie.title
         cardView.contentText = "$casText${movie.year}"
+        etiquetaValida.visibility = View.GONE
 
-        // Personalización de textos internos con reflexión
         try {
             val titleTextView: TextView = getTextViewFromCard(cardView, "mTitleView")
             val contentTextView: TextView = getTextViewFromCard(cardView, "mContentView")
@@ -86,10 +100,7 @@ class CardPresenter: Presenter(){
                 isFocusable = true
                 isFocusableInTouchMode = true
                 setHorizontallyScrolling(true)
-
-                setOnFocusChangeListener { v, hasFocus ->
-                    v.isSelected = hasFocus
-                }
+                setOnFocusChangeListener { v, hasFocus -> v.isSelected = hasFocus }
             }
 
             contentTextView.apply {
@@ -102,21 +113,14 @@ class CardPresenter: Presenter(){
                 isFocusable = true
                 isFocusableInTouchMode = true
                 setHorizontallyScrolling(true)
-
-                setOnFocusChangeListener { v, hasFocus ->
-                    v.isSelected = hasFocus
-                }
-
+                setOnFocusChangeListener { v, hasFocus -> v.isSelected = hasFocus }
             }
-
         } catch (e: Exception) {
             e.printStackTrace()
         }
 
-        // Cancelar temporizador anterior si existe
         holder.countDownTimer?.cancel()
 
-        // Cargar imagen
         cardView.mainImageView?.let {
             Glide.with(cardView.context)
                 .load(movie.imageUrl)
@@ -125,29 +129,41 @@ class CardPresenter: Presenter(){
                 .into(it)
         }
 
-        // Temporizador y colores del infoArea
         val createdAtMillis = movie.createdAt.toDate().time
         val countdownDurationMillis = TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
         val currentTime = System.currentTimeMillis()
         val timeElapsed = currentTime - createdAtMillis
 
+        val esValida = validacioneslista.yaCargado() &&
+                validacioneslista.obtenerPeliculasValidas().any { it.streamUrl == movie.streamUrl }
+
         if (movie.countdownMinutes <= 0 || timeElapsed >= countdownDurationMillis) {
-            cardView.contentText = "$casText${movie.year}"
-            cardView.setInfoAreaBackgroundColor(Color.parseColor("#006064"))
+            if (esValida) {
+                cardView.contentText = "Abierta al público"
+                cardView.setInfoAreaBackgroundColor(Color.parseColor("#006064"))
+                etiquetaValida.text = "Gratis ✅"
+                etiquetaValida.setBackgroundColor(Color.parseColor("#006064"))
+                etiquetaValida.visibility = View.VISIBLE
+            } else {
+                cardView.contentText = "$casText${movie.year}"
+                cardView.setInfoAreaBackgroundColor(Color.parseColor("#880E4F"))
+                etiquetaValida.text = "Alquilar 💳"
+                etiquetaValida.setBackgroundColor(Color.parseColor("#880E4F"))
+                etiquetaValida.visibility = View.VISIBLE
+            }
         } else {
             val remainingTimeMillis = countdownDurationMillis - timeElapsed
             holder.countDownTimer = object : CountDownTimer(remainingTimeMillis, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
-                    val hoursRemaining = TimeUnit.MILLISECONDS.toHours(millisUntilFinished)
-                    val minutesRemaining = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished) % 60
-                    val secondsRemaining = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
-
-                    cardView.contentText = "%02d:%02d:%02d".format(
-                        hoursRemaining,
-                        minutesRemaining,
-                        secondsRemaining
-                    )
+                    val h = TimeUnit.MILLISECONDS.toHours(millisUntilFinished)
+                    val m = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished) % 60
+                    val s = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
+                    cardView.contentText = "%02d:%02d:%02d".format(h, m, s)
                     cardView.setInfoAreaBackgroundColor(Color.parseColor("#001f3f"))
+
+                    etiquetaValida.text = "Tiempo limitado ⏳"
+                    etiquetaValida.setBackgroundColor(Color.parseColor("#001f3f"))
+                    etiquetaValida.visibility = View.VISIBLE
                 }
 
                 override fun onFinish() {
@@ -171,7 +187,11 @@ class CardPresenter: Presenter(){
         holder.countDownTimer = null
     }
 
-    inner class CardViewHolder(view: FrameLayout, val cardView: ImageCardView) : ViewHolder(view) {
+    inner class CardViewHolder(
+        view: FrameLayout,
+        val cardView: ImageCardView,
+        val etiquetaValida: TextView
+    ) : ViewHolder(view) {
         var countDownTimer: CountDownTimer? = null
     }
 

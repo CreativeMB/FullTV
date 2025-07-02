@@ -46,7 +46,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Cargando...\n🎉 ¡Acceso gratuito desbloqueado!\n🔓 Películas que fueron alquiladas ahora están disponibles para ti sin límites.\n🍿 Disfrútalas cuando quieras."
+            android:text="Cargando...\nActualizando biblioteca gratis"
             android:textColor="@color/redpersonalisado"
             android:textSize="26sp"
             android:textStyle="bold"

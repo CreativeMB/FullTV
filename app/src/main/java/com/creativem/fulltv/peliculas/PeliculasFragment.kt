@@ -72,6 +72,7 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import java.io.File
 import com.creativem.fulltv.BuildConfig
+import kotlinx.coroutines.withContext
 
 
 class PeliculasFragment : BrowseSupportFragment() {
@@ -281,6 +282,10 @@ class PeliculasFragment : BrowseSupportFragment() {
 
         CoroutineScope(Dispatchers.IO).launch {
             validacioneslista.cargarPeliculas()
+            // ⚠️ Cambio importante: actualizar etiquetas en el hilo principal
+            withContext(Dispatchers.Main) {
+                actualizarSoloEtiquetas()
+            }
         }
 
         obtenerNoticia()
@@ -412,6 +417,18 @@ class PeliculasFragment : BrowseSupportFragment() {
             updateMovieList(peliculasOrdenadas)
         }
     }
+    private fun actualizarSoloEtiquetas() {
+        for (i in 0 until rowsAdapter.size()) {
+            val row = rowsAdapter[i]
+            if (row is ListRow) {
+                val adapter = row.adapter as? ArrayObjectAdapter ?: continue
+                for (j in 0 until adapter.size()) {
+                    adapter.notifyArrayItemRangeChanged(j, 1) // 🔁 Solo re-bindea el ítem
+                }
+            }
+        }
+    }
+
     //fondo animado de colores
     private var fondoActual: GradientDrawable? = null
     private val handler = Handler(Looper.getMainLooper())

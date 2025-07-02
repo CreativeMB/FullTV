@@ -61,7 +61,7 @@ class PeliculasValidasFragment : RowsSupportFragment() {
             ocultarCargando() // Ocultar la barra de progreso
 
             if (peliculasOrdenadasValidas.isNotEmpty()) {
-                agregarALista(peliculasOrdenadasValidas, "🔓Gracias a la comunidad de FullTV, ahora puedes disfrutar estas películas gratis.")
+                agregarALista(peliculasOrdenadasValidas, "")
             } else {
                 Log.e("PeliculasValidasFragment", "No hay películas válidas.")
             }
