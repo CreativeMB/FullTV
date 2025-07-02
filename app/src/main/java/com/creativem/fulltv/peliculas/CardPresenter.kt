@@ -161,7 +161,7 @@ class CardPresenter: Presenter(){
                     cardView.contentText = "%02d:%02d:%02d".format(h, m, s)
                     cardView.setInfoAreaBackgroundColor(Color.parseColor("#001f3f"))
 
-                    etiquetaValida.text = "Tiempo limitado ⏳"
+                    etiquetaValida.text = "Alquilada \uD83C\uDFAC"
                     etiquetaValida.setBackgroundColor(Color.parseColor("#001f3f"))
                     etiquetaValida.visibility = View.VISIBLE
                 }
