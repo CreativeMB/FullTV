@@ -74,7 +74,6 @@ import java.io.File
 import com.creativem.fulltv.BuildConfig
 
 
-
 class PeliculasFragment : BrowseSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
     private val validaciones = Validaciones()
@@ -279,6 +278,10 @@ class PeliculasFragment : BrowseSupportFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            validacioneslista.cargarPeliculas()
+        }
 
         obtenerNoticia()
 

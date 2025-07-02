@@ -12,14 +12,13 @@ import androidx.leanback.widget.*
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.creativem.fulltv.R
-import com.creativem.fulltv.peliculas.Validaciones
+import com.creativem.fulltv.peliculas.validacioneslista
 import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.peliculas.CardPresenter  // Cambio aquí
 import com.creativem.fulltv.peliculas.PlayerPeliculas
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class PeliculasValidasFragment : RowsSupportFragment() {
     private val channels = ArrayObjectAdapter(ListRowPresenter())
@@ -52,21 +51,23 @@ class PeliculasValidasFragment : RowsSupportFragment() {
     private fun loadMovies() {
         mostrarCargando() // Mostrar la barra de progreso
 
-        CoroutineScope(Dispatchers.IO).launch {
-            val validaciones = Validaciones()
-            val (peliculasOrdenadasValidas, _) = validaciones.obtenerPeliculas()
+        CoroutineScope(Dispatchers.Main).launch {
+            // 🔄 Esperar a que la carga en segundo plano se complete
+            validacioneslista.esperarCarga()
 
-            withContext(Dispatchers.Main) {
-                ocultarCargando() // Ocultar la barra de progreso
+            // ✅ Obtener las películas válidas ya cargadas
+            val peliculasOrdenadasValidas = validacioneslista.obtenerPeliculasValidas()
 
-                if (peliculasOrdenadasValidas.isNotEmpty()) {
-                    agregarALista(peliculasOrdenadasValidas,"🔓Gracias a la comunidad de FullTV, ahora puedes disfrutar estas películas gratis.")
-                } else {
-                    Log.e("PeliculasValidasFragment", "No hay películas válidas.")
-                }
+            ocultarCargando() // Ocultar la barra de progreso
+
+            if (peliculasOrdenadasValidas.isNotEmpty()) {
+                agregarALista(peliculasOrdenadasValidas, "🔓Gracias a la comunidad de FullTV, ahora puedes disfrutar estas películas gratis.")
+            } else {
+                Log.e("PeliculasValidasFragment", "No hay películas válidas.")
             }
         }
     }
+
 
     private fun mostrarCargando() {
         progressBar.visibility = View.VISIBLE

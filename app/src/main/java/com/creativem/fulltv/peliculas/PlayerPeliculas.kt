@@ -249,17 +249,18 @@ class PlayerPeliculas : AppCompatActivity() {
 
     private fun loadMovies() {
         CoroutineScope(Dispatchers.Main).launch {
-            val validaciones = Validaciones()
-            val (peliculasOrdenadasValidas, peliculasInvalidas) = validaciones.obtenerPeliculas()
+            // Usamos las que ya fueron cargadas y validadas previamente
+            val peliculasOrdenadasValidas = validacioneslista.obtenerPeliculasValidas()
+            val peliculasInvalidas = validacioneslista.obtenerPeliculasInvalidas()
 
-            // Log para verificar la cantidad de películas cargadas
-            Log.d("MoviesData", "Películas válidas ordenadas: ${peliculasOrdenadasValidas.size}, Películas inválidas: ${peliculasInvalidas.size}")
+            // Log para verificar
+            Log.d(
+                "MoviesData",
+                "Películas válidas ordenadas: ${peliculasOrdenadasValidas.size}, Películas inválidas: ${peliculasInvalidas.size}"
+            )
 
             // Actualizar el adaptador
-            withContext(Dispatchers.Main) {
-                adapter.updateMovies(peliculasOrdenadasValidas)
-                // Aquí no cambiamos la visibilidad
-            }
+            adapter.updateMovies(peliculasOrdenadasValidas)
         }
     }
     // Método que llama al repositorio de Firestore para validar la URL
