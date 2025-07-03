@@ -1,0 +1,17 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Fondo gris claro -->
+    <item android:id="@android:id/background">
+        <shape>
+            <solid android:color="#33000000" />
+        </shape>
+    </item>
+
+    <!-- Barra de progreso (roja) -->
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape>
+                <solid android:color="#FF0000" /> <!-- Rojo puro -->
+            </shape>
+        </clip>
+    </item>
+</layer-list>

@@ -51,12 +51,11 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
 import org.json.JSONObject
 import android.graphics.Color
-import android.os.CountDownTimer
-
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
+import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.activity.addCallback
 import com.bumptech.glide.Glide
@@ -66,9 +65,11 @@ import com.creativem.fulltv.principal.Nosotros
 
 
 import androidx.annotation.OptIn
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 
 import androidx.media3.common.util.UnstableApi
+import androidx.recyclerview.widget.RecyclerView
 import java.util.concurrent.TimeUnit
 
 
@@ -85,11 +86,6 @@ class PlayerPeliculas : AppCompatActivity() {
     private lateinit var adapter: PeliculasMenuAdapter
     private lateinit var firestore: FirebaseFirestore
     private lateinit var auth: FirebaseAuth
-    private val handler = Handler(Looper.getMainLooper())
-    private lateinit var runnableActualizar: Runnable
-    private lateinit var runnableOcultar: Runnable
-    private val hideControlsDelay: Long = 10000 // 10 segundos
-    private val updateInterval: Long = 1000 // 1 segundo
     private var isProcessingOrder = false
     private var reconnectionAttempts = 0
     private val maxReconnectionAttempts = 10
@@ -98,7 +94,19 @@ class PlayerPeliculas : AppCompatActivity() {
     private val playbackStartTime = AtomicLong(0) // Tiempo en que inicia la reproducción
     private var lastKnownPosition: Long = 0 // Para guardar la última posición conocida
 
+    private val handler = Handler(Looper.getMainLooper())
+    private val hideControlsDelay = 5000L // 5 segundos
+    private val updateInterval = 1000L    // 1 segundo
+    private var lastInteractionTime = 0L
 
+
+    private var runnableOcultar = Runnable {
+        binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.GONE
+    }
+
+    private val runnableActualizar: Runnable = Runnable {
+        actualizarTiempo()
+    }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -109,8 +117,9 @@ class PlayerPeliculas : AppCompatActivity() {
 
         initializeRecyclerView() // Configura el RecyclerView con un adaptador vacío
         loadMovies()
-
-        auth = FirebaseAuth.getInstance()
+        setupControlTimers()
+        activarListenersEnControles()
+              auth = FirebaseAuth.getInstance()
         firestore = FirebaseFirestore.getInstance()
 
         binding.reproductor.useController = false
@@ -220,40 +229,66 @@ class PlayerPeliculas : AppCompatActivity() {
             }
         })
 
+        // Referencia a los controles
+        val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
 
-        runnableActualizar = Runnable { actualizarTiempo() }
-        runnableOcultar = Runnable {
-            binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility =
-                View.GONE
+// Define el runnable que revisa si debe ocultar los controles
+        runnableOcultar = object : Runnable {
+            override fun run() {
+                val tiempoActual = System.currentTimeMillis()
+                val tiempoInactivo = tiempoActual - lastInteractionTime
+
+                // Si ha pasado suficiente tiempo y no hay interacción visible
+                if (tiempoInactivo >= hideControlsDelay) {
+                    controles.visibility = View.GONE
+                } else {
+                    handler.postDelayed(this, 1000)
+                }
+            }
         }
 
+// Listeners para reiniciar el temporizador con cualquier interacción
         binding.reproductor.setOnTouchListener { _, _ ->
             showControlsAndResetTimer()
             true
         }
-        showControlsAndResetTimer() // Mostrar controles al inicio
+
+        binding.reproductor.setOnKeyListener { _, _, _ ->
+            showControlsAndResetTimer()
+            false
+        }
+
+// ✅ Inicia los controles y temporizador
+        showControlsAndResetTimer()
+
+        // 🕐 Iniciar temporizador de actualización
         handler.postDelayed(runnableActualizar, updateInterval)
+
+        // 🕒 Primer tiempo inmediato
         actualizarTiempo()
 
-
+        // ⬅️ Manejar botón "Atrás"
         onBackPressedDispatcher.addCallback(this) {
-            val menuVisible = binding.recyclerMoviesMenu.visibility == View.VISIBLE
-            val controlesVisibles = binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility == View.VISIBLE
+            val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
+            val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
+
+            val menuVisible = menuPelis.visibility == View.VISIBLE
+            val controlesVisibles = controles.visibility == View.VISIBLE
 
             when {
                 menuVisible -> {
-                    binding.recyclerMoviesMenu.animate()
+                    menuPelis.animate()
                         .alpha(0f)
                         .setDuration(200)
                         .withEndAction {
-                            binding.recyclerMoviesMenu.visibility = View.GONE
-                            binding.recyclerMoviesMenu.alpha = 1f
+                            menuPelis.visibility = View.GONE
+                            menuPelis.alpha = 1f
                         }
                         .start()
                 }
 
                 controlesVisibles -> {
-                    binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.GONE
+                    controles.visibility = View.GONE
                 }
 
                 else -> {
@@ -261,27 +296,28 @@ class PlayerPeliculas : AppCompatActivity() {
                 }
             }
         }
-
-
     }
 
-    private fun mostarpelis() {
-        val isVisible = binding.recyclerMoviesMenu.visibility == View.VISIBLE
+        private fun mostarpelis() {
+        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
+        val isVisible = menuPelis.visibility == View.VISIBLE
 
         if (isVisible) {
-            binding.recyclerMoviesMenu.animate()
+            menuPelis.animate()
                 .alpha(0f)
                 .setDuration(200)
                 .withEndAction {
-                    binding.recyclerMoviesMenu.visibility = View.GONE
-                    binding.recyclerMoviesMenu.alpha = 1f
+                    menuPelis.visibility = View.GONE
+                    menuPelis.alpha = 1f
                 }
                 .start()
         } else {
-            binding.recyclerMoviesMenu.visibility = View.VISIBLE
-            binding.recyclerMoviesMenu.alpha = 1f
+            menuPelis.visibility = View.VISIBLE
+            menuPelis.alpha = 1f
+            menuPelis.requestFocus() // importante si usas navegación con control remoto
         }
     }
+
 
 
     private fun initializeRecyclerView() {
@@ -290,11 +326,16 @@ class PlayerPeliculas : AppCompatActivity() {
             startMoviePlayback(movie.streamUrl, movie.title, movie.year, movie.imageUrl)
         }
 
-        // Establecer el LayoutManager horizontal
-        binding.recyclerMoviesMenu.layoutManager =
-            LinearLayoutManager(this@PlayerPeliculas, LinearLayoutManager.HORIZONTAL, false)
+        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
 
-        binding.recyclerMoviesMenu.adapter = adapter
+        menuPelis.layoutManager = LinearLayoutManager(
+            this@PlayerPeliculas,
+            LinearLayoutManager.HORIZONTAL,
+            false
+        )
+
+        menuPelis.adapter = adapter
+
 
         // Cargar las películas desde Firestore
         loadMovies()
@@ -453,7 +494,8 @@ class PlayerPeliculas : AppCompatActivity() {
                         intentarReconexion() // Llama al método de reconexión
                     } else {
 
-                        handler.removeCallbacks(runnable) // Detiene el runnable
+                        handler.postDelayed(runnableActualizar, 1000)
+                        // Detiene el runnable
                     }
                 }
 
@@ -467,7 +509,8 @@ class PlayerPeliculas : AppCompatActivity() {
                         intentarReconexion() // Llama al método de reconexión
                     } else {
 
-                        handler.removeCallbacks(runnable) // Detiene el runnable
+                        handler.postDelayed(runnableActualizar, 1000)
+// Detiene el runnable
                     }
                 }
 
@@ -581,49 +624,46 @@ class PlayerPeliculas : AppCompatActivity() {
         val dialogView = layoutInflater.inflate(R.layout.player_alerdialogo, null)
         val messageText = dialogView.findViewById<TextView>(R.id.messageText)
         val linkNosotros = dialogView.findViewById<TextView>(R.id.linkNosotros)
+        val imageView = dialogView.findViewById<ImageView>(R.id.dialogImage)
+        imageView.setImageResource(R.drawable.qrcontenido)
 
         val spannable = SpannableStringBuilder()
 
-        // Primera línea: "Película: <Título>"
+        // Texto película
         val movieInfo = "Película: $movieTitle\n"
         spannable.append(movieInfo)
 
-        // Resaltar "Película:" en rojo y más grande
         val peliculaTexto = "Película:"
         val peliculaIndex = spannable.indexOf(peliculaTexto)
         spannable.setSpan(ForegroundColorSpan(Color.RED), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         spannable.setSpan(RelativeSizeSpan(1.3f), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
 
-        // Resaltar el título de la película en rojo y más grande
         val tituloIndex = peliculaIndex + peliculaTexto.length + 1
-        spannable.setSpan(ForegroundColorSpan(Color.BLUE), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(ForegroundColorSpan(Color.GREEN), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         spannable.setSpan(RelativeSizeSpan(1.4f), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
 
-        // Segunda línea: "Precio CasTV: $<Año>"
-        val precioInfo = "Precio CasTV: $$movieYear\n"  // Aquí el $ está dentro del String
+        // Precio
+        val precioInfo = "Precio CasTV: $$movieYear\n"
         spannable.append(precioInfo)
 
-        // Resaltar "Precio CasTV:" en azul y más grande
         val precioTexto = "Precio CasTV:"
         val precioIndex = spannable.indexOf(precioTexto)
         spannable.setSpan(ForegroundColorSpan(Color.RED), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         spannable.setSpan(RelativeSizeSpan(1.3f), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
 
-        // Ubicamos el índice del número sin incluir el $
-        val precioValorIndex = precioIndex + precioTexto.length + 2 // +2 para saltar "$ "
-        spannable.setSpan(ForegroundColorSpan(Color.BLUE), precioValorIndex, precioValorIndex + movieYear.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        val precioValorIndex = precioIndex + precioTexto.length + 2
+        spannable.setSpan(ForegroundColorSpan(Color.GREEN), precioValorIndex, precioValorIndex + movieYear.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         spannable.setSpan(RelativeSizeSpan(1.4f), precioValorIndex, precioValorIndex + movieYear.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
 
-        // Agregar las demás líneas sin perder formato
+        spannable.append("\n¡Alquila Tu Película!")
         spannable.append("\nEstará en línea en breve. Estamos disponibles 24/7")
         spannable.append("\nSi no tienes saldo recuerda recargar en COP")
 
-        // Aplicar el texto formateado al TextView
         messageText.text = spannable
 
-        // Configurar el enlace a la actividad "Nosotros"
+        // Enlace
         linkNosotros.text = "Más información aquí"
-        linkNosotros.setTextColor(Color.GRAY)
+        linkNosotros.setTextColor(Color.RED)
         linkNosotros.paintFlags = linkNosotros.paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
         linkNosotros.setOnClickListener {
             val intent = Intent(this, Nosotros::class.java)
@@ -631,24 +671,49 @@ class PlayerPeliculas : AppCompatActivity() {
         }
 
         val alertDialog = AlertDialog.Builder(this)
-            .setTitle("¡Alquila Tu Pelicula!")
             .setView(dialogView)
-            .setPositiveButton("Volver al contenido") { dialog, _ ->
+            .setNegativeButton("Volver al contenido") { dialog, _ ->
                 dialog.dismiss()
                 finish()
             }
-            .setNeutralButton("Alquilar Pelicula") { _, _ ->
+            .setNeutralButton("Alquilar Película") { _, _ ->
                 verificarYProcesarPedido()
             }
-            .create() // Asegurar que se crea antes de modificar el fondo
+            .setPositiveButton("Cerrar") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .create()
 
         alertDialog.setOnShowListener {
-            alertDialog.window?.setBackgroundDrawableResource(R.color.textColorPrimary) // Reemplaza con tu color
+            // Botones
+            val btnAlquilar = alertDialog.getButton(AlertDialog.BUTTON_NEUTRAL)
+            val btnVolver = alertDialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            val btnCerrar = alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+
+            // Asignar fondo con selector visual de foco
+            val focusSelector = R.drawable.focus_selector
+            btnAlquilar.setBackgroundResource(focusSelector)
+            btnVolver.setBackgroundResource(focusSelector)
+            btnCerrar.setBackgroundResource(focusSelector)
+
+            // Fondo para la barra inferior (padres de botones)
+            val buttonParent = btnAlquilar.parent as View
+            buttonParent.setBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary))
+
+            // Activar foco y navegación
+            listOf(btnAlquilar, btnVolver, btnCerrar).forEach {
+                it.isFocusable = true
+                it.isFocusableInTouchMode = true
+            }
+
+            // Foco inicial
+            btnAlquilar.requestFocus()
         }
 
-        alertDialog.show() // Mostrar después de aplicar el fondo
-    }
 
+
+        alertDialog.show()
+    }
 
 
     private fun verificarYProcesarPedido() {
@@ -840,7 +905,8 @@ class PlayerPeliculas : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         player?.pause()
-        handler.removeCallbacks(runnable)
+        handler.postDelayed(runnableActualizar, 1000)
+
     }
 
     override fun onResume() {
@@ -848,7 +914,8 @@ class PlayerPeliculas : AppCompatActivity() {
         super.onResume()
         player?.playWhenReady = true
         if (player?.isPlaying == true) {
-            handler.postDelayed(runnable, updateInterval) // Reanudar actualizaciones al reproducir
+            handler.postDelayed(runnableActualizar, 1000)
+            // Reanudar actualizaciones al reproducir
         }
     }
 
@@ -883,20 +950,142 @@ class PlayerPeliculas : AppCompatActivity() {
         }
     }
 
+
+    private fun setupControlTimers() {
+        runnableOcultar = object : Runnable {
+            override fun run() {
+                val now = System.currentTimeMillis()
+                val elapsed = now - lastInteractionTime
+
+                val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
+                val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
+
+
+                val controlesTienenFoco = tieneFocoEnHijos(controles)
+                val menuTieneFoco = tieneFocoEnHijos(menuPelis)
+
+                if (elapsed >= hideControlsDelay && !controlesTienenFoco && !menuTieneFoco) {
+                    // Ocultar controles con animación
+                    controles.animate()
+                        .alpha(0f)
+                        .setDuration(300)
+                        .withEndAction {
+                            controles.visibility = View.GONE
+                            controles.alpha = 1f
+                        }
+                        .start()
+
+                    if (menuPelis.visibility == View.VISIBLE) {
+                        menuPelis.animate()
+                            .alpha(0f)
+                            .setDuration(200)
+                            .withEndAction {
+                                menuPelis.visibility = View.GONE
+                                menuPelis.alpha = 1f
+                            }
+                            .start()
+                    }
+                } else {
+                    handler.postDelayed(this, 1000)
+                }
+            }
+        }
+
+        binding.reproductor.setOnTouchListener { _, _ ->
+            showControlsAndResetTimer()
+            true
+        }
+
+        showControlsAndResetTimer()
+    }
+
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Solo reinicia el temporizador, pero NO interfiere con la navegación de foco
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            lastInteractionTime = System.currentTimeMillis()
+            handler.removeCallbacks(runnableOcultar)
+            handler.postDelayed(runnableOcultar, hideControlsDelay)
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun tieneFocoEnHijos(view: View): Boolean {
+        if (view.hasFocus()) return true
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                if (tieneFocoEnHijos(view.getChildAt(i))) return true
+            }
+        }
+        return false
+    }
+
+
     private fun showControlsAndResetTimer() {
-        binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.VISIBLE
-        // Reinicia el temporizador
-        handler.removeCallbacks(runnable)
-        handler.postDelayed(runnable, hideControlsDelay)
+        lastInteractionTime = System.currentTimeMillis()
+        binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis).requestFocus()
+        val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
+        if (controles.visibility != View.VISIBLE) {
+            controles.alpha = 0f
+            controles.visibility = View.VISIBLE
+            controles.animate().alpha(1f).setDuration(300).start()
+        }
+
+        handler.removeCallbacks(runnableOcultar)
+        handler.postDelayed(runnableOcultar, hideControlsDelay)
     }
 
-    private val runnable = Runnable {
-        // Actualiza la UI
-        actualizarTiempo()
 
-        // Oculta los controles
-        binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.GONE
+    private fun activarListenersEnControles() {
+        val controles = binding.reproductor.findViewById<ViewGroup>(R.id.controles_reproductor)
+        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
+
+
+        // Listeners para cada control dentro del contenedor de controles
+        for (i in 0 until controles.childCount) {
+            val child = controles.getChildAt(i)
+
+            child.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) showControlsAndResetTimer()
+            }
+
+            child.setOnTouchListener { _, _ ->
+                showControlsAndResetTimer()
+                false
+            }
+
+            child.setOnKeyListener { _, _, _ ->
+                showControlsAndResetTimer()
+                false
+            }
+
+            child.setOnHoverListener { _, _ ->
+                showControlsAndResetTimer()
+                false
+            }
+        }
+
+        // Listeners adicionales para el menú de películas
+        menuPelis.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) showControlsAndResetTimer()
+        }
+
+        menuPelis.setOnKeyListener { _, _, _ ->
+            showControlsAndResetTimer()
+            false
+        }
+
+        menuPelis.setOnTouchListener { _, _ ->
+            showControlsAndResetTimer()
+            false
+        }
+
+        menuPelis.setOnHoverListener { _, _ ->
+            showControlsAndResetTimer()
+            false
+        }
     }
+
 
     private fun togglePlayPause() {
         val player = binding.reproductor.player
@@ -974,34 +1163,31 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        showControlsAndResetTimer()
         Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
+
         return when (keyCode) {
-            KeyEvent.KEYCODE_MENU -> {
+            // ✅ Solo estas teclas llaman a mostarpelis()
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_PAGE_UP,
+            KeyEvent.KEYCODE_PAGE_DOWN,
+            174 -> {
                 mostarpelis()
                 true
             }
 
-            KeyEvent.KEYCODE_PAGE_UP -> {
-                Log.d("KeyCodeTest", "Página Arriba presionada")
-                mostarpelis()
+            // ✅ Solo OK muestra los controles
+            KeyEvent.KEYCODE_DPAD_CENTER -> {
+                showControlsAndResetTimer()
                 true
             }
 
-            KeyEvent.KEYCODE_PAGE_DOWN -> {
-                Log.d("KeyCodeTest", "Página Abajo presionada")
-                mostarpelis()
-                true
-            }
-
-            174 -> { // Código del botón del control remoto
-                Log.d("KeyCodeTest", "Botón del control remoto (174) presionado")
-                mostarpelis()
-                true
+            KeyEvent.KEYCODE_BACK -> {
+                false // NO interceptamos aquí
             }
 
             else -> super.onKeyDown(keyCode, event)
         }
     }
+
 
 }

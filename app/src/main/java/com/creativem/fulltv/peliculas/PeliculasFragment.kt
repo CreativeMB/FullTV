@@ -1291,6 +1291,7 @@ class PeliculasFragment : BrowseSupportFragment() {
         val btnCerrar = view.findViewById<ImageButton>(R.id.btnCerrarPublicidad)
         val txtContador = view.findViewById<TextView>(R.id.txtContadorPublicidad)
         val textoPublicidad = view.findViewById<TextView>(R.id.tvPublicidadTexto)
+        val progressBar = view.findViewById<ProgressBar>(R.id.progressBarPublicidad)
 
         publicidadDialog = Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen).apply {
             setContentView(view)
@@ -1298,7 +1299,6 @@ class PeliculasFragment : BrowseSupportFragment() {
             show()
         }
 
-        // Foco inicial al botón cerrar
         btnCerrar.isFocusableInTouchMode = true
         btnCerrar.requestFocus()
 
@@ -1319,12 +1319,30 @@ class PeliculasFragment : BrowseSupportFragment() {
         }
         handler.postDelayed(runnable, 1000)
 
-        // Cerrar manualmente
+        // Botón cerrar manual
         btnCerrar.setOnClickListener {
             publicidadDialog?.dismiss()
         }
 
-        // Cargar imagen desde Firebase y ocultar texto cuando cargue
+        // Mostrar barra y simular progreso mientras carga
+        progressBar.visibility = View.VISIBLE
+        progressBar.progress = 0
+
+        var progreso = 0
+        val progresoHandler = Handler(Looper.getMainLooper())
+        val progresoRunnable = object : Runnable {
+            override fun run() {
+                if (progreso < 100) {
+                    progreso += 25  // carga mucho más rápido
+                    if (progreso > 100) progreso = 100
+                    progressBar.progress = progreso
+                    progresoHandler.postDelayed(this, 40) // cada 40ms
+                }
+            }
+        }
+        progresoHandler.post(progresoRunnable)
+
+        // Cargar imagen desde Firebase
         val folderRef = Firebase.storage.reference.child("FulltvPublicidad")
         folderRef.listAll().addOnSuccessListener { listResult ->
             val archivos = listResult.items
@@ -1336,11 +1354,22 @@ class PeliculasFragment : BrowseSupportFragment() {
                             .load(uri)
                             .into(imgPublicidad)
 
-                        // ✅ Ocultar el texto una vez se cargue la imagen
+                        // Ocultar barra y texto cuando termine
+                        progressBar.visibility = View.GONE
+                        progresoHandler.removeCallbacks(progresoRunnable)
                         textoPublicidad.visibility = View.GONE
                     }
+                }.addOnFailureListener {
+                    progressBar.visibility = View.GONE
+                    progresoHandler.removeCallbacks(progresoRunnable)
                 }
+            } else {
+                progressBar.visibility = View.GONE
+                progresoHandler.removeCallbacks(progresoRunnable)
             }
+        }.addOnFailureListener {
+            progressBar.visibility = View.GONE
+            progresoHandler.removeCallbacks(progresoRunnable)
         }
     }
 

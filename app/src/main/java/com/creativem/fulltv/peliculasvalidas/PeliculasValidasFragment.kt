@@ -3,9 +3,13 @@ package com.creativem.fulltv.peliculasvalidas
 import android.content.Intent
 import android.content.res.Resources
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.*
@@ -18,11 +22,12 @@ import com.creativem.fulltv.peliculas.CardPresenter  // Cambio aquí
 import com.creativem.fulltv.peliculas.PlayerPeliculas
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class PeliculasValidasFragment : RowsSupportFragment() {
     private val channels = ArrayObjectAdapter(ListRowPresenter())
-    private lateinit var progressBar: View
+    private lateinit var progressBar: ProgressBar
     private lateinit var loadingText: View
     private var backgroundImageView: ImageView? = null
 
@@ -42,6 +47,7 @@ class PeliculasValidasFragment : RowsSupportFragment() {
         progressBar = requireActivity().findViewById(R.id.progressBar)
         loadingText = requireActivity().findViewById(R.id.loadingText)
         backgroundImageView = requireActivity().findViewById(R.id.backgroundImageView)
+        layoutCargando = requireActivity().findViewById(R.id.layoutCargando)
 
         setOnItemViewClickedListener(ItemViewClickedListener())
         setOnItemViewSelectedListener(ItemViewSelectedListener())
@@ -68,16 +74,48 @@ class PeliculasValidasFragment : RowsSupportFragment() {
         }
     }
 
+    private lateinit var layoutCargando: LinearLayout
+
+    private var progreso = 0
+    private val progresoHandler = Handler(Looper.getMainLooper())
+    private val progresoRunnable = object : Runnable {
+        override fun run() {
+            if (progreso < 95) { // Simula solo hasta el 95%
+                progreso += 1     // Avanza más lento
+                progressBar.progress = progreso
+                progresoHandler.postDelayed(this, 100) // Cada 100 ms
+            }
+        }
+    }
 
     private fun mostrarCargando() {
+        progreso = 0
         progressBar.visibility = View.VISIBLE
         loadingText.visibility = View.VISIBLE
+        progressBar.progress = 0
+        progresoHandler.post(progresoRunnable) // Inicia simulación
     }
 
+
     private fun ocultarCargando() {
-        progressBar.visibility = View.GONE
-        loadingText.visibility = View.GONE
+        progresoHandler.removeCallbacks(progresoRunnable)
+
+        CoroutineScope(Dispatchers.Main).launch {
+            // Llenar hasta 100% más rápido (en ~100ms)
+            while (progreso < 100) {
+                progreso += 5
+                if (progreso > 100) progreso = 100
+                progressBar.progress = progreso
+                delay(10) // velocidad rápida
+            }
+
+            delay(100) // Pequeña pausa para que se vea completa
+            layoutCargando.visibility = View.GONE
+
+        }
     }
+
+
 
     private fun calcularElementosPorFila(): Int {
         val displayMetrics = Resources.getSystem().displayMetrics

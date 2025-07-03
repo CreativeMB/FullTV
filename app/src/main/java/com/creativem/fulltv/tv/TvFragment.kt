@@ -3,6 +3,8 @@ package com.creativem.fulltv.tv
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import androidx.core.content.ContextCompat
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.*
@@ -11,6 +13,7 @@ import com.creativem.fulltv.principal.Movie
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -19,7 +22,8 @@ class TvFragment : RowsSupportFragment() {
 
     private val db = FirebaseFirestore.getInstance()
     private val channels = ArrayObjectAdapter(ListRowPresenter())
-    private lateinit var progressBar: View
+    private lateinit var layoutCargando: LinearLayout
+    private lateinit var progressBar: ProgressBar
     private lateinit var loadingText: View
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,6 +41,8 @@ class TvFragment : RowsSupportFragment() {
         // Inicializar referencias
         progressBar = requireActivity().findViewById(R.id.progressBar)
         loadingText = requireActivity().findViewById(R.id.loadingText)
+        layoutCargando = requireActivity().findViewById(R.id.layoutCargando)
+
 
         loadTvChannels() // Cargar los canales antes de asignar el adapter
 
@@ -67,15 +73,44 @@ class TvFragment : RowsSupportFragment() {
         }
     }
 
-    private fun mostrarCargando() {
-        progressBar.visibility = View.VISIBLE
-        loadingText.visibility = View.VISIBLE
+
+    private var progreso = 0
+    private val progresoHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val progresoRunnable = object : Runnable {
+        override fun run() {
+            if (progreso < 95) {
+                progreso += 1
+                progressBar.progress = progreso
+                progresoHandler.postDelayed(this, 100)
+            }
+        }
     }
 
-    private fun ocultarCargando() {
-        progressBar.visibility = View.GONE
-        loadingText.visibility = View.GONE
+
+    private fun mostrarCargando() {
+        progreso = 0
+        layoutCargando.visibility = View.VISIBLE
+        progressBar.progress = 0
+        progresoHandler.post(progresoRunnable)
     }
+
+
+    private fun ocultarCargando() {
+        progresoHandler.removeCallbacks(progresoRunnable)
+
+        CoroutineScope(Dispatchers.Main).launch {
+            while (progreso < 100) {
+                progreso += 5
+                if (progreso > 100) progreso = 100
+                progressBar.progress = progreso
+                delay(10)
+            }
+
+            delay(100)
+            layoutCargando.visibility = View.GONE
+        }
+    }
+
 
 
     private fun calcularElementosPorFila(): Int {

@@ -9,6 +9,7 @@
     android:focusableInTouchMode="true">
 
 
+
     <!-- Imagen de la publicidad que llena la pantalla -->
     <ImageView
         android:id="@+id/imgPublicidad"
@@ -54,15 +55,27 @@
         android:id="@+id/tvPublicidadTexto"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Actualizando Biblioteca en línea..."
+        android:text="Actualizando contenido de Biblioteca en línea...\n\nCargando..."
         android:textSize="40sp"
         android:textStyle="bold"
         android:textColor="@color/colorSeekBar"
         android:gravity="center"
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="80dp"
-        android:padding="12dp" />
+        />
 
+    <ProgressBar
+        android:id="@+id/progressBarPublicidad"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:padding="15dp"
+        android:layout_marginTop="16dp"
+        android:progress="0"
+        android:max="100"
+        android:visibility="visible"
+        android:progressDrawable="@drawable/progress_bar_rojo"/>
 
 
 </FrameLayout>
