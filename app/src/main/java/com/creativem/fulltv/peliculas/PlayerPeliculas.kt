@@ -93,7 +93,7 @@ class PlayerPeliculas : AppCompatActivity() {
     private var isPlaybackActive = false // Indica si la reproducción ha sido activa
     private val playbackStartTime = AtomicLong(0) // Tiempo en que inicia la reproducción
     private var lastKnownPosition: Long = 0 // Para guardar la última posición conocida
-
+    private var menuAbierto = false
     private val handler = Handler(Looper.getMainLooper())
     private val hideControlsDelay = 5000L // 5 segundos
     private val updateInterval = 1000L    // 1 segundo
@@ -114,12 +114,12 @@ class PlayerPeliculas : AppCompatActivity() {
         binding = PlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-
-        initializeRecyclerView() // Configura el RecyclerView con un adaptador vacío
-        loadMovies()
-        setupControlTimers()
+        initializeRecyclerView()
         activarListenersEnControles()
-              auth = FirebaseAuth.getInstance()
+        setupControlTimers()
+        loadMovies()
+
+        auth = FirebaseAuth.getInstance()
         firestore = FirebaseFirestore.getInstance()
 
         binding.reproductor.useController = false
@@ -298,27 +298,26 @@ class PlayerPeliculas : AppCompatActivity() {
         }
     }
 
-        private fun mostarpelis() {
+    private fun mostarpelis() {
         val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
-        val isVisible = menuPelis.visibility == View.VISIBLE
 
-        if (isVisible) {
+        if (menuAbierto) {
             menuPelis.animate()
                 .alpha(0f)
                 .setDuration(200)
                 .withEndAction {
                     menuPelis.visibility = View.GONE
                     menuPelis.alpha = 1f
+                    menuAbierto = false
                 }
                 .start()
         } else {
             menuPelis.visibility = View.VISIBLE
             menuPelis.alpha = 1f
-            menuPelis.requestFocus() // importante si usas navegación con control remoto
+            menuPelis.requestFocus()
+            menuAbierto = true
         }
     }
-
-
 
     private fun initializeRecyclerView() {
         // Crear el adaptador inicialmente con una lista vacía
@@ -958,14 +957,11 @@ class PlayerPeliculas : AppCompatActivity() {
                 val elapsed = now - lastInteractionTime
 
                 val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
-                val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
-
 
                 val controlesTienenFoco = tieneFocoEnHijos(controles)
-                val menuTieneFoco = tieneFocoEnHijos(menuPelis)
 
-                if (elapsed >= hideControlsDelay && !controlesTienenFoco && !menuTieneFoco) {
-                    // Ocultar controles con animación
+                if (elapsed >= hideControlsDelay && !controlesTienenFoco && !menuAbierto) {
+                    // Ocultar controles
                     controles.animate()
                         .alpha(0f)
                         .setDuration(300)
@@ -974,20 +970,15 @@ class PlayerPeliculas : AppCompatActivity() {
                             controles.alpha = 1f
                         }
                         .start()
-
-                    if (menuPelis.visibility == View.VISIBLE) {
-                        menuPelis.animate()
-                            .alpha(0f)
-                            .setDuration(200)
-                            .withEndAction {
-                                menuPelis.visibility = View.GONE
-                                menuPelis.alpha = 1f
-                            }
-                            .start()
-                    }
-                } else {
-                    handler.postDelayed(this, 1000)
                 }
+
+                // Si el menú sigue abierto y no hay interacción, lo cerramos
+                if (elapsed >= hideControlsDelay && menuAbierto) {
+                    mostarpelis()
+                }
+
+                // Continuar verificando cada segundo
+                handler.postDelayed(this, 1000)
             }
         }
 
@@ -1040,8 +1031,7 @@ class PlayerPeliculas : AppCompatActivity() {
         val controles = binding.reproductor.findViewById<ViewGroup>(R.id.controles_reproductor)
         val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
 
-
-        // Listeners para cada control dentro del contenedor de controles
+        // Escucha interacción en cada botón de los controles
         for (i in 0 until controles.childCount) {
             val child = controles.getChildAt(i)
 
@@ -1065,17 +1055,17 @@ class PlayerPeliculas : AppCompatActivity() {
             }
         }
 
-        // Listeners adicionales para el menú de películas
+        // Escuchar interacción en el RecyclerView del menú de películas
         menuPelis.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) showControlsAndResetTimer()
         }
 
-        menuPelis.setOnKeyListener { _, _, _ ->
+        menuPelis.setOnTouchListener { _, _ ->
             showControlsAndResetTimer()
             false
         }
 
-        menuPelis.setOnTouchListener { _, _ ->
+        menuPelis.setOnKeyListener { _, _, _ ->
             showControlsAndResetTimer()
             false
         }
@@ -1085,6 +1075,7 @@ class PlayerPeliculas : AppCompatActivity() {
             false
         }
     }
+
 
 
     private fun togglePlayPause() {
