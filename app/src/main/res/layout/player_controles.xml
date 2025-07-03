@@ -1,166 +1,170 @@
 <?xml version="1.0" encoding="utf-8"?>
-<merge xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:background="@android:color/transparent">
 
-    <!-- Fondo para los controles -->
+    <!-- Fondo requerido por ExoPlayer -->
     <View
         android:id="@id/exo_controls_background"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:background="#00000000" />
 
-    <FrameLayout
+    <!-- Contenedor inferior para imagen + controles -->
+    <LinearLayout
         android:id="@+id/controles_reproductor"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="@color/colorBarra"
-        android:padding="5dp">
+        android:orientation="horizontal"
+        android:gravity="bottom|center_vertical"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
+        <!-- Imagen de la película más grande -->
+        <ImageView
+            android:id="@+id/imagenPelicula"
+            android:layout_width="150dp"
+            android:layout_height="230dp"
+            android:scaleType="fitXY"
+            android:src="@drawable/icono"
+            android:contentDescription="Imagen de la película" />
+
+        <!-- Controles del reproductor -->
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:padding="5dp">
+            android:layout_weight="1"
+            android:background="@color/colorBarra"
+            android:orientation="vertical"
+            android:gravity="center_vertical">
 
-            <!-- Imagen de la película a la izquierda -->
-            <ImageView
-                android:id="@+id/imagenPelicula"
-                android:layout_width="70dp"
-                android:layout_height="100dp"
-                android:contentDescription="Imagen de la película"
-                android:scaleType="fitCenter"
-                android:src="@drawable/icono"
-                android:layout_marginEnd="10dp" />
-
-            <!-- Contenedor de controles a la derecha -->
-            <LinearLayout
-                android:layout_width="0dp"
+            <!-- Nombre de la película -->
+            <TextView
+                android:id="@+id/nombrePelicula"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:ellipsize="marquee"
+                android:focusable="true"
+                android:layout_marginStart="15dp"
+                android:focusableInTouchMode="true"
+                android:gravity="start"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:scrollHorizontally="true"
+                android:singleLine="true"
+                android:text="Nombre película"
+                android:textColor="@color/exo_button_color"
+                android:textSize="25sp"
+                android:textStyle="bold" />
 
-                <!-- Nombre de la película -->
+            <!-- Barra de progreso -->
+            <SeekBar
+                android:id="@+id/progreso"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="15dp"
+                android:background="@drawable/button_selector"
+                android:max="100"
+                android:progressTint="@color/colorSeekBar"
+                android:thumbTint="@color/colorSeekBar1"
+                android:layout_marginTop="5dp" />
+
+            <!-- Controles inferiores -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginStart="15dp"
+                android:gravity="center_vertical"
+                android:paddingTop="5dp"
+                android:weightSum="3">
+
+                <!-- Tiempo reproducido -->
                 <TextView
-                    android:id="@+id/nombrePelicula"
-                    android:layout_width="match_parent"
+                    android:id="@+id/tiemporeproducido"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:ellipsize="marquee"
-                    android:focusable="true"
-                    android:focusableInTouchMode="true"
+                    android:layout_weight="0.6"
                     android:gravity="start"
-                    android:marqueeRepeatLimit="marquee_forever"
-                    android:scrollHorizontally="true"
-                    android:singleLine="true"
-                    android:text="Nombre película"
+                    android:layout_marginStart="5dp"
+                    android:text="0:00"
                     android:textColor="@color/exo_button_color"
                     android:textSize="25sp"
                     android:textStyle="bold" />
 
-                <!-- Barra de progreso -->
-                <SeekBar
-                    android:id="@+id/progreso"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/button_selector"
-                    android:max="100"
-                    android:progressTint="@color/colorSeekBar"
-                    android:thumbTint="@color/colorSeekBar1"
-                    android:layout_marginTop="5dp" />
-
-                <!-- Controles básicos en una fila -->
+                <!-- Botones -->
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1.8"
                     android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingTop="5dp"
-                    android:weightSum="3">
-
-                    <!-- Tiempo reproducido (Izquierda) -->
-                    <TextView
-                        android:id="@+id/tiemporeproducido"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="start"
-                        android:layout_marginStart="5dp"
-                        android:text="0:00"
-                        android:textColor="@color/exo_button_color"
-                        android:textSize="25sp"
-                        android:textStyle="bold" />
-
-                    <!-- Contenedor de botones (Centro) -->
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="horizontal"
-                        android:gravity="center"
-                        android:layout_marginHorizontal="5dp">
-
-                        <ImageButton
-                            android:id="@+id/play_pause"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:background="@drawable/button_selector"
-                            android:scaleType="fitCenter"
-                            android:src="@drawable/ic_play"
-                            app:tint="@color/exo_button_color" />
-                        <ImageButton
-                            android:id="@+id/render"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:background="@drawable/button_selector"
-                            android:scaleType="fitCenter"
-                            android:src="@drawable/ic_render"
-                            app:tint="@color/exo_button_color" />
-
-                        <ImageButton
-                            android:id="@+id/lista_pelis"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:background="@drawable/button_selector"
-                            android:scaleType="fitCenter"
-                            android:src="@drawable/pelis_menu"
-                            app:tint="@color/exo_button_color" />
+                    android:layout_marginHorizontal="5dp">
 
 
-                        <ImageButton
-                            android:id="@+id/pedidos"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:background="@drawable/button_selector"
-                            android:scaleType="fitCenter"
-                            android:src="@drawable/pago"
-                            app:tint="@color/exo_button_color" />
 
-                        <ImageButton
-                            android:id="@+id/home"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:background="@drawable/button_selector"
-                            android:scaleType="fitCenter"
-                            android:src="@drawable/ic_cineflex"
-                            app:tint="@color/exo_button_color" />
-                    </LinearLayout>
+                    <ImageButton
+                        android:id="@+id/render"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/button_selector"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_render"
+                        app:tint="@color/exo_button_color" />
 
-                    <!-- Tiempo total restante (Derecha) -->
-                    <TextView
-                        android:id="@+id/tiempototal"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="end"
-                        android:layout_marginEnd="10dp"
-                        android:text="-0:00"
-                        android:textColor="@color/exo_button_color"
-                        android:textSize="25sp"
-                        android:textStyle="bold" />
+
+
+                    <ImageButton
+                        android:id="@+id/pedidos"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/button_selector"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/pago"
+                        app:tint="@color/exo_button_color" />
+
+                    <ImageButton
+                        android:id="@+id/home"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/button_selector"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_cineflex"
+                        app:tint="@color/exo_button_color" />
+                    <ImageButton
+                        android:id="@+id/play_pause"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/button_selector"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_play"
+                        app:tint="@color/exo_button_color" />
+                    <ImageButton
+                        android:id="@+id/lista_pelis"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/button_selector"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/pelis_menu"
+                        app:tint="@color/exo_button_color" />
                 </LinearLayout>
 
+                <!-- Tiempo total restante -->
+                <TextView
+                    android:id="@+id/tiempototal"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0.6"
+                    android:gravity="end"
+                    android:layout_marginEnd="10dp"
+                    android:text="-0:00"
+                    android:textColor="@color/exo_button_color"
+                    android:textSize="25sp"
+                    android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
-    </FrameLayout>
-</merge>
+    </LinearLayout>
+</FrameLayout>

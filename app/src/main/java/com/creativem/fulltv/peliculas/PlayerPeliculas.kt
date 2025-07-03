@@ -51,12 +51,14 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
 import org.json.JSONObject
 import android.graphics.Color
+import android.os.CountDownTimer
 
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.widget.ImageView
+import androidx.activity.addCallback
 import com.bumptech.glide.Glide
 
 import com.creativem.fulltv.databinding.PlayerBinding
@@ -64,8 +66,10 @@ import com.creativem.fulltv.principal.Nosotros
 
 
 import androidx.annotation.OptIn
+import androidx.lifecycle.lifecycleScope
 
 import androidx.media3.common.util.UnstableApi
+import java.util.concurrent.TimeUnit
 
 
 @Suppress("DEPRECATION")
@@ -126,16 +130,18 @@ class PlayerPeliculas : AppCompatActivity() {
             nombrePeliculaTextView.text = movieTitle
 
             Glide.with(this)
-                .load( movieImageUrl)
+                .load(movieImageUrl)
                 .placeholder(R.drawable.icono)
                 .error(R.drawable.icono)
                 .into(imagenPeliculaImageView)
 
             if (streamUrl.isEmpty()) {
                 showErrorDialog(movieTitle, movieYear)
-                return
+                return@let
             }
+
         }
+
         val textHora = binding.textHora
         val textfecha = binding.textfecha
         val reloj = Reloj(textHora, textfecha)
@@ -148,6 +154,13 @@ class PlayerPeliculas : AppCompatActivity() {
         binding.reproductor.player = player
         initializePlayer()
 
+        lifecycleScope.launch {
+            // Esperar a que las validaciones estén listas
+            validacioneslista.esperarCarga()
+
+            // Luego cargar las películas al RecyclerView del menú
+            loadMovies()
+        }
 
         val menupelis = binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis)
         menupelis.setOnClickListener {
@@ -221,13 +234,55 @@ class PlayerPeliculas : AppCompatActivity() {
         showControlsAndResetTimer() // Mostrar controles al inicio
         handler.postDelayed(runnableActualizar, updateInterval)
         actualizarTiempo()
+
+
+        onBackPressedDispatcher.addCallback(this) {
+            val menuVisible = binding.recyclerMoviesMenu.visibility == View.VISIBLE
+            val controlesVisibles = binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility == View.VISIBLE
+
+            when {
+                menuVisible -> {
+                    binding.recyclerMoviesMenu.animate()
+                        .alpha(0f)
+                        .setDuration(200)
+                        .withEndAction {
+                            binding.recyclerMoviesMenu.visibility = View.GONE
+                            binding.recyclerMoviesMenu.alpha = 1f
+                        }
+                        .start()
+                }
+
+                controlesVisibles -> {
+                    binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.GONE
+                }
+
+                else -> {
+                    finish()
+                }
+            }
+        }
+
+
     }
 
     private fun mostarpelis() {
-        Log.e("PlayerPeliculas", "clki menupelis")
-        binding.recyclerMoviesMenu.visibility =
-            if (binding.recyclerMoviesMenu.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        val isVisible = binding.recyclerMoviesMenu.visibility == View.VISIBLE
+
+        if (isVisible) {
+            binding.recyclerMoviesMenu.animate()
+                .alpha(0f)
+                .setDuration(200)
+                .withEndAction {
+                    binding.recyclerMoviesMenu.visibility = View.GONE
+                    binding.recyclerMoviesMenu.alpha = 1f
+                }
+                .start()
+        } else {
+            binding.recyclerMoviesMenu.visibility = View.VISIBLE
+            binding.recyclerMoviesMenu.alpha = 1f
+        }
     }
+
 
     private fun initializeRecyclerView() {
         // Crear el adaptador inicialmente con una lista vacía
@@ -276,8 +331,6 @@ class PlayerPeliculas : AppCompatActivity() {
 
 
     private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieYear: String, movieImageUrl: String) {
-        // Crea un Intent para abrir PlayerPeliculas
-        val intent = Intent(this, PlayerPeliculas::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP) // Limpia la pila de actividades
         // Envía la URL de transmisión y el título de la película como extras
         intent.putExtra("EXTRA_STREAM_URL", streamUrl)
@@ -430,13 +483,16 @@ class PlayerPeliculas : AppCompatActivity() {
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            // Cambia el comportamiento dependiendo si se está reproduciendo
+            val playPauseButton = findViewById<ImageButton>(R.id.play_pause)
             if (isPlaying) {
-                handler.postDelayed(runnableOcultar, hideControlsDelay) // Oculta controles después de un tiempo
+                handler.postDelayed(runnableOcultar, hideControlsDelay)
+                playPauseButton.setImageResource(R.drawable.ic_play)
             } else {
-                handler.removeCallbacks(runnableOcultar) // Remueve el runnable si no se está reproduciendo
+                handler.removeCallbacks(runnableOcultar)
+                playPauseButton.setImageResource(R.drawable.ic_stop)
             }
         }
+
 
         override fun onPlayerError(error: PlaybackException) {
 
@@ -827,18 +883,6 @@ class PlayerPeliculas : AppCompatActivity() {
         }
     }
 
-    @Deprecated("This method has been deprecated in favor of using the\n      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.\n      The OnBackPressedDispatcher controls how back button events are dispatched\n      to one or more {@link OnBackPressedCallback} objects.")
-    override fun onBackPressed() {
-        super.onBackPressed()
-        // Si el GridView es visible, simplemente ocultarlo
-        if (binding.recyclerMoviesMenu.visibility == View.VISIBLE) {
-            binding.recyclerMoviesMenu.visibility = View.GONE
-        } else {
-            // Finaliza la actividad al presionar "atrás"
-            finish()
-        }
-    }
-
     private fun showControlsAndResetTimer() {
         binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.VISIBLE
         // Reinicia el temporizador
@@ -855,16 +899,24 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
     private fun togglePlayPause() {
-        val player = binding.reproductor.player // Accede al reproductor desde PlayerView
+        val player = binding.reproductor.player
+        val playPauseButton = findViewById<ImageButton>(R.id.play_pause)
 
         if (player != null) {
             if (player.isPlaying) {
                 player.pause()
+                playPauseButton.setImageResource(R.drawable.ic_stop)
             } else {
                 player.play()
+                playPauseButton.setImageResource(R.drawable.ic_play)
+
+                // ✅ Reiniciar contador de tiempo manualmente
+                handler.removeCallbacks(runnableActualizar)
+                handler.post(runnableActualizar) // Esto reactiva actualizarTiempo()
             }
         }
     }
+
 
     // Función para alternar entre pantalla completa y vista normal
     private var currentAspectRatioMode = 0
@@ -885,34 +937,37 @@ class PlayerPeliculas : AppCompatActivity() {
     private fun actualizarTiempo() {
         if (player != null && player!!.isPlaying) {
             MainScope().launch {
-                val tiemporeproducido =
-                    binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido)
+                val tiemporeproducido = binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido)
                 val tiempototal = binding.reproductor.findViewById<TextView>(R.id.tiempototal)
                 val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
-                Log.d("PlayerPeliculas", "actualizarTiempo() llamado")
 
                 val posicionActual = player?.currentPosition ?: 0
                 val duracionTotal = player?.duration ?: 0
-                Log.d(
-                    "PlayerPeliculas",
-                    "Posición actual: $posicionActual, Duración total: $duracionTotal"
-                )
+                val tiempoRestante = duracionTotal - posicionActual
 
+                // Mostrar tiempo reproducido
                 tiemporeproducido.text = tiempoFormateado(posicionActual)
-                tiempototal.text = tiempoFormateado(duracionTotal)
 
+                // Mostrar tiempo restante (hacia atrás)
+                if (tiempoRestante > 0) {
+                    val h = TimeUnit.MILLISECONDS.toHours(tiempoRestante)
+                    val m = TimeUnit.MILLISECONDS.toMinutes(tiempoRestante) % 60
+                    val s = TimeUnit.MILLISECONDS.toSeconds(tiempoRestante) % 60
+                    tiempototal.text = String.format("⏳ %02d:%02d:%02d", h, m, s)
+                } else {
+                    tiempototal.text = "⛔ Finalizado"
+                }
+
+                // Avance del SeekBar
                 if (duracionTotal > 0) {
                     val progress = (posicionActual.toFloat() / duracionTotal * 100).toInt()
                     seekBar.progress = progress
-                    Log.d("PlayerPeliculas", "SeekBar progress: $progress")
-
                     handler.postDelayed(runnableActualizar, updateInterval)
                 }
             }
-        } else {
-            Log.d("PlayerPeliculas", "El reproductor no está listo o no está reproduciendo")
         }
     }
+
 
     private fun tiempoFormateado(tiempoMs: Long): String {
         return DateUtils.formatElapsedTime(tiempoMs / 1000)

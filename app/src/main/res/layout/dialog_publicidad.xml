@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/publicidadOverlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/colorPrimary"
+    android:focusable="true"
+    android:focusableInTouchMode="true">
+
+
+    <!-- Imagen de la publicidad que llena la pantalla -->
+    <ImageView
+        android:id="@+id/imgPublicidad"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY" />
+
+    <!-- Contenedor del contador y botón cerrar -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:background="@color/colorPrimary"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="10dp">
+
+        <TextView
+            android:id="@+id/txtContadorPublicidad"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:text="5 s"
+            android:textColor="#E53935"
+            android:textSize="40sp"
+            android:gravity="center"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btnCerrarPublicidad"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:background="@android:color/transparent"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:scaleType="fitCenter"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:contentDescription="Cerrar publicidad"
+            app:tint="#E53935" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvPublicidadTexto"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Actualizando Biblioteca en línea..."
+        android:textSize="40sp"
+        android:textStyle="bold"
+        android:textColor="@color/colorSeekBar"
+        android:gravity="center"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="80dp"
+        android:padding="12dp" />
+
+
+
+</FrameLayout>

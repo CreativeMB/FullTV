@@ -209,53 +209,5 @@
             android:textStyle="bold" />
     </FrameLayout>
 
-    <FrameLayout
-        android:id="@+id/publicidadOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone"
-        android:background="#CC000000">
-
-        <ImageView
-            android:id="@+id/imgPublicidad"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="fitXY" />
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|end"
-            android:orientation="horizontal"
-            android:padding="10dp"
-            android:background="@color/colorPrimary"
-            android:layout_marginTop="10dp"
-            android:layout_marginEnd="10dp">
-
-            <TextView
-                android:id="@+id/txtContadorPublicidad"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:text="5 S"
-                android:textColor="#E53935"
-                android:textSize="40sp"
-                android:gravity="center"
-                android:textStyle="bold" />
-
-            <ImageButton
-                android:id="@+id/btnCerrarPublicidad"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:background="@android:color/transparent"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
-                app:tint="#E53935"
-                android:scaleType="fitCenter" />
-
-        </LinearLayout>
-
-    </FrameLayout>
-
-
-
 
 </FrameLayout>

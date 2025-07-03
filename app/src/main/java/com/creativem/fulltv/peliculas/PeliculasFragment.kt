@@ -250,11 +250,13 @@ class PeliculasFragment : BrowseSupportFragment() {
             } else if (item is Movie) {
                 val intent = Intent(context, PlayerPeliculas::class.java)
                 intent.putExtra("EXTRA_STREAM_URL", item.streamUrl)
-                intent.putExtra("EXTRA_MOVIE_TITLE", item.title) // Título de la película
-                intent.putExtra("EXTRA_MOVIE_YEAR", item.year) // Año de la película
+                intent.putExtra("EXTRA_MOVIE_TITLE", item.title)
+                intent.putExtra("EXTRA_MOVIE_YEAR", item.year)
                 intent.putExtra("EXTRA_MOVIE_IMAGE_URL", item.imageUrl)
+                intent.putExtra("EXTRA_COUNTDOWN", item.countdownMinutes)
                 startActivity(intent)
             }
+
 
 
         }
@@ -280,8 +282,12 @@ class PeliculasFragment : BrowseSupportFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+
+
+
         CoroutineScope(Dispatchers.IO).launch {
             validacioneslista.cargarPeliculas()
+
             // ⚠️ Cambio importante: actualizar etiquetas en el hilo principal
             withContext(Dispatchers.Main) {
                 actualizarSoloEtiquetas()
@@ -914,10 +920,13 @@ class PeliculasFragment : BrowseSupportFragment() {
 
     private fun irAlReproductor(movie: Movie) {
         val intent = Intent(context, PlayerPeliculas::class.java).apply {
-            putExtra("EXTRA_STREAM_URL", movie.streamUrl)  // Pasa el URL del stream
-            putExtra("EXTRA_MOVIE_TITLE", movie.title)     // Pasa el título de la película
+            putExtra("EXTRA_STREAM_URL", movie.streamUrl)
+            putExtra("EXTRA_MOVIE_TITLE", movie.title)
             putExtra("EXTRA_MOVIE_YEAR", movie.year)
-            putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)// Pasa el año de la película
+            putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
+            putExtra("EXTRA_COUNTDOWN", movie.countdownMinutes)
+            putExtra("EXTRA_CREATED_AT", movie.createdAt.seconds)
+
         }
         startActivity(intent) // Inicia la actividad del reproductor
     }
@@ -1273,45 +1282,29 @@ class PeliculasFragment : BrowseSupportFragment() {
     private var publicidadDialog: Dialog? = null
 
     private fun mostrarPublicidad() {
-        if (!isAdded) return
+        if (!isAdded || publicidadDialog?.isShowing == true) return
 
-        val rootView = requireActivity().findViewById<View>(R.id.main)
-        val overlay = rootView.findViewById<View>(R.id.publicidadOverlay)
-        val imgPublicidad = rootView.findViewById<ImageView>(R.id.imgPublicidad)
-        val btnCerrar = rootView.findViewById<ImageButton>(R.id.btnCerrarPublicidad)
-        val txtContador = rootView.findViewById<TextView>(R.id.txtContadorPublicidad)
+        val inflater = LayoutInflater.from(requireContext())
+        val view = inflater.inflate(R.layout.dialog_publicidad, null)
 
-        overlay.visibility = View.VISIBLE
-        txtContador.text = "10 s"
+        val imgPublicidad = view.findViewById<ImageView>(R.id.imgPublicidad)
+        val btnCerrar = view.findViewById<ImageButton>(R.id.btnCerrarPublicidad)
+        val txtContador = view.findViewById<TextView>(R.id.txtContadorPublicidad)
+        val textoPublicidad = view.findViewById<TextView>(R.id.tvPublicidadTexto)
 
-        val folderRef = Firebase.storage.reference.child("FulltvPublicidad")
-
-        folderRef.listAll().addOnSuccessListener { listResult ->
-            val archivos = listResult.items
-            if (archivos.isNotEmpty()) {
-                val imagenAleatoria = archivos.random()
-
-                imagenAleatoria.downloadUrl.addOnSuccessListener { uri ->
-                    if (isAdded) {
-                        Glide.with(requireContext())
-                            .load(uri)
-                            .into(imgPublicidad)
-                    }
-                }.addOnFailureListener {
-                    Toast.makeText(requireContext(), "Error al obtener imagen", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                Toast.makeText(requireContext(), "No hay imágenes en FulltvPublicidad", Toast.LENGTH_SHORT).show()
-            }
-        }.addOnFailureListener {
-            Toast.makeText(requireContext(), "Error al cargar publicidad", Toast.LENGTH_SHORT).show()
+        publicidadDialog = Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen).apply {
+            setContentView(view)
+            setCancelable(false)
+            show()
         }
 
-        btnCerrar.setOnClickListener {
-            overlay.visibility = View.GONE
-        }
+        // Foco inicial al botón cerrar
+        btnCerrar.isFocusableInTouchMode = true
+        btnCerrar.requestFocus()
 
+        // Contador regresivo
         var segundosRestantes = 10
+        txtContador.text = "$segundosRestantes s"
         val handler = Handler(Looper.getMainLooper())
         val runnable = object : Runnable {
             override fun run() {
@@ -1320,27 +1313,35 @@ class PeliculasFragment : BrowseSupportFragment() {
                     txtContador.text = "$segundosRestantes s"
                     handler.postDelayed(this, 1000)
                 } else {
-                    overlay.visibility = View.GONE
+                    publicidadDialog?.dismiss()
                 }
             }
         }
-
         handler.postDelayed(runnable, 1000)
-    }
 
-
-    // Método seguro para cerrar el diálogo
-    private fun dismissDialog() {
-        if (isAdded && publicidadDialog?.isShowing == true) {
+        // Cerrar manualmente
+        btnCerrar.setOnClickListener {
             publicidadDialog?.dismiss()
-            publicidadDialog = null
         }
-    }
 
-    // Asegurar que el diálogo se cierre correctamente si el fragmento se destruye
-    override fun onDestroyView() {
-        dismissDialog()
-        super.onDestroyView()
+        // Cargar imagen desde Firebase y ocultar texto cuando cargue
+        val folderRef = Firebase.storage.reference.child("FulltvPublicidad")
+        folderRef.listAll().addOnSuccessListener { listResult ->
+            val archivos = listResult.items
+            if (archivos.isNotEmpty()) {
+                val imagenAleatoria = archivos.random()
+                imagenAleatoria.downloadUrl.addOnSuccessListener { uri ->
+                    if (isAdded) {
+                        Glide.with(requireContext())
+                            .load(uri)
+                            .into(imgPublicidad)
+
+                        // ✅ Ocultar el texto una vez se cargue la imagen
+                        textoPublicidad.visibility = View.GONE
+                    }
+                }
+            }
+        }
     }
 
 

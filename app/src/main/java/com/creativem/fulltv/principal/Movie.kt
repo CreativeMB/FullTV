@@ -16,6 +16,7 @@ data class Movie(
     var isActive: Boolean = true,
     val casTV: String = "",
     val countdownMinutes: Int = 0
+
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
         parcel.readString() ?: "",
