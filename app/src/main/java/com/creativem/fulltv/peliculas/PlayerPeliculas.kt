@@ -667,6 +667,7 @@ class PlayerPeliculas : AppCompatActivity() {
         }
 
         val alertDialog = AlertDialog.Builder(this)
+
             .setView(dialogView)
             .setNegativeButton("Volver al contenido") { dialog, _ ->
                 dialog.dismiss()
@@ -679,6 +680,7 @@ class PlayerPeliculas : AppCompatActivity() {
                 dialog.dismiss()
             }
             .create()
+        dialogView.setBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary))
 
         alertDialog.setOnShowListener {
             // Botones

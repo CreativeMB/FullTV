@@ -3,6 +3,7 @@ package com.creativem.fulltv.tv
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -29,6 +30,7 @@ import android.text.format.DateUtils
 import android.widget.ImageView
 import androidx.annotation.OptIn
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -143,9 +145,8 @@ class PlayerTv : AppCompatActivity() {
                     dialog.dismiss()
                 }
                 .create()
-
             alertDialog.setOnShowListener {
-                alertDialog.window?.setBackgroundDrawableResource(R.color.textColorPrimary) // Reemplaza con tu color
+                alertDialog.window?.setBackgroundDrawable(ColorDrawable(ContextCompat.getColor(this, R.color.exo_progress_color)))
             }
 
             alertDialog.show()
