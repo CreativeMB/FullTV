@@ -55,14 +55,15 @@
         android:id="@+id/tvPublicidadTexto"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Actualizando contenido de Biblioteca en línea...\n\nCargando..."
+        android:layout_marginTop="16dp"
+        android:text="Actualizando biblioteca de Pelis gratis\n\nCargando..."
+        android:textColor="@color/redpersonalisado"
         android:textSize="40sp"
         android:textStyle="bold"
-        android:textColor="@color/colorSeekBar"
         android:gravity="center"
-        android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="80dp"
-        />
+        android:layout_gravity="bottom|center_horizontal"
+        android:textAlignment="center"/>
 
     <ProgressBar
         android:id="@+id/progressBarPublicidad"
