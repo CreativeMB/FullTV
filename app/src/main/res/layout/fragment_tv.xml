@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/layoutCargando"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -29,6 +29,8 @@
             android:textSize="40sp"
             android:textStyle="bold"
             android:gravity="center"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="80dp"
             android:textAlignment="center" />
         <ProgressBar
             android:id="@+id/progressBar"
@@ -42,6 +44,6 @@
             android:max="100"
             android:visibility="visible"
             android:progressDrawable="@drawable/progress_bar_rojo"/>
-    </LinearLayout>
+    </FrameLayout>
 
 </FrameLayout>

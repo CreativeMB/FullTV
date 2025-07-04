@@ -27,15 +27,13 @@
         android:textSize="18sp"
         android:textStyle="bold" />
 
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/layoutCargando"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="center"
         android:background="@color/colorPrimary"
         android:orientation="vertical">
-
-
 
         <TextView
             android:id="@+id/loadingText"
@@ -47,6 +45,8 @@
             android:textSize="40sp"
             android:textStyle="bold"
             android:gravity="center"
+            android:layout_marginBottom="80dp"
+            android:layout_gravity="bottom|center_horizontal"
             android:textAlignment="center" />
         <ProgressBar
             android:id="@+id/progressBar"
@@ -60,7 +60,7 @@
             android:max="100"
             android:visibility="visible"
             android:progressDrawable="@drawable/progress_bar_rojo"/>
-    </LinearLayout>
+    </FrameLayout>
 
 </FrameLayout>
 
