@@ -212,10 +212,6 @@ class PlayerTv : AppCompatActivity() {
         }
     }
 
-
-
-
-
     private fun initializeRecyclerView() {
         adapter = TvMenuAdapter(this, mutableListOf()) { movie ->
             startMoviePlayback(movie.streamUrl, movie.title, movie.imageUrl)
@@ -544,19 +540,15 @@ class PlayerTv : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        showControlsAndResetTimer()
-
         val teclasAtras = setOf(
-            KeyEvent.KEYCODE_BACK,         // 4
-            KeyEvent.KEYCODE_ESCAPE,       // 111
-            KeyEvent.KEYCODE_BUTTON_B,     // 97 (Botón B en gamepad)
-            158,                           // Algunos controles físicos
-            172                            // Otros remotos
+            KeyEvent.KEYCODE_BACK,
+            KeyEvent.KEYCODE_ESCAPE,
+            KeyEvent.KEYCODE_BUTTON_B,
+            158, 172
         )
 
         return when (keyCode) {
-
-            // ✅ Teclas para mostrar u ocultar el menú de películas
+            // ✅ Teclas que muestran el menú
             KeyEvent.KEYCODE_MENU,
             KeyEvent.KEYCODE_PAGE_UP,
             KeyEvent.KEYCODE_PAGE_DOWN,
@@ -589,5 +581,6 @@ class PlayerTv : AppCompatActivity() {
             else -> super.onKeyDown(keyCode, event)
         }
     }
+
 
 }
