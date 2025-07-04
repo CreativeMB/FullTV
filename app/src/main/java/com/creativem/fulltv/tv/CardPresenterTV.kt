@@ -2,6 +2,7 @@ package com.creativem.fulltv.tv
 
 import android.content.Intent
 import android.graphics.Color
+import android.text.TextUtils
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.leanback.widget.ImageCardView
@@ -35,12 +36,16 @@ class CardPresenterTV : Presenter() {
             val titleTextView: TextView = getTextViewFromCard(cardView, "mTitleView")
             // Modificar el tamaño y color del texto
             titleTextView.apply {
-                textSize = 16f
-                maxLines = 2
+                textSize = 18f
+                maxLines = 1
                 setTextColor(Color.WHITE)
-                setLines(2) // 🔹 Asegura que siempre sean 3 líneas visibles
-                setLineSpacing(1f, 1f) // 🔹 Ajusta el espaciado entre líneas
-                text = if (text.isNullOrEmpty()) "\n" else text // 🔹 Agrega espacios si está vacío
+                isSingleLine = true
+                ellipsize = TextUtils.TruncateAt.MARQUEE
+                marqueeRepeatLimit = -1
+                isFocusable = true
+                isFocusableInTouchMode = true
+                setHorizontallyScrolling(true)
+                setOnFocusChangeListener { v, hasFocus -> v.isSelected = hasFocus }
             }
 
             // Cargar imagen con Glide
