@@ -7,8 +7,8 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.leanback.app.RowsSupportFragment
@@ -30,7 +30,7 @@ class PeliculasValidasFragment : RowsSupportFragment() {
     private lateinit var progressBar: ProgressBar
     private lateinit var loadingText: View
     private var backgroundImageView: ImageView? = null
-
+    private lateinit var loadingContainer: FrameLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,7 +47,7 @@ class PeliculasValidasFragment : RowsSupportFragment() {
         progressBar = requireActivity().findViewById(R.id.progressBar)
         loadingText = requireActivity().findViewById(R.id.loadingText)
         backgroundImageView = requireActivity().findViewById(R.id.backgroundImageView)
-        layoutCargando = requireActivity().findViewById(R.id.layoutCargando)
+        loadingContainer = requireActivity().findViewById(R.id.layoutCargando)
 
         setOnItemViewClickedListener(ItemViewClickedListener())
         setOnItemViewSelectedListener(ItemViewSelectedListener())
@@ -73,8 +73,6 @@ class PeliculasValidasFragment : RowsSupportFragment() {
             }
         }
     }
-
-    private lateinit var layoutCargando: LinearLayout
 
     private var progreso = 0
     private val progresoHandler = Handler(Looper.getMainLooper())
@@ -110,7 +108,7 @@ class PeliculasValidasFragment : RowsSupportFragment() {
             }
 
             delay(100) // Pequeña pausa para que se vea completa
-            layoutCargando.visibility = View.GONE
+            loadingContainer.visibility = View.GONE
 
         }
     }

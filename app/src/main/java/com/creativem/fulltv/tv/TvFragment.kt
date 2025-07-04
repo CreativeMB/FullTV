@@ -3,7 +3,7 @@ package com.creativem.fulltv.tv
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.widget.LinearLayout
+import android.widget.FrameLayout
 import android.widget.ProgressBar
 import androidx.core.content.ContextCompat
 import androidx.leanback.app.RowsSupportFragment
@@ -22,7 +22,7 @@ class TvFragment : RowsSupportFragment() {
 
     private val db = FirebaseFirestore.getInstance()
     private val channels = ArrayObjectAdapter(ListRowPresenter())
-    private lateinit var layoutCargando: LinearLayout
+    private lateinit var loadingContainer: FrameLayout
     private lateinit var progressBar: ProgressBar
     private lateinit var loadingText: View
 
@@ -41,7 +41,7 @@ class TvFragment : RowsSupportFragment() {
         // Inicializar referencias
         progressBar = requireActivity().findViewById(R.id.progressBar)
         loadingText = requireActivity().findViewById(R.id.loadingText)
-        layoutCargando = requireActivity().findViewById(R.id.layoutCargando)
+        loadingContainer = requireActivity().findViewById(R.id.layoutCargando)
 
 
         loadTvChannels() // Cargar los canales antes de asignar el adapter
@@ -89,7 +89,7 @@ class TvFragment : RowsSupportFragment() {
 
     private fun mostrarCargando() {
         progreso = 0
-        layoutCargando.visibility = View.VISIBLE
+        loadingContainer.visibility = View.VISIBLE
         progressBar.progress = 0
         progresoHandler.post(progresoRunnable)
     }
@@ -107,7 +107,7 @@ class TvFragment : RowsSupportFragment() {
             }
 
             delay(100)
-            layoutCargando.visibility = View.GONE
+            loadingContainer.visibility = View.GONE
         }
     }
 
