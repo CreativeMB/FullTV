@@ -272,11 +272,8 @@ class PlayerPeliculas : AppCompatActivity() {
             val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
             val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
 
-            val menuVisible = menuPelis.visibility == View.VISIBLE
-            val controlesVisibles = controles.visibility == View.VISIBLE
-
             when {
-                menuVisible -> {
+                menuPelis.visibility == View.VISIBLE -> {
                     menuPelis.animate()
                         .alpha(0f)
                         .setDuration(200)
@@ -287,7 +284,7 @@ class PlayerPeliculas : AppCompatActivity() {
                         .start()
                 }
 
-                controlesVisibles -> {
+                controles.visibility == View.VISIBLE -> {
                     controles.visibility = View.GONE
                 }
 
@@ -298,7 +295,7 @@ class PlayerPeliculas : AppCompatActivity() {
         }
     }
 
-    private fun mostarpelis() {
+        private fun mostarpelis() {
         val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
 
         if (menuAbierto) {
@@ -992,14 +989,35 @@ class PlayerPeliculas : AppCompatActivity() {
 
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        // Solo reinicia el temporizador, pero NO interfiere con la navegación de foco
         if (event.action == KeyEvent.ACTION_DOWN) {
+            // ⏱️ Mantiene el temporizador de ocultar controles
             lastInteractionTime = System.currentTimeMillis()
             handler.removeCallbacks(runnableOcultar)
             handler.postDelayed(runnableOcultar, hideControlsDelay)
+
+            // 🔙 Detectar teclas "atrás" universales
+            val keyCode = event.keyCode
+            val scanCode = event.scanCode
+            val keyName = KeyEvent.keyCodeToString(keyCode)
+
+            Log.d("KeyBack", "Tecla presionada: $keyCode ($keyName), scanCode: $scanCode")
+
+            val teclasAtras = setOf(
+                KeyEvent.KEYCODE_BACK,          // 4
+                KeyEvent.KEYCODE_ESCAPE,        // 111
+                KeyEvent.KEYCODE_BUTTON_B,      // 97 (Gamepad botón B)
+                4, 111, 158, 172                // Otros comunes por scanCode
+            )
+
+            if (keyCode in teclasAtras || scanCode in teclasAtras) {
+                onBackPressedDispatcher.onBackPressed()
+                return true
+            }
         }
+
         return super.dispatchKeyEvent(event)
     }
+
 
     private fun tieneFocoEnHijos(view: View): Boolean {
         if (view.hasFocus()) return true
@@ -1154,10 +1172,9 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        Log.d("KeyCodeTest", "Tecla presionada: $keyCode")
 
         return when (keyCode) {
-            // ✅ Solo estas teclas llaman a mostarpelis()
+            // ✅ Teclas que muestran el menú de películas
             KeyEvent.KEYCODE_MENU,
             KeyEvent.KEYCODE_PAGE_UP,
             KeyEvent.KEYCODE_PAGE_DOWN,
@@ -1166,18 +1183,25 @@ class PlayerPeliculas : AppCompatActivity() {
                 true
             }
 
-            // ✅ Solo OK muestra los controles
-            KeyEvent.KEYCODE_DPAD_CENTER -> {
+            // ✅ Todas las teclas "OK" o "Enter"
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER,
+            KeyEvent.KEYCODE_BUTTON_A,
+            KeyEvent.KEYCODE_MEDIA_PLAY,
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
                 showControlsAndResetTimer()
                 true
             }
 
+            // 🔙 Tecla "Atrás"
             KeyEvent.KEYCODE_BACK -> {
-                false // NO interceptamos aquí
+                false // deja que el sistema lo maneje
             }
 
             else -> super.onKeyDown(keyCode, event)
         }
+
     }
 
 
