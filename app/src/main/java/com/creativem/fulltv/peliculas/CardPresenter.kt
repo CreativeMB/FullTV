@@ -14,6 +14,7 @@ import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import java.lang.reflect.Field
@@ -121,12 +122,15 @@ class CardPresenter: Presenter(){
 
         holder.countDownTimer?.cancel()
 
-        cardView.mainImageView?.let {
+        cardView.mainImageView?.let { imageView ->
+            imageView.scaleType = ImageView.ScaleType.FIT_XY
+            imageView.adjustViewBounds = false
+
             Glide.with(cardView.context)
                 .load(movie.imageUrl)
-                .centerCrop()
+                .placeholder(R.drawable.icono)
                 .error(R.drawable.icono)
-                .into(it)
+                .into(imageView)
         }
 
         val createdAtMillis = movie.createdAt.toDate().time

@@ -40,13 +40,19 @@ class TvMenuAdapter(
             holder.imageView.setImageResource(R.drawable.icono)
         }
 
-        // ✅ Cambiar color si está seleccionado
-        holder.itemView.setBackgroundColor(
-            if (position == selectedPosition)
-                ContextCompat.getColor(context, R.color.colorhover2)
-            else
-                ContextCompat.getColor(context, R.color.colorNotSelected)
-        )
+        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
+            holder.itemView.setBackgroundColor(
+                if (hasFocus) ContextCompat.getColor(context, R.color.colorhover2)
+                else ContextCompat.getColor(context, R.color.colorNotSelected)
+            )
+
+            if (hasFocus) {
+                // Llama a la función en PlayerTv si el context es una instancia válida
+                (context as? PlayerTv)?.reiniciarTemporizadorMenu()
+            }
+        }
+
+
 
         // ✅ Click para seleccionar y enviar la película
         holder.itemView.setOnClickListener {
@@ -57,6 +63,7 @@ class TvMenuAdapter(
 
             clickListener(tvItem)
         }
+
 
         // ✅ Cambia color al recibir foco (para control remoto/teclado)
         holder.itemView.setOnFocusChangeListener { _, hasFocus ->

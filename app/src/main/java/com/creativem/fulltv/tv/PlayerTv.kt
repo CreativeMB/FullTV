@@ -57,6 +57,14 @@ class PlayerTv : AppCompatActivity() {
     private var playerReleased = false
     private val playerHandler = Handler(Looper.getMainLooper())
 
+
+
+    private lateinit var handlerMenu: Handler
+    private lateinit var ocultarMenuRunnable: Runnable
+    private var lastMenuInteractionTime: Long = 0L
+    private val menuHideDelay = 5000L // 5 segundos
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = PlayerBinding.inflate(layoutInflater)
@@ -64,6 +72,13 @@ class PlayerTv : AppCompatActivity() {
 
         binding.reproductor.keepScreenOn = true
         initializeRecyclerView()
+        binding.recyclerViewTv.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
+            if (binding.recyclerViewTv.visibility == View.VISIBLE) {
+                reiniciarTemporizadorMenu()
+            }
+        }
+
+
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val nombrePeliculaTextView: TextView = findViewById(R.id.nombrePelicula)
@@ -71,7 +86,6 @@ class PlayerTv : AppCompatActivity() {
         intent?.let {
             streamUrl = it.getStringExtra("EXTRA_STREAM_URL") ?: ""
             movieTitle = it.getStringExtra("EXTRA_MOVIE_TITLE") ?: "Título desconocido"
-            movieYear = it.getStringExtra("EXTRA_MOVIE_YEAR") ?: ""
             movieImageUrl = it.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
 
             nombrePeliculaTextView.text = movieTitle
@@ -164,6 +178,11 @@ class PlayerTv : AppCompatActivity() {
         })
 
 
+        handlerMenu = Handler(Looper.getMainLooper())
+        ocultarMenuRunnable = Runnable {
+            binding.recyclerViewTv.visibility = View.GONE
+        }
+
         runnableActualizar = Runnable { actualizarTiempo() }
         runnableOcultar = Runnable {
             binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility =
@@ -179,10 +198,23 @@ class PlayerTv : AppCompatActivity() {
         actualizarTiempo()
     }
 
+
+
     private fun mostarpélis() {
-        binding.recyclerViewTv.visibility =
-            if (binding.recyclerViewTv.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        val recycler = binding.recyclerViewTv
+
+        if (recycler.visibility == View.VISIBLE) {
+            recycler.visibility = View.GONE
+            handlerMenu.removeCallbacks(ocultarMenuRunnable)
+        } else {
+            recycler.visibility = View.VISIBLE
+            reiniciarTemporizadorMenu()
+        }
     }
+
+
+
+
 
     private fun initializeRecyclerView() {
         adapter = TvMenuAdapter(this, mutableListOf()) { movie ->
@@ -357,6 +389,11 @@ class PlayerTv : AppCompatActivity() {
         }
 
     }
+    fun reiniciarTemporizadorMenu() {
+        handlerMenu.removeCallbacks(ocultarMenuRunnable)
+        handlerMenu.postDelayed(ocultarMenuRunnable, menuHideDelay)
+    }
+
 
     private fun reiniciarReproductor() {
         Log.d("PlayerTv", "Reiniciando el reproductor...")
@@ -425,15 +462,6 @@ class PlayerTv : AppCompatActivity() {
                             or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                             or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                     )
-        }
-    }
-
-    override fun onBackPressed() {
-        super.onBackPressed()
-        if (binding.recyclerViewTv.visibility == View.VISIBLE) {
-            binding.recyclerViewTv.visibility = View.GONE
-        } else {
-            finish()
         }
     }
 
@@ -517,28 +545,49 @@ class PlayerTv : AppCompatActivity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         showControlsAndResetTimer()
+
+        val teclasAtras = setOf(
+            KeyEvent.KEYCODE_BACK,         // 4
+            KeyEvent.KEYCODE_ESCAPE,       // 111
+            KeyEvent.KEYCODE_BUTTON_B,     // 97 (Botón B en gamepad)
+            158,                           // Algunos controles físicos
+            172                            // Otros remotos
+        )
+
         return when (keyCode) {
-            KeyEvent.KEYCODE_MENU -> {
-                mostarpélis()
-                true
-            }
 
-            KeyEvent.KEYCODE_PAGE_UP -> {
-                mostarpélis()
-                true
-            }
-
-            KeyEvent.KEYCODE_PAGE_DOWN -> {
-                mostarpélis()
-                true
-            }
-
+            // ✅ Teclas para mostrar u ocultar el menú de películas
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_PAGE_UP,
+            KeyEvent.KEYCODE_PAGE_DOWN,
             174 -> {
                 mostarpélis()
+                true
+            }
+
+            // ✅ Teclas "OK", "Enter", "Play"
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER,
+            KeyEvent.KEYCODE_BUTTON_A,
+            KeyEvent.KEYCODE_MEDIA_PLAY,
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                showControlsAndResetTimer()
+                true
+            }
+
+            // ✅ Teclas "Atrás"
+            in teclasAtras -> {
+                if (binding.recyclerViewTv.visibility == View.VISIBLE) {
+                    binding.recyclerViewTv.visibility = View.GONE
+                } else {
+                    finish()
+                }
                 true
             }
 
             else -> super.onKeyDown(keyCode, event)
         }
     }
+
 }

@@ -116,7 +116,7 @@ class TvFragment : RowsSupportFragment() {
     private fun calcularElementosPorFila(): Int {
         val displayMetrics = android.content.res.Resources.getSystem().displayMetrics
         val anchoPantalla = displayMetrics.widthPixels
-        val anchoTarjeta = 200
+        val anchoTarjeta = 240
         return (anchoPantalla / anchoTarjeta).coerceAtLeast(1)
     }
 
@@ -130,7 +130,7 @@ class TvFragment : RowsSupportFragment() {
                 addAll(0, chunk)
             }
 
-            val header = if (index == 0) HeaderItem(0, "Canales en Vivo Gratis") else null
+            val header = if (index == 0) HeaderItem(0, "") else null
             channels.add(ListRow(header, listRowAdapter))
         }
     }
