@@ -66,6 +66,8 @@ import com.creativem.fulltv.principal.Nosotros
 
 import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 
 import androidx.media3.common.util.UnstableApi
@@ -378,150 +380,225 @@ class PlayerPeliculas : AppCompatActivity() {
         startActivity(intent)
     }
 
-    // Método para inicializar el reproductor de video
     @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
-        // Verifica si la URL ya ha sido establecida
         if (streamUrl.isEmpty()) {
             showErrorDialog(movieTitle, movieYear)
             return
         }
 
         CoroutineScope(Dispatchers.Main).launch {
-            // Validar la URL en Firestore de manera asíncrona
             val isUrlValid = withContext(Dispatchers.IO) {
                 isUrlValidInFirestore(streamUrl)
             }
 
-            // Si la URL no es válida, muestra un diálogo de error
             if (!isUrlValid) {
                 showErrorDialog(movieTitle, movieYear)
                 return@launch
             }
 
-            val dataSourceFactory = DefaultHttpDataSource.Factory()
-                .setDefaultRequestProperties(mapOf("User-Agent" to "Mozilla/5.0"))
-                .setConnectTimeoutMs(30_000) // Tiempo de espera de conexión (30 segundos)
-                .setReadTimeoutMs(30_000) // Tiempo de espera de lectura (30 segundos)
+            val progresoGuardado = obtenerProgresoGuardado()
 
-            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+            if (progresoGuardado > 0) {
 
-            // Configura el LoadControl
-            val loadControl = DefaultLoadControl.Builder()
-                .setTargetBufferBytes(8 * 1024 * 1024) // 8 MB
-                .setPrioritizeTimeOverSizeThresholds(false)
-                .build()
+                val minutos = progresoGuardado / 60000
+                val segundos = (progresoGuardado % 60000) / 1000
+                val tiempoFormateado = String.format("%02d:%02d", minutos, segundos)
 
-            // Crea el reproductor
-            player = ExoPlayer.Builder(this@PlayerPeliculas)
-                .setLoadControl(loadControl)
-                .setRenderersFactory(
-                    DefaultRenderersFactory(this@PlayerPeliculas)
-                        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-                ) // Esto habilita FFmpeg
-                .setMediaSourceFactory(mediaSourceFactory)
-                .build().also { exoPlayer ->
-
-                    // Asocia el ExoPlayer con el PlayerView usando binding
-                    binding.reproductor.player = exoPlayer
-
-                    // Configura el MediaItem
-                    val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
-
-                    // Prepara el ExoPlayer para la reproducción
-                    exoPlayer.setMediaItem(mediaItem)
-                    exoPlayer.prepare()
-
-                    // Añade el listener del reproductor para detectar si es en vivo
-                    exoPlayer.addListener(object : Player.Listener {
-                        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
-                            // Verifica si hay ventanas en la línea de tiempo
-                            if (timeline.windowCount > 0) {
-                                val window = Timeline.Window()
-                                timeline.getWindow(0, window)
-                                // Determina si la ventana es en vivo
-                                when {
-                                    !window.isLive -> {
-
-                                    }
-                                }
-                            }
-                        }
-                    })
-
-                    // Añade el listener del reproductor
-                    exoPlayer.addListener(playerListener)
-                    // Inicia la reproducción automáticamente
-                    exoPlayer.playWhenReady = true
-                }
+                AlertDialog.Builder(this@PlayerPeliculas)
+                    .setTitle("¿Continuar viendo?")
+                    .setMessage("¿Quieres continuar desde el minuto $tiempoFormateado?")
+                    .setPositiveButton("Sí") { _, _ ->
+                        prepararReproductor(progresoGuardado)
+                    }
+                    .setNegativeButton("No") { _, _ ->
+                        prepararReproductor(0L)
+                    }
+                    .setCancelable(false)
+                    .show()
+            } else {
+                prepararReproductor(0L)
+            }
         }
     }
+
+
+    @OptIn(UnstableApi::class)
+    private fun prepararReproductor(posicionInicial: Long) {
+        val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setDefaultRequestProperties(mapOf("User-Agent" to "Mozilla/5.0"))
+            .setConnectTimeoutMs(30_000)
+            .setReadTimeoutMs(30_000)
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
+        val loadControl = DefaultLoadControl.Builder()
+            .setTargetBufferBytes(8 * 1024 * 1024)
+            .setPrioritizeTimeOverSizeThresholds(false)
+            .build()
+
+        player = ExoPlayer.Builder(this@PlayerPeliculas)
+            .setLoadControl(loadControl)
+            .setRenderersFactory(
+                DefaultRenderersFactory(this@PlayerPeliculas)
+                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            )
+            .setMediaSourceFactory(mediaSourceFactory)
+            .build().also { exoPlayer ->
+
+                binding.reproductor.player = exoPlayer
+
+                val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+                exoPlayer.setMediaItem(mediaItem)
+                exoPlayer.prepare()
+
+                exoPlayer.addListener(object : Player.Listener {
+                    override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+                        if (timeline.windowCount > 0) {
+                            val window = Timeline.Window()
+                            timeline.getWindow(0, window)
+                            if (!window.isLive) {
+                                // No es stream en vivo
+                            }
+                        }
+                    }
+                })
+
+                exoPlayer.addListener(playerListener)
+
+                if (posicionInicial > 0) {
+                    exoPlayer.seekTo(posicionInicial)
+                }
+
+                exoPlayer.playWhenReady = true
+
+                // 🔁 Handler para actualizar la última posición válida mientras se reproduce
+                val handlerPosicion = Handler(Looper.getMainLooper())
+                val actualizarPosicionRunnable = object : Runnable {
+                    override fun run() {
+                        val position = player?.contentPosition ?: 0L
+                        if (position > 10_000) {
+                            ultimaPosicionValida = position
+
+                        }
+                        handlerPosicion.postDelayed(this, 5000)
+                    }
+                }
+                handlerPosicion.postDelayed(actualizarPosicionRunnable, 5000)
+
+                // Limpia el handler cuando se destruya la actividad
+                lifecycle.addObserver(object : DefaultLifecycleObserver {
+                    override fun onDestroy(owner: LifecycleOwner) {
+                        handlerPosicion.removeCallbacks(actualizarPosicionRunnable)
+                    }
+                })
+            }
+    }
+
+    private fun obtenerProgresoGuardado(): Long {
+        val clave = generarClaveProgreso()
+        val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
+        return prefs.getLong(clave, 0L)
+    }
+
+    private fun generarClaveProgreso(): String {
+        val titulo = movieTitle.trim().ifBlank { "pelicula_sin_titulo" }
+        val año = movieYear.trim().ifBlank { "sin_año" }
+        return "$titulo-$año".replace(Regex("[^A-Za-z0-9_-]"), "_")
+    }
+
+    private fun borrarProgresoGuardado() {
+        val clave = generarClaveProgreso()
+        val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
+        prefs.edit().remove(clave).apply()
+    }
+
+    override fun onPause() {
+        super.onPause()
+
+        val position = ultimaPosicionValida
+        if (position > 10_000) {
+            val clave = generarClaveProgreso()
+            val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
+            prefs.edit().putLong(clave, position).apply()
+        }
+
+        player?.pause()
+        handler.postDelayed(runnableActualizar, 1000)
+    }
+
+
+    private var ultimaPosicionValida: Long = 0L
+
     // Listener para el reproductor
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
+            val currentPosition = player?.contentPosition ?: 0L
+
             when (playbackState) {
                 Player.STATE_BUFFERING -> {
-                    mostrarBuffer() // Muestra el estado del búfer
+                    mostrarBuffer()
+                    if (currentPosition > 0) {
+                        ultimaPosicionValida = currentPosition
+
+                    }
                 }
 
                 Player.STATE_READY -> {
+                    isPlaybackActive = true
+                    playbackStartTime.set(System.currentTimeMillis())
+                    reconnectionAttempts = 0
+                    isReconnecting = false
 
-                    isPlaybackActive = true // Indica que la reproducción está activa
-                    playbackStartTime.set(System.currentTimeMillis()) // Guarda el tiempo de inicio
-                    reconnectionAttempts = 0 // Reinicia los intentos de reconexión
-                    isReconnecting = false // Indica que no se está reconectando
-
-                    // Reanudar desde la última posición conocida
                     if (lastKnownPosition > 0) {
-                        player?.seekTo(lastKnownPosition) // Busca a la última posición
-                        lastKnownPosition = 0 // Reinicia la posición
+                        player?.seekTo(lastKnownPosition)
+                        lastKnownPosition = 0
                     }
 
-                    actualizarTiempo() // Actualiza el tiempo de reproducción
+                    actualizarTiempo()
+                    val pos = player?.contentPosition ?: 0L
+                    Log.d("PROGRESO", "📍 Posición detectada en estado $playbackState: $pos")
+
+// Guardamos la última posición válida
+                    val current = player?.contentPosition ?: 0L
+                    if (current > 10_000) {
+                        ultimaPosicionValida = current
+                        Log.d("PROGRESO", "🎯 Posición válida (READY): $ultimaPosicionValida ms")
+                    }
                 }
 
                 Player.STATE_ENDED -> {
-
-                    isPlaybackActive = false // La reproducción ya no está activa
+                    borrarProgresoGuardado()
+                    isPlaybackActive = false
                     showErrorDialog(movieTitle, movieYear)
-                    // Si es un stream en vivo, intentar reconectar
+
                     if (isLiveStream) {
-
-                        intentarReconexion() // Llama al método de reconexión
+                        intentarReconexion()
                     } else {
-
                         handler.postDelayed(runnableActualizar, 1000)
-                        // Detiene el runnable
                     }
                 }
 
                 Player.STATE_IDLE -> {
+                    isPlaybackActive = false
 
-                    isPlaybackActive = false // La reproducción ya no está activa
-
-                    // Si es un stream en vivo, intentar reconectar
                     if (isLiveStream) {
-
-                        intentarReconexion() // Llama al método de reconexión
+                        intentarReconexion()
                     } else {
-
                         handler.postDelayed(runnableActualizar, 1000)
-// Detiene el runnable
                     }
                 }
 
                 else -> {
-
-                    // En caso de un estado desconocido, intenta reconectar si no hay actividad de reproducción
                     if (!isPlaybackActive && reconnectionAttempts < maxReconnectionAttempts) {
-
-                        intentarReconexion() // Llama al método de reconexión
+                        intentarReconexion()
                     }
                 }
             }
         }
 
-        override fun onIsPlayingChanged(isPlaying: Boolean) {
+
+    override fun onIsPlayingChanged(isPlaying: Boolean) {
             val playPauseButton = findViewById<ImageButton>(R.id.play_pause)
             if (isPlaying) {
                 handler.postDelayed(runnableOcultar, hideControlsDelay)
@@ -900,12 +977,12 @@ class PlayerPeliculas : AppCompatActivity() {
                 .show()
         }
     }
-    override fun onPause() {
-        super.onPause()
-        player?.pause()
-        handler.postDelayed(runnableActualizar, 1000)
-
-    }
+//    override fun onPause() {
+//        super.onPause()
+//        player?.pause()
+//        handler.postDelayed(runnableActualizar, 1000)
+//
+//    }
 
     override fun onResume() {
 
