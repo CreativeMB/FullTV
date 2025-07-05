@@ -51,7 +51,7 @@ class CardPresenterTV : Presenter() {
             text = "TV Gratis ✅"
             cardView.setInfoAreaBackgroundColor(Color.parseColor("#006064"))
             setTextColor(Color.WHITE)
-            textSize = 10f
+            textSize = 12f
             setPadding(8, 4, 8, 4)
             gravity = Gravity.CENTER
             setBackgroundColor(Color.parseColor("#006064"))

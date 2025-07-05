@@ -3,6 +3,14 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/colorPrimary">
+    <!-- Fondo dinámico -->
+    <ImageView
+        android:id="@+id/fondoDinamico"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0.4"
+        android:visibility="visible" />
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/tv"
@@ -22,7 +30,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Actualizando biblioteca de Pelis gratis\n\nCargando..."
+            android:text="Actualizando biblioteca de TV gratis...\n\nCargando..."
             android:textColor="@color/redpersonalisado"
             android:textSize="40sp"
             android:textStyle="bold"

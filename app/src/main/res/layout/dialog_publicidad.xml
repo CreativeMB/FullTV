@@ -56,7 +56,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="Actualizando biblioteca de Pelis gratis\n\nCargando..."
+        android:text="Actualizando biblioteca en linea...\n\nCargando..."
         android:textColor="@color/redpersonalisado"
         android:textSize="40sp"
         android:textStyle="bold"

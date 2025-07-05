@@ -48,7 +48,7 @@ class CardPresenter: Presenter(){
         val etiquetaValida = TextView(context).apply {
             text = ""
             setTextColor(Color.WHITE)
-            textSize = 10f
+            textSize = 12f
             setPadding(8, 4, 8, 4)
             gravity = Gravity.CENTER
             layoutParams = FrameLayout.LayoutParams(

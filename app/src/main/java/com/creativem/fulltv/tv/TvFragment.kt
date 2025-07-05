@@ -4,10 +4,11 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.ProgressBar
-import androidx.core.content.ContextCompat
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.*
+import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 import com.google.firebase.firestore.FirebaseFirestore
@@ -35,13 +36,23 @@ class TvFragment : RowsSupportFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-        // Establecer el color de fondo del fragmento
-        view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.colorPrimary))
         // Inicializar referencias
         progressBar = requireActivity().findViewById(R.id.progressBar)
         loadingText = requireActivity().findViewById(R.id.loadingText)
         loadingContainer = requireActivity().findViewById(R.id.layoutCargando)
+// Referenciar fondo dinámico del Activity
+        val fondoDinamico = requireActivity().findViewById<ImageView>(R.id.fondoDinamico)
+
+// Detectar ítem seleccionado y cambiar fondo
+        setOnItemViewSelectedListener { _, item, _, _ ->
+            val movie = item as? Movie
+            if (movie != null && !movie.imageUrl.isNullOrEmpty()) {
+                Glide.with(requireContext())
+                    .load(movie.imageUrl)
+                    .error(R.drawable.icono)
+                    .into(fondoDinamico)
+            }
+        }
 
 
         loadTvChannels() // Cargar los canales antes de asignar el adapter
