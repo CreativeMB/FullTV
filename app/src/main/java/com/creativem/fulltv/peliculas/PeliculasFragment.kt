@@ -670,43 +670,37 @@ class PeliculasFragment : BrowseSupportFragment() {
         val fileName = "FullTV_update.apk"
         val apkFile = File(requireContext().getExternalFilesDir(null), fileName)
 
-        if (apkFile.exists()) apkFile.delete()
-
-        val porcentajeTexto = TextView(requireContext()).apply {
-            text = "Descargando... 0%"
-            textSize = 16f
-            setPadding(0, 0, 0, 10)
-            setTextColor(ContextCompat.getColor(requireContext(), android.R.color.black))
-            gravity = Gravity.CENTER_HORIZONTAL
+        if (apkFile.exists()) {
+            apkFile.delete()
         }
 
         val progressBar = ProgressBar(requireContext(), null, android.R.attr.progressBarStyleHorizontal).apply {
+            isIndeterminate = false
             max = 100
             progress = 0
-            isIndeterminate = false
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, 30
-            )
-            progressDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.progress_bar_rojo)
+            progressDrawable = ContextCompat.getDrawable(requireContext(), android.R.drawable.progress_horizontal)
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, 20)
+            progressTintList = ContextCompat.getColorStateList(requireContext(), android.R.color.holo_red_light)
+        }
+
+        val textoProgreso = TextView(requireContext()).apply {
+            text = "Preparando descarga..."
+            setTextColor(Color.RED)
+            textSize = 16f
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, 20, 0, 0)
         }
 
         val layout = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(40, 20, 40, 20)
-            addView(porcentajeTexto)
+            setPadding(40, 40, 40, 40)
             addView(progressBar)
-        }
-
-        val mensaje = SpannableString(
-            "Estamos instalando una nueva versión de FullTV con mejoras de velocidad, estabilidad y nuevas funciones.\n\nGracias por tu paciencia 🙌"
-        ).apply {
-            setSpan(RelativeSizeSpan(1.15f), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            setSpan(StyleSpan(Typeface.BOLD), 0, 54, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            addView(textoProgreso)
         }
 
         val progressDialog = AlertDialog.Builder(requireContext())
-            .setTitle("📥 Actualizando FullTV")
-            .setMessage(mensaje)
+            .setTitle("\uD83D\uDCE5 Nueva versión disponible")
+            .setMessage("Se recomienda actualizar para mejorar rendimiento y disfrutar nuevas funciones.")
             .setView(layout)
             .setCancelable(false)
             .create()
@@ -715,90 +709,114 @@ class PeliculasFragment : BrowseSupportFragment() {
 
         val request = DownloadManager.Request(Uri.parse(url)).apply {
             setTitle("Descargando FullTV")
-            setDescription("La actualización se está descargando...")
+            setDescription("Actualizando aplicación...")
             setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             setDestinationUri(Uri.fromFile(apkFile))
-            setAllowedOverMetered(true)
-            setAllowedOverRoaming(true)
         }
 
         val downloadManager = requireContext().getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val downloadId = downloadManager.enqueue(request)
 
         val handler = Handler(Looper.getMainLooper())
+        var lastProgress = 0
+        var totalSizeBytes = 0L
+        var downloadedBytes = 0L
+
         handler.post(object : Runnable {
             override fun run() {
                 val query = DownloadManager.Query().setFilterById(downloadId)
                 val cursor = downloadManager.query(query)
 
-                if (cursor != null && cursor.moveToFirst()) {
+                if (cursor.moveToFirst()) {
                     val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-                    val downloaded = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
-                    val total = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                    totalSizeBytes = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                    downloadedBytes = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
 
                     if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                        progressBar.progress = 100
-                        porcentajeTexto.text = "Descarga completada ✅"
-                        progressDialog.dismiss()
-                        instalarAPK(apkFile)
                         cursor.close()
+
+                        // Si no alcanzó a mostrar barra, simular
+                        if (lastProgress < 100) {
+                            simulateFinalProgress(progressBar, textoProgreso, apkFile, progressDialog)
+                        } else {
+                            textoProgreso.text = "Descarga completada ✅"
+                            progressDialog.dismiss()
+                            instalarAPK(apkFile)
+                        }
+
                         return
                     }
 
                     if (status == DownloadManager.STATUS_FAILED) {
-                        progressDialog.dismiss()
-                        Toast.makeText(requireContext(), "❌ Error al descargar la actualización", Toast.LENGTH_LONG).show()
                         cursor.close()
+                        textoProgreso.text = "❌ Error al descargar"
+                        progressDialog.dismiss()
                         return
                     }
 
-                    if (total > 0) {
-                        val progress = (downloaded * 100 / total).toInt()
-                        progressBar.progress = progress
-                        porcentajeTexto.text = "Descargando... $progress%"
-                    } else {
-                        // Simula progresivamente si no hay tamaño
-                        var simulado = progressBar.progress
-                        simulado += 2
-                        if (simulado > 100) simulado = 100
-                        progressBar.progress = simulado
-                        porcentajeTexto.text = "Descargando... $simulado%"
-                    }
+                    if (totalSizeBytes > 0) {
+                        val progress = ((downloadedBytes * 100) / totalSizeBytes).toInt()
+                        if (progress > lastProgress) {
+                            lastProgress = progress
+                            progressBar.progress = progress
 
-                    cursor.close()
-                    handler.postDelayed(this, 500)
+                            textoProgreso.text = "Descargando... $progress%"
+                        }
+                    } else {
+                        textoProgreso.text = "Conectando al servidor..."
+                    }
+                }
+
+                cursor.close()
+                handler.postDelayed(this, 500)
+            }
+        })
+    }
+
+    private fun simulateFinalProgress(
+        progressBar: ProgressBar,
+        texto: TextView,
+        apkFile: File,
+        dialog: AlertDialog
+    ) {
+        val handler = Handler(Looper.getMainLooper())
+        var progress = progressBar.progress
+
+        handler.post(object : Runnable {
+            override fun run() {
+                progress += 5
+                if (progress >= 100) {
+                    progress = 100
+                    progressBar.progress = 100
+                    texto.text = "Descarga completada ✅"
+                    dialog.dismiss()
+                    instalarAPK(apkFile)
+                } else {
+                    progressBar.progress = progress
+                    texto.text = "Descargando... $progress%"
+                    handler.postDelayed(this, 30)
                 }
             }
         })
     }
 
 
-
     private fun instalarAPK(apkFile: File) {
-        if (apkFile.exists()) {
-            val apkUri = FileProvider.getUriForFile(
-                requireContext(),
-                "${requireContext().packageName}.provider",
-                apkFile
-            )
+        val apkUri = FileProvider.getUriForFile(
+            requireContext(),
+            "${requireContext().packageName}.provider",
+            apkFile
+        )
 
-            val installIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(apkUri, "application/vnd.android.package-archive")
-                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-            }
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(apkUri, "application/vnd.android.package-archive")
+            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+        }
 
-            try {
-                startActivity(installIntent)
-
-                Handler(Looper.getMainLooper()).postDelayed({
-                    if (apkFile.exists()) apkFile.delete()
-                }, 5000)
-
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), "⚠️ No se pudo abrir el instalador.", Toast.LENGTH_LONG).show()
-            }
-        } else {
-            Toast.makeText(requireContext(), "❌ No se encontró el archivo descargado.", Toast.LENGTH_LONG).show()
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(requireContext(), "No se pudo abrir el instalador", Toast.LENGTH_LONG).show()
         }
     }
 
