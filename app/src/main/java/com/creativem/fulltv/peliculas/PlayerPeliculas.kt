@@ -53,6 +53,7 @@ import org.json.JSONObject
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
+import android.os.CountDownTimer
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
@@ -60,6 +61,7 @@ import android.text.style.RelativeSizeSpan
 import android.util.TypedValue
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.LinearLayout
 import androidx.activity.addCallback
 import com.bumptech.glide.Glide
 
@@ -411,36 +413,48 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
     private fun mostrarDialogoContinuar(progresoGuardado: Long) {
-        val minutos = progresoGuardado / 60000
+        val horas = progresoGuardado / 3600000
+        val minutos = (progresoGuardado % 3600000) / 60000
         val segundos = (progresoGuardado % 60000) / 1000
-        val tiempoFormateado = String.format("%02d:%02d", minutos, segundos)
+        val tiempoFormateado = String.format("%02d:%02d:%02d", horas, minutos, segundos)
+
+        val contadorTextView = TextView(this@PlayerPeliculas).apply {
+            textSize = 22f
+            setTextColor(Color.GREEN)
+            setPadding(30, 10, 20, 10)
+        }
 
         val customTitle = TextView(this@PlayerPeliculas).apply {
-            text = "¿Continuar viendo?"
+            text = "¿Deseas continuar?"
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 25f)
             setTextColor(Color.GREEN)
             typeface = Typeface.DEFAULT_BOLD
             setPadding(30, 20, 20, 20)
         }
 
-        val customMessage = TextView(this@PlayerPeliculas).apply {
-            text = "Te quedaste en el minuto $tiempoFormateado.\n¿Quieres seguir viendo desde ahí o empezar desde el principio?"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-            setTextColor(Color.RED)
+        val customMessage = LinearLayout(this@PlayerPeliculas).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(30, 20, 20, 20)
+
+            val texto = TextView(this@PlayerPeliculas).apply {
+                text = "Te Quedaste en $tiempoFormateado"
+                setTextSize(30f)
+                setTextColor(Color.RED)
+            }
+
+            addView(texto)
+            addView(contadorTextView)
         }
 
         val dialog = AlertDialog.Builder(this@PlayerPeliculas)
             .setCustomTitle(customTitle)
             .setView(customMessage)
-            .setPositiveButton("Sí") { _, _ ->
-                prepararReproductor(progresoGuardado)
-            }
-            .setNegativeButton("No") { _, _ ->
-                prepararReproductor(0L)
-            }
+            .setNegativeButton("Reanudar", null)
+            .setPositiveButton("Reiniciar", null) // se configura luego para evitar cierre automático
             .setCancelable(false)
             .create()
+
+        var contador: CountDownTimer? = null
 
         dialog.setOnShowListener {
             dialog.window?.setBackgroundDrawable(
@@ -448,31 +462,49 @@ class PlayerPeliculas : AppCompatActivity() {
             )
 
             val focusSelector = R.drawable.focus_selector
+            val btnReiniciar = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            val btnReanudar = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
 
-            val btnSi = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            val btnNo = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
-
-            // Botones con estilos
-            listOf(btnSi, btnNo).forEach {
-                it.setTextColor(Color.MAGENTA)
-                it.textSize = 25f
+            listOf(btnReiniciar, btnReanudar).forEach {
+                it.setTextColor(Color.LTGRAY)
+                it.textSize = 16f
                 it.setBackgroundResource(focusSelector)
                 it.isFocusable = true
                 it.isFocusableInTouchMode = true
             }
 
-            // Fondo para la barra de botones (padre de los botones)
-            val buttonParent = btnSi?.parent as? View
-            buttonParent?.setBackgroundColor(ContextCompat.getColor(this@PlayerPeliculas, R.color.colorPrimary))
+            // Botón por defecto con foco
+            btnReiniciar?.requestFocus()
 
-            // Foco inicial
-            btnSi?.requestFocus()
+            // Acciones de los botones
+            btnReiniciar.setOnClickListener {
+                contador?.cancel()
+                prepararReproductor(0L)
+                dialog.dismiss()
+            }
+
+            btnReanudar.setOnClickListener {
+                contador?.cancel()
+                prepararReproductor(progresoGuardado)
+                dialog.dismiss()
+            }
+
+            // Iniciar contador regresivo
+            contador = object : CountDownTimer(10000, 1000) {
+                override fun onTick(millisUntilFinished: Long) {
+                    val segundosRestantes = millisUntilFinished / 1000
+                    contadorTextView.text = "Reanudar en $segundosRestantes"
+                }
+
+                override fun onFinish() {
+                    prepararReproductor(progresoGuardado)
+                    dialog.dismiss()
+                }
+            }.start()
         }
 
         dialog.show()
     }
-
-
 
     @OptIn(UnstableApi::class)
     private fun prepararReproductor(posicionInicial: Long) {
