@@ -51,10 +51,13 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
 import org.json.JSONObject
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
+import android.util.TypedValue
 import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.activity.addCallback
@@ -400,27 +403,75 @@ class PlayerPeliculas : AppCompatActivity() {
             val progresoGuardado = obtenerProgresoGuardado()
 
             if (progresoGuardado > 0) {
-
-                val minutos = progresoGuardado / 60000
-                val segundos = (progresoGuardado % 60000) / 1000
-                val tiempoFormateado = String.format("%02d:%02d", minutos, segundos)
-
-                AlertDialog.Builder(this@PlayerPeliculas)
-                    .setTitle("¿Continuar viendo?")
-                    .setMessage("¿Quieres continuar desde el minuto $tiempoFormateado?")
-                    .setPositiveButton("Sí") { _, _ ->
-                        prepararReproductor(progresoGuardado)
-                    }
-                    .setNegativeButton("No") { _, _ ->
-                        prepararReproductor(0L)
-                    }
-                    .setCancelable(false)
-                    .show()
+                mostrarDialogoContinuar(progresoGuardado)
             } else {
                 prepararReproductor(0L)
             }
         }
     }
+
+    private fun mostrarDialogoContinuar(progresoGuardado: Long) {
+        val minutos = progresoGuardado / 60000
+        val segundos = (progresoGuardado % 60000) / 1000
+        val tiempoFormateado = String.format("%02d:%02d", minutos, segundos)
+
+        val customTitle = TextView(this@PlayerPeliculas).apply {
+            text = "¿Continuar viendo?"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 25f)
+            setTextColor(Color.YELLOW)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(30, 20, 20, 20)
+        }
+
+        val customMessage = TextView(this@PlayerPeliculas).apply {
+            text = "Te quedaste en el minuto $tiempoFormateado.\n¿Quieres seguir viendo desde ahí o empezar desde el principio?"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            setTextColor(Color.RED)
+            setPadding(30, 20, 20, 20)
+        }
+
+        val dialog = AlertDialog.Builder(this@PlayerPeliculas)
+            .setCustomTitle(customTitle)
+            .setView(customMessage)
+            .setPositiveButton("Sí") { _, _ ->
+                prepararReproductor(progresoGuardado)
+            }
+            .setNegativeButton("No") { _, _ ->
+                prepararReproductor(0L)
+            }
+            .setCancelable(false)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.window?.setBackgroundDrawable(
+                ColorDrawable(ContextCompat.getColor(this@PlayerPeliculas, R.color.colorPrimary))
+            )
+
+            val focusSelector = R.drawable.focus_selector
+
+            val btnSi = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            val btnNo = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+
+            // Botones con estilos
+            listOf(btnSi, btnNo).forEach {
+                it.setTextColor(Color.MAGENTA)
+                it.textSize = 25f
+                it.setBackgroundResource(focusSelector)
+                it.isFocusable = true
+                it.isFocusableInTouchMode = true
+            }
+
+            // Fondo para la barra de botones (padre de los botones)
+            val buttonParent = btnSi?.parent as? View
+            buttonParent?.setBackgroundColor(ContextCompat.getColor(this@PlayerPeliculas, R.color.colorPrimary))
+
+            // Foco inicial
+            btnSi?.requestFocus()
+        }
+
+        dialog.show()
+    }
+
 
 
     @OptIn(UnstableApi::class)
