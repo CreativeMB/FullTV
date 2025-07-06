@@ -418,7 +418,7 @@ class PlayerPeliculas : AppCompatActivity() {
         val customTitle = TextView(this@PlayerPeliculas).apply {
             text = "¿Continuar viendo?"
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 25f)
-            setTextColor(Color.YELLOW)
+            setTextColor(Color.GREEN)
             typeface = Typeface.DEFAULT_BOLD
             setPadding(30, 20, 20, 20)
         }
