@@ -38,6 +38,7 @@
         <activity
             android:name=".ApiPeliculaActivity"
             android:exported="false"
+            android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
@@ -54,7 +55,6 @@
             android:exported="false"
             android:windowSoftInputMode="stateHidden|adjustPan"
             tools:ignore="Instantiatable" />
-        <activity android:name=".ContenedorPeliculasActivity" />
 
         <activity
             android:name=".tv.TvFragment"

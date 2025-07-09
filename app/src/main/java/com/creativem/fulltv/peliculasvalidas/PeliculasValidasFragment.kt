@@ -15,6 +15,7 @@ import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.*
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+import com.creativem.fulltv.ApiPeliculaActivity
 import com.creativem.fulltv.R
 import com.creativem.fulltv.peliculas.Validacioneslista
 import com.creativem.fulltv.principal.Movie
@@ -147,13 +148,16 @@ class PeliculasValidasFragment : RowsSupportFragment() {
         ) {
             if (item is Movie) { // Si es una película, abre PlayerPeliculas
 
-                val intent = Intent(context, PlayerPeliculas::class.java).apply {
+                val intent = Intent(requireContext(), ApiPeliculaActivity::class.java).apply {
                     putExtra("EXTRA_STREAM_URL", item.streamUrl)
                     putExtra("EXTRA_MOVIE_TITLE", item.title)
                     putExtra("EXTRA_MOVIE_YEAR", item.year)
                     putExtra("EXTRA_MOVIE_IMAGE_URL", item.imageUrl)
+                    putExtra("EXTRA_ORIGINAL_TITLE", item.originalTitle)
+                    putExtra("EXTRA_COUNTDOWN", item.countdownMinutes)
                 }
                 startActivity(intent)
+
             } else { // Si es otro tipo de elemento, muestra un mensaje
                 Toast.makeText(
                     requireContext(),

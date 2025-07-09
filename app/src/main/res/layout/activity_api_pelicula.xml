@@ -26,101 +26,136 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <!-- Columna izquierda: poster + datos -->
+                <!-- Fila principal: imagen + video + datos -->
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="3"
-                    android:orientation="horizontal">
+                    android:orientation="vertical">
 
-                    <!-- Poster -->
-                    <ImageView
-                        android:id="@+id/ivPoster"
-                        android:layout_width="150dp"
-                        android:layout_height="220dp"
-                        android:scaleType="fitXY"
-                        android:layout_marginEnd="8dp"
-                        android:src="@drawable/icono" />
-
-                    <!-- Datos -->
+                    <!-- Fila: imagen + datos -->
                     <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/tvTitulo"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:textColor="@color/textColorPrimary"
-                            android:text="Título"
-                            android:textStyle="bold"
-                            android:textSize="18sp"
-                            android:layout_marginBottom="4dp" />
-
-                        <TextView
-                            android:id="@+id/tvFecha"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:textColor="@color/textColorPrimary"
-                            android:text="Fecha de estreno"
-                            android:layout_marginBottom="4dp" />
-
-                        <TextView
-                            android:id="@+id/tvCalificacion"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Calificación"
-                            android:textColor="@color/textColorPrimary"
-                            android:layout_marginBottom="4dp" />
-
-                        <TextView
-                            android:id="@+id/tvSinopsis"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:maxLines="6"
-                            android:textColor="@color/textColorPrimary"
-                            android:text="Sinopsis"
-                            android:lineSpacingExtra="4dp"
-                            android:layout_marginTop="8dp" />
-                    </LinearLayout>
-                </LinearLayout>
-                <LinearLayout
-                    android:id="@+id/videoLayout"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="2"
-                    android:orientation="vertical"
-                    android:layout_marginStart="8dp"
-                    android:background="@android:color/black"
-                    android:focusable="true"
-                    android:focusableInTouchMode="true">
-
-                    <FrameLayout
-                        android:id="@+id/videoContainer"
                         android:layout_width="match_parent"
-                        android:layout_height="220dp"
-                        android:background="@android:color/black">
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
 
-                        <!-- Video que se reproduce debajo -->
-                        <VideoView
-                            android:id="@+id/videoView"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:layout_gravity="center"
-                            android:focusable="false"
-                            android:focusableInTouchMode="false" />
+                        <!-- Poster -->
+                        <ImageView
+                            android:id="@+id/ivPoster"
+                            android:layout_width="200dp"
+                            android:layout_height="280dp"
+                            android:scaleType="fitXY"
+                            android:layout_marginEnd="8dp"
+                            android:src="@drawable/icono" />
 
-                        <!-- Capa de borde por encima del video -->
-                        <View
-                            android:id="@+id/focusBorder"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:visibility="gone"
-                            android:background="@drawable/card_focused_background"/>
-                    </FrameLayout>
+                        <!-- Contenedor de datos -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <!-- Línea: Título + Calificación -->
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:layout_marginBottom="4dp">
+
+                                <TextView
+                                    android:id="@+id/tvTitulo"
+                                    android:layout_width="0dp"
+                                    android:layout_weight="2"
+                                    android:layout_height="wrap_content"
+                                    android:text="Título"
+                                    android:textColor="@color/colorFocused"
+                                    android:textStyle="bold"
+                                    android:textSize="30sp" />
+
+                                <TextView
+                                    android:id="@+id/tvCalificacion"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="⭐ 8.5"
+                                    android:textColor="@color/textColorPrimary"
+                                    android:textSize="40sp"
+                                    android:layout_gravity="center_vertical"
+                                    android:layout_marginEnd="10dp"
+                                    android:paddingStart="8dp" />
+                            </LinearLayout>
+
+                            <!-- Fecha de estreno -->
+                            <TextView
+                                android:id="@+id/tvFecha"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Estreno: 2024-07-19"
+                                android:textColor="@color/textColorPrimary"
+                                android:textSize="20sp"
+                                android:layout_marginBottom="4dp" />
+
+                            <!-- Línea: Info adicional + Reproducir -->
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:layout_marginBottom="4dp"
+                                android:gravity="center_vertical">
+
+                                <TextView
+                                    android:id="@+id/tvInfoAdicional"
+                                    android:layout_width="0dp"
+                                    android:layout_weight="2"
+                                    android:layout_height="wrap_content"
+                                    android:textColor="@android:color/white"
+                                    android:textSize="18sp"
+                                    android:text="🎭 Géneros: Acción, Aventura\n⏱ 120 min"
+                                    android:padding="2dp" />
+
+                                <TextView
+                                    android:id="@+id/tvReproducir"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="▶ Reproducir"
+                                    android:textColor="@color/colorSeekBar"
+                                    android:textSize="16sp"
+                                    android:padding="12dp"
+                                    android:gravity="center"
+                                    android:background="@drawable/focus_selector"
+                                    android:focusable="true"
+                                    android:focusableInTouchMode="true"
+                                    android:clickable="true"
+                                    android:layout_marginEnd="8dp"
+                                    android:layout_marginStart="8dp" />
+                            </LinearLayout>
+
+                            <!-- Lista de actores -->
+                            <androidx.recyclerview.widget.RecyclerView
+                                android:id="@+id/recyclerActores"
+                                android:layout_width="match_parent"
+                                android:layout_height="140dp"
+                                android:orientation="horizontal"
+                                android:padding="2dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- 🔽 Sinopsis como última fila, ocupando todo el ancho -->
+                    <TextView
+                        android:id="@+id/tvSinopsis"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Sinopsis"
+                        android:textColor="@color/textColorPrimary"
+                        android:textSize="18sp"
+                        android:lineSpacingExtra="4dp"
+                        android:maxLines="6"
+                        android:padding="8dp" />
                 </LinearLayout>
+
+
+
+
+
+
 
 
 
@@ -193,7 +228,12 @@
 
         </LinearLayout>
     </ScrollView>
-
-
+    <ImageView
+        android:id="@+id/backgroundImageView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0.1"
+        android:visibility="visible" />
 
 </FrameLayout>

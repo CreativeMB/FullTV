@@ -13,8 +13,8 @@ android {
         applicationId = "com.creativem.fulltv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 7
-        versionName = "7"
+        versionCode = 8
+        versionName = "8"
     }
 
     buildFeatures {

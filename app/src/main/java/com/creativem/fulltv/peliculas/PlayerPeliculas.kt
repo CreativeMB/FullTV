@@ -589,8 +589,14 @@ class PlayerPeliculas : AppCompatActivity() {
     private fun obtenerProgresoGuardado(): Long {
         val clave = generarClaveProgreso()
         val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
-        return prefs.getLong(clave, 0L)
+
+        return try {
+            prefs.getLong(clave, 0L)
+        } catch (e: ClassCastException) {
+            prefs.getInt(clave, 0).toLong() // 🛠️ Conversión segura
+        }
     }
+
 
     private fun generarClaveProgreso(): String {
         val titulo = movieTitle.trim().ifBlank { "pelicula_sin_titulo" }
@@ -603,6 +609,7 @@ class PlayerPeliculas : AppCompatActivity() {
         val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
         prefs.edit().remove(clave).apply()
     }
+
 
     override fun onPause() {
         super.onPause()
