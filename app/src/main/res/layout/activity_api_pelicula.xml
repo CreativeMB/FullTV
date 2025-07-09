@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootContainer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/colorPrimary">
+
+    <!-- Contenido principal dentro del ScrollView -->
+    <ScrollView
+        android:id="@+id/mainScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:id="@+id/mainContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <!-- Fila principal: imagen + video + datos -->
+            <LinearLayout
+                android:id="@+id/topRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <!-- Columna izquierda: poster + datos -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="3"
+                    android:orientation="horizontal">
+
+                    <!-- Poster -->
+                    <ImageView
+                        android:id="@+id/ivPoster"
+                        android:layout_width="150dp"
+                        android:layout_height="220dp"
+                        android:scaleType="fitXY"
+                        android:layout_marginEnd="8dp"
+                        android:src="@drawable/icono" />
+
+                    <!-- Datos -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvTitulo"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/textColorPrimary"
+                            android:text="Título"
+                            android:textStyle="bold"
+                            android:textSize="18sp"
+                            android:layout_marginBottom="4dp" />
+
+                        <TextView
+                            android:id="@+id/tvFecha"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/textColorPrimary"
+                            android:text="Fecha de estreno"
+                            android:layout_marginBottom="4dp" />
+
+                        <TextView
+                            android:id="@+id/tvCalificacion"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Calificación"
+                            android:textColor="@color/textColorPrimary"
+                            android:layout_marginBottom="4dp" />
+
+                        <TextView
+                            android:id="@+id/tvSinopsis"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:maxLines="6"
+                            android:textColor="@color/textColorPrimary"
+                            android:text="Sinopsis"
+                            android:lineSpacingExtra="4dp"
+                            android:layout_marginTop="8dp" />
+                    </LinearLayout>
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/videoLayout"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="2"
+                    android:orientation="vertical"
+                    android:layout_marginStart="8dp"
+                    android:background="@android:color/black"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true">
+
+                    <FrameLayout
+                        android:id="@+id/videoContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="220dp"
+                        android:background="@android:color/black">
+
+                        <!-- Video que se reproduce debajo -->
+                        <VideoView
+                            android:id="@+id/videoView"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_gravity="center"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false" />
+
+                        <!-- Capa de borde por encima del video -->
+                        <View
+                            android:id="@+id/focusBorder"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:visibility="gone"
+                            android:background="@drawable/card_focused_background"/>
+                    </FrameLayout>
+                </LinearLayout>
+
+
+
+
+            </LinearLayout>
+    <!-- Contenedor del RecyclerView + capa de carga -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="250dp"
+                android:layout_marginTop="16dp">
+
+                <!-- RecyclerView -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_movies_menu"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="8dp"
+                    android:orientation="horizontal"
+                    android:overScrollMode="never"
+                    android:scrollbars="none"
+                    android:background="@android:color/transparent" />
+
+                <!-- Capa de carga sobre el RecyclerView -->
+                <FrameLayout
+                    android:id="@+id/layoutCargando"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#00000000"
+                    android:visibility="gone"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:layout_gravity="center"
+                        android:paddingHorizontal="16dp">
+
+                        <!-- Texto centrado en una sola línea -->
+                        <TextView
+                            android:id="@+id/loadingText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="12dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:text="Cargando biblioteca de Pelis gratis..."
+                            android:textColor="@color/redpersonalisado"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:gravity="center"
+                            android:textAlignment="center" />
+
+                        <!-- Barra de progreso horizontal ocupando todo el ancho -->
+                        <ProgressBar
+                            android:id="@+id/progressBar"
+                            style="@android:style/Widget.ProgressBar.Horizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="20dp"
+                            android:progress="0"
+                            android:max="100"
+                            android:visibility="visible"
+                            android:progressDrawable="@drawable/progress_bar_rojo" />
+                    </LinearLayout>
+                </FrameLayout>
+            </FrameLayout>
+
+
+        </LinearLayout>
+    </ScrollView>
+
+
+
+</FrameLayout>

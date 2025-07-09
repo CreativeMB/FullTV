@@ -10,4 +10,9 @@
         <domain includeSubdomains="true">teleclub.xyz</domain>
         <domain includeSubdomains="true">coninfo.net</domain>
     </domain-config>
+        <base-config>
+            <trust-anchors>
+                <certificates src="system" />
+            </trust-anchors>
+        </base-config>
 </network-security-config>

@@ -17,6 +17,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import com.creativem.fulltv.ApiPeliculaActivity
 import java.lang.reflect.Field
 
 class CardPresenter: Presenter(){
@@ -138,8 +139,8 @@ class CardPresenter: Presenter(){
         val currentTime = System.currentTimeMillis()
         val timeElapsed = currentTime - createdAtMillis
 
-        val esValida = validacioneslista.yaCargado() &&
-                validacioneslista.obtenerPeliculasValidas().any { it.streamUrl == movie.streamUrl }
+        val esValida = Validacioneslista.yaCargado() &&
+                Validacioneslista.obtenerPeliculasValidas().any { it.streamUrl == movie.streamUrl }
 
         if (movie.countdownMinutes <= 0 || timeElapsed >= countdownDurationMillis) {
             if (esValida) {
@@ -179,10 +180,20 @@ class CardPresenter: Presenter(){
 
         holder.view.setOnClickListener {
             val context = cardView.context
-            val intent = Intent(context, PlayerPeliculas::class.java)
+            val intent = Intent(context, ApiPeliculaActivity::class.java)
+            intent.putExtra("EXTRA_TITLE", movie.title)
             intent.putExtra("EXTRA_STREAM_URL", movie.streamUrl)
             context.startActivity(intent)
         }
+
+
+
+//        holder.view.setOnClickListener {
+//            val context = cardView.context
+//            val intent = Intent(context, PlayerPeliculas::class.java)
+//            intent.putExtra("EXTRA_STREAM_URL", movie.streamUrl)
+//            context.startActivity(intent)
+//        }
     }
 
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {

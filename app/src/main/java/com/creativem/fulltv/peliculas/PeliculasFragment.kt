@@ -76,6 +76,7 @@ import android.text.style.StyleSpan
 import android.view.Gravity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import com.creativem.fulltv.ApiPeliculaActivity
 import java.io.File
 import com.creativem.fulltv.BuildConfig
 import kotlinx.coroutines.withContext
@@ -253,8 +254,18 @@ class PeliculasFragment : BrowseSupportFragment() {
                         ).show()
                     }
                 }
+//            } else if (item is Movie) {
+//                val intent = Intent(context, PlayerPeliculas::class.java)
+//                intent.putExtra("EXTRA_STREAM_URL", item.streamUrl)
+//                intent.putExtra("EXTRA_MOVIE_TITLE", item.title)
+//                intent.putExtra("EXTRA_MOVIE_YEAR", item.year)
+//                intent.putExtra("EXTRA_MOVIE_IMAGE_URL", item.imageUrl)
+//                intent.putExtra("EXTRA_COUNTDOWN", item.countdownMinutes)
+//                startActivity(intent)
+//            }
             } else if (item is Movie) {
-                val intent = Intent(context, PlayerPeliculas::class.java)
+                val intent = Intent(context, ApiPeliculaActivity::class.java)
+                intent.putExtra("EXTRA_ORIGINAL_TITLE", item.originalTitle)
                 intent.putExtra("EXTRA_STREAM_URL", item.streamUrl)
                 intent.putExtra("EXTRA_MOVIE_TITLE", item.title)
                 intent.putExtra("EXTRA_MOVIE_YEAR", item.year)
@@ -262,8 +273,6 @@ class PeliculasFragment : BrowseSupportFragment() {
                 intent.putExtra("EXTRA_COUNTDOWN", item.countdownMinutes)
                 startActivity(intent)
             }
-
-
 
         }
 
@@ -292,7 +301,7 @@ class PeliculasFragment : BrowseSupportFragment() {
 
 
         CoroutineScope(Dispatchers.IO).launch {
-            validacioneslista.cargarPeliculas()
+            Validacioneslista.cargarPeliculas()
 
             // ⚠️ Cambio importante: actualizar etiquetas en el hilo principal
             withContext(Dispatchers.Main) {

@@ -16,7 +16,7 @@ import androidx.leanback.widget.*
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.creativem.fulltv.R
-import com.creativem.fulltv.peliculas.validacioneslista
+import com.creativem.fulltv.peliculas.Validacioneslista
 import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.peliculas.CardPresenter  // Cambio aquí
 import com.creativem.fulltv.peliculas.PlayerPeliculas
@@ -59,10 +59,10 @@ class PeliculasValidasFragment : RowsSupportFragment() {
 
         CoroutineScope(Dispatchers.Main).launch {
             // 🔄 Esperar a que la carga en segundo plano se complete
-            validacioneslista.esperarCarga()
+            Validacioneslista.esperarCarga()
 
             // ✅ Obtener las películas válidas ya cargadas
-            val peliculasOrdenadasValidas = validacioneslista.obtenerPeliculasValidas()
+            val peliculasOrdenadasValidas = Validacioneslista.obtenerPeliculasValidas()
 
             ocultarCargando() // Ocultar la barra de progreso
 

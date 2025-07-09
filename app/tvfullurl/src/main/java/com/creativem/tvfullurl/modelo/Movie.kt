@@ -7,6 +7,7 @@ data class Movie(
     var userId: String = "", // Agrega el ID del usuario que hizo el pedido
     var nombre: String = "",
     var title: String = "",    // Título de la película, valor por defecto vacío
+    var originalTitle: String = "",
     var year: String = "", // Sinopsis o descripción de la película (antes contenido)
     val email: String = "",
     var imageUrl: String = "", // URL de la imagen de la película

@@ -105,6 +105,7 @@ class PlayerPeliculas : AppCompatActivity() {
     private val hideControlsDelay = 5000L // 5 segundos
     private val updateInterval = 1000L    // 1 segundo
     private var lastInteractionTime = 0L
+    private var startPosition: Long = 0L
 
 
     private var runnableOcultar = Runnable {
@@ -137,11 +138,16 @@ class PlayerPeliculas : AppCompatActivity() {
         val nombrePeliculaTextView: TextView = findViewById(R.id.nombrePelicula)
         val imagenPeliculaImageView: ImageView = findViewById(R.id.imagenPelicula)
 
+
+
         intent?.let {
             streamUrl = it.getStringExtra("EXTRA_STREAM_URL") ?: ""
             movieTitle = it.getStringExtra("EXTRA_MOVIE_TITLE") ?: "Título desconocido"
             movieYear = it.getStringExtra("EXTRA_MOVIE_YEAR") ?: ""
             movieImageUrl = it.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
+            startPosition = it.getIntExtra("EXTRA_POSITION", 0).toLong()
+
+
 
             nombrePeliculaTextView.text = movieTitle
 
@@ -172,7 +178,7 @@ class PlayerPeliculas : AppCompatActivity() {
 
         lifecycleScope.launch {
             // Esperar a que las validaciones estén listas
-            validacioneslista.esperarCarga()
+            Validacioneslista.esperarCarga()
 
             // Luego cargar las películas al RecyclerView del menú
             loadMovies()
@@ -296,7 +302,8 @@ class PlayerPeliculas : AppCompatActivity() {
                 }
 
                 else -> {
-                    finish()
+                   finish()
+
                 }
             }
         }
@@ -349,8 +356,8 @@ class PlayerPeliculas : AppCompatActivity() {
     private fun loadMovies() {
         CoroutineScope(Dispatchers.Main).launch {
             // Usamos las que ya fueron cargadas y validadas previamente
-            val peliculasOrdenadasValidas = validacioneslista.obtenerPeliculasValidas()
-            val peliculasInvalidas = validacioneslista.obtenerPeliculasInvalidas()
+            val peliculasOrdenadasValidas = Validacioneslista.obtenerPeliculasValidas()
+            val peliculasInvalidas = Validacioneslista.obtenerPeliculasInvalidas()
 
             // Log para verificar
             Log.d(
@@ -407,7 +414,8 @@ class PlayerPeliculas : AppCompatActivity() {
             if (progresoGuardado > 0) {
                 mostrarDialogoContinuar(progresoGuardado)
             } else {
-                prepararReproductor(0L)
+                prepararReproductor(startPosition)
+
             }
         }
     }

@@ -6,8 +6,9 @@ import android.os.Parcelable
 import com.google.firebase.Timestamp
 
 data class Movie(
-    val id: String = "",  // Añadir campo id
+    val id: String = "",
     val title: String = "",
+    val originalTitle: String = "",
     val year: String = "",
     val imageUrl: String = "",
     val streamUrl: String = "",
@@ -16,34 +17,36 @@ data class Movie(
     var isActive: Boolean = true,
     val casTV: String = "",
     val countdownMinutes: Int = 0
-
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
-        parcel.readString() ?: "",
-        parcel.readString() ?: "",
-        parcel.readString() ?: "",
-        parcel.readString() ?: "",
-        parcel.readString() ?: "",
-        Timestamp(parcel.readLong(), parcel.readInt().toInt()), // Lee los segundos y nanosegundos
-        parcel.readByte() != 0.toByte(),
-        parcel.readByte() != 0.toByte(),
-        parcel.readString() ?: "",
-        parcel.readInt() // Leer countdownMinutes
+        id = parcel.readString() ?: "",
+        title = parcel.readString() ?: "",
+        originalTitle = parcel.readString() ?: "",
+        year = parcel.readString() ?: "",
+        imageUrl = parcel.readString() ?: "",
+        streamUrl = parcel.readString() ?: "",
+        createdAt = Timestamp(parcel.readLong(), parcel.readInt()), // segundos, nanosegundos
+        isValid = parcel.readByte() != 0.toByte(),
+        isActive = parcel.readByte() != 0.toByte(),
+        casTV = parcel.readString() ?: "",
+        countdownMinutes = parcel.readInt()
     )
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {
-        parcel.writeString(id)  // Escribir el id
+        parcel.writeString(id)
         parcel.writeString(title)
+        parcel.writeString(originalTitle)
         parcel.writeString(year)
         parcel.writeString(imageUrl)
         parcel.writeString(streamUrl)
-        parcel.writeLong(createdAt.seconds) // Escribir los segundos
-        parcel.writeInt(createdAt.nanoseconds) // Escribir los nanosegundos
+        parcel.writeLong(createdAt.seconds)
+        parcel.writeInt(createdAt.nanoseconds)
         parcel.writeByte(if (isValid) 1 else 0)
         parcel.writeByte(if (isActive) 1 else 0)
         parcel.writeString(casTV)
-        parcel.writeInt(countdownMinutes) // Escribir countdownMinutes
+        parcel.writeInt(countdownMinutes)
     }
+
 
     override fun describeContents(): Int {
         return 0

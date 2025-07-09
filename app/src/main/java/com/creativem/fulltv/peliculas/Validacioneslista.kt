@@ -6,7 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-object validacioneslista {
+object Validacioneslista {
     private val validaciones = Validaciones()
     private var peliculasValidas: List<Movie> = emptyList()
     private var peliculasInvalidas: List<Movie> = emptyList()

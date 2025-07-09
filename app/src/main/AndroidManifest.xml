@@ -2,17 +2,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28"/>
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
-
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO"
+    <uses-permission
+        android:name="android.permission.RECORD_AUDIO"
         tools:ignore="PermissionImpliesUnsupportedHardware" />
-    <uses-permission android:name="android.permission.READ_PRIVILEGED_PHONE_STATE"
+    <uses-permission
+        android:name="android.permission.READ_PRIVILEGED_PHONE_STATE"
         tools:ignore="ProtectedPermissions" />
+
     <uses-feature
         android:name="android.hardware.touchscreen"
         android:required="false" />
@@ -32,39 +36,39 @@
         android:usesCleartextTraffic="true"
         tools:ignore="UnusedAttribute">
         <activity
-            android:name=".principal.Main"
+            android:name=".ApiPeliculaActivity"
             android:exported="false"
-           />
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+        <activity
+            android:name=".principal.Main"
+            android:exported="false" />
         <activity
             android:name=".tv.Tv"
-            android:exported="false"
-            />
+            android:exported="false" />
         <activity
             android:name=".peliculasvalidas.PeliculasValidas"
-            android:exported="false"
-            />
+            android:exported="false" />
         <activity
             android:name=".peliculas.PeliculasFragment"
             android:exported="false"
             android:windowSoftInputMode="stateHidden|adjustPan"
-
             tools:ignore="Instantiatable" />
+        <activity android:name=".ContenedorPeliculasActivity" />
+
         <activity
             android:name=".tv.TvFragment"
             android:exported="false"
             android:windowSoftInputMode="stateHidden|adjustPan"
-
             tools:ignore="Instantiatable" />
         <activity
             android:name=".peliculasvalidas.PeliculasValidasFragment"
             android:exported="false"
             android:windowSoftInputMode="stateHidden|adjustPan"
-
             tools:ignore="Instantiatable" />
         <activity
             android:name=".principal.Nosotros"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
-
         <activity
             android:name=".peliculas.PlayerPeliculas"
             android:configChanges="orientation|screenSize|keyboardHidden"
@@ -75,9 +79,8 @@
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".principal.Login"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
-            android:exported="true">
-
+            android:exported="true"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -85,6 +88,7 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
@@ -94,9 +98,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-
-
-
     </application>
 
 </manifest>

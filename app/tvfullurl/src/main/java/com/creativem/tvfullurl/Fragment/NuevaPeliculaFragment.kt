@@ -35,6 +35,7 @@ class NuevaPeliculaFragment : Fragment() {
     private var imageUrl: String = ""
     private var streamUrl: String = ""
     private var trailerUrl: String = ""
+    private var originalTitle: String = ""
 
 
     override fun onCreateView(
@@ -51,6 +52,7 @@ class NuevaPeliculaFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         editTexts = listOf(
             binding.titleEditText,
+            binding.originalTitleEditText,
             binding.yearEditText,
             binding.imageUrlEditText,
             binding.streamUrlEditText,
@@ -85,6 +87,7 @@ class NuevaPeliculaFragment : Fragment() {
                     movie?.let {
                         // Cargar los datos en los campos
                         binding.titleEditText.setText(it.title)
+                        binding.originalTitleEditText.setText(it.originalTitle)
                         binding.yearEditText.setText(it.year)
                         binding.imageUrlEditText.setText(it.imageUrl)
                         binding.streamUrlEditText.setText(it.streamUrl)
@@ -105,6 +108,7 @@ class NuevaPeliculaFragment : Fragment() {
 
         val newMovie = Movie(
             title = binding.titleEditText.text.toString(),
+            originalTitle = binding.originalTitleEditText.text.toString(),
             year = binding.yearEditText.text.toString(),
             imageUrl = binding.imageUrlEditText.text.toString(),
             streamUrl = binding.streamUrlEditText.text.toString(),
@@ -160,6 +164,7 @@ class NuevaPeliculaFragment : Fragment() {
         imageUrl = binding.imageUrlEditText.text.toString().trim()
         streamUrl = binding.streamUrlEditText.text.toString().trim()
         trailerUrl = binding.trailerUrlEditText.text.toString().trim()
+        originalTitle = binding.originalTitleEditText.text.toString().trim()
 
         // Verificar si los campos están completos
         if (title.isEmpty() || year.isEmpty() || imageUrl.isEmpty()) {
@@ -183,6 +188,7 @@ class NuevaPeliculaFragment : Fragment() {
         // Crear el mapa con los datos de la película actualizados
         val movie: MutableMap<String, Any> = mutableMapOf(
             "title" to title,  // Asegúrate de que estas variables ya tienen los valores correctos
+            "originalTitle" to originalTitle,
             "year" to year,
             "imageUrl" to imageUrl,
             "streamUrl" to streamUrl,
@@ -219,6 +225,7 @@ class NuevaPeliculaFragment : Fragment() {
 
     private fun clearFields() {
         binding.titleEditText.text.clear()
+        binding.originalTitleEditText.text.clear()
         binding.yearEditText.text.clear()
         binding.imageUrlEditText.text.clear()
         binding.streamUrlEditText.text.clear()
