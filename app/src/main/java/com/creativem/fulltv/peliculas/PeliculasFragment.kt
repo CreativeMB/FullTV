@@ -1012,11 +1012,12 @@ class PeliculasFragment : BrowseSupportFragment() {
     }
 
     private fun irAlReproductor(movie: Movie) {
-        val intent = Intent(context, PlayerPeliculas::class.java).apply {
+        val intent = Intent(context, ApiPeliculaActivity::class.java).apply {
             putExtra("EXTRA_STREAM_URL", movie.streamUrl)
             putExtra("EXTRA_MOVIE_TITLE", movie.title)
             putExtra("EXTRA_MOVIE_YEAR", movie.year)
             putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
+            putExtra("EXTRA_ORIGINAL_TITLE", movie.originalTitle)
             putExtra("EXTRA_COUNTDOWN", movie.countdownMinutes)
             putExtra("EXTRA_CREATED_AT", movie.createdAt.seconds)
 
