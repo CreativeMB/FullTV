@@ -43,8 +43,8 @@
                             android:id="@+id/ivPoster"
                             android:layout_width="200dp"
                             android:layout_height="280dp"
-                            android:scaleType="fitXY"
                             android:layout_marginEnd="8dp"
+                            android:scaleType="fitXY"
                             android:src="@drawable/icono" />
 
                         <!-- Contenedor de datos -->
@@ -58,29 +58,29 @@
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:orientation="horizontal"
-                                android:layout_marginBottom="4dp">
+                                android:layout_marginBottom="4dp"
+                                android:orientation="horizontal">
 
                                 <TextView
                                     android:id="@+id/tvTitulo"
                                     android:layout_width="0dp"
-                                    android:layout_weight="2"
                                     android:layout_height="wrap_content"
+                                    android:layout_weight="2"
                                     android:text="Título"
                                     android:textColor="@color/colorFocused"
-                                    android:textStyle="bold"
-                                    android:textSize="30sp" />
+                                    android:textSize="30sp"
+                                    android:textStyle="bold" />
 
                                 <TextView
                                     android:id="@+id/tvCalificacion"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="⭐ 8.5"
-                                    android:textColor="@color/textColorPrimary"
-                                    android:textSize="40sp"
                                     android:layout_gravity="center_vertical"
                                     android:layout_marginEnd="10dp"
-                                    android:paddingStart="8dp" />
+                                    android:paddingStart="8dp"
+                                    android:text="⭐ 8.5"
+                                    android:textColor="@color/textColorPrimary"
+                                    android:textSize="40sp" />
                             </LinearLayout>
 
                             <!-- Fecha de estreno -->
@@ -88,44 +88,45 @@
                                 android:id="@+id/tvFecha"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:layout_marginBottom="4dp"
                                 android:text="Estreno: 2024-07-19"
                                 android:textColor="@color/textColorPrimary"
-                                android:textSize="20sp"
-                                android:layout_marginBottom="4dp" />
+                                android:textSize="20sp" />
 
                             <!-- Línea: Info adicional + Reproducir -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:orientation="horizontal"
                                 android:layout_marginBottom="4dp"
-                                android:gravity="center_vertical">
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
 
                                 <TextView
                                     android:id="@+id/tvInfoAdicional"
                                     android:layout_width="0dp"
-                                    android:layout_weight="2"
                                     android:layout_height="wrap_content"
-                                    android:textColor="@android:color/white"
-                                    android:textSize="18sp"
+                                    android:layout_weight="2"
+                                    android:padding="2dp"
                                     android:text="🎭 Géneros: Acción, Aventura\n⏱ 120 min"
-                                    android:padding="2dp" />
+                                    android:textColor="@android:color/white"
+                                    android:textSize="18sp" />
 
                                 <TextView
                                     android:id="@+id/tvReproducir"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="▶ Reproducir"
-                                    android:textColor="@color/colorSeekBar"
-                                    android:textSize="16sp"
-                                    android:padding="12dp"
-                                    android:gravity="center"
+                                    android:layout_marginStart="8dp"
+                                    android:layout_marginEnd="8dp"
                                     android:background="@drawable/focus_selector"
+                                    android:clickable="true"
                                     android:focusable="true"
                                     android:focusableInTouchMode="true"
-                                    android:clickable="true"
-                                    android:layout_marginEnd="8dp"
-                                    android:layout_marginStart="8dp" />
+                                    android:gravity="center"
+                                    android:padding="12dp"
+                                    android:textStyle="bold"
+                                    android:text="▶ Reproducir"
+                                    android:textColor="@color/colorSeekBar"
+                                    android:textSize="25sp" />
                             </LinearLayout>
 
                             <!-- Lista de actores -->
@@ -143,40 +144,31 @@
                         android:id="@+id/tvSinopsis"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:lineSpacingExtra="4dp"
+                        android:padding="2dp"
                         android:text="Sinopsis"
                         android:textColor="@color/textColorPrimary"
-                        android:textSize="18sp"
-                        android:lineSpacingExtra="4dp"
-                        android:maxLines="6"
-                        android:padding="8dp" />
+                        android:textSize="18sp" />
                 </LinearLayout>
 
 
-
-
-
-
-
-
-
-
             </LinearLayout>
-    <!-- Contenedor del RecyclerView + capa de carga -->
+            <!-- Contenedor del RecyclerView + capa de carga -->
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="250dp"
-                android:layout_marginTop="16dp">
+                android:layout_height="200dp"
+                android:layout_marginTop="2dp">
 
                 <!-- RecyclerView -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recycler_movies_menu"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:padding="8dp"
+                    android:background="@android:color/transparent"
                     android:orientation="horizontal"
                     android:overScrollMode="never"
-                    android:scrollbars="none"
-                    android:background="@android:color/transparent" />
+                    android:padding="2dp"
+                    android:scrollbars="none" />
 
                 <!-- Capa de carga sobre el RecyclerView -->
                 <FrameLayout
@@ -184,16 +176,16 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:background="#00000000"
-                    android:visibility="gone"
                     android:clickable="true"
-                    android:focusable="true">
+                    android:focusable="true"
+                    android:visibility="gone">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center"
                         android:layout_gravity="center"
+                        android:gravity="center"
+                        android:orientation="vertical"
                         android:paddingHorizontal="16dp">
 
                         <!-- Texto centrado en una sola línea -->
@@ -203,13 +195,13 @@
                             android:layout_height="wrap_content"
                             android:layout_marginBottom="12dp"
                             android:ellipsize="end"
+                            android:gravity="center"
                             android:maxLines="1"
                             android:text="Cargando biblioteca de Pelis gratis..."
+                            android:textAlignment="center"
                             android:textColor="@color/redpersonalisado"
                             android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:gravity="center"
-                            android:textAlignment="center" />
+                            android:textStyle="bold" />
 
                         <!-- Barra de progreso horizontal ocupando todo el ancho -->
                         <ProgressBar
@@ -217,10 +209,10 @@
                             style="@android:style/Widget.ProgressBar.Horizontal"
                             android:layout_width="match_parent"
                             android:layout_height="20dp"
-                            android:progress="0"
                             android:max="100"
-                            android:visibility="visible"
-                            android:progressDrawable="@drawable/progress_bar_rojo" />
+                            android:progress="0"
+                            android:progressDrawable="@drawable/progress_bar_rojo"
+                            android:visibility="visible" />
                     </LinearLayout>
                 </FrameLayout>
             </FrameLayout>
@@ -228,12 +220,13 @@
 
         </LinearLayout>
     </ScrollView>
+
     <ImageView
         android:id="@+id/backgroundImageView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="centerCrop"
         android:alpha="0.1"
+        android:scaleType="centerCrop"
         android:visibility="visible" />
 
 </FrameLayout>

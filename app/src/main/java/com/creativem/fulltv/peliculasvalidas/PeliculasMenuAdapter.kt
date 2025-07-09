@@ -1,4 +1,5 @@
 package com.creativem.fulltv.peliculasvalidas
+import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -9,7 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
-
+import android.graphics.Color
 class PeliculasMenuAdapter(
     private val movieList: MutableList<Movie>,
     private val onMovieClick: (Movie) -> Unit
@@ -38,6 +39,7 @@ class PeliculasMenuAdapter(
                     if (hasFocus) ContextCompat.getColor(view.context, R.color.colorhover2)
                     else ContextCompat.getColor(view.context, R.color.colorNotSelected)
                 )
+
             }
         }
     }
@@ -50,7 +52,21 @@ class PeliculasMenuAdapter(
 
     override fun onBindViewHolder(holder: SmallMovieViewHolder, position: Int) {
         val movie = movieList[position]
-        holder.movieTitle.text = movie.title
+
+        holder.movieTitle.apply {
+            text = movie.title
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.MARQUEE
+            marqueeRepeatLimit = -1
+            isSingleLine = true
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setHorizontallyScrolling(true)
+
+        }
+
 
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
@@ -64,6 +80,17 @@ class PeliculasMenuAdapter(
             else
                 ContextCompat.getColor(holder.itemView.context, R.color.colorNotSelected)
         )
+        // 🔵 El focus se controla desde el ítem
+        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+            holder.movieTitle.isSelected = hasFocus // 🔹 Solo se mueve el que tiene el foco
+
+            view.setBackgroundColor(
+                if (hasFocus)
+                    ContextCompat.getColor(view.context, R.color.colorhover2)
+                else
+                    ContextCompat.getColor(view.context, R.color.colorNotSelected)
+            )
+        }
     }
 
     override fun getItemCount(): Int = movieList.size
