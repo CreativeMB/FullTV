@@ -37,7 +37,7 @@ class CardPresenterTV : Presenter() {
         val cardView = ImageCardView(context).apply {
             isFocusable = true
             isFocusableInTouchMode = true
-            setMainImageDimensions(200, 280)
+            setMainImageDimensions(200, 220)
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT

@@ -127,7 +127,7 @@ class TvFragment : RowsSupportFragment() {
     private fun calcularElementosPorFila(): Int {
         val displayMetrics = android.content.res.Resources.getSystem().displayMetrics
         val anchoPantalla = displayMetrics.widthPixels
-        val anchoTarjeta = 240
+        val anchoTarjeta = 245
         return (anchoPantalla / anchoTarjeta).coerceAtLeast(1)
     }
 
