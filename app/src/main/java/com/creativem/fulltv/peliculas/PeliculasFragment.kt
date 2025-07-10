@@ -90,6 +90,7 @@ class PeliculasFragment : BrowseSupportFragment() {
     private lateinit var loadingContainer: FrameLayout
     private lateinit var binding: FragmentPeliculasBinding
     private val db = FirebaseFirestore.getInstance()
+    private var versionRemotaGlobal: String? = null
 
     // Declarar las listas de UIDs (Strings)
     val usuariosConectados = mutableListOf<String>()
@@ -240,7 +241,12 @@ class PeliculasFragment : BrowseSupportFragment() {
                         startActivity(intent)
                     }
                     "Descarga\nActualizacion" -> {
-                        descargarActualizacion()
+                        versionRemotaGlobal?.let { version ->
+                            descargarActualizacion(version)
+                        } ?: run {
+                            Toast.makeText(requireContext(), "Versión remota no disponible", Toast.LENGTH_SHORT).show()
+                        }
+
                     }
                     "Cerrar\nCuenta" -> {
                         cerrarSesion() // Llama al método de cerrar sesión
@@ -563,9 +569,10 @@ class PeliculasFragment : BrowseSupportFragment() {
         noticiaRef.get()
             .addOnSuccessListener { document ->
                 if (document.exists()) {
-                    val versionLocal = BuildConfig.VERSION_CODE
+                    val versionLocal = BuildConfig.VERSION_NAME
                     val mensajeBanner = document.getString("banner") ?: ""
                     val versionRemota = document.getString("versionapk") ?: ""
+                    versionRemotaGlobal = versionRemota
 
                     val mensajeFinalBanner = """
                     $mensajeBanner
@@ -632,11 +639,11 @@ class PeliculasFragment : BrowseSupportFragment() {
                         val mensaje = """
         ¡Tenemos buenas noticias!
 
-        Una nueva versión de la aplicación está disponible.
+        Una nueva (versión $versionRemota) de la aplicación está disponible.
 
         Esta actualización incluye mejoras de rendimiento, nuevas funciones y una experiencia mucho más rápida y estable.
 
-        🔄 ¡Actualiza ahora para disfrutar la mejor versión de FullTV!
+        🔄 ¡Actualiza ahora para disfrutar la mejor (versión $versionRemota) de FullTV!
     """.trimIndent()
 
                         val spannable = SpannableString(mensaje).apply {
@@ -649,7 +656,12 @@ class PeliculasFragment : BrowseSupportFragment() {
                             .setMessage(spannable)
                             .setCancelable(false)
                             .setPositiveButton("Actualizar ahora") { _, _ ->
-                                descargarActualizacion()
+                                versionRemotaGlobal?.let { version ->
+                                    descargarActualizacion(version)
+                                } ?: run {
+                                    Toast.makeText(requireContext(), "Versión remota no disponible", Toast.LENGTH_SHORT).show()
+                                }
+
                             }
                             .setNegativeButton("Más tarde", null)
                             .show()
@@ -674,7 +686,19 @@ class PeliculasFragment : BrowseSupportFragment() {
             }
     }
 
-    private fun descargarActualizacion() {
+    private fun descargarActualizacion(versionRemota: String) {
+        val versionLocal = BuildConfig.VERSION_NAME
+
+        // ✅ Validar si la versión ya está instalada
+        if (versionRemota == versionLocal) {
+            AlertDialog.Builder(requireContext())
+                .setTitle("✅ Ya tienes la última versión (versión $versionRemota)")
+                .setMessage("No es necesario actualizar. Estás usando la (versión $versionRemota) más reciente de FullTV.")
+                .setPositiveButton("Aceptar", null)
+                .show()
+            return
+        }
+
         val url = "https://github.com/CreativeMB/FullTV/releases/download/fulltv/FullTV_update.apk"
         val fileName = "FullTV_update.apk"
         val apkFile = File(requireContext().getExternalFilesDir(null), fileName)
@@ -708,8 +732,8 @@ class PeliculasFragment : BrowseSupportFragment() {
         }
 
         val progressDialog = AlertDialog.Builder(requireContext())
-            .setTitle("\uD83D\uDCE5 Nueva versión disponible")
-            .setMessage("Se recomienda actualizar para mejorar rendimiento y disfrutar nuevas funciones.")
+            .setTitle("📥 Descargando actualización (versión $versionRemota)")
+            .setMessage("La descarga de la (versión $versionRemota) ha comenzado. En un momento disfrutarás de las nuevas funciones y mejoras.")
             .setView(layout)
             .setCancelable(false)
             .create()
@@ -741,26 +765,25 @@ class PeliculasFragment : BrowseSupportFragment() {
                     totalSizeBytes = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
                     downloadedBytes = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
 
-                    if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                        cursor.close()
-
-                        // Si no alcanzó a mostrar barra, simular
-                        if (lastProgress < 100) {
-                            simulateFinalProgress(progressBar, textoProgreso, apkFile, progressDialog)
-                        } else {
-                            textoProgreso.text = "Descarga completada ✅"
-                            progressDialog.dismiss()
-                            instalarAPK(apkFile)
+                    when (status) {
+                        DownloadManager.STATUS_SUCCESSFUL -> {
+                            cursor.close()
+                            if (lastProgress < 100) {
+                                simulateFinalProgress(progressBar, textoProgreso, apkFile, progressDialog)
+                            } else {
+                                textoProgreso.text = "Descarga completada ✅"
+                                progressDialog.dismiss()
+                                instalarAPK(apkFile)
+                            }
+                            return
                         }
 
-                        return
-                    }
-
-                    if (status == DownloadManager.STATUS_FAILED) {
-                        cursor.close()
-                        textoProgreso.text = "❌ Error al descargar"
-                        progressDialog.dismiss()
-                        return
+                        DownloadManager.STATUS_FAILED -> {
+                            cursor.close()
+                            textoProgreso.text = "❌ Error al descargar"
+                            progressDialog.dismiss()
+                            return
+                        }
                     }
 
                     if (totalSizeBytes > 0) {
@@ -768,7 +791,6 @@ class PeliculasFragment : BrowseSupportFragment() {
                         if (progress > lastProgress) {
                             lastProgress = progress
                             progressBar.progress = progress
-
                             textoProgreso.text = "Descargando... $progress%"
                         }
                     } else {
@@ -781,6 +803,7 @@ class PeliculasFragment : BrowseSupportFragment() {
             }
         })
     }
+
 
     private fun simulateFinalProgress(
         progressBar: ProgressBar,
