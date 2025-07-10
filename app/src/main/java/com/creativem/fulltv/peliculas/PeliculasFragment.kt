@@ -838,10 +838,10 @@ class PeliculasFragment : RowsSupportFragment() {
         }
 
         // Agregamos el menú al rowsAdapter
-        rowsAdapter.add(ListRow(HeaderItem(3, "Opciones"), menuAdapter))
+        rowsAdapter.add(ListRow(HeaderItem(3, ""), menuAdapter))
 
         // Luego, agregamos el contenido de las películas
-        agregarALista(peliculas, "Alquila Pelicula")
+        agregarALista(peliculas, "")
 
         // Notificamos el cambio de rango si es necesario
         rowsAdapter.notifyArrayItemRangeChanged(
