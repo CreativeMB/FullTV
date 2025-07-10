@@ -68,6 +68,8 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.TransitionDrawable
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.net.Uri
 import android.text.SpannableString
 import android.text.Spanned
@@ -75,13 +77,16 @@ import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import android.view.Gravity
 import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.getSystemService
 import androidx.core.content.FileProvider
 import androidx.leanback.app.RowsSupportFragment
 import com.creativem.fulltv.ApiPeliculaActivity
 import java.io.File
 import com.creativem.fulltv.BuildConfig
 import kotlinx.coroutines.withContext
-
+import android.media.AudioAttributes
+import android.os.Build
+import androidx.annotation.RequiresApi
 
 class PeliculasFragment : RowsSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -381,6 +386,10 @@ class PeliculasFragment : RowsSupportFragment() {
     override fun onResume() {
         super.onResume()
         actualizarUsuarioInfo() // Actualiza la información del usuario cada vez que el fragmento se vuelve visible
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context?.let { requestAudioFocus(it) } // <-- contexto del fragmento
+        }
+
     }
 
     // Función para actualizar el nombre de usuario y la cantidad de Castv
@@ -1451,7 +1460,42 @@ class PeliculasFragment : RowsSupportFragment() {
             progresoHandler.removeCallbacks(progresoRunnable)
         }
     }
+    lateinit var audioManager: AudioManager
+    lateinit var focusRequest: AudioFocusRequest
 
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun requestAudioFocus(context: Context) {
+        audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+        focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+            )
+            .setOnAudioFocusChangeListener { /* Ignorado si solo queremos silenciar otras apps */ }
+            .build()
+
+        val result = audioManager.requestAudioFocus(focusRequest)
+        if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            Log.d("AudioFocus", "Audio focus obtenido")
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun abandonAudioFocus() {
+        if (::audioManager.isInitialized && ::focusRequest.isInitialized) {
+            audioManager.abandonAudioFocusRequest(focusRequest)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            abandonAudioFocus()
+        }
+    }
 
 }
 
