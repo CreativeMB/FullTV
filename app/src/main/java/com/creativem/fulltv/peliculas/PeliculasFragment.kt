@@ -76,13 +76,14 @@ import android.text.style.StyleSpan
 import android.view.Gravity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.leanback.app.RowsSupportFragment
 import com.creativem.fulltv.ApiPeliculaActivity
 import java.io.File
 import com.creativem.fulltv.BuildConfig
 import kotlinx.coroutines.withContext
 
 
-class PeliculasFragment : BrowseSupportFragment() {
+class PeliculasFragment : RowsSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
     private val validaciones = Validaciones()
     private lateinit var progressBar: ProgressBar
@@ -105,6 +106,9 @@ class PeliculasFragment : BrowseSupportFragment() {
         val view = super.onCreateView(inflater, container, savedInstanceState)
         // Ya no inflar ni añadir loading_overlay
         binding = FragmentPeliculasBinding.bind(requireActivity().findViewById(R.id.main))
+
+
+
         loadingContainer = binding.loadingOverlay
         progressBar = binding.progressBar
         loadingText = binding.loadingText
@@ -260,15 +264,6 @@ class PeliculasFragment : BrowseSupportFragment() {
                         ).show()
                     }
                 }
-//            } else if (item is Movie) {
-//                val intent = Intent(context, PlayerPeliculas::class.java)
-//                intent.putExtra("EXTRA_STREAM_URL", item.streamUrl)
-//                intent.putExtra("EXTRA_MOVIE_TITLE", item.title)
-//                intent.putExtra("EXTRA_MOVIE_YEAR", item.year)
-//                intent.putExtra("EXTRA_MOVIE_IMAGE_URL", item.imageUrl)
-//                intent.putExtra("EXTRA_COUNTDOWN", item.countdownMinutes)
-//                startActivity(intent)
-//            }
             } else if (item is Movie) {
                 val intent = Intent(context, ApiPeliculaActivity::class.java)
                 intent.putExtra("EXTRA_ORIGINAL_TITLE", item.originalTitle)
@@ -333,39 +328,6 @@ class PeliculasFragment : BrowseSupportFragment() {
         cargarPeliculas()
         actualizarUsuarioInfo()
         mostrarPublicidad()
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            // Esperar hasta que el RecyclerView de Leanback esté listo
-            delay(1000)
-            Log.d("DEBUG", "Tamaño de rowsAdapter: ${rowsAdapter.size()}")
-
-            if (rowsAdapter.size() > 0 && rowsAdapter.get(0) is ListRow) {
-                val firstRow = rowsAdapter.get(0) as ListRow
-                Log.d("DEBUG", "Tamaño del adapter de la primera fila: ${firstRow.adapter.size()}")
-
-                if (firstRow.adapter.size() > 0) {
-                    requireActivity().runOnUiThread {
-                        setSelectedPosition(0, true, object : ListRowPresenter.SelectItemViewHolderTask(0) {
-                            override fun run(holder: androidx.leanback.widget.Presenter.ViewHolder?) {
-                                super.run(holder)
-                                Log.d("DEBUG", "Seleccionado primer elemento de la primera lista")
-
-                                holder?.view?.post {
-                                    holder.view.performClick() // Primer clic
-                                    Log.d("DEBUG", "Primer clic realizado")
-
-                                    holder.view.postDelayed({
-                                        holder.view.performClick() // Segundo clic (doble clic)
-                                        Log.d("DEBUG", "Segundo clic realizado")
-                                    }, 200) // Pequeño retraso para simular doble clic
-                                }
-                            }
-                        })
-                    }
-                }
-            }
-        }
-
 
         // Cargar información del usuario
         val usuarioId =
@@ -892,7 +854,7 @@ class PeliculasFragment : BrowseSupportFragment() {
     private fun calcularElementosPorFila(): Int {
         val displayMetrics = Resources.getSystem().displayMetrics
         val anchoPantalla = displayMetrics.widthPixels
-        val anchoTarjeta = 240 // Define el ancho aproximado de cada tarjeta en píxeles
+        val anchoTarjeta = 245 // Define el ancho aproximado de cada tarjeta en píxeles
         return (anchoPantalla / anchoTarjeta).coerceAtLeast(1) // Asegura al menos 1 elemento por fila
     }
 
