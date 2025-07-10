@@ -577,7 +577,7 @@ class PeliculasFragment : BrowseSupportFragment() {
                     val mensajeFinalBanner = """
                     $mensajeBanner
 
-                    📲 Versión instalada: $versionLocal
+                    📲 Instalada: (versión $versionLocal) 🆕 Última: (versión $versionRemota)
                 """.trimIndent()
 
                     binding.txtBanner.apply {
