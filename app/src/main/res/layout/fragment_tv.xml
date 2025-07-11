@@ -31,7 +31,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Actualizando biblioteca de TV gratis...\n\nCargando..."
-            android:textColor="@color/redpersonalisado"
+            android:textColor="@color/rojo"
             android:textSize="40sp"
             android:textStyle="bold"
             android:gravity="center"

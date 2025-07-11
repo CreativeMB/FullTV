@@ -10,12 +10,24 @@
     android:descendantFocusability="afterDescendants"
     android:clipToPadding="false">
 
-
     <ImageView
         android:id="@+id/mainBackgroundImage"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/menu_principal"
+        android:layout_width="55dp"
+        android:layout_height="match_parent"
+        android:background="@color/fondo"
+        android:gravity="center_horizontal"
+        android:padding="8dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:descendantFocusability="afterDescendants"
+        />
+
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/fragment_container"
@@ -28,22 +40,31 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <TextView
-        android:id="@+id/txtBanner"
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="#7A282828"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:padding="8dp"
-        android:gravity="center_vertical"
-        android:singleLine="true"
-        android:ellipsize="marquee"
-        android:marqueeRepeatLimit="marquee_forever"
-        android:focusable="false"
-        android:focusableInTouchMode="false"
-        android:scrollHorizontally="true"
-        android:visibility="gone" />
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:id="@+id/txtBanner"
+            android:layout_width="905dp"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_marginEnd="0dp"
+            android:background="@color/fondo"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:padding="8dp"
+            android:text="soy el banner principal de la app"
+            android:gravity="center_vertical"
+            android:singleLine="true"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:scrollHorizontally="true"
+            android:visibility="visible" />
+    </RelativeLayout>
+
 
     <LinearLayout
         android:id="@+id/linearLayout"
@@ -51,9 +72,8 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:layout_gravity="end"
-        android:background="#7A282828"
-        android:layout_marginTop="35dp"
-        android:layout_marginEnd="20dp">
+        android:background="@color/fondo"
+        android:layout_marginTop="35dp">
 
 
         <LinearLayout
@@ -122,7 +142,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="@color/redpersonalisado"
+                        android:textColor="@color/rojo"
                         android:textSize="16sp"
                         android:layout_marginEnd="10dp" />
                 </LinearLayout>
@@ -171,7 +191,7 @@
                 android:scrollHorizontally="true"
                 android:text="Actualización"
                 android:layout_gravity="end"
-                android:textColor="#E53935"
+                android:textColor="@color/rojo"
                 android:textSize="16sp"
                 android:visibility="visible"
                 android:padding="8dp" />
@@ -194,30 +214,20 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             style="?android:attr/progressBarStyleLarge"
-            android:indeterminateTint="@android:color/holo_red_dark" />
+            android:indeterminateTint="@color/rojo" />
 
         <TextView
             android:id="@+id/loadingText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Cargando..."
-            android:textColor="@android:color/holo_red_dark"
+            android:textColor="@color/rojo"
             android:layout_gravity="center|bottom"
             android:gravity="center"
             android:layout_marginBottom="32dp"
             android:textSize="40sp"
             android:textStyle="bold" />
     </FrameLayout>
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/menu_principal"
-        android:layout_width="50dp"
-        android:layout_height="match_parent"
-        android:background="#7A282828"
-        android:padding="8dp"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:descendantFocusability="afterDescendants"
-        />
 
 
 </FrameLayout>

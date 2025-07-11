@@ -24,7 +24,7 @@
         android:layout_gravity="top|end"
         android:orientation="horizontal"
         android:padding="10dp"
-        android:background="@color/colorPrimary"
+        android:background="@color/fondo"
         android:layout_marginTop="10dp"
         android:layout_marginEnd="10dp">
 
@@ -33,7 +33,7 @@
             android:layout_width="60dp"
             android:layout_height="60dp"
             android:text="5 s"
-            android:textColor="#E53935"
+            android:textColor="@color/rojo"
             android:textSize="40sp"
             android:gravity="center"
             android:textStyle="bold" />
@@ -48,7 +48,7 @@
             android:focusable="true"
             android:focusableInTouchMode="true"
             android:contentDescription="Cerrar publicidad"
-            app:tint="#E53935" />
+            app:tint="@color/rojo" />
     </LinearLayout>
 
     <TextView
@@ -57,7 +57,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
         android:text="Actualizando biblioteca en linea...\n\nCargando..."
-        android:textColor="@color/redpersonalisado"
+        android:textColor="@color/rojo"
         android:textSize="40sp"
         android:textStyle="bold"
         android:gravity="center"

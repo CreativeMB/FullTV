@@ -74,7 +74,7 @@
                 android:layout_marginStart="15dp"
                 android:background="@drawable/button_selector"
                 android:max="100"
-                android:progressTint="@color/colorSeekBar"
+                android:progressTint="@color/rojo"
                 android:thumbTint="@color/colorSeekBar1"
                 android:layout_marginTop="5dp" />
 

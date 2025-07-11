@@ -5,7 +5,7 @@
     <color name="colorhover">#D500B8D4</color>
     <color name="colorhover2">#0091EA</color><!-- Color para hover -->
     <color name="negro">#000000</color> <!-- Color para selección -->
-    <color name="fondo">#2B2B2B</color>    <!-- Color para hover -->
+    <color name="fondo">#CC1D1D1D</color>    <!-- Color para hover -->
     <color name="bordeitems">#FFD600</color>
     <color name="redpersonalisado">#FC3D4C</color>
 
@@ -13,6 +13,7 @@
     <color name="tu_color_barra">#FF0000</color>
     <color name="tu_color_navegacion">#0000FF</color>
     <color name="tu_color_estado">#00FF00</color>
+    <color name="rojo">#BC0700</color>
 
     <color name="colorPrimary">#282828</color> <!-- Color principal -->
     <color name="colorPrimaryDark">#3700B3</color> <!-- Color oscuro principal -->

@@ -23,7 +23,7 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:textAlignment="center"
-        android:textColor="@color/redpersonalisado"
+        android:textColor="@color/rojo"
         android:textSize="18sp"
         android:textStyle="bold" />
 
@@ -41,7 +41,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Actualizando biblioteca de Pelis gratis\n\nCargando..."
-            android:textColor="@color/redpersonalisado"
+            android:textColor="@color/rojo"
             android:textSize="40sp"
             android:textStyle="bold"
             android:gravity="center"

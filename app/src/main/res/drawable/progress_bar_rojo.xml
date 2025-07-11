@@ -10,7 +10,7 @@
     <item android:id="@android:id/progress">
         <clip>
             <shape>
-                <solid android:color="#FF0000" /> <!-- Rojo puro -->
+                <solid android:color="@color/rojo" /> <!-- Rojo puro -->
             </shape>
         </clip>
     </item>
