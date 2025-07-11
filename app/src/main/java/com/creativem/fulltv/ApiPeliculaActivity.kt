@@ -332,20 +332,4 @@ class ApiPeliculaActivity : AppCompatActivity() {
             loadingContainer.visibility = View.GONE
         }
     }
-    override fun onResume() {
-        super.onResume()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val granted = AudioFocusHelper.requestAudioFocus(this)
-            if (granted) {
-                // Aquí podrías reproducir audio si lo tuvieras
-            }
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioFocusHelper.abandonAudioFocus()
-        }
-    }
 }

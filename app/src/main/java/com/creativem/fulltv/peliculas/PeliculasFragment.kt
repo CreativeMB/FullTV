@@ -66,6 +66,7 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.TransitionDrawable
+import android.media.AudioManager
 import android.net.Uri
 import android.text.SpannableString
 import android.text.Spanned
@@ -81,7 +82,6 @@ import com.creativem.fulltv.BuildConfig
 import kotlinx.coroutines.withContext
 import android.os.Build
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
 
 class PeliculasFragment : RowsSupportFragment() {
@@ -345,11 +345,7 @@ class PeliculasFragment : RowsSupportFragment() {
     override fun onResume() {
         super.onResume()
         actualizarUsuarioInfo() // Actualiza la información del usuario cada vez que el fragmento se vuelve visible
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context?.let { requestAudioFocus(it) } // <-- contexto del fragmento
-        }
-
-    }
+            }
 
     // Función para actualizar el nombre de usuario y la cantidad de Castv
     fun actualizarUsuario(usuario: String, cantidadCastv: Int, cantidadPeliculas: Int) {
@@ -1459,10 +1455,20 @@ class PeliculasFragment : RowsSupportFragment() {
             progresoHandler.removeCallbacks(progresoRunnable)
         }
     }
-    override fun onPause() {
-        super.onPause()
+    override fun onStart() {
+        super.onStart()
+
+        val context = requireContext() // <-- contexto correcto para Fragment
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioFocusHelper.abandonAudioFocus()
+            AudioFocusHelper.requestAudioFocus(context)
+        } else {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            audioManager.requestAudioFocus(
+                { /* puedes manejar cambios si quieres */ },
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            )
         }
     }
 

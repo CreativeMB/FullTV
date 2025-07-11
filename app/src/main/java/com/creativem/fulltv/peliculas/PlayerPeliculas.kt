@@ -624,10 +624,6 @@ class PlayerPeliculas : AppCompatActivity() {
 
         player?.pause()
         handler.postDelayed(runnableActualizar, 1000)
-        // Abandonar el audio focus (importante)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioFocusHelper.abandonAudioFocus()
-        }
     }
 
 
@@ -1084,19 +1080,7 @@ class PlayerPeliculas : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-
-        // Solicitar el audio focus antes de reproducir
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val granted = AudioFocusHelper.requestAudioFocus(this)
-            if (granted) {
-                player?.playWhenReady = true
-            }
-        } else {
-            // Para versiones menores a Oreo, seguir como siempre
-            player?.playWhenReady = true
-        }
-
-        // Verificar si el player está en reproducción para actualizar el UI
+            // Verificar si el player está en reproducción para actualizar el UI
         if (player?.isPlaying == true) {
             handler.postDelayed(runnableActualizar, 1000)
         }

@@ -24,21 +24,6 @@ class Nosotros : AppCompatActivity() {
         col2.text = HtmlCompat.fromHtml(getString(R.string.columna_2), HtmlCompat.FROM_HTML_MODE_LEGACY)
         col3.text = HtmlCompat.fromHtml(getString(R.string.columna_3), HtmlCompat.FROM_HTML_MODE_LEGACY)
     }
-    override fun onResume() {
-        super.onResume()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val granted = AudioFocusHelper.requestAudioFocus(this)
-            if (granted) {
-                // Aquí podrías reproducir audio si lo tuvieras
-            }
-        }
-    }
 
-    override fun onPause() {
-        super.onPause()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioFocusHelper.abandonAudioFocus()
-        }
-    }
 
 }

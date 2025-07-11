@@ -196,23 +196,4 @@ class PeliculasValidasFragment : RowsSupportFragment() {
             }
         }
     }
-    override fun onResume() {
-        super.onResume()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val context = requireContext()
-            val granted = AudioFocusHelper.requestAudioFocus(context)
-            if (granted) {
-                // Lógica si se obtiene el foco
-            }
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioFocusHelper.abandonAudioFocus()
-        }
-    }
-
-
 }
