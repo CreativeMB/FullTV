@@ -11,6 +11,7 @@ import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.*
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
+import com.creativem.fulltv.principal.AudioFocusHelper
 import com.creativem.fulltv.principal.Movie
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope

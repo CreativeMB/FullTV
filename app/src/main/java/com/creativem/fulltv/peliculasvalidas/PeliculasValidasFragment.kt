@@ -2,7 +2,6 @@ package com.creativem.fulltv.peliculasvalidas
 
 import android.content.Intent
 import android.content.res.Resources
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -16,12 +15,11 @@ import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.*
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
-import com.creativem.fulltv.ApiPeliculaActivity
+import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.R
 import com.creativem.fulltv.peliculas.Validacioneslista
 import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.peliculas.CardPresenter  // Cambio aquí
-import com.creativem.fulltv.peliculas.PlayerPeliculas
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay

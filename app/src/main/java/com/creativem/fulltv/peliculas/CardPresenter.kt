@@ -17,7 +17,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
-import com.creativem.fulltv.ApiPeliculaActivity
+import com.creativem.fulltv.api.ApiPeliculaActivity
 import java.lang.reflect.Field
 
 class CardPresenter: Presenter(){

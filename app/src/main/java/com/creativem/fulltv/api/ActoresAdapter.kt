@@ -1,4 +1,4 @@
-package com.creativem.fulltv
+package com.creativem.fulltv.api
 
 import android.view.LayoutInflater
 import android.view.View
@@ -7,6 +7,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.creativem.fulltv.R
 
 class ActoresAdapter(private val actores: List<CastMember>) :
     RecyclerView.Adapter<ActoresAdapter.ActorViewHolder>() {

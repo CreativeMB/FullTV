@@ -1,4 +1,4 @@
-package com.creativem.fulltv
+package com.creativem.fulltv.api
 
 import retrofit2.Call
 import retrofit2.http.GET

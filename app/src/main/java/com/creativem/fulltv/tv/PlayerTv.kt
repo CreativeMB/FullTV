@@ -40,6 +40,7 @@ import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.databinding.PlayerBinding
+import com.creativem.fulltv.principal.AudioFocusHelper
 import com.google.firebase.firestore.FirebaseFirestore
 
 class PlayerTv : AppCompatActivity() {

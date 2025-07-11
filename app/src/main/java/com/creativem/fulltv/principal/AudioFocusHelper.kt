@@ -1,3 +1,5 @@
+package com.creativem.fulltv.principal
+
 import android.content.Context
 import android.media.*
 import android.os.Build
@@ -28,7 +30,7 @@ object AudioFocusHelper {
 
     @RequiresApi(Build.VERSION_CODES.O)
     fun abandonAudioFocus() {
-        if (::audioManager.isInitialized && focusRequest != null) {
+        if (AudioFocusHelper::audioManager.isInitialized && focusRequest != null) {
             audioManager.abandonAudioFocusRequest(focusRequest!!)
         }
     }

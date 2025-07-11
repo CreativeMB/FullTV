@@ -1,4 +1,4 @@
-package com.creativem.fulltv
+package com.creativem.fulltv.api
 
 data class MovieDetailResponse(
     val id: Int,

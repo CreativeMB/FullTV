@@ -1,6 +1,5 @@
 package com.creativem.fulltv.peliculas
 
-import AudioFocusHelper.requestAudioFocus
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Intent
@@ -76,13 +75,14 @@ import android.view.Gravity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.leanback.app.RowsSupportFragment
-import com.creativem.fulltv.ApiPeliculaActivity
+import com.creativem.fulltv.api.ApiPeliculaActivity
 import java.io.File
 import com.creativem.fulltv.BuildConfig
 import kotlinx.coroutines.withContext
 import android.os.Build
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
+import com.creativem.fulltv.principal.AudioFocusHelper
 
 class PeliculasFragment : RowsSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())

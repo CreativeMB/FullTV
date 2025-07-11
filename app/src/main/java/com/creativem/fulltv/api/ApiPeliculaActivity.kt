@@ -1,11 +1,9 @@
-package com.creativem.fulltv
+package com.creativem.fulltv.api
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import android.widget.*
@@ -13,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.creativem.fulltv.R
 import com.creativem.fulltv.peliculas.PlayerPeliculas
 import com.creativem.fulltv.peliculas.Validacioneslista
 import com.creativem.fulltv.peliculasvalidas.PeliculasMenuAdapter
