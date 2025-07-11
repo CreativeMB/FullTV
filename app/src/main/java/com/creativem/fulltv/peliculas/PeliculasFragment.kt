@@ -1,5 +1,7 @@
 package com.creativem.fulltv.peliculas
 
+import AudioFocusHelper.abandonAudioFocus
+import AudioFocusHelper.requestAudioFocus
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Intent
@@ -382,7 +384,7 @@ class PeliculasFragment : RowsSupportFragment() {
         }
     }
 
-    // Sobrescribir el método onResume para actualizar la información del usuario
+//     Sobrescribir el método onResume para actualizar la información del usuario
     override fun onResume() {
         super.onResume()
         actualizarUsuarioInfo() // Actualiza la información del usuario cada vez que el fragmento se vuelve visible
@@ -1460,40 +1462,10 @@ class PeliculasFragment : RowsSupportFragment() {
             progresoHandler.removeCallbacks(progresoRunnable)
         }
     }
-    lateinit var audioManager: AudioManager
-    lateinit var focusRequest: AudioFocusRequest
-
-    @RequiresApi(Build.VERSION_CODES.O)
-    fun requestAudioFocus(context: Context) {
-        audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
-        focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build()
-            )
-            .setOnAudioFocusChangeListener { /* Ignorado si solo queremos silenciar otras apps */ }
-            .build()
-
-        val result = audioManager.requestAudioFocus(focusRequest)
-        if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-            Log.d("AudioFocus", "Audio focus obtenido")
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.O)
-    fun abandonAudioFocus() {
-        if (::audioManager.isInitialized && ::focusRequest.isInitialized) {
-            audioManager.abandonAudioFocusRequest(focusRequest)
-        }
-    }
-
     override fun onPause() {
         super.onPause()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            abandonAudioFocus()
+            AudioFocusHelper.abandonAudioFocus()
         }
     }
 

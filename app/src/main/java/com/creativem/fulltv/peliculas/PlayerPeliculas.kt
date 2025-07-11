@@ -53,6 +53,7 @@ import org.json.JSONObject
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.os.CountDownTimer
 import android.text.Spannable
 import android.text.SpannableStringBuilder
@@ -623,6 +624,10 @@ class PlayerPeliculas : AppCompatActivity() {
 
         player?.pause()
         handler.postDelayed(runnableActualizar, 1000)
+        // Abandonar el audio focus (importante)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioFocusHelper.abandonAudioFocus()
+        }
     }
 
 
@@ -1075,22 +1080,28 @@ class PlayerPeliculas : AppCompatActivity() {
                 .show()
         }
     }
-//    override fun onPause() {
-//        super.onPause()
-//        player?.pause()
-//        handler.postDelayed(runnableActualizar, 1000)
-//
-//    }
+
 
     override fun onResume() {
-
         super.onResume()
-        player?.playWhenReady = true
+
+        // Solicitar el audio focus antes de reproducir
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val granted = AudioFocusHelper.requestAudioFocus(this)
+            if (granted) {
+                player?.playWhenReady = true
+            }
+        } else {
+            // Para versiones menores a Oreo, seguir como siempre
+            player?.playWhenReady = true
+        }
+
+        // Verificar si el player está en reproducción para actualizar el UI
         if (player?.isPlaying == true) {
             handler.postDelayed(runnableActualizar, 1000)
-            // Reanudar actualizaciones al reproducir
         }
     }
+
 
     private fun releasePlayer() {
         player?.removeListener(playerListener)

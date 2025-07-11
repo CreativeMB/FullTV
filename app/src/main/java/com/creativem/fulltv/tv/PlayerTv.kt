@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -415,14 +416,31 @@ class PlayerTv : AppCompatActivity() {
         super.onPause()
         releasePlayer()
         playerHandler.removeCallbacksAndMessages(null) // Limpiar todos los mensajes del Handler
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioFocusHelper.abandonAudioFocus()
+        }
     }
 
     override fun onResume() {
         super.onResume()
+
         if (player == null && !playerReleased) {
-            player = ExoPlayer.Builder(this).build()
-            binding.reproductor.player = player
-            initializePlayer()
+            // Solicitar audio focus antes de reproducir
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val granted = AudioFocusHelper.requestAudioFocus(this)
+                if (granted) {
+                    player = ExoPlayer.Builder(this).build()
+                    binding.reproductor.player = player
+                    initializePlayer()
+                } else {
+                    Log.d("AudioFocus", "No se pudo obtener el audio focus")
+                }
+            } else {
+                // Para versiones < Oreo no se requiere AudioFocusRequest
+                player = ExoPlayer.Builder(this).build()
+                binding.reproductor.player = player
+                initializePlayer()
+            }
         }
     }
 

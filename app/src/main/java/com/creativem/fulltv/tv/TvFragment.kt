@@ -1,5 +1,6 @@
 package com.creativem.fulltv.tv
 
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -145,4 +146,22 @@ class TvFragment : RowsSupportFragment() {
             channels.add(ListRow(header, listRowAdapter))
         }
     }
+    override fun onResume() {
+        super.onResume()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val context = requireContext()
+            val granted = AudioFocusHelper.requestAudioFocus(context)
+            if (granted) {
+                // Lógica si se obtiene el foco
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioFocusHelper.abandonAudioFocus()
+        }
+    }
+
 }

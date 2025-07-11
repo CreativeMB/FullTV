@@ -2,6 +2,7 @@ package com.creativem.fulltv.peliculasvalidas
 
 import android.content.Intent
 import android.content.res.Resources
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -193,6 +194,23 @@ class PeliculasValidasFragment : RowsSupportFragment() {
             if (item is Movie) {
                 cargarImagenDeFondo(item.imageUrl)
             }
+        }
+    }
+    override fun onResume() {
+        super.onResume()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val context = requireContext()
+            val granted = AudioFocusHelper.requestAudioFocus(context)
+            if (granted) {
+                // Lógica si se obtiene el foco
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioFocusHelper.abandonAudioFocus()
         }
     }
 
