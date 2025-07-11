@@ -166,10 +166,10 @@
 
 
             <ImageView
+                android:id="@+id/imagenuser"
                 android:layout_width="65dp"
                 android:layout_height="65dp"
                 android:background="@drawable/icono"
-                android:padding="10dp"
                 android:layout_gravity="top|end" />
         </LinearLayout>
 

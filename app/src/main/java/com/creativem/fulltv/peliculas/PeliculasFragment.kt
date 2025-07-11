@@ -317,21 +317,31 @@ class PeliculasFragment : RowsSupportFragment() {
             viewLifecycleOwner.lifecycleScope.launch {
                 val nombreUsuario = validaciones.obtenerNombreUsuario(usuarioId)
                 val cantidadCastv = validaciones.obtenerCantidadCastv(usuarioId)
-                val cantidadPeliculas =
-                    validaciones.obtenerCantidadPeliculas() // Obtener cantidad de películas
-                actualizarUsuario(
-                    nombreUsuario,
-                    cantidadCastv,
-                    cantidadPeliculas
-                ) // Pasar cantidad de películas
+                val cantidadPeliculas = validaciones.obtenerCantidadPeliculas()
+
+                actualizarUsuario(nombreUsuario, cantidadCastv, cantidadPeliculas)
+
+                // ✅ Cargar la foto de perfil de Gmail (Google)
+                val photoUrl = FirebaseAuth.getInstance().currentUser?.photoUrl
+                if (photoUrl != null) {
+                    Glide.with(requireContext())
+                        .load(photoUrl)
+                        .placeholder(R.drawable.icono)
+                        .error(R.drawable.icono)
+                        .centerCrop()
+                        .into(binding.imagenuser)
+                } else {
+                    binding.imagenuser.setImageResource(R.drawable.icono)
+                }
             }
         } else {
             Log.e("PeliculasValidasFragment", "No hay usuario autenticado")
-            actualizarUsuario("Usuario Desconocido", 0, 0) // Información predeterminada
+            actualizarUsuario("Usuario Desconocido", 0, 0)
+            binding.imagenuser.setImageResource(R.drawable.icono)
         }
     }
 
-//     Sobrescribir el método onResume para actualizar la información del usuario
+    //     Sobrescribir el método onResume para actualizar la información del usuario
     override fun onResume() {
         super.onResume()
         actualizarUsuarioInfo() // Actualiza la información del usuario cada vez que el fragmento se vuelve visible
