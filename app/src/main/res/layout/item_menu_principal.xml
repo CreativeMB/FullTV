@@ -1,35 +1,33 @@
-<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:layout_margin="2dp">
+    android:orientation="vertical"
+    android:gravity="center_vertical"
+    android:layout_marginBottom="12dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
+    <ImageView
+        android:id="@+id/iconoMenu"
+        android:layout_width="35dp"
+        android:layout_height="35dp"
+         android:src="@drawable/icono"
+        android:focusable="true"
+        android:focusableInTouchMode="true"/>
+
+    <TextView
+        android:id="@+id/textoMenu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="menu"
+        android:textColor="@android:color/white"
+        android:textSize="12sp"
         android:gravity="center"
-        android:background="@color/redpersonalisado"
-        android:orientation="vertical"
-        android:padding="8dp">
-
-        <ImageView
-            android:id="@+id/iconView"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginBottom="8dp"
-            android:background="@android:color/transparent"
-            android:scaleType="fitXY" />
-
-        <TextView
-            android:id="@+id/nameView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:ellipsize="end"
-            android:maxLines="2"
-            android:textAlignment="center"
-            android:textStyle="bold"
-            android:textColor="@color/exo_button_color"
-            android:textSize="10sp" />
-    </LinearLayout>
-</androidx.cardview.widget.CardView>
+        android:maxLines="1"
+        android:ellipsize="marquee"
+        android:marqueeRepeatLimit="marquee_forever"
+        android:singleLine="true"
+        android:focusable="false"
+        android:focusableInTouchMode="false"
+        android:scrollHorizontally="true"
+        android:visibility="invisible" />
+</LinearLayout>

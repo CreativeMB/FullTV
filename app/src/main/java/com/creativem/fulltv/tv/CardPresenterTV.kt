@@ -110,7 +110,7 @@ class CardPresenterTV : Presenter() {
 
             Glide.with(context)
                 .load(item.imageUrl)
-                .placeholder(R.drawable.icono)
+                .placeholder(R.drawable.pelifondo)
                 .error(R.drawable.icono)
                 .into(this)
         }

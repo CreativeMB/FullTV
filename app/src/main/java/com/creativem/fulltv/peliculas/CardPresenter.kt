@@ -129,7 +129,7 @@ class CardPresenter: Presenter(){
 
             Glide.with(cardView.context)
                 .load(movie.imageUrl)
-                .placeholder(R.drawable.icono)
+                .placeholder(R.drawable.pelifondo)
                 .error(R.drawable.icono)
                 .into(imageView)
         }

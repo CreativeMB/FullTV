@@ -1,6 +1,5 @@
 package com.creativem.fulltv.peliculas
 
-import AudioFocusHelper.abandonAudioFocus
 import AudioFocusHelper.requestAudioFocus
 import android.app.AlertDialog
 import android.app.Dialog
@@ -25,7 +24,6 @@ import android.widget.ListView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-import androidx.leanback.app.BrowseSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
@@ -36,8 +34,7 @@ import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.principal.Reloj
-import com.creativem.fulltv.menu.MenuItem
-import com.creativem.fulltv.menu.MenuPresenter
+import com.creativem.fulltv.menu.MenuPrincipalItem
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
@@ -61,7 +58,6 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.storage.storage
-import kotlinx.coroutines.delay
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.app.DownloadManager
@@ -70,8 +66,6 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.TransitionDrawable
-import android.media.AudioFocusRequest
-import android.media.AudioManager
 import android.net.Uri
 import android.text.SpannableString
 import android.text.Spanned
@@ -79,16 +73,16 @@ import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import android.view.Gravity
 import androidx.core.content.ContextCompat
-import androidx.core.content.ContextCompat.getSystemService
 import androidx.core.content.FileProvider
 import androidx.leanback.app.RowsSupportFragment
 import com.creativem.fulltv.ApiPeliculaActivity
 import java.io.File
 import com.creativem.fulltv.BuildConfig
 import kotlinx.coroutines.withContext
-import android.media.AudioAttributes
 import android.os.Build
-import androidx.annotation.RequiresApi
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.creativem.fulltv.menu.MenuPrincipalAdapter
 
 class PeliculasFragment : RowsSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -99,6 +93,7 @@ class PeliculasFragment : RowsSupportFragment() {
     private lateinit var binding: FragmentPeliculasBinding
     private val db = FirebaseFirestore.getInstance()
     private var versionRemotaGlobal: String? = null
+
 
     // Declarar las listas de UIDs (Strings)
     val usuariosConectados = mutableListOf<String>()
@@ -222,56 +217,9 @@ class PeliculasFragment : RowsSupportFragment() {
         val reloj = Reloj(textHora, textfecha)
         reloj.startClock()
 
-
-        // Configura el listener de clics mrnu
+// Configura el listener de clics SOLO para items tipo Movie (Leanback)
         setOnItemViewClickedListener { _, item, _, _ ->
-            if (item is MenuItem) {
-                Log.d("PeliculasValidasFragment", "Menu item clicked: ${item.name}")
-                when (item.name) {
-                    "Buscar\nPelicula" -> {
-                        buscarPeliculaDialogo()
-                    }
-                    "Pedir\nPelicula" -> {
-                        mostrarDialogoPedido()
-                    }
-                    "Activar\nPaquete" -> {
-                        activarpaquete()
-                    }
-
-                    "Pelis\nGratis" -> {
-                        val intent = Intent(requireContext(), PeliculasValidas::class.java)
-                        startActivity(intent)
-                    }
-
-                    "¿Como\nPago?" -> {
-                        val intent = Intent(requireContext(), Nosotros::class.java)
-                        startActivity(intent)
-                    }
-                    "TV\nGratis" -> {
-                        val intent = Intent(requireContext(), Tv::class.java)
-                        startActivity(intent)
-                    }
-                    "Descarga\nActualizacion" -> {
-                        versionRemotaGlobal?.let { version ->
-                            descargarActualizacion(version)
-                        } ?: run {
-                            Toast.makeText(requireContext(), "Versión remota no disponible", Toast.LENGTH_SHORT).show()
-                        }
-
-                    }
-                    "Cerrar\nCuenta" -> {
-                        cerrarSesion() // Llama al método de cerrar sesión
-                    }
-
-                    else -> {
-                        Toast.makeText(
-                            requireContext(),
-                            "${item.name} seleccionado",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-            } else if (item is Movie) {
+            if (item is Movie) {
                 val intent = Intent(context, ApiPeliculaActivity::class.java)
                 intent.putExtra("EXTRA_ORIGINAL_TITLE", item.originalTitle)
                 intent.putExtra("EXTRA_STREAM_URL", item.streamUrl)
@@ -281,7 +229,6 @@ class PeliculasFragment : RowsSupportFragment() {
                 intent.putExtra("EXTRA_COUNTDOWN", item.countdownMinutes)
                 startActivity(intent)
             }
-
         }
 
         return view
@@ -305,7 +252,7 @@ class PeliculasFragment : RowsSupportFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-
+        cargarMenuPrincipal()
 
 
         CoroutineScope(Dispatchers.IO).launch {
@@ -511,6 +458,67 @@ class PeliculasFragment : RowsSupportFragment() {
         })
 
     }
+
+    private fun cargarMenuPrincipal() {
+        val recycler = binding.menuPrincipal
+        if (recycler == null) {
+            Log.e("MenuPrincipal", "RecyclerView menuPrincipal no está en el layout.")
+            return
+        }
+
+        val menuItems = listOf(
+            "TV\nGratis", "Pelis\nGratis", "Pedir\nPelicula", "Buscar\nPelicula",
+            "Activar\nPaquete", "¿Como\nPago?", "Descarga\nActualizacion", "Cerrar\nCuenta"
+        )
+
+        val menuIcons = listOf(
+            R.drawable.tv, R.drawable.cartelera, R.drawable.pedido, R.drawable.buscar,
+            R.drawable.activacion, R.drawable.pago, R.drawable.descarga, R.drawable.cerrrar
+        )
+
+        val menuList = menuItems.mapIndexed { i, name ->
+            MenuPrincipalItem(name, menuIcons[i])
+        }
+
+        val adapter = MenuPrincipalAdapter(menuList) { item ->
+            Log.d("PeliculasValidasFragment", "Menu item clicked: ${item.name}")
+            when (item.name) {
+                "Buscar\nPelicula" -> buscarPeliculaDialogo()
+                "Pedir\nPelicula" -> mostrarDialogoPedido()
+                "Activar\nPaquete" -> activarpaquete()
+                "Pelis\nGratis" -> startActivity(Intent(requireContext(), PeliculasValidas::class.java))
+                "¿Como\nPago?" -> startActivity(Intent(requireContext(), Nosotros::class.java))
+                "TV\nGratis" -> startActivity(Intent(requireContext(), Tv::class.java))
+                "Descarga\nActualizacion" -> {
+                    versionRemotaGlobal?.let { version ->
+                        descargarActualizacion(version)
+                    } ?: Toast.makeText(requireContext(), "Versión remota no disponible", Toast.LENGTH_SHORT).show()
+                }
+                "Cerrar\nCuenta" -> cerrarSesion()
+                else -> Toast.makeText(requireContext(), "${item.name} seleccionado", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        recycler.layoutManager = LinearLayoutManager(requireContext())
+        recycler.adapter = adapter
+
+        // 🔄 Restaurar el último foco al entrar
+        recycler.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                recycler.post {
+                    val pos = adapter.lastFocusedPosition
+                    val viewHolder = recycler.findViewHolderForAdapterPosition(pos)
+                    viewHolder?.itemView?.requestFocus()
+                }
+            }
+        }
+
+        // ✅ Enfocar el primer ítem al cargar por primera vez
+        recycler.post {
+            recycler.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+        }
+    }
+
 
     private fun cargarImagenDeFondo(url: String?) {
         handler.removeCallbacksAndMessages(null)
@@ -829,27 +837,6 @@ class PeliculasFragment : RowsSupportFragment() {
 
     private fun updateMovieList(peliculas: List<Movie>) {
         rowsAdapter.clear()
-
-        // Primero, agregamos el menú
-        val menuAdapter = ArrayObjectAdapter(MenuPresenter())
-        val menuItems = listOf("TV\nGratis", "Pelis\nGratis", "Pedir\nPelicula", "Buscar\nPelicula", "Activar\nPaquete", "¿Como\nPago?", "Descarga\nActualizacion", "Cerrar\nCuenta")
-        val menuIcons = listOf(
-            R.drawable.tv,
-            R.drawable.cartelera,
-            R.drawable.pedido,
-            R.drawable.buscar,
-            R.drawable.activacion,
-            R.drawable.pago,
-            R.drawable.descarga,
-            R.drawable.cerrrar
-        )
-
-        menuItems.forEachIndexed { i, item ->
-            menuAdapter.add(MenuItem(item, menuIcons[i]))
-        }
-
-        // Agregamos el menú al rowsAdapter
-        rowsAdapter.add(ListRow(HeaderItem(3, ""), menuAdapter))
 
         // Luego, agregamos el contenido de las películas
         agregarALista(peliculas, "")

@@ -208,6 +208,16 @@
             android:textSize="40sp"
             android:textStyle="bold" />
     </FrameLayout>
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/menu_principal"
+        android:layout_width="50dp"
+        android:layout_height="match_parent"
+        android:background="#7A282828"
+        android:padding="8dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:descendantFocusability="afterDescendants"
+        />
 
 
 </FrameLayout>
