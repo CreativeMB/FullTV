@@ -1,6 +1,7 @@
 package com.creativem.fulltv
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -218,7 +219,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
             .placeholder(R.drawable.icono)
             .into(ivPoster)
 
-// Fondo opaco
+// Fondo opaco|1
         Glide.with(this)
             .load(posterUrl)
             .centerCrop()
@@ -329,6 +330,22 @@ class ApiPeliculaActivity : AppCompatActivity() {
             }
             delay(100)
             loadingContainer.visibility = View.GONE
+        }
+    }
+    override fun onResume() {
+        super.onResume()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val granted = AudioFocusHelper.requestAudioFocus(this)
+            if (granted) {
+                // Aquí podrías reproducir audio si lo tuvieras
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioFocusHelper.abandonAudioFocus()
         }
     }
 }
