@@ -10,12 +10,11 @@ import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
 
 class MenuPrincipalAdapter(
-
     private val items: List<MenuPrincipalItem>,
     private val onItemClick: (MenuPrincipalItem) -> Unit
 ) : RecyclerView.Adapter<MenuPrincipalAdapter.MenuViewHolder>() {
 
-    var lastFocusedPosition: Int = 0  // <- público para usar desde el fragmento
+    var lastFocusedPosition: Int = 0  // Se puede usar desde el Fragmento para restaurar foco
 
     inner class MenuViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.iconoMenu)
@@ -23,13 +22,12 @@ class MenuPrincipalAdapter(
 
         init {
             view.setOnClickListener {
-                val item = items[adapterPosition]
+                val item = items[bindingAdapterPosition]
                 onItemClick(item)
             }
 
-            // Focus único
             view.setOnFocusChangeListener { v, hasFocus ->
-                // Fondo + escala
+                // Fondo y escala
                 v.background = if (hasFocus)
                     ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
                 else
@@ -38,7 +36,7 @@ class MenuPrincipalAdapter(
                 val scale = if (hasFocus) 1.1f else 1f
                 v.animate().scaleX(scale).scaleY(scale).setDuration(150).start()
 
-                // Mostrar el texto solo con focus
+                // Mostrar texto solo cuando tiene focus
                 text.visibility = if (hasFocus) View.VISIBLE else View.INVISIBLE
                 text.isSelected = hasFocus
 
@@ -60,9 +58,19 @@ class MenuPrincipalAdapter(
         holder.icon.setImageResource(item.iconResId)
         holder.text.text = item.name
 
-        // Siempre oculto por defecto al bindear
-        holder.text.visibility = View.INVISIBLE
-        holder.text.isSelected = false
+        val hasFocus = position == lastFocusedPosition
+        holder.text.visibility = if (hasFocus) View.VISIBLE else View.INVISIBLE
+        holder.text.isSelected = hasFocus
+
+        // Restaurar fondo y escala visual si es el último con focus
+        holder.itemView.background = if (hasFocus)
+            ContextCompat.getDrawable(holder.itemView.context, R.drawable.card_focused_background)
+        else
+            null
+
+        val scale = if (hasFocus) 1.1f else 1f
+        holder.itemView.scaleX = scale
+        holder.itemView.scaleY = scale
     }
 
     override fun getItemCount(): Int = items.size
