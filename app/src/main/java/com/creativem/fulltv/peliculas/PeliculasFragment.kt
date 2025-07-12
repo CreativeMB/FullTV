@@ -78,7 +78,6 @@ import com.creativem.fulltv.BuildConfig
 import kotlinx.coroutines.withContext
 import android.os.Build
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.creativem.fulltv.HeaderPresenter
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
 import com.creativem.fulltv.principal.AudioFocusHelper
 
