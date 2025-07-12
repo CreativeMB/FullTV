@@ -81,6 +81,7 @@ import com.creativem.fulltv.BuildConfig
 import kotlinx.coroutines.withContext
 import android.os.Build
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.creativem.fulltv.HeaderPresenter
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
 import com.creativem.fulltv.principal.AudioFocusHelper
 
@@ -195,9 +196,6 @@ class PeliculasFragment : RowsSupportFragment() {
                     }
                 }
 
-                // Actualizar los TextViews con el número de usuarios conectados y desconectados
-                binding.useronline.text = "ON-${usuariosConectados.size}"
-                binding.useroff.text = "OFF-${usuariosDesconectados.size}"
             }
 
             override fun onCancelled(error: DatabaseError) {
@@ -206,16 +204,11 @@ class PeliculasFragment : RowsSupportFragment() {
         })
 
 
-        // Establecer valores iniciales para nombre de usuario y cantidad de Castv
-        binding.textUsuario.text = "users" // Cambia [Usuario] por el valor real
-        binding.textCastv.text = "Castv" // Cambia el valor según corresponda
+
 
         requireActivity().window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        // Iniciar el reloj
-        val textHora = binding.textHora
-        val textfecha = binding.textfecha
-        val reloj = Reloj(textHora, textfecha)
-        reloj.startClock()
+
+
 
 // Configura el listener de clics SOLO para items tipo Movie (Leanback)
         setOnItemViewClickedListener { _, item, _, _ ->
@@ -280,82 +273,18 @@ class PeliculasFragment : RowsSupportFragment() {
         }
         escucharCambiosEnPeliculas()
         cargarPeliculas()
-        actualizarUsuarioInfo()
         mostrarPublicidad()
 
         // Cargar información del usuario
         val usuarioId =
             FirebaseAuth.getInstance().currentUser?.uid // Obtén el ID del usuario autenticado
 
-        // Llama a obtenerNombreUsuario y obtenerCantidadCastv dentro de una coroutine
-        if (usuarioId != null) {
-            viewLifecycleOwner.lifecycleScope.launch {
-                val nombreUsuario = validaciones.obtenerNombreUsuario(usuarioId)
-                val cantidadCastv = validaciones.obtenerCantidadCastv(usuarioId)
-                val cantidadPeliculas = validaciones.obtenerCantidadPeliculas()
-                actualizarUsuario(
-                    nombreUsuario,
-                    cantidadCastv,
-                    cantidadPeliculas
-                ) // Actualiza la UI con la información del usuario
-            }
-        } else {
-            // Manejo de usuario no autenticado
-            Log.e("PeliculasValidasFragment", "No hay usuario autenticado")
-            actualizarUsuario(
-                "Usuario Desconocido",
-                0,
-                0
-            )  // Actualiza la UI con información predeterminada
-        }
+
     }
 
-    private fun actualizarUsuarioInfo() {
-        val usuarioId = FirebaseAuth.getInstance().currentUser?.uid
-
-        if (usuarioId != null) {
-            viewLifecycleOwner.lifecycleScope.launch {
-                val nombreUsuario = validaciones.obtenerNombreUsuario(usuarioId)
-                val cantidadCastv = validaciones.obtenerCantidadCastv(usuarioId)
-                val cantidadPeliculas = validaciones.obtenerCantidadPeliculas()
-
-                actualizarUsuario(nombreUsuario, cantidadCastv, cantidadPeliculas)
-
-                // ✅ Cargar la foto de perfil de Gmail (Google)
-                val photoUrl = FirebaseAuth.getInstance().currentUser?.photoUrl
-                if (photoUrl != null) {
-                    Glide.with(requireContext())
-                        .load(photoUrl)
-                        .placeholder(R.drawable.icono)
-                        .error(R.drawable.icono)
-                        .centerCrop()
-                        .into(binding.imagenuser)
-                } else {
-                    binding.imagenuser.setImageResource(R.drawable.icono)
-                }
-            }
-        } else {
-            Log.e("PeliculasValidasFragment", "No hay usuario autenticado")
-            actualizarUsuario("Usuario Desconocido", 0, 0)
-            binding.imagenuser.setImageResource(R.drawable.icono)
-        }
-    }
-
-    //     Sobrescribir el método onResume para actualizar la información del usuario
-    override fun onResume() {
-        super.onResume()
-        actualizarUsuarioInfo() // Actualiza la información del usuario cada vez que el fragmento se vuelve visible
-            }
-
-    // Función para actualizar el nombre de usuario y la cantidad de Castv
-    fun actualizarUsuario(usuario: String, cantidadCastv: Int, cantidadPeliculas: Int) {
-        binding.textUsuario.text = usuario
-        binding.textCastv.text =
-            "Películas: $cantidadPeliculas | CasTV $$cantidadCastv" // Mostrar ambos valores
-    }
 
     fun cargarPeliculas() {
-        binding.linearLayout.visibility = View.GONE
+
         establecerFondoPorDefecto()
 
         mostrarCarga("Actualizando biblioteca en línea...")
@@ -366,7 +295,7 @@ class PeliculasFragment : RowsSupportFragment() {
             // Ordenamos por fecha de publicación, siendo la primera la última actualizada
             val peliculasOrdenadas = peliculas.sortedByDescending { it.createdAt }
             ocultarCarga()
-            binding.linearLayout.visibility = View.VISIBLE
+
             updateMovieList(peliculasOrdenadas)
         }
     }
@@ -573,54 +502,6 @@ class PeliculasFragment : RowsSupportFragment() {
                         isSelected = true
                     }
 
-                    // 🔁 Obtener lista de pedidos desde la colección "pedidosmovies"
-                    db.collection("pedidosmovies")
-                        .get()
-                        .addOnSuccessListener { result ->
-                            if (!result.isEmpty) {
-                                val listaPedidos = StringBuilder()
-                                for (pedido in result) {
-                                    val nombre = pedido.getString("nombre") ?: "Usuario desconocido"
-                                    val title = pedido.getString("title") ?: "Película desconocida"
-                                    listaPedidos.append("🎬 $nombre pidió: $title\n")
-                                }
-
-                                binding.txtActualizacion.apply {
-                                    text = listaPedidos.toString().trim()
-                                    visibility = View.VISIBLE
-                                    isSelected = true
-
-                                    // Animación de color
-                                    ObjectAnimator.ofArgb(
-                                        this,
-                                        "textColor",
-                                        Color.RED,
-                                        Color.parseColor("#FF9800"),
-                                        Color.YELLOW,
-                                        Color.GREEN,
-                                        Color.BLUE,
-                                        Color.parseColor("#4B0082"),
-                                        Color.parseColor("#EE82EE"),
-                                        Color.RED
-                                    ).apply {
-                                        duration = 4000L
-                                        repeatCount = ValueAnimator.INFINITE
-                                        repeatMode = ValueAnimator.RESTART
-                                        start()
-                                    }
-                                }
-                            } else {
-                                // No hay pedidos → ocultar el TextView
-                                binding.txtActualizacion.visibility = View.GONE
-                            }
-                        }
-                        .addOnFailureListener {
-                            binding.txtActualizacion.apply {
-                                text = "Error al cargar los pedidos."
-                                visibility = View.VISIBLE
-                            }
-                        }
-
                     // ✅ Mostrar diálogo si hay nueva versión
                     if (versionRemota > versionLocal.toString()) {
                         val mensaje = """
@@ -654,21 +535,6 @@ class PeliculasFragment : RowsSupportFragment() {
                             .show()
                     }
 
-                } else {
-                    binding.txtBanner.visibility = View.GONE
-                    binding.txtActualizacion.visibility = View.GONE
-                }
-            }
-            .addOnFailureListener {
-                binding.txtBanner.apply {
-                    text = "No Hay Comunicado"
-                    visibility = View.VISIBLE
-                    isSelected = true
-                }
-                binding.txtActualizacion.apply {
-                    text = "Muy pronto Fecha de Actualización"
-                    visibility = View.VISIBLE
-                    isSelected = true
                 }
             }
     }
@@ -844,6 +710,15 @@ class PeliculasFragment : RowsSupportFragment() {
     private fun updateMovieList(peliculas: List<Movie>) {
         rowsAdapter.clear()
 
+        // ✅ Agregar encabezado
+        val headerPresenter = HeaderPresenter()
+        val headerRowAdapter = ArrayObjectAdapter(headerPresenter)
+        headerRowAdapter.add(Object()) // puede ser cualquier objeto
+
+        val headerItem = HeaderItem(" ") // título invisible
+        rowsAdapter.add(ListRow(headerItem, headerRowAdapter))
+
+
         // Luego, agregamos el contenido de las películas
         agregarALista(peliculas, "")
 
@@ -913,7 +788,6 @@ class PeliculasFragment : RowsSupportFragment() {
 
                 val peliculasOrdenadas = peliculas.sortedByDescending { it.createdAt }
                 updateMovieList(peliculasOrdenadas) // Elimina el segundo parámetro
-                actualizarUsuarioInfo()
 
             } else {
                 Log.d("PeliculasValidasFragment", "No se encontraron películas.")

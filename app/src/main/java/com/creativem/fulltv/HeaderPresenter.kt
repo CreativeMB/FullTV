@@ -1,0 +1,185 @@
+package com.creativem.fulltv
+
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
+import android.graphics.Color
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.leanback.widget.Presenter
+import com.bumptech.glide.Glide
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.firestore.FirebaseFirestore
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+class HeaderPresenter : Presenter() {
+
+    override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_encabezado_peliculas, parent, false)
+
+        return ViewHolder(view)
+    }
+
+    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
+        val context = viewHolder.view.context
+
+        // Referencias de las vistas
+        val textFecha = viewHolder.view.findViewById<TextView>(R.id.textfecha)
+        val textHora = viewHolder.view.findViewById<TextView>(R.id.textHora)
+        val textUsuario = viewHolder.view.findViewById<TextView>(R.id.textUsuario)
+        val userOnline = viewHolder.view.findViewById<TextView>(R.id.useronline)
+        val userOff = viewHolder.view.findViewById<TextView>(R.id.useroff)
+        val textCastv = viewHolder.view.findViewById<TextView>(R.id.textCastv)
+        val txtActualizacion = viewHolder.view.findViewById<TextView>(R.id.txtActualizacion)
+        val imagenUser = viewHolder.view.findViewById<ImageView>(R.id.imagenuser)
+
+        val auth = FirebaseAuth.getInstance()
+        val firestore = FirebaseFirestore.getInstance()
+        val realtimeDb = FirebaseDatabase.getInstance().reference
+
+        val usuario = auth.currentUser
+        val usuarioId = usuario?.uid
+
+        textFecha.text = obtenerFechaActual() // Muestra una vez
+        textHora.text = obtenerHoraActual()  // También muestra la hora inicial
+
+
+        if (usuarioId == null) {
+            textUsuario.text = "Invitado"
+            textCastv.text = "🎬 Películas: 0 | ⭐ Castv: 0"
+            userOnline.text = "ON-0"
+            userOff.text = "OFF-0"
+            imagenUser.setImageResource(R.drawable.icono)
+            return
+        }
+
+        // 🔄 Cargar nombre, email y puntos (Castv)
+        firestore.collection("users").document(usuarioId)
+            .get()
+            .addOnSuccessListener { doc ->
+                val nombre = doc.getString("nombre") ?: "Usuario"
+                val puntos = doc.getLong("puntos") ?: 0
+                val email = doc.getString("email") ?: usuario.email ?: ""
+
+                textUsuario.text = "$nombre\n📩 $email"
+
+                // 📊 Luego, obtener cantidad de películas
+                firestore.collection("movies")
+                    .get()
+                    .addOnSuccessListener { result ->
+                        val cantidadPeliculas = result.size()
+                        textCastv.text =
+                            "🎬 Películas: $cantidadPeliculas | ⭐ CasTV: $puntos"
+                    }
+                    .addOnFailureListener {
+                        textCastv.text = "🎬 Películas: 0 | ⭐ Castv: $puntos"
+                    }
+            }
+            .addOnFailureListener {
+                textUsuario.text = "Usuario Desconocido"
+                textCastv.text = "🎬 Películas: 0 | ⭐ Castv: 0"
+            }
+
+        // 🖼️ Imagen de usuario
+        val photoUrl = usuario.photoUrl
+        if (photoUrl != null) {
+            Glide.with(context)
+                .load(photoUrl)
+                .placeholder(R.drawable.icono)
+                .error(R.drawable.icono)
+                .centerCrop()
+                .into(imagenUser)
+        } else {
+            imagenUser.setImageResource(R.drawable.icono)
+        }
+
+        // 📶 Usuarios conectados/desconectados
+        realtimeDb.child("usuarios_conectados")
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    var on = 0
+                    var off = 0
+                    for (user in snapshot.children) {
+                        val conectado = user.getValue(Boolean::class.java) ?: false
+                        if (conectado) on++ else off++
+                    }
+                    userOnline.text = "ON-$on"
+                    userOff.text = "OFF-$off"
+                }
+
+                override fun onCancelled(error: DatabaseError) {}
+            })
+
+        // 🧾 Pedidos recientes
+        firestore.collection("pedidosmovies")
+            .get()
+            .addOnSuccessListener { result ->
+                if (!result.isEmpty) {
+                    val listaPedidos = StringBuilder()
+                    for (pedido in result) {
+                        val nombre = pedido.getString("nombre") ?: "Desconocido"
+                        val title = pedido.getString("title") ?: "Película"
+                        listaPedidos.append("🎬 $nombre pidió: $title\n")
+                    }
+
+                    txtActualizacion.apply {
+                        text = listaPedidos.toString().trim()
+                        visibility = View.VISIBLE
+                        isSelected = true
+
+                        // Animación de color
+                        ObjectAnimator.ofArgb(
+                            this,
+                            "textColor",
+                            Color.RED,
+                            Color.parseColor("#FF9800"),
+                            Color.YELLOW,
+                            Color.GREEN,
+                            Color.BLUE,
+                            Color.parseColor("#4B0082"),
+                            Color.parseColor("#EE82EE"),
+                            Color.RED
+                        ).apply {
+                            duration = 4000L
+                            repeatCount = ValueAnimator.INFINITE
+                            repeatMode = ValueAnimator.RESTART
+                            start()
+                        }
+                    }
+                } else {
+                    // No hay pedidos → ocultar el TextView
+                    txtActualizacion.visibility = View.GONE
+                }
+            }
+            .addOnFailureListener {
+                txtActualizacion.apply {
+                    text = "Error al cargar los pedidos."
+                    visibility = View.VISIBLE
+                }
+
+
+            }
+    }
+
+    override fun onUnbindViewHolder(viewHolder: ViewHolder?) {}
+
+    private fun obtenerFechaActual(): String {
+        val fecha = SimpleDateFormat("EEEE dd MM yy", Locale.getDefault()).format(Date())
+        return fecha.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+    }
+
+    private fun obtenerHoraActual(): String {
+        val hora = SimpleDateFormat("hh:mm aa", Locale.getDefault()).format(Date())
+        return hora.replace("am", "AM").replace("pm", "PM")
+    }
+
+}
