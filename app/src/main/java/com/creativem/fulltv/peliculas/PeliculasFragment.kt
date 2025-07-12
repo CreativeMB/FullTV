@@ -399,8 +399,8 @@ class PeliculasFragment : RowsSupportFragment() {
         }
 
         val menuItems = listOf(
-            "TV\nGratis", "Pelis\nGratis", "Pedir\nPelicula", "Buscar\nPelicula",
-            "Activar\nPaquete", "¿Como\nPago?", "Descarga\nActualizacion", "Cerrar\nCuenta"
+            "TV Gratis", "Pelis Gratis", "Pedir Pelicula", "Buscar Pelicula",
+            "Activar Paquete", "¿Como Pago?", "Descarga", "Cerrar Cuenta"
         )
 
         val menuIcons = listOf(
@@ -415,18 +415,18 @@ class PeliculasFragment : RowsSupportFragment() {
         val adapter = MenuPrincipalAdapter(menuList) { item ->
             Log.d("PeliculasValidasFragment", "Menu item clicked: ${item.name}")
             when (item.name) {
-                "Buscar\nPelicula" -> buscarPeliculaDialogo()
-                "Pedir\nPelicula" -> mostrarDialogoPedido()
-                "Activar\nPaquete" -> activarpaquete()
-                "Pelis\nGratis" -> startActivity(Intent(requireContext(), PeliculasValidas::class.java))
-                "¿Como\nPago?" -> startActivity(Intent(requireContext(), Nosotros::class.java))
-                "TV\nGratis" -> startActivity(Intent(requireContext(), Tv::class.java))
-                "Descarga\nActualizacion" -> {
+                "Buscar Pelicula" -> buscarPeliculaDialogo()
+                "Pedir Pelicula" -> mostrarDialogoPedido()
+                "Activar Paquete" -> activarpaquete()
+                "Pelis Gratis" -> startActivity(Intent(requireContext(), PeliculasValidas::class.java))
+                "¿Como Pago?" -> startActivity(Intent(requireContext(), Nosotros::class.java))
+                "TV Gratis" -> startActivity(Intent(requireContext(), Tv::class.java))
+                "Descarga" -> {
                     versionRemotaGlobal?.let { version ->
                         descargarActualizacion(version)
                     } ?: Toast.makeText(requireContext(), "Versión remota no disponible", Toast.LENGTH_SHORT).show()
                 }
-                "Cerrar\nCuenta" -> cerrarSesion()
+                "Cerrar Cuenta" -> cerrarSesion()
                 else -> Toast.makeText(requireContext(), "${item.name} seleccionado", Toast.LENGTH_SHORT).show()
             }
         }

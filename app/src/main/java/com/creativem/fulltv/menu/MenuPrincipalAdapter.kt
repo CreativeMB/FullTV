@@ -33,8 +33,13 @@ class MenuPrincipalAdapter(
                 else
                     null
 
-                val scale = if (hasFocus) 1.1f else 1f
-                v.animate().scaleX(scale).scaleY(scale).setDuration(150).start()
+                val layoutParams = v.layoutParams
+                if (hasFocus) {
+                    layoutParams.width = ViewGroup.LayoutParams.WRAP_CONTENT // Expande al tamaño del contenido (título)
+                } else {
+                    layoutParams.width = v.context.resources.getDimensionPixelSize(R.dimen.menu_item_width_collapsed)
+                }
+                v.layoutParams = layoutParams
 
                 // Mostrar texto solo cuando tiene focus
                 text.visibility = if (hasFocus) View.VISIBLE else View.INVISIBLE
@@ -44,7 +49,9 @@ class MenuPrincipalAdapter(
                     lastFocusedPosition = bindingAdapterPosition
                 }
             }
+
         }
+
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MenuViewHolder {

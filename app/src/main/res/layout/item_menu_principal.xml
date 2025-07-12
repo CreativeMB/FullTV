@@ -1,32 +1,29 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="wrap_content"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="@dimen/menu_item_width_collapsed"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:gravity="center_vertical"
-    android:layout_marginBottom="12dp">
+    android:gravity="center"
+    android:padding="4dp"
+    android:background="@android:color/transparent">
 
     <ImageView
         android:id="@+id/iconoMenu"
-        android:layout_width="35dp"
-        android:layout_height="35dp"
-        android:src="@drawable/icono"
-        android:layout_gravity="center_horizontal"/>
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="center"
+        android:src="@drawable/icono" />
 
     <TextView
         android:id="@+id/textoMenu"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="menu"
+        android:text="Título"
         android:textColor="@android:color/white"
-        android:textSize="12sp"
-        android:gravity="center"
+        android:textSize="14sp"
+        android:visibility="invisible"
+        android:ellipsize="end"
         android:maxLines="1"
-        android:ellipsize="marquee"
-        android:marqueeRepeatLimit="marquee_forever"
-        android:singleLine="true"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:scrollHorizontally="true"
-        android:visibility="invisible"  />
+        android:gravity="center"
+        android:textAlignment="center" />
 </LinearLayout>

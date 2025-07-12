@@ -1,11 +1,11 @@
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
 
-    <solid android:color="@android:color/transparent" />
+    <solid android:color="@color/fondo" />
 
     <!-- Aumentamos grosor del borde -->
     <stroke
-        android:width="20dp"
+        android:width="6dp"
         android:color="#C20091EA" />
 
 
