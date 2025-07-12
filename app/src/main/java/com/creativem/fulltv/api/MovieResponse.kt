@@ -11,7 +11,11 @@ data class TmdbMovie(
     val overview: String,
     val release_date: String,
     val poster_path: String?,
-    val vote_average: Float
+    val vote_average: Float,
+    // Campos adicionales necesarios
+    val streamUrl: String = "",         // Puedes manejar esto con una función si lo generas tú
+    val imageUrl: String = "",          // Alternativa a poster_path si la construyes tú
+    val year: String = ""              // Puedes usar vote_average o un campo auxiliar
 )
 data class CreditsResponse(
     val cast: List<CastMember>,

@@ -29,5 +29,12 @@ interface TMDbApiService {
         @Path("movie_id") movieId: Int,
         @Query("api_key") apiKey: String
     ): Call<CreditsResponse>
+    // Cartelera
+    @GET("movie/now_playing")
+    fun getNowPlaying(
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String = "es-MX",
+        @Query("page") page: Int = 1
+    ): Call<MovieResponse>
 }
 
