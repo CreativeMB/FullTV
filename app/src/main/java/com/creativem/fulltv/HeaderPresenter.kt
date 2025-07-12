@@ -66,7 +66,7 @@ class HeaderPresenter : Presenter() {
         firestore.collection("users").document(usuarioId)
             .get()
             .addOnSuccessListener { doc ->
-                val nombre = doc.getString("nombre") ?: "Usuario"
+                val nombre = doc.getString("nombre") ?: "Estas de Invitado"
                 val puntos = doc.getLong("puntos") ?: 0
                 val email = doc.getString("email") ?: usuario.email ?: ""
 

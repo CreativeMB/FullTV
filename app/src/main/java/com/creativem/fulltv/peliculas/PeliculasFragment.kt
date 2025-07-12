@@ -32,7 +32,6 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
-import com.creativem.fulltv.principal.Reloj
 import com.creativem.fulltv.menu.MenuPrincipalItem
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -57,8 +56,6 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.storage.storage
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.app.DownloadManager
 import android.content.Context
 import android.graphics.Color
