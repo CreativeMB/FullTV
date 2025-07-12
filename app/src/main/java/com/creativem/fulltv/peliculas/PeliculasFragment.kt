@@ -78,8 +78,11 @@ import com.creativem.fulltv.BuildConfig
 import kotlinx.coroutines.withContext
 import android.os.Build
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.android.volley.Request
+import com.android.volley.toolbox.StringRequest
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
 import com.creativem.fulltv.principal.AudioFocusHelper
+import java.net.URLEncoder
 
 class PeliculasFragment : RowsSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -1080,31 +1083,25 @@ class PeliculasFragment : RowsSupportFragment() {
     }
     // Método para enviar un correo
     private fun enviarCorreoNuevoPedido(pedido: String) {
-        // Crear un objeto JSON para el correo
-        val emailData = mapOf(
-            "to" to "fulltvurl@gmail.com", // Cambia esto por el correo del destinatario
-            "subject" to "$pedido",
-            "text" to "PAGADA: $pedido"
-        )
-
-        // Hacer la solicitud POST al servidor que envía el correo
-        val url = "https://fulltvurl.glitch.me/sendEmail" // Cambia esto por la URL de tu servidor
+        val tituloCodificado = URLEncoder.encode(pedido, "UTF-8")
+        val url = "https://95352320-03ad-4522-981d-b0a9fa14e5b2-00-3h049y4fufp0h.picard.replit.dev/send?titulo=$tituloCodificado"
 
         // Usar Volley para hacer la solicitud
         val requestQueue = Volley.newRequestQueue(requireContext()) // Contexto de tu actividad
 
-        val jsonObjectRequest = object : JsonObjectRequest(
-            Method.POST, url, JSONObject(emailData),
+        val stringRequest = object : StringRequest(
+            Request.Method.GET, url,
             Response.Listener { response ->
-                Log.d("Email", "Correo enviado exitosamente: ${response.toString()}")
+                Log.d("Email", "✅ Correo enviado exitosamente: $response")
             },
             Response.ErrorListener { error ->
-                Log.e("Email", "Error al enviar el correo: ${error.message}")
+                Log.e("Email", "❌ Error al enviar el correo: ${error.message}")
             }
         ) {}
 
-        requestQueue.add(jsonObjectRequest)
+        requestQueue.add(stringRequest)
     }
+
     private fun activarpaquete() {
         // Crear el AlertDialog.Builder
         val builder = AlertDialog.Builder(requireContext())

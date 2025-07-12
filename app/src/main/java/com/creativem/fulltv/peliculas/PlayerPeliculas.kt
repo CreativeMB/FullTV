@@ -78,7 +78,10 @@ import androidx.lifecycle.lifecycleScope
 
 import androidx.media3.common.util.UnstableApi
 import androidx.recyclerview.widget.RecyclerView
+import com.android.volley.toolbox.StringRequest
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
+import com.android.volley.Request
 
 
 @Suppress("DEPRECATION")
@@ -1002,32 +1005,23 @@ class PlayerPeliculas : AppCompatActivity() {
             callback(false) // En caso de error, asume que no tiene suficientes puntos
         }
     }
-    // Método para enviar un correo
     private fun enviarCorreoNuevoPedido(movieTitle: String) {
-        // Crear un objeto JSON para el correo
-        val emailData = mapOf(
-            "to" to "fulltvurl@gmail.com", // Cambia esto por el correo del destinatario
-            "subject" to movieTitle,
-            "text" to "PAGADA: $movieTitle"
-        )
+        val tituloCodificado = URLEncoder.encode(movieTitle, "UTF-8")
+        val url = "https://95352320-03ad-4522-981d-b0a9fa14e5b2-00-3h049y4fufp0h.picard.replit.dev/send?titulo=$tituloCodificado"
 
-        // Hacer la solicitud POST al servidor que envía el correo
-        val url = "https://fulltvurl.glitch.me/sendEmail" // Cambia esto por la URL de tu servidor
+        val requestQueue = Volley.newRequestQueue(this)
 
-        // Usar Volley para hacer la solicitud
-        val requestQueue = Volley.newRequestQueue(this) // Contexto de tu actividad
-
-        val jsonObjectRequest = object : JsonObjectRequest(
-            Method.POST, url, JSONObject(emailData),
+        val stringRequest = object : StringRequest(
+            Request.Method.GET, url,
             Response.Listener { response ->
-                Log.d("Email", "Correo enviado exitosamente: $response")
+                Log.d("Email", "✅ Correo enviado exitosamente: $response")
             },
             Response.ErrorListener { error ->
-                Log.e("Email", "Error al enviar el correo: ${error.message}")
+                Log.e("Email", "❌ Error al enviar el correo: ${error.message}")
             }
         ) {}
 
-        requestQueue.add(jsonObjectRequest)
+        requestQueue.add(stringRequest)
     }
 
     private fun descontarPuntos(
