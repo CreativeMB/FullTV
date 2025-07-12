@@ -69,12 +69,6 @@ class MenuPrincipalAdapter(
         holder.text.visibility = if (hasFocus) View.VISIBLE else View.INVISIBLE
         holder.text.isSelected = hasFocus
 
-        // Restaurar fondo y escala visual si es el último con focus
-        holder.itemView.background = if (hasFocus)
-            ContextCompat.getDrawable(holder.itemView.context, R.drawable.card_focused_background)
-        else
-            null
-
         val scale = if (hasFocus) 1.1f else 1f
         holder.itemView.scaleX = scale
         holder.itemView.scaleY = scale

@@ -129,5 +129,6 @@
         android:textColor="@color/rojo"
         android:textSize="16sp"
         android:visibility="visible"
-        android:gravity="start" />
+        android:gravity="start"
+        />
 </LinearLayout>
