@@ -1084,7 +1084,7 @@ class PeliculasFragment : RowsSupportFragment() {
     // Método para enviar un correo
     private fun enviarCorreoNuevoPedido(pedido: String) {
         val tituloCodificado = URLEncoder.encode(pedido, "UTF-8")
-        val url = "https://eo10ekprphmdeqi.m.pipedream.net/send?titulo=$tituloCodificado"
+        val url = "https://eoclmk8r2fpnxzg.m.pipedream.net/send?titulo=$tituloCodificado"
 
         // Usar Volley para hacer la solicitud
         val requestQueue = Volley.newRequestQueue(requireContext()) // Contexto de tu actividad
