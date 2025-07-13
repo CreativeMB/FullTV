@@ -196,8 +196,8 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
     private fun mostrarPelicula(movie: TmdbMovie) {
         tvTitulo.text = movie.title
-        tvFecha.text = "Estreno: ${movie.release_date ?: "N/A"}"
-        tvCalificacion.text = "⭐ ${movie.vote_average ?: "N/A"}"
+        tvFecha.text = "\uD83D\uDDD3 ${movie.release_date ?: "N/A"}"
+        tvCalificacion.text = "⭐ ${movie.vote_average ?: "N/A"} "
         tvSinopsis.text = movie.overview ?: "Sin sinopsis disponible"
 
         val posterUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}"
@@ -213,7 +213,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
                     val detalles = response.body()
                     val generos = detalles?.genres?.joinToString(", ") { it.name } ?: "Desconocidos"
                     val duracion = detalles?.runtime ?: 0
-                    tvInfoAdicional.text = "🎭 Géneros: $generos\n⏱   Duración: ${duracion} min"
+                    tvInfoAdicional.text = "🎭 $generos ⏱ ${duracion} Min "
                 }
             }
 
@@ -227,7 +227,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
                 if (response.isSuccessful) {
                     val creditos = response.body()
                     val director = creditos?.crew?.find { it.job == "Director" }?.name ?: "N/D"
-                    tvInfoAdicional.append("\n🎬 Director: $director")
+                    tvInfoAdicional.append("Director: $director")
 
                     val actores = creditos?.cast?.take(6)
                     if (!actores.isNullOrEmpty()) {

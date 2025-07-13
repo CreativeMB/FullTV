@@ -1,193 +1,195 @@
-<?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/rootContainer"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/colorPrimary">
 
-    <!-- Contenido principal dentro del ScrollView -->
-    <ScrollView
-        android:id="@+id/mainScrollView"
+    <!-- Scroll padre para todo el contenido -->
+    <androidx.core.widget.NestedScrollView
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:id="@+id/nestedScrollView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:fillViewport="true">
+        android:fillViewport="true"
+        android:background="@color/colorPrimary">
 
         <LinearLayout
             android:id="@+id/mainContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="12dp">
+            android:orientation="vertical">
 
-            <!-- Fila principal: imagen + video + datos -->
+            <!-- Fila superior: imagen + datos -->
             <LinearLayout
                 android:id="@+id/topRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <!-- Fila principal: imagen + video + datos -->
+                <!-- Imagen del póster -->
+                <ImageView
+                    android:id="@+id/ivPoster"
+                    android:layout_width="160dp"
+                    android:layout_height="210dp"
+                    android:layout_marginEnd="8dp"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/icono" />
+
+                <!-- Contenedor de datos -->
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:orientation="vertical">
 
-                    <!-- Fila: imagen + datos -->
+                    <!-- Título y calificación -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="4dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvTitulo"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="2"
+                            android:text="Título"
+                            android:textColor="@color/colorFocused"
+                            android:textSize="30sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvCalificacion"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="10dp"
+                            android:paddingStart="8dp"
+                            android:text="⭐ 8.5"
+                            android:textColor="@color/textColorPrimary"
+                            android:textSize="30sp" />
+                    </LinearLayout>
+
+                    <!-- Info adicional + Fecha -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal">
 
-                        <!-- Poster -->
-                        <ImageView
-                            android:id="@+id/ivPoster"
-                            android:layout_width="200dp"
-                            android:layout_height="280dp"
-                            android:layout_marginEnd="8dp"
-                            android:scaleType="fitXY"
-                            android:src="@drawable/icono" />
-
-                        <!-- Contenedor de datos -->
-                        <LinearLayout
+                        <TextView
+                            android:id="@+id/tvInfoAdicional"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
+                            android:layout_weight="2"
+                            android:text="🎭 Acción, Aventura ⏱ 120 min"
+                            android:textColor="@android:color/white"
+                            android:textSize="18sp" />
 
-                            <!-- Línea: Título + Calificación -->
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginBottom="4dp"
-                                android:orientation="horizontal">
-
-                                <TextView
-                                    android:id="@+id/tvTitulo"
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_weight="2"
-                                    android:text="Título"
-                                    android:textColor="@color/colorFocused"
-                                    android:textSize="30sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/tvCalificacion"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_gravity="center_vertical"
-                                    android:layout_marginEnd="10dp"
-                                    android:paddingStart="8dp"
-                                    android:text="⭐ 8.5"
-                                    android:textColor="@color/textColorPrimary"
-                                    android:textSize="30sp" />
-                            </LinearLayout>
-
-                            <!-- Fecha de estreno -->
-                            <TextView
-                                android:id="@+id/tvFecha"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginBottom="4dp"
-                                android:text="Estreno: 2024-07-19"
-                                android:textColor="@color/textColorPrimary"
-                                android:textSize="20sp" />
-
-                            <!-- Línea: Info adicional + Reproducir -->
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginBottom="4dp"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal">
-
-                                <TextView
-                                    android:id="@+id/tvInfoAdicional"
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_weight="2"
-                                    android:padding="2dp"
-                                    android:text="🎭 Géneros: Acción, Aventura\n⏱ 120 min"
-                                    android:textColor="@android:color/white"
-                                    android:textSize="18sp" />
-
-                                <TextView
-                                    android:id="@+id/tvReproducir"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="8dp"
-                                    android:layout_marginEnd="8dp"
-                                    android:background="@drawable/focus_selector"
-                                    android:clickable="true"
-                                    android:focusable="true"
-                                    android:focusableInTouchMode="true"
-                                    android:gravity="center"
-                                    android:padding="12dp"
-                                    android:textStyle="bold"
-                                    android:text="▶ Reproducir"
-                                    android:textColor="@color/rojo"
-                                    android:textSize="25sp" />
-                            </LinearLayout>
-
-                            <!-- Lista de actores -->
-                            <androidx.recyclerview.widget.RecyclerView
-                                android:id="@+id/recyclerActores"
-                                android:layout_width="match_parent"
-                                android:layout_height="140dp"
-                                android:orientation="horizontal"
-                                android:padding="2dp" />
-                        </LinearLayout>
+                        <TextView
+                            android:id="@+id/tvFecha"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="📅 2024-07-19"
+                            android:layout_marginEnd="10dp"
+                            android:textColor="@color/textColorPrimary"
+                            android:textSize="18sp" />
                     </LinearLayout>
 
-                    <!-- 🔽 Sinopsis como última fila, ocupando todo el ancho -->
-                    <TextView
-                        android:id="@+id/tvSinopsis"
+                    <!-- Actores -->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recyclerActores"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:lineSpacingExtra="4dp"
-                        android:padding="2dp"
-                        android:text="Sinopsis"
-                        android:textColor="@color/textColorPrimary"
-                        android:textSize="18sp" />
+                        android:layout_height="150dp"
+                        android:orientation="horizontal"
+                        android:padding="2dp" />
                 </LinearLayout>
-
-
             </LinearLayout>
+
+            <!-- Contenedor horizontal: Scroll de sinopsis + botón -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="80dp"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:paddingHorizontal="4dp">
+
+            <!-- ScrollView con TextView de sinopsis -->
+            <ScrollView
+                android:id="@+id/scrollSinopsis"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="7"
+                android:fillViewport="true"
+                android:scrollbars="vertical"
+                android:nestedScrollingEnabled="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:background="@drawable/button_selector">
+
+                <TextView
+                    android:id="@+id/tvSinopsis"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingExtra="4dp"
+                    android:padding="4dp"
+                    android:text="Sinopsis larga que puede ocupar varias líneas y hacer scroll dentro del área fija..."
+                    android:textColor="@color/textColorPrimary"
+                    android:textSize="18sp" />
+            </ScrollView>
+
+            <!-- Botón Reproducir -->
+            <TextView
+                android:id="@+id/tvReproducir"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="2"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/focus_selector"
+                android:clickable="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center"
+                android:text="▶ Reproducir"
+                android:textColor="@color/rojo"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Cartelera -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="8dp"
                 android:orientation="vertical">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="🎬 Películas en cartelera casTV $50 para Alquilar"
-                    android:textSize="18sp"
+                    android:textSize="14sp"
                     android:textStyle="bold"
-                    android:padding="8dp"
                     android:textColor="@android:color/white" />
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/peliscartelera"
                     android:layout_width="match_parent"
-                    android:layout_height="220dp"
+                    android:layout_height="200dp"
                     android:background="@android:color/transparent"
                     android:orientation="horizontal"
                     android:overScrollMode="never"
                     android:padding="2dp"
                     android:scrollbars="none" />
             </LinearLayout>
-
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 
+    <!-- Fondo decorativo -->
     <ImageView
         android:id="@+id/backgroundImageView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:alpha="0.1"
+        android:alpha="0.2"
         android:scaleType="centerCrop"
         android:visibility="visible" />
-
 </FrameLayout>

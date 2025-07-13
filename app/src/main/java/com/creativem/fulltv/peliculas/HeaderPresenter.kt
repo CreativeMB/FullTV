@@ -71,7 +71,7 @@ class HeaderPresenter : Presenter() {
                 val puntos = doc.getLong("puntos") ?: 0
                 val email = doc.getString("email") ?: usuario.email ?: ""
 
-                textUsuario.text = "$nombre\n📩 $email"
+                textUsuario.text = "\uD83E\uDDD1 $nombre"
 
                 // 📊 Luego, obtener cantidad de películas
                 firestore.collection("movies")

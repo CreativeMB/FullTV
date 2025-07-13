@@ -1007,7 +1007,7 @@ class PlayerPeliculas : AppCompatActivity() {
     }
     private fun enviarCorreoNuevoPedido(movieTitle: String) {
         val tituloCodificado = URLEncoder.encode(movieTitle, "UTF-8")
-        val url = "https://95352320-03ad-4522-981d-b0a9fa14e5b2-00-3h049y4fufp0h.picard.replit.dev/send?titulo=$tituloCodificado"
+        val url = "https://eo10ekprphmdeqi.m.pipedream.net/send?titulo=$tituloCodificado"
 
         val requestQueue = Volley.newRequestQueue(this)
 
