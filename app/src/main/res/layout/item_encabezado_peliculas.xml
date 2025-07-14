@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@color/fondo"
+    android:background="@android:color/transparent"
     android:padding="0dp"
     android:focusable="false"
     android:focusableInTouchMode="false">
@@ -49,6 +49,8 @@
                     android:textColor="@color/lb_tv_white"
                     android:textSize="30sp"
                     android:textStyle="bold"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
                     android:layout_marginEnd="10dp" />
 
                 <TextView
@@ -85,6 +87,7 @@
                     android:text="ON-0"
                     android:textColor="#00C505"
                     android:textSize="20sp"
+                    android:textStyle="bold"
                     android:layout_marginEnd="10dp" />
 
                 <TextView
@@ -92,8 +95,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="OFF-0"
-                    android:textColor="@color/rojo"
+                    android:textColor="#000000"
                     android:textSize="20sp"
+                    android:textStyle="bold"
                     android:layout_marginEnd="10dp" />
             </LinearLayout>
 
@@ -124,9 +128,7 @@
         android:singleLine="true"
         android:ellipsize="marquee"
         android:marqueeRepeatLimit="marquee_forever"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:scrollHorizontally="true"
+       android:scrollHorizontally="true"
         android:text="Actualización"
         android:textColor="@color/rojo"
         android:textSize="16sp"

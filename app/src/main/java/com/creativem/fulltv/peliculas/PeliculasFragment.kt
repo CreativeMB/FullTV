@@ -1082,25 +1082,29 @@ class PeliculasFragment : RowsSupportFragment() {
         }
     }
     // Método para enviar un correo
-    private fun enviarCorreoNuevoPedido(pedido: String) {
-        val tituloCodificado = URLEncoder.encode(pedido, "UTF-8")
-        val url = "https://eoclmk8r2fpnxzg.m.pipedream.net/send?titulo=$tituloCodificado"
+      private fun enviarCorreoNuevoPedido(pedido: String) {
+        val url = "https://correo-railway.fly.dev/correo"
 
-        // Usar Volley para hacer la solicitud
-        val requestQueue = Volley.newRequestQueue(requireContext()) // Contexto de tu actividad
+        val jsonBody = JSONObject()
+        jsonBody.put("titulo", pedido) // sin URLEncoder
 
-        val stringRequest = object : StringRequest(
-            Request.Method.GET, url,
+        val requestQueue = Volley.newRequestQueue(requireContext())
+
+        val jsonRequest = object : JsonObjectRequest(
+            Request.Method.POST, url, jsonBody,
             Response.Listener { response ->
                 Log.d("Email", "✅ Correo enviado exitosamente: $response")
             },
             Response.ErrorListener { error ->
                 Log.e("Email", "❌ Error al enviar el correo: ${error.message}")
             }
-        ) {}
+        ) {
+            override fun getBodyContentType(): String = "application/json; charset=utf-8"
+        }
 
-        requestQueue.add(stringRequest)
+        requestQueue.add(jsonRequest)
     }
+
 
     private fun activarpaquete() {
         // Crear el AlertDialog.Builder

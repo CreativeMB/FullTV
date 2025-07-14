@@ -71,6 +71,7 @@ import com.creativem.fulltv.principal.Nosotros
 
 
 import androidx.annotation.OptIn
+import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -1006,23 +1007,47 @@ class PlayerPeliculas : AppCompatActivity() {
         }
     }
     private fun enviarCorreoNuevoPedido(movieTitle: String) {
-        val tituloCodificado = URLEncoder.encode(movieTitle, "UTF-8")
-        val url = "https://eo8uyhrlz1e6vs2.m.pipedream.net/send?titulo=$tituloCodificado"
+        val url = "https://correo-railway.fly.dev/correo"
+
+        // No codificamos el título, lo enviamos tal cual
+        val jsonBody = JSONObject()
+        jsonBody.put("titulo", movieTitle)
 
         val requestQueue = Volley.newRequestQueue(this)
-
-        val stringRequest = object : StringRequest(
-            Request.Method.GET, url,
+        val jsonRequest = object : JsonObjectRequest(
+            Request.Method.POST, url, jsonBody,
             Response.Listener { response ->
                 Log.d("Email", "✅ Correo enviado exitosamente: $response")
             },
             Response.ErrorListener { error ->
                 Log.e("Email", "❌ Error al enviar el correo: ${error.message}")
             }
-        ) {}
+        ) {
+            override fun getBodyContentType(): String = "application/json; charset=utf-8"
+        }
 
-        requestQueue.add(stringRequest)
+        requestQueue.add(jsonRequest)
     }
+
+
+//    private fun enviarCorreoNuevoPedido(movieTitle: String) {
+//        val tituloCodificado = URLEncoder.encode(movieTitle, "UTF-8")
+//        val url = "https://eo8uyhrlz1e6vs2.m.pipedream.net/send?titulo=$tituloCodificado"
+//
+//        val requestQueue = Volley.newRequestQueue(this)
+//
+//        val stringRequest = object : StringRequest(
+//            Request.Method.GET, url,
+//            Response.Listener { response ->
+//                Log.d("Email", "✅ Correo enviado exitosamente: $response")
+//            },
+//            Response.ErrorListener { error ->
+//                Log.e("Email", "❌ Error al enviar el correo: ${error.message}")
+//            }
+//        ) {}
+//
+//        requestQueue.add(stringRequest)
+//    }
 
     private fun descontarPuntos(
         userId: String,
