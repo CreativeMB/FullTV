@@ -106,7 +106,15 @@ class NuevaPeliculaFragment : Fragment() {
     private fun saveNewMovie() {
         if (!validarCampos()) return
 
+        val db = FirebaseFirestore.getInstance()
+        val collection = db.collection("movies")
+
+        // Generar ID automático con document()
+        val documentRef = collection.document()
+        val generatedId = documentRef.id
+
         val newMovie = Movie(
+            id = generatedId, // Guardamos el ID generado en el campo "id"
             title = binding.titleEditText.text.toString(),
             originalTitle = binding.originalTitleEditText.text.toString(),
             year = binding.yearEditText.text.toString(),
@@ -117,7 +125,8 @@ class NuevaPeliculaFragment : Fragment() {
             countdownMinutes = binding.validEditText.text.toString().toIntOrNull() ?: 0
         )
 
-        db.collection("movies").add(newMovie)
+        // Guardar usando set() para conservar el ID generado
+        documentRef.set(newMovie)
             .addOnSuccessListener {
                 Toast.makeText(requireContext(), "Película guardada", Toast.LENGTH_SHORT).show()
                 clearFields()
@@ -127,6 +136,7 @@ class NuevaPeliculaFragment : Fragment() {
                 clearFields()
             }
     }
+
 
     private fun listenerimagen() {
         binding.imageUrlEditText.addTextChangedListener(object : TextWatcher {
@@ -185,43 +195,43 @@ class NuevaPeliculaFragment : Fragment() {
     private fun editarMovie(movieId: String) {
         if (!validarCampos()) return
 
-        // Crear el mapa con los datos de la película actualizados
-        val movie: MutableMap<String, Any> = mutableMapOf(
-            "title" to title,  // Asegúrate de que estas variables ya tienen los valores correctos
-            "originalTitle" to originalTitle,
-            "year" to year,
-            "imageUrl" to imageUrl,
-            "streamUrl" to streamUrl,
-            "trailerUrl" to trailerUrl,
-            "createdAt" to Timestamp.now(),
-            "countdownMinutes" to (binding.validEditText.text.toString().toIntOrNull() ?: 0)
-        )
+        val db = FirebaseFirestore.getInstance()
+        val movieRef = db.collection("movies").document(movieId)
 
-        // Usar update() para modificar el documento existente
-        db.collection("movies")
-            .document(movieId)
-            .update(movie)
-            .addOnSuccessListener {
-                Log.d("movies", "Película actualizada correctamente con ID: $movieId")
-                Toast.makeText(
-                    requireContext(),
-                    "Película actualizada correctamente",
+        movieRef.get().addOnSuccessListener { snapshot ->
+            val idActual = snapshot.getString("id")
 
-                    Toast.LENGTH_LONG
+            val movie: MutableMap<String, Any> = mutableMapOf(
+                "title" to title,
+                "originalTitle" to originalTitle,
+                "year" to year,
+                "imageUrl" to imageUrl,
+                "streamUrl" to streamUrl,
+                "trailerUrl" to trailerUrl,
+                "createdAt" to Timestamp.now(),
+                "countdownMinutes" to (binding.validEditText.text.toString().toIntOrNull() ?: 0)
+            )
 
-                ).show()
-                clearFields()
-                findNavController().navigateUp()
+            // Solo agregamos el campo "id" si no existe o está vacío
+            if (idActual.isNullOrEmpty()) {
+                movie["id"] = movieId
             }
-            .addOnFailureListener { e ->
-                Log.e("movies", "Error al actualizar la película: ${e.message}")
-                Toast.makeText(
-                    requireContext(),
-                    "Error al actualizar la película: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
+
+            movieRef.update(movie)
+                .addOnSuccessListener {
+                    Toast.makeText(requireContext(), "Película actualizada correctamente", Toast.LENGTH_LONG).show()
+                    clearFields()
+                    findNavController().navigateUp()
+                }
+                .addOnFailureListener { e ->
+                    Toast.makeText(requireContext(), "Error al actualizar: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+
+        }.addOnFailureListener { e ->
+            Toast.makeText(requireContext(), "Error al obtener la película: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
+
 
     private fun clearFields() {
         binding.titleEditText.text.clear()

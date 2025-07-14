@@ -831,9 +831,11 @@ class PlayerPeliculas : AppCompatActivity() {
         spannable.setSpan(ForegroundColorSpan(Color.GREEN), precioValorIndex, precioValorIndex + movieYear.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         spannable.setSpan(RelativeSizeSpan(1.4f), precioValorIndex, precioValorIndex + movieYear.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
 
-        spannable.append("\n¡Alquila Tu Película!")
-        spannable.append("\nEstará en línea en breve. Estamos disponibles 24/7")
-        spannable.append("\nSi no tienes saldo recuerda recargar en COP")
+        spannable.append("\n¡Gracias por tu pedido!")
+        spannable.append("\nLa película estará disponible pronto. Estamos disponibles 24/7.")
+        spannable.append("\nSi la película se estrenó hace menos de 1 mes, no será puesta en línea.")
+        spannable.append("\nEn ese caso, el valor será reembolsado como crédito (casTV).")
+        spannable.append("\nRecuerda tener saldo en COP para futuros Alquileres.")
 
         messageText.text = spannable
 

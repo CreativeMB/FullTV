@@ -1,0 +1,34 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/populares_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Fondo animado -->
+    <ImageView
+        android:id="@+id/mainBackgroundImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="matrix"
+        android:alpha="0.85"
+        android:layout_gravity="center" />
+
+    <!-- Menú superior -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/menu_horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginTop="8dp"
+        android:clipToPadding="false"
+        android:overScrollMode="never"
+        android:layout_gravity="top" />
+
+    <!-- Películas -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_populares"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="58dp"
+        android:padding="12dp"
+        android:clipToPadding="false"
+        android:overScrollMode="never" />
+</FrameLayout>

@@ -79,10 +79,12 @@ import kotlinx.coroutines.withContext
 import android.os.Build
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.android.volley.Request
-import com.android.volley.toolbox.StringRequest
+import com.creativem.fulltv.api.PeliculasApi
+import com.creativem.fulltv.api.TMDbApiClient
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
 import com.creativem.fulltv.principal.AudioFocusHelper
-import java.net.URLEncoder
+import kotlinx.coroutines.Job
+import com.google.firebase.Timestamp
 
 class PeliculasFragment : RowsSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -401,13 +403,14 @@ class PeliculasFragment : RowsSupportFragment() {
         }
 
         val menuItems = listOf(
-            "TV Gratis", "Pelis Gratis", "Pedir Pelicula", "Buscar Pelicula",
-            "Activar Paquete", "¿Como Pago?", "Descarga", "Cerrar Cuenta"
+            "TV Gratis", "Pelis Gratis", "Peliculas", "Buscar Pelicula", "Pedir Pelicula",
+            "Activar Paquete", "¿Como Pago?", "Cerrar Cuenta"
         )
 
         val menuIcons = listOf(
-            R.drawable.tv, R.drawable.cartelera, R.drawable.pedido, R.drawable.buscar,
-            R.drawable.activacion, R.drawable.pago, R.drawable.descarga, R.drawable.cerrrar
+            R.drawable.tv, R.drawable.cartelera,
+            R.drawable.cine, R.drawable.buscar, R.drawable.pedido,
+            R.drawable.activacion, R.drawable.pago, R.drawable.cerrrar
         )
 
         val menuList = menuItems.mapIndexed { i, name ->
@@ -421,13 +424,9 @@ class PeliculasFragment : RowsSupportFragment() {
                 "Pedir Pelicula" -> mostrarDialogoPedido()
                 "Activar Paquete" -> activarpaquete()
                 "Pelis Gratis" -> startActivity(Intent(requireContext(), PeliculasValidas::class.java))
+                "Peliculas"-> startActivity(Intent(requireContext(), PeliculasApi::class.java))
                 "¿Como Pago?" -> startActivity(Intent(requireContext(), Nosotros::class.java))
                 "TV Gratis" -> startActivity(Intent(requireContext(), Tv::class.java))
-                "Descarga" -> {
-                    versionRemotaGlobal?.let { version ->
-                        descargarActualizacion(version)
-                    } ?: Toast.makeText(requireContext(), "Versión remota no disponible", Toast.LENGTH_SHORT).show()
-                }
                 "Cerrar Cuenta" -> cerrarSesion()
                 else -> Toast.makeText(requireContext(), "${item.name} seleccionado", Toast.LENGTH_SHORT).show()
             }
@@ -798,80 +797,85 @@ class PeliculasFragment : RowsSupportFragment() {
     }
 
     private fun buscarPeliculaDialogo() {
-        // Creamos el layout para el diálogo usando un EditText, ProgressBar y ListView
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.buscador, null)
         val searchEditText = dialogView.findViewById<EditText>(R.id.search_edit_text)
         val searchResultsView = dialogView.findViewById<ListView>(R.id.list_view)
         val progressBar = dialogView.findViewById<ProgressBar>(R.id.progress_bar)
 
-        // Lista de películas para la búsqueda
-        val movieList = mutableListOf<Movie>()
-        val filteredMovieList = mutableListOf<Movie>() // Lista para almacenar películas filtradas
-
-        // Adaptador para los resultados de búsqueda
+        val filteredMovieList = mutableListOf<Movie>()
         val adapter = ArrayAdapter(
             requireContext(),
             android.R.layout.simple_list_item_1,
-            filteredMovieList.map { it.title })
+            mutableListOf<String>()
+        )
         searchResultsView.adapter = adapter
 
-        // Crear el AlertDialog
         val dialog = AlertDialog.Builder(requireContext())
             .setView(dialogView)
             .create()
 
         dialog.show()
 
-        // Muestra el ProgressBar y oculta el EditText y la lista al principio
-        progressBar.visibility = View.VISIBLE
-        searchEditText.visibility = View.GONE
-        searchResultsView.visibility = View.GONE
+        progressBar.visibility = View.GONE
+        searchEditText.visibility = View.VISIBLE
+        searchResultsView.visibility = View.VISIBLE
 
-        // Cargar todas las películas desde Firestore sin validaciones
-        CoroutineScope(Dispatchers.Main).launch {
-            val peliculas =
-                validaciones.obtenerPeliculasCompleta() // Obtenemos todas las películas sin filtrar
-            movieList.clear()
-            movieList.addAll(peliculas)
-            filteredMovieList.clear()
-            filteredMovieList.addAll(movieList)
-
-            adapter.clear()
-            adapter.addAll(filteredMovieList.map { it.title })
-
-            // Oculta el ProgressBar y muestra el EditText y el ListView cuando los datos estén listos
-            progressBar.visibility = View.GONE
-            searchEditText.visibility = View.VISIBLE
-            searchResultsView.visibility = View.VISIBLE
-
-            adapter.notifyDataSetChanged()
-        }
-        // Listener para la entrada en el EditText
+        // Configura búsqueda en la API
         searchEditText.addTextChangedListener(object : TextWatcher {
+            private var searchJob: Job? = null
+
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val query = s.toString()
-                val filteredList = movieList.filter { movie ->
-                    movie.title.contains(query, ignoreCase = true)
+                val query = s.toString().trim()
+
+                if (query.length < 2) return
+
+                searchJob?.cancel()
+                searchJob = CoroutineScope(Dispatchers.IO).launch {
+                    val response = TMDbApiClient.service.searchMovies(
+                        apiKey = "678193d2c735c6f37840cee035f4d69a",
+                        language = "es-MX",
+                        query = query
+                    ).execute()
+
+                    if (response.isSuccessful) {
+                        val moviesApi = response.body()?.results ?: emptyList()
+                        val mapped = moviesApi.map {
+                            Movie(
+                                id = it.id.toString(),
+                                title = "${it.title} (${it.release_date ?: "N/A"})",
+                                originalTitle = it.original_title,
+                                imageUrl = "https://image.tmdb.org/t/p/w500${it.poster_path}",
+                                streamUrl = "https://tuservidor.com/stream/${it.id}",
+                                year = "50",
+                                countdownMinutes = 60,
+                                casTV = "50",
+                                createdAt = Timestamp.now()
+                            )
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            filteredMovieList.clear()
+                            filteredMovieList.addAll(mapped)
+                            adapter.clear()
+                            adapter.addAll(filteredMovieList.map { it.title })
+                            adapter.notifyDataSetChanged()
+                        }
+                    }
                 }
-                filteredMovieList.clear()
-                filteredMovieList.addAll(filteredList)
-                adapter.clear()
-                adapter.addAll(filteredMovieList.map { it.title })
-                adapter.notifyDataSetChanged()
             }
 
             override fun afterTextChanged(s: Editable?) {}
         })
 
-        // Listener para detectar clic en los elementos de la lista
         searchResultsView.setOnItemClickListener { _, _, position, _ ->
             val selectedMovie = filteredMovieList[position]
             irAlReproductor(selectedMovie)
-            dialog.dismiss() // Cierra el diálogo después de seleccionar
+            dialog.dismiss()
         }
     }
+
 
     private fun irAlReproductor(movie: Movie) {
         val intent = Intent(context, ApiPeliculaActivity::class.java).apply {

@@ -8,6 +8,7 @@ data class MovieResponse(
 data class TmdbMovie(
     val id: Int,
     val title: String,
+    val original_title: String,
     val overview: String,
     val release_date: String,
     val poster_path: String?,
@@ -16,7 +17,10 @@ data class TmdbMovie(
     val streamUrl: String = "",         // Puedes manejar esto con una función si lo generas tú
     val imageUrl: String = "",          // Alternativa a poster_path si la construyes tú
     val year: String = ""              // Puedes usar vote_average o un campo auxiliar
-)
+) {
+
+}
+
 data class CreditsResponse(
     val cast: List<CastMember>,
     val crew: List<CrewMember>
@@ -32,3 +36,10 @@ data class CrewMember(
     val name: String,
     val job: String // buscamos "Director"
 )
+data class PeliculasResponse(
+    val results: List<TmdbMovie>,
+    val page: Int,
+    val total_results: Int,
+    val total_pages: Int
+)
+

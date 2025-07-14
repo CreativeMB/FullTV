@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <dimen name="menu_item_width_collapsed">50dp</dimen>
+    <dimen name="menu_item_width_collapsed">40dp</dimen>
 
 
 </resources>
