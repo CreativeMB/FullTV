@@ -834,8 +834,8 @@ class PlayerPeliculas : AppCompatActivity() {
         spannable.append("\n¡Gracias por tu pedido!")
         spannable.append("\nLa película estará disponible pronto. Estamos disponibles 24/7.")
         spannable.append("\nSi la película se estrenó hace menos de 1 mes, no será puesta en línea.")
-        spannable.append("\nEn ese caso, el valor será reembolsado como crédito (casTV).")
-        spannable.append("\nRecuerda tener saldo en COP para futuros Alquileres.")
+        spannable.append("\nEn ese caso, el valor será reembolsado como crédito (CasTV).")
+        spannable.append("\nRecuerda tener saldo en CasTV para futuros Alquileres.")
 
         messageText.text = spannable
 
