@@ -1,6 +1,7 @@
 package com.creativem.fulltv.api
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Matrix
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.TransitionDrawable
@@ -48,33 +49,13 @@ class PeliculasApiFragment : Fragment() {
             mainBackgroundImage = view.findViewById(R.id.mainBackgroundImage)
             establecerFondoPorDefecto()
 
-
             // 🔹 Menu horizontal
             val menuOpciones = listOf(
-                "Populares",
-                "Mejor valoradas",
-                "En cartelera",
-                "Acción",
-                "Aventura",
-                "Animación",
-                "Comedia",
-                "Crimen",
-                "Documental",
-                "Drama",
-                "Familia",
-                "Fantasía",
-                "Historia",
-                "Terror",
-                "Música",
-                "Misterio",
-                "Romance",
-                "Ciencia ficción",
-                "Película de TV",
-                "Suspenso",
-                "Bélica",
-                "Western"
+                "Populares", "Mejor valoradas", "En cartelera", "Acción", "Aventura", "Animación",
+                "Comedia", "Crimen", "Documental", "Drama", "Familia", "Fantasía",
+                "Historia", "Terror", "Música", "Misterio", "Romance", "Ciencia ficción",
+                "Película de TV", "Suspenso", "Bélica", "Western"
             )
-
 
             val menuRecycler = view.findViewById<RecyclerView>(R.id.menu_horizontal)
             menuRecycler.layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
@@ -87,10 +68,18 @@ class PeliculasApiFragment : Fragment() {
                 }
             }
 
-
             // 🔹 Recycler de películas
             recyclerView = view.findViewById(R.id.recycler_populares)
-            recyclerView.layoutManager = GridLayoutManager(requireContext(), calcularElementosPorFila())
+
+            // Se ajusta dinámicamente al tamaño visible
+            recyclerView.viewTreeObserver.addOnGlobalLayoutListener {
+                val spanCount = calcularElementosPorFila(recyclerView.width)
+                if (recyclerView.layoutManager !is GridLayoutManager ||
+                    (recyclerView.layoutManager as GridLayoutManager).spanCount != spanCount) {
+
+                    recyclerView.layoutManager = GridLayoutManager(requireContext(), spanCount)
+                }
+            }
 
             adapter = PeliculasMenuAdapter(mutableListOf()) { movie ->
                 val intent = Intent(requireContext(), ApiPeliculaActivity::class.java).apply {
@@ -360,11 +349,27 @@ class PeliculasApiFragment : Fragment() {
         }
     }
 
+    // Función para calcular cuántos elementos caben según el ancho real del RecyclerView
+    private fun calcularElementosPorFila(anchoRecyclerPx: Int): Int {
+        val anchoTarjetaDp = 120
+        val anchoTarjetaPx = (anchoTarjetaDp * resources.displayMetrics.density).toInt()
+        return (anchoRecyclerPx / anchoTarjetaPx).coerceAtLeast(1)
+    }
+    override fun onResume() {
+        super.onResume()
 
-    private fun calcularElementosPorFila(): Int {
-            val displayMetrics = resources.displayMetrics
-            val anchoPantalla = displayMetrics.widthPixels
-            val anchoTarjeta = 245
-            return (anchoPantalla / anchoTarjeta).coerceAtLeast(1)
+        // Espera a que el recyclerView esté ya medido antes de calcular
+        recyclerView.post {
+            val ancho = recyclerView.width
+            if (ancho > 0) {
+                val spanCount = calcularElementosPorFila(ancho)
+                val currentLayoutManager = recyclerView.layoutManager as? GridLayoutManager
+                if (currentLayoutManager == null || currentLayoutManager.spanCount != spanCount) {
+                    recyclerView.layoutManager = GridLayoutManager(requireContext(), spanCount)
+                }
+            }
         }
     }
+
+
+}

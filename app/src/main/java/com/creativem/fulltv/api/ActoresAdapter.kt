@@ -25,7 +25,8 @@ class ActoresAdapter(private val actores: List<CastMember>) :
         val url = "https://image.tmdb.org/t/p/w200${actor.profile_path}"
         Glide.with(holder.itemView)
             .load(url)
-            .placeholder(R.drawable.icono)
+            .placeholder(R.drawable.pelifondo)
+            .error(R.drawable.icono)
             .into(holder.foto)
     }
 

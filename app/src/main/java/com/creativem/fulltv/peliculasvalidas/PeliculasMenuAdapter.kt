@@ -70,7 +70,7 @@ class PeliculasMenuAdapter(
 
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
-            .placeholder(R.drawable.icono)
+            .placeholder(R.drawable.pelifondo)
             .error(R.drawable.icono)
             .into(holder.movieImage)
 

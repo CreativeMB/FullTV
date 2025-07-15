@@ -75,7 +75,7 @@ class PelisCarteleraAdapter(
 
         Glide.with(holder.itemView.context)
             .load("https://image.tmdb.org/t/p/w500${movie.poster_path}")
-            .placeholder(R.drawable.icono)
+            .placeholder(R.drawable.pelifondo)
             .error(R.drawable.icono)
             .into(holder.poster)
 
