@@ -150,7 +150,7 @@ class PeliculasValidasFragment : RowsSupportFragment() {
                 val intent = Intent(requireContext(), ApiPeliculaActivity::class.java).apply {
                     putExtra("EXTRA_STREAM_URL", item.streamUrl)
                     putExtra("EXTRA_MOVIE_TITLE", item.title)
-                    putExtra("EXTRA_MOVIE_YEAR", item.year)
+                    putExtra("EXTRA_MOVIE_YEAR", item.castv)
                     putExtra("EXTRA_MOVIE_IMAGE_URL", item.imageUrl)
                     putExtra("EXTRA_ORIGINAL_TITLE", item.originalTitle)
                     putExtra("EXTRA_COUNTDOWN", item.countdownMinutes)

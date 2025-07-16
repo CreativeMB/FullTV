@@ -9,6 +9,7 @@ import androidx.fragment.app.FragmentActivity
 import com.creativem.fulltv.databinding.FragmentPeliculasBinding
 
 class Main : FragmentActivity() {
+    var haProcesadoEliminacion = false
     private lateinit var binding: FragmentPeliculasBinding
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,5 +24,8 @@ class Main : FragmentActivity() {
             WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         )
+        if (savedInstanceState == null) {
+            haProcesadoEliminacion = false
+        }
     }
 }

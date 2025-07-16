@@ -1,11 +1,8 @@
 package com.creativem.tvfullurl.Fragment
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
-import android.util.Log
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
@@ -53,7 +50,7 @@ class NuevaPeliculaFragment : Fragment() {
         editTexts = listOf(
             binding.titleEditText,
             binding.originalTitleEditText,
-            binding.yearEditText,
+            binding.castvEditText,
             binding.imageUrlEditText,
             binding.streamUrlEditText,
             binding.validEditText,
@@ -88,7 +85,7 @@ class NuevaPeliculaFragment : Fragment() {
                         // Cargar los datos en los campos
                         binding.titleEditText.setText(it.title)
                         binding.originalTitleEditText.setText(it.originalTitle)
-                        binding.yearEditText.setText(it.year)
+                        binding.castvEditText.setText(it.castv.toString())
                         binding.imageUrlEditText.setText(it.imageUrl)
                         binding.streamUrlEditText.setText(it.streamUrl)
                         binding.trailerUrlEditText.setText(it.trailerUrl)
@@ -117,7 +114,7 @@ class NuevaPeliculaFragment : Fragment() {
             id = generatedId, // Guardamos el ID generado en el campo "id"
             title = binding.titleEditText.text.toString(),
             originalTitle = binding.originalTitleEditText.text.toString(),
-            year = binding.yearEditText.text.toString(),
+            castv = binding.castvEditText.text.toString().toIntOrNull() ?: 0,
             imageUrl = binding.imageUrlEditText.text.toString(),
             streamUrl = binding.streamUrlEditText.text.toString(),
             trailerUrl = binding.trailerUrlEditText.text.toString(),
@@ -170,7 +167,7 @@ class NuevaPeliculaFragment : Fragment() {
     private fun validarCampos(): Boolean {
         // Actualiza las variables globales con los valores de los campos
         title = binding.titleEditText.text.toString().trim()
-        year = binding.yearEditText.text.toString().trim()
+        year = binding.castvEditText.text.toString().trim()
         imageUrl = binding.imageUrlEditText.text.toString().trim()
         streamUrl = binding.streamUrlEditText.text.toString().trim()
         trailerUrl = binding.trailerUrlEditText.text.toString().trim()
@@ -236,12 +233,13 @@ class NuevaPeliculaFragment : Fragment() {
     private fun clearFields() {
         binding.titleEditText.text.clear()
         binding.originalTitleEditText.text.clear()
-        binding.yearEditText.text.clear()
+        binding.castvEditText.text.clear()
         binding.imageUrlEditText.text.clear()
         binding.streamUrlEditText.text.clear()
         binding.trailerUrlEditText.text.clear()
         binding.previewImageView.setImageResource(R.drawable.icono)
         binding.validEditText.text.clear()
     }
+
 
 }

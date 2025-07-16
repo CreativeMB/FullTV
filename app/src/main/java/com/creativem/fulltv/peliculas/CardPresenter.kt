@@ -85,7 +85,7 @@ class CardPresenter: Presenter(){
 
         val casText = "CasTV $"
         cardView.titleText = movie.title
-        cardView.contentText = "$casText${movie.year}"
+        cardView.contentText = "$casText${movie.castv}"
         etiquetaValida.visibility = View.GONE
 
         try {
@@ -150,7 +150,7 @@ class CardPresenter: Presenter(){
                 etiquetaValida.setBackgroundColor(Color.parseColor("#006064"))
                 etiquetaValida.visibility = View.VISIBLE
             } else {
-                cardView.contentText = "$casText${movie.year}"
+                cardView.contentText = "$casText${movie.castv}"
                 cardView.setInfoAreaBackgroundColor(Color.parseColor("#880E4F"))
                 etiquetaValida.text = "Alquilar 💳"
                 etiquetaValida.setBackgroundColor(Color.parseColor("#880E4F"))

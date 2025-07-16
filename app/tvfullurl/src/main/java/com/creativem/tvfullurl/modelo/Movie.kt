@@ -8,7 +8,7 @@ data class Movie(
     var nombre: String = "",
     var title: String = "",    // Título de la película, valor por defecto vacío
     var originalTitle: String = "",
-    var year: String = "", // Sinopsis o descripción de la película (antes contenido)
+    val castv: Int = 0,
     val email: String = "",
     var imageUrl: String = "", // URL de la imagen de la película
     var streamUrl: String = "",

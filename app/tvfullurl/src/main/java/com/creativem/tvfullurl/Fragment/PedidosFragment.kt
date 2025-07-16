@@ -11,9 +11,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.cineflexurl.modelo.Movie
 import com.creativem.tvfullurl.adapter.PedidosAdapter
 import com.creativem.tvfullurl.databinding.FragmentPedidosBinding
-import com.creativem.tvfullurl.modelo.User
 import com.google.android.gms.tasks.Task
-import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.QuerySnapshot
 
@@ -54,34 +52,27 @@ class PedidosFragment : Fragment() {
     }
 
     private fun cargarPedidos() {
-        movieList.clear() // Limpiar la lista actual
+        movieList.clear()
 
-        db.collection("pedidosmovies").get() // Obtener los documentos de la colección "pedidosmovies"
+        db.collection("pedidosmovies").get()
             .addOnCompleteListener { task: Task<QuerySnapshot> ->
                 if (task.isSuccessful) {
-                    // Aquí directamente accedemos a los documentos de la colección
                     for (document in task.result!!) {
-                        // Accedemos solo a los campos necesarios
                         val nombre = document.getString("nombre") ?: ""
                         val email = document.getString("email") ?: ""
                         val title = document.getString("title") ?: ""
-                        var year = document.getString("year") ?: ""
-
-                        // Agregar la palabra "CasTV" antes del año
-                        year = "CasTV: $year"
-
+                        val castv = document.getLong("castv")?.toInt() ?: 0
                         val id = document.id
-                        // Creamos un objeto Movie con solo los campos necesarios
+
                         val movie = Movie(
                             id = id,
                             nombre = nombre,
                             email = email,
                             title = title,
-                            year = year
+                            castv = castv // ya es Int
                         )
-                        movieList.add(movie) // Agregar la película a la lista
+                        movieList.add(movie)
                     }
-                    // Actualizamos el adaptador con la nueva lista de películas
                     pedidosAdapter.updateMovieList(movieList)
                 } else {
                     Log.e("PedidosFragment", "Error getting documents: ", task.exception)
@@ -91,6 +82,7 @@ class PedidosFragment : Fragment() {
                 Log.e("PedidosFragment", "Error loading pedidos", e)
             }
     }
+
 
     private fun iniciarRecycler() {
         pedidosAdapter = PedidosAdapter(

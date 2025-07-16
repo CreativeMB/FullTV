@@ -16,7 +16,7 @@ data class TmdbMovie(
     // Campos adicionales necesarios
     val streamUrl: String = "",         // Puedes manejar esto con una función si lo generas tú
     val imageUrl: String = "",          // Alternativa a poster_path si la construyes tú
-    val year: String = ""              // Puedes usar vote_average o un campo auxiliar
+    val castv: Int = 0,           // Puedes usar vote_average o un campo auxiliar
 ) {
 
 }

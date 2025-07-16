@@ -1,5 +1,6 @@
 package com.creativem.fulltv.principal
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -13,6 +14,7 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.creativem.fulltv.R
+import com.creativem.fulltv.peliculas.PeliculasFragment
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -22,6 +24,8 @@ class Login : AppCompatActivity() {
     private lateinit var googleSignInClient: GoogleSignInClient
     private lateinit var firestore: FirebaseFirestore
     private lateinit var database: FirebaseDatabase
+
+
     companion object {
         private const val RC_SIGN_IN = 9001
         private const val TAG = "Login"
@@ -34,6 +38,7 @@ class Login : AppCompatActivity() {
         // Configurar Firebase Auth
         auth = FirebaseAuth.getInstance()
         firestore = FirebaseFirestore.getInstance()
+        database = FirebaseDatabase.getInstance()
 
         // Configurar Google Sign-In
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -63,6 +68,7 @@ class Login : AppCompatActivity() {
                 finish()
             }
         }
+
     }
     /**
      * Muestra un AlertDialog para que el usuario elija el método de inicio de sesión.
@@ -113,7 +119,7 @@ class Login : AppCompatActivity() {
                     Log.d(TAG, "signInWithCredential:success")
                     val user = auth.currentUser
                     user?.let {
-                        updateUserPoints(it.uid, it.displayName ?: "", it.email ?: "")
+                        nuevosusuarios(it.uid, it.displayName ?: "", it.email ?: "")
                     }
                     val intent = Intent(this, Main::class.java)
                     startActivity(intent)
@@ -150,6 +156,16 @@ class Login : AppCompatActivity() {
                                     "Usuario invitado creado con éxito.",
                                     Toast.LENGTH_SHORT
                                 ).show()
+
+                                // 🟢 Agregar a Realtime Database con Castv = 10
+                                val user = auth.currentUser
+                                if (user != null) {
+                                    val nombre = "Estas En Invitado"
+                                    val email = user.email
+                                    val userId = user.uid
+                                    nuevosusuarios(userId, nombre, email)
+                                }
+
                                 val intent = Intent(this, Main::class.java)
                                 startActivity(intent)
                                 finish()
@@ -166,54 +182,29 @@ class Login : AppCompatActivity() {
             }
     }
 
-    private fun updateUserPoints(userId: String, nombre: String, email: String?) {
-        val userRef = firestore.collection("users").document(userId)
-
-        // Guardar o actualizar los puntos del usuario
-        userRef.get()
-            .addOnSuccessListener { document ->
-                if (document.exists()) {
-                    userRef.update("puntos", document.getLong("puntos") ?: 0)
-                        .addOnSuccessListener {
-                            Log.d(TAG, "Puntos actualizados correctamente.")
-                        }
-                } else {
-                    val user = hashMapOf(
-                        "nombre" to nombre,
-                        "email" to email,
-                        "puntos" to 10 // Valor inicial de puntos
-                    )
-                    userRef.set(user)
-                        .addOnSuccessListener {
-                            Log.d(TAG, "Usuario registrado con éxito.")
-                            // Agregar también al Realtime Database
-                            addUserToRealtimeDatabase(userId, nombre, email)
-                        }
-                }
-            }
-            .addOnFailureListener { e ->
-                Log.w(TAG, "Error al obtener documento: ", e)
-                Toast.makeText(this, "Error al obtener usuario.", Toast.LENGTH_SHORT).show()
-            }
-    }
-
-    private fun addUserToRealtimeDatabase(userId: String, nombre: String, email: String?) {
-        val user = hashMapOf(
+    private fun nuevosusuarios(userId: String, nombre: String, email: String?) {
+        val user = mapOf(
             "nombre" to nombre,
-            "email" to email,
-            "puntos" to 10 // Valor inicial de puntos
+            "correo" to email,
+            "castv" to 10,
+            "userId" to userId,
+            "estado" to "activo",
+            "enlinea" to false
         )
 
-        val databaseRef = database.reference.child("users").child(userId)
+        val databaseRef = database.reference.child("usuarios").child(userId)
 
         databaseRef.setValue(user)
             .addOnSuccessListener {
-                Log.d(TAG, "Usuario agregado a Realtime Database.")
+                Log.d(TAG, "Usuario agregado a Realtime Database correctamente.")
             }
             .addOnFailureListener { e ->
                 Log.w(TAG, "Error al agregar usuario a Realtime Database.", e)
-                Toast.makeText(this, "Error al agregar usuario a Realtime Database.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Error al agregar usuario a la base de datos.", Toast.LENGTH_SHORT).show()
             }
     }
+
+
+
 }
 

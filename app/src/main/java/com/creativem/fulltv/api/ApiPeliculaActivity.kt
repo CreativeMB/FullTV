@@ -54,11 +54,11 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
     private var streamUrlGuardado = ""
     private var movieTitle = ""
-    private var movieYear = ""
+    private var movieCastv: Int = 0
     private var movieImageUrl = ""
     private var movieCountdown = 0
     private var movieActual: Movie? = null
-
+    private var movieReleaseDate: String = ""
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_api_pelicula)
@@ -88,7 +88,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
         val movieOriginalTitle = intent.getStringExtra("EXTRA_ORIGINAL_TITLE") ?: ""
         streamUrlGuardado = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
         movieTitle = intent.getStringExtra("EXTRA_MOVIE_TITLE") ?: ""
-        movieYear = intent.getStringExtra("EXTRA_MOVIE_YEAR") ?: ""
+        movieCastv = intent.getIntExtra("EXTRA_MOVIE_CASTV", 0)
         movieImageUrl = intent.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
         movieCountdown = intent.getIntExtra("EXTRA_COUNTDOWN", 0)
 
@@ -106,7 +106,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
             val intent = Intent(this, PlayerPeliculas::class.java).apply {
                 putExtra("EXTRA_STREAM_URL", streamUrlGuardado)
                 putExtra("EXTRA_MOVIE_TITLE", movieActual?.title ?: movieTitle)
-                putExtra("EXTRA_MOVIE_YEAR", movieActual?.year ?: movieYear)
+                putExtra("EXTRA_MOVIE_CASTV", movieActual?.castv ?: movieCastv)
                 putExtra("EXTRA_MOVIE_IMAGE_URL", movieActual?.imageUrl ?: movieImageUrl)
                 putExtra("EXTRA_COUNTDOWN", movieActual?.countdownMinutes ?: movieCountdown)
             }
@@ -137,7 +137,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
                             peli.copy(
                                 streamUrl = "https://tuservidor.com/stream/${peli.id}",
                                 imageUrl = "https://image.tmdb.org/t/p/w500${peli.poster_path}",
-                                year = "50" // Valor fijo
+                                castv = 50 // Valor fijo para todos
                             )
                         } ?: emptyList()
                         peliculasTotales.addAll(pelis)
@@ -150,21 +150,26 @@ class ApiPeliculaActivity : AppCompatActivity() {
             withContext(Dispatchers.Main) {
                 if (peliculasTotales.isNotEmpty()) {
                     carteleraAdapter = PelisCarteleraAdapter(peliculasTotales) { movieSeleccionado ->
+
+                        val releaseDate = movieSeleccionado.release_date ?: "N/A"
+                        val releaseYear = releaseDate.take(4) // Extrae solo el año (los 4 primeros caracteres)
+
                         movieActual = Movie(
-                            title = "${movieSeleccionado.title} (${movieSeleccionado.release_date ?: "N/A"})", // 🔧 aquí
-                            originalTitle = movieSeleccionado.title,
+                            title = movieSeleccionado.title,
+                            originalTitle = movieSeleccionado.original_title ?: movieSeleccionado.title,
                             imageUrl = movieSeleccionado.imageUrl,
                             streamUrl = movieSeleccionado.streamUrl,
-                            year = "50", // Valor fijo
-                            countdownMinutes = 60,
-                            casTV = "50"
+                            castv = movieSeleccionado.castv ?: 50,
+                            countdownMinutes = 60
                         )
 
+                        // Asignaciones a variables globales
                         streamUrlGuardado = movieSeleccionado.streamUrl
                         movieTitle = movieSeleccionado.title
-                        movieYear = movieSeleccionado.release_date ?: "2024"
+                        movieCastv = movieSeleccionado.castv ?: 50
                         movieImageUrl = movieSeleccionado.imageUrl
                         movieCountdown = 60
+                        movieReleaseDate = releaseYear // 🔧 nuevo campo, si necesitas usarlo
 
                         mostrarPelicula(movieSeleccionado)
                     }
@@ -245,13 +250,13 @@ class ApiPeliculaActivity : AppCompatActivity() {
         val movie = movieActual
         if (movie != null) {
             tvTitulo.text = movie.title
-            tvFecha.text = "Estreno: ${movie.year}"
-            tvCalificacion.text = "⭐ ${movie.casTV}" // CasTV fijo
+            tvFecha.text = "Estreno: ${movie.castv}"
+            tvCalificacion.text = "⭐ ${movie.castv}" // CasTV fijo
             tvSinopsis.text = "Tiempo válido: ${movie.countdownMinutes} min"
             Glide.with(this).load(movie.imageUrl).placeholder(R.drawable.icono).into(ivPoster)
         } else {
             tvTitulo.text = movieTitle
-            tvFecha.text = "Estreno: $movieYear"
+            tvFecha.text = "Estreno: $movieCastv"
             tvCalificacion.text = "⭐ 50"
             tvSinopsis.text = "Tiempo válido: $movieCountdown min"
             Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(ivPoster)

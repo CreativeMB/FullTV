@@ -71,7 +71,7 @@
                     android:layout_marginBottom="4dp" />
 
                 <EditText
-                    android:id="@+id/year_edit_text"
+                    android:id="@+id/castv_edit_text"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center"

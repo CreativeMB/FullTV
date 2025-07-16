@@ -10,6 +10,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.leanback.widget.Presenter
 import com.bumptech.glide.Glide
+import com.creativem.fulltv.CastvHelper
 import com.creativem.fulltv.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -22,18 +23,15 @@ import java.util.Date
 import java.util.Locale
 
 class HeaderPresenter : Presenter() {
-
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_encabezado_peliculas, parent, false)
-
         return ViewHolder(view)
     }
 
     override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
         val context = viewHolder.view.context
 
-        // Referencias de las vistas
         val textFecha = viewHolder.view.findViewById<TextView>(R.id.textfecha)
         val textHora = viewHolder.view.findViewById<TextView>(R.id.textHora)
         val textUsuario = viewHolder.view.findViewById<TextView>(R.id.textUsuario)
@@ -50,9 +48,8 @@ class HeaderPresenter : Presenter() {
         val usuario = auth.currentUser
         val usuarioId = usuario?.uid
 
-        textFecha.text = obtenerFechaActual() // Muestra una vez
-        textHora.text = obtenerHoraActual()  // También muestra la hora inicial
-
+        textFecha.text = obtenerFechaActual()
+        textHora.text = obtenerHoraActual()
 
         if (usuarioId == null) {
             textUsuario.text = "Invitado"
@@ -63,34 +60,30 @@ class HeaderPresenter : Presenter() {
             return
         }
 
-        // 🔄 Cargar nombre, email y puntos (Castv)
-        firestore.collection("users").document(usuarioId)
-            .get()
-            .addOnSuccessListener { doc ->
-                val nombre = doc.getString("nombre") ?: "Estas de Invitado"
-                val puntos = doc.getLong("puntos") ?: 0
-                val email = doc.getString("email") ?: usuario.email ?: ""
+        // 🔄 Obtener datos del usuario desde Realtime Database
+        CastvHelper.obtenerDatosUsuario(
+            userId = usuarioId,
+            onSuccess = { nombre, correo, castv, enlinea ->
+                textUsuario.text = "\uD83E\uDDD1 $nombre" + if (enlinea) " 🟢" else " 🔴"
 
-                textUsuario.text = "\uD83E\uDDD1 $nombre"
-
-                // 📊 Luego, obtener cantidad de películas
+                // 📊 Obtener cantidad de películas
                 firestore.collection("movies")
                     .get()
                     .addOnSuccessListener { result ->
                         val cantidadPeliculas = result.size()
-                        textCastv.text =
-                            "🎬 Películas: $cantidadPeliculas | ⭐ CasTV: $puntos"
+                        textCastv.text = "🎬 Películas: $cantidadPeliculas | ⭐ Castv: $castv"
                     }
                     .addOnFailureListener {
-                        textCastv.text = "🎬 Películas: 0 | ⭐ Castv: $puntos"
+                        textCastv.text = "🎬 Películas: 0 | ⭐ Castv: $castv"
                     }
-            }
-            .addOnFailureListener {
-                textUsuario.text = "Usuario Desconocido"
+            },
+            onFailure = {
+                textUsuario.text = "Usuario desconocido"
                 textCastv.text = "🎬 Películas: 0 | ⭐ Castv: 0"
             }
+        )
 
-        // 🖼️ Imagen de usuario
+        // 🖼️ Foto del usuario
         val photoUrl = usuario.photoUrl
         if (photoUrl != null) {
             Glide.with(context)
@@ -103,14 +96,14 @@ class HeaderPresenter : Presenter() {
             imagenUser.setImageResource(R.drawable.icono)
         }
 
-        // 📶 Usuarios conectados/desconectados
-        realtimeDb.child("usuarios_conectados")
+        // ✅ Contar usuarios en línea usando el campo "enlinea" en "usuarios"
+        realtimeDb.child("usuarios")
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     var on = 0
                     var off = 0
-                    for (user in snapshot.children) {
-                        val conectado = user.getValue(Boolean::class.java) ?: false
+                    for (userSnapshot in snapshot.children) {
+                        val conectado = userSnapshot.child("enlinea").getValue(Boolean::class.java) ?: false
                         if (conectado) on++ else off++
                     }
                     userOnline.text = "ON-$on"
@@ -119,7 +112,6 @@ class HeaderPresenter : Presenter() {
 
                 override fun onCancelled(error: DatabaseError) {}
             })
-
         // 🧾 Pedidos recientes
         firestore.collection("pedidosmovies")
             .get()
@@ -137,7 +129,6 @@ class HeaderPresenter : Presenter() {
                         visibility = View.VISIBLE
                         isSelected = true
 
-                        // Animación de color
                         ObjectAnimator.ofArgb(
                             this,
                             "textColor",
@@ -157,17 +148,12 @@ class HeaderPresenter : Presenter() {
                         }
                     }
                 } else {
-                    // No hay pedidos → ocultar el TextView
                     txtActualizacion.visibility = View.GONE
                 }
             }
             .addOnFailureListener {
-                txtActualizacion.apply {
-                    text = "Error al cargar los pedidos."
-                    visibility = View.VISIBLE
-                }
-
-
+                txtActualizacion.text = "Error al cargar los pedidos."
+                txtActualizacion.visibility = View.VISIBLE
             }
     }
 
@@ -182,5 +168,4 @@ class HeaderPresenter : Presenter() {
         val hora = SimpleDateFormat("hh:mm aa", Locale.getDefault()).format(Date())
         return hora.replace("am", "AM").replace("pm", "PM")
     }
-
 }

@@ -1,7 +1,6 @@
 package com.creativem.fulltv.api
 
 import android.content.Intent
-import android.content.res.Configuration
 import android.graphics.Matrix
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.TransitionDrawable
@@ -85,7 +84,7 @@ class PeliculasApiFragment : Fragment() {
                 val intent = Intent(requireContext(), ApiPeliculaActivity::class.java).apply {
                     putExtra("EXTRA_STREAM_URL", movie.streamUrl)
                     putExtra("EXTRA_MOVIE_TITLE", movie.title)
-                    putExtra("EXTRA_MOVIE_YEAR", movie.year)
+                    putExtra("EXTRA_MOVIE_CASTV", movie.castv)
                     putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
                     putExtra("EXTRA_ORIGINAL_TITLE", movie.originalTitle)
                     putExtra("EXTRA_COUNTDOWN", movie.countdownMinutes)
@@ -208,9 +207,8 @@ class PeliculasApiFragment : Fragment() {
                                     originalTitle = movie.original_title,
                                     imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}",
                                     streamUrl = "https://tuservidor.com/stream/${movie.id}",
-                                    year = "50",
+                                    castv = 50,
                                     countdownMinutes = 60,
-                                    casTV = "50",
                                     createdAt = Timestamp.now()
                                 )
                             }
@@ -241,9 +239,8 @@ class PeliculasApiFragment : Fragment() {
                                     originalTitle = movie.original_title,
                                     imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}",
                                     streamUrl = "https://tuservidor.com/stream/${movie.id}",
-                                    year = "50",
+                                    castv = 50,
                                     countdownMinutes = 60,
-                                    casTV = "50",
                                     createdAt = Timestamp.now()
                                 )
                             }
@@ -299,9 +296,8 @@ class PeliculasApiFragment : Fragment() {
                                     originalTitle = movie.original_title,
                                     imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}",
                                     streamUrl = "https://tuservidor.com/stream/${movie.id}",
-                                    year = "50",
+                                    castv = 50,
                                     countdownMinutes = 60,
-                                    casTV = "50",
                                     createdAt = Timestamp.now()
                                 )
                             }
@@ -331,9 +327,8 @@ class PeliculasApiFragment : Fragment() {
                                 originalTitle = movie.original_title,
                                 imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}",
                                 streamUrl = "https://tuservidor.com/stream/${movie.id}",
-                                year = "50",
+                                castv = 50,
                                 countdownMinutes = 60,
-                                casTV = "50",
                                 createdAt = Timestamp.now()
                             )
                         }

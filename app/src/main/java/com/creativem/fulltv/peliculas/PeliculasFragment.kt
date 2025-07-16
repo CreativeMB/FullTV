@@ -79,12 +79,15 @@ import kotlinx.coroutines.withContext
 import android.os.Build
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.android.volley.Request
+import com.creativem.fulltv.CastvHelper
 import com.creativem.fulltv.api.PeliculasApi
 import com.creativem.fulltv.api.TMDbApiClient
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
 import com.creativem.fulltv.principal.AudioFocusHelper
+import com.creativem.fulltv.principal.Main
 import kotlinx.coroutines.Job
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldValue
 
 class PeliculasFragment : RowsSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -96,10 +99,10 @@ class PeliculasFragment : RowsSupportFragment() {
     private val db = FirebaseFirestore.getInstance()
     private var versionRemotaGlobal: String? = null
 
-
-    // Declarar las listas de UIDs (Strings)
-    val usuariosConectados = mutableListOf<String>()
-    val usuariosDesconectados = mutableListOf<String>()
+    private lateinit var auth: FirebaseAuth
+    private var isLoggingOut = false
+    private var userStatusListener: ValueEventListener? = null
+    private val databaseRef by lazy { FirebaseDatabase.getInstance().reference }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -111,114 +114,47 @@ class PeliculasFragment : RowsSupportFragment() {
         // Ya no inflar ni añadir loading_overlay
         binding = FragmentPeliculasBinding.bind(requireActivity().findViewById(R.id.main))
 
-
-
         loadingContainer = binding.loadingOverlay
         progressBar = binding.progressBar
         loadingText = binding.loadingText
 
-        val realtimeDbRef = FirebaseDatabase.getInstance().getReference("usuarios_conectados")
-
-        val currentUserUid = FirebaseAuth.getInstance().currentUser?.uid
+        auth = FirebaseAuth.getInstance()
+        val currentUserUid = auth.currentUser?.uid
 
         if (currentUserUid != null) {
-            val userStatusRef = realtimeDbRef.child(currentUserUid)
+            val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(currentUserUid)
 
-            // Escuchar cambios en la conexión
+            // Escuchar cambios de conexión y actualizar campo "enlinea"
             val connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected")
             connectedRef.addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val connected = snapshot.getValue(Boolean::class.java) ?: false
                     if (connected) {
-                        // El usuario está conectado, actualizar estado a true
-                        userStatusRef.setValue(true)
-                            .addOnSuccessListener { Log.d("Connection", "Estado actualizado a conectado") }
-                            .addOnFailureListener { e -> Log.e("Connection", "Error al actualizar estado", e) }
-
-                        // Configurar la desconexión automática cuando el usuario pierda conexión
-                        userStatusRef.onDisconnect().setValue(false)
-                            .addOnSuccessListener { Log.d("Connection", "Estado de desconexión configurado") }
-                            .addOnFailureListener { e -> Log.e("Connection", "Error al configurar desconexión", e) }
+                        userRef.child("enlinea").setValue(true)
+                        userRef.child("enlinea").onDisconnect().setValue(false)
                     }
                 }
 
                 override fun onCancelled(error: DatabaseError) {
-                    Log.e("Connection", "Error al escuchar conexión: ${error.message}")
+                    Log.e("Connection", "Error al verificar conexión: ${error.message}")
                 }
             })
         } else {
             Log.e("Connection", "Usuario no autenticado")
         }
 
-        if (currentUserUid != null) {
-            val userStatusRef = realtimeDbRef.child(currentUserUid)
-
-            // Escuchar cambios en la conexión
-            val connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected")
-            connectedRef.addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val connected = snapshot.getValue(Boolean::class.java) ?: false
-                    if (connected) {
-                        // El usuario está conectado, actualizar estado a true
-                        userStatusRef.setValue(true)
-                            .addOnSuccessListener { Log.d("Connection", "Estado actualizado a conectado") }
-                            .addOnFailureListener { e -> Log.e("Connection", "Error al actualizar estado", e) }
-
-                        // Configurar la desconexión automática cuando el usuario pierda conexión
-                        userStatusRef.onDisconnect().setValue(false)
-                            .addOnSuccessListener { Log.d("Connection", "Estado de desconexión configurado") }
-                            .addOnFailureListener { e -> Log.e("Connection", "Error al configurar desconexión", e) }
-                    }
-                }
-
-                override fun onCancelled(error: DatabaseError) {
-                    Log.e("Connection", "Error al escuchar conexión: ${error.message}")
-                }
-            })
-        } else {
-            Log.e("Connection", "Usuario no autenticado")
-        }
-
-        // Escuchar los cambios en los usuarios conectados y desconectados
-        realtimeDbRef.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                usuariosConectados.clear()
-                usuariosDesconectados.clear()
-
-                for (userSnapshot in snapshot.children) {
-                    // Obtener el valor de conexión (true/false) para cada usuario
-                    val conectado = userSnapshot.getValue(Boolean::class.java) ?: false
-
-                    // Agregar el usuario a la lista según su estado de conexión
-                    if (conectado) {
-                        usuariosConectados.add(userSnapshot.key ?: "")  // Agregar solo el UID
-                    } else {
-                        usuariosDesconectados.add(userSnapshot.key ?: "")  // Agregar solo el UID
-                    }
-                }
-
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                Log.e("Connection", "Error al escuchar los usuarios: ${error.message}")
-            }
-        })
-
-
-
-
+        // Mantener pantalla encendida
         requireActivity().window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-
-
-// Configura el listener de clics SOLO para items tipo Movie (Leanback)
+        // Configura clic en ítems tipo Movie
         setOnItemViewClickedListener { _, item, _, _ ->
             if (item is Movie) {
                 val intent = Intent(context, ApiPeliculaActivity::class.java)
                 intent.putExtra("EXTRA_ORIGINAL_TITLE", item.originalTitle)
                 intent.putExtra("EXTRA_STREAM_URL", item.streamUrl)
                 intent.putExtra("EXTRA_MOVIE_TITLE", item.title)
-                intent.putExtra("EXTRA_MOVIE_YEAR", item.year)
+                intent.putExtra("EXTRA_MOVIE_YEAR", item.castv)
+                intent.putExtra("EXTRA_MOVIE_CASTV", item.castv)
                 intent.putExtra("EXTRA_MOVIE_IMAGE_URL", item.imageUrl)
                 intent.putExtra("EXTRA_COUNTDOWN", item.countdownMinutes)
                 startActivity(intent)
@@ -228,42 +164,62 @@ class PeliculasFragment : RowsSupportFragment() {
         return view
     }
 
-    // Agrega este método para cerrar sesión
     private fun cerrarSesion() {
         val auth = FirebaseAuth.getInstance()
-        auth.signOut()
-        Toast.makeText(requireContext(), "Sesión cerrada", Toast.LENGTH_SHORT).show()
+        val currentUser = auth.currentUser
 
-        // Aquí puedes redirigir al usuario a la pantalla de inicio de sesión o cualquier otra actividad
-        val intent = Intent(
-            requireContext(),
-            Login::class.java
-        ) // Cambia a tu actividad de inicio de sesión
-        startActivity(intent)
-        requireActivity().finish() // Finaliza la actividad actual si es necesario
+        if (currentUser != null) {
+            val uid = currentUser.uid
+            val userRef = FirebaseDatabase.getInstance().reference
+                .child("usuarios")
+                .child(uid)
+                .child("enlinea")
+
+            // Primero marcar enlinea = false
+            userRef.setValue(false).addOnCompleteListener {
+                // Luego cerrar sesión
+                auth.signOut()
+                Toast.makeText(requireContext(), "Sesión cerrada", Toast.LENGTH_SHORT).show()
+
+                // Redirigir al Login
+                val intent = Intent(requireContext(), Login::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+                requireActivity().finish()
+            }
+        } else {
+            // Si no hay usuario (por seguridad)
+            Toast.makeText(requireContext(), "No hay sesión activa", Toast.LENGTH_SHORT).show()
+        }
     }
+
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         cargarMenuPrincipal()
 
 
+
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser != null) {
+            val userId = currentUser.uid
+            val email = currentUser.email
+            val nombre = currentUser.displayName ?: "Usuario sin nombre"
+
+            // ✅ Solo crear/actualizar el usuario en Realtime si no existe
+            CastvHelper.actualizarCastvSiNoExiste(requireContext(), userId, nombre, email)
+        }
+
         CoroutineScope(Dispatchers.IO).launch {
             Validacioneslista.cargarPeliculas()
-
-            // ⚠️ Cambio importante: actualizar etiquetas en el hilo principal
             withContext(Dispatchers.Main) {
                 actualizarSoloEtiquetas()
             }
         }
 
         obtenerNoticia()
-
         binding.mainBackgroundImage.setImageDrawable(null)
-
-
-        adapter = rowsAdapter // Inicializa el adaptador
+        adapter = rowsAdapter
 
         setOnItemViewSelectedListener { _, item, _, _ ->
             if (item is Movie) {
@@ -272,17 +228,11 @@ class PeliculasFragment : RowsSupportFragment() {
                 establecerFondoPorDefecto()
             }
         }
+
         escucharCambiosEnPeliculas()
         cargarPeliculas()
         mostrarPublicidad()
-
-        // Cargar información del usuario
-        val usuarioId =
-            FirebaseAuth.getInstance().currentUser?.uid // Obtén el ID del usuario autenticado
-
-
     }
-
 
     fun cargarPeliculas() {
 
@@ -848,9 +798,8 @@ class PeliculasFragment : RowsSupportFragment() {
                                 originalTitle = it.original_title,
                                 imageUrl = "https://image.tmdb.org/t/p/w500${it.poster_path}",
                                 streamUrl = "https://tuservidor.com/stream/${it.id}",
-                                year = "50",
+                                castv = 50,
                                 countdownMinutes = 60,
-                                casTV = "50",
                                 createdAt = Timestamp.now()
                             )
                         }
@@ -881,7 +830,7 @@ class PeliculasFragment : RowsSupportFragment() {
         val intent = Intent(context, ApiPeliculaActivity::class.java).apply {
             putExtra("EXTRA_STREAM_URL", movie.streamUrl)
             putExtra("EXTRA_MOVIE_TITLE", movie.title)
-            putExtra("EXTRA_MOVIE_YEAR", movie.year)
+            putExtra("EXTRA_MOVIE_CASTV", movie.castv)
             putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
             putExtra("EXTRA_ORIGINAL_TITLE", movie.originalTitle)
             putExtra("EXTRA_COUNTDOWN", movie.countdownMinutes)
@@ -952,31 +901,27 @@ class PeliculasFragment : RowsSupportFragment() {
     // Subir el pedido a Firestore
     private fun subirPedidoAFirestore(pedido: String) {
         val auth = FirebaseAuth.getInstance()
-        val db = FirebaseFirestore.getInstance()
-
+        val database = FirebaseDatabase.getInstance()
         val userId = auth.currentUser?.uid
 
         if (userId != null) {
-            val userRef = db.collection("users").document(userId)
+            val userRef = database.reference.child("usuarios").child(userId)
 
-            // Obtener datos del usuario
-            userRef.get().addOnSuccessListener { document ->
-                if (document.exists()) {
-                    val nombreUsuario = document.getString("nombre") ?: "Nombre no disponible"
-                    val emailUsuario = document.getString("email") ?: "Email no disponible"
-                    val puntosActuales = document.getLong("puntos")?.toInt() ?: 0
+            userRef.get().addOnSuccessListener { snapshot ->
+                if (snapshot.exists()) {
+                    val nombreUsuario = snapshot.child("nombre").getValue(String::class.java) ?: "Nombre no disponible"
+                    val emailUsuario = snapshot.child("correo").getValue(String::class.java) ?: "Email no disponible"
+                    val castvActual = snapshot.child("castv").getValue(Int::class.java) ?: 0
 
-                    val puntosDescontar = 20 // Establecemos el valor de los puntos a descontar
+                    val puntosDescontar = 20
 
-                    if (puntosActuales >= puntosDescontar) {
-                        // Mostrar mensaje de confirmación
+                    if (castvActual >= puntosDescontar) {
                         val mensaje = """
                         Usuario: $nombreUsuario
                         Email: $emailUsuario
-                        Saldo CasTV: $puntosActuales
+                        Saldo CasTV: $castvActual
                         Valor CasTV: $puntosDescontar
                         Pedido: $pedido
-                 
                     """.trimIndent()
 
                         AlertDialog.Builder(requireContext())
@@ -989,20 +934,16 @@ class PeliculasFragment : RowsSupportFragment() {
                                     "userId" to userId,
                                     "email" to emailUsuario,
                                     "nombre" to nombreUsuario,
-                                    "year" to puntosDescontar.toString() // Agregar el campo de puntos a descontar
+                                    "CasTV" to puntosDescontar.toString()
                                 )
 
-                                // Subir pedido a la colección
-                                db.collection("pedidosmovies").add(pedidoData)
+                                // Subir el pedido a Firestore
+                                FirebaseFirestore.getInstance().collection("pedidosmovies")
+                                    .add(pedidoData)
                                     .addOnSuccessListener {
-                                        // Descontar puntos
+                                        // Descontar los puntos usando el método modular
                                         descontarPuntos(userId, puntosDescontar)
                                         enviarCorreoNuevoPedido(pedido)
-                                        Toast.makeText(
-                                            requireContext(),
-                                            "Pedido enviado correctamente",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
                                     }
                                     .addOnFailureListener { e ->
                                         Toast.makeText(
@@ -1024,8 +965,7 @@ class PeliculasFragment : RowsSupportFragment() {
                         ).show()
                     }
                 } else {
-                    Toast.makeText(requireContext(), "Usuario no encontrado", Toast.LENGTH_SHORT)
-                        .show()
+                    Toast.makeText(requireContext(), "Usuario no encontrado", Toast.LENGTH_SHORT).show()
                 }
             }.addOnFailureListener { e ->
                 Toast.makeText(
@@ -1040,37 +980,35 @@ class PeliculasFragment : RowsSupportFragment() {
     }
 
 
-    // Descontar puntos del usuario
     private fun descontarPuntos(userId: String, puntosADescontar: Int) {
-        val db = FirebaseFirestore.getInstance()
-        val userRef = db.collection("users").document(userId)
+        val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId)
 
-        // Obtener puntos actuales y actualizar
-        userRef.get().addOnSuccessListener { document ->
-            if (document.exists()) {
-                val puntosActuales = document.getLong("puntos")?.toInt() ?: 0
+        userRef.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                val castvActual = snapshot.child("castv").getValue(Int::class.java) ?: 0
 
-                if (puntosActuales >= puntosADescontar) {
-                    // Actualizar los puntos
-                    userRef.update("puntos", puntosActuales - puntosADescontar)
+                if (castvActual >= puntosADescontar) {
+                    val nuevoCastv = castvActual - puntosADescontar
+
+                    userRef.child("castv").setValue(nuevoCastv)
                         .addOnSuccessListener {
                             Toast.makeText(
                                 requireContext(),
-                                "Pedido enviado y puntos descontados",
+                                "Pedido enviado y CasTV descontado",
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
                         .addOnFailureListener { e ->
                             Toast.makeText(
                                 requireContext(),
-                                "Error al descontar puntos: ${e.message}",
+                                "Error al descontar CasTV: ${e.message}",
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
                 } else {
                     Toast.makeText(
                         requireContext(),
-                        "No tienes suficientes puntos para esta acción",
+                        "No tienes suficientes CasTV para esta acción",
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -1085,9 +1023,11 @@ class PeliculasFragment : RowsSupportFragment() {
             ).show()
         }
     }
+
+
     // Método para enviar un correo
       private fun enviarCorreoNuevoPedido(pedido: String) {
-        val url = "https://correo-railway.fly.dev/correo"
+        val url = "https://server-csks8w.fly.dev/correo"
 
         val jsonBody = JSONObject()
         jsonBody.put("titulo", pedido) // sin URLEncoder
@@ -1167,19 +1107,17 @@ class PeliculasFragment : RowsSupportFragment() {
     // Subir el comprobante de pago a Firestore
     private fun comprobantepago(pedido: String) {
         val auth = FirebaseAuth.getInstance()
-        val db = FirebaseFirestore.getInstance()
-
+        val database = FirebaseDatabase.getInstance()
         val userId = auth.currentUser?.uid
 
         if (userId != null) {
-            val userRef = db.collection("users").document(userId)
+            val userRef = database.reference.child("usuarios").child(userId)
 
-            // Obtener datos del usuario
-            userRef.get().addOnSuccessListener { document ->
-                if (document.exists()) {
-                    val nombreUsuario = document.getString("nombre") ?: "Nombre no disponible"
-                    val emailUsuario = document.getString("email") ?: "Email no disponible"
-                    val puntosActuales = document.getLong("puntos")?.toInt() ?: 0
+            userRef.get().addOnSuccessListener { snapshot ->
+                if (snapshot.exists()) {
+                    val nombreUsuario = snapshot.child("nombre").getValue(String::class.java) ?: "Nombre no disponible"
+                    val emailUsuario = snapshot.child("correo").getValue(String::class.java) ?: "Email no disponible"
+                    val puntosActuales = snapshot.child("castv").getValue(Int::class.java) ?: 0
 
                     val mensaje = """
                     Usuario: $nombreUsuario
@@ -1189,7 +1127,7 @@ class PeliculasFragment : RowsSupportFragment() {
                 """.trimIndent()
 
                     AlertDialog.Builder(requireContext())
-                        .setTitle("Confirmar Activacion de paquete")
+                        .setTitle("Confirmar Activación de Paquete")
                         .setMessage(mensaje)
                         .setPositiveButton("Registrar") { _, _ ->
                             // Crear el pedido sin descontar puntos
@@ -1200,13 +1138,14 @@ class PeliculasFragment : RowsSupportFragment() {
                                 "nombre" to nombreUsuario
                             )
 
-                            // Subir pedido a la colección
-                            db.collection("pedidosmovies").add(pedidoData)
+                            // Subir pedido a Firestore
+                            FirebaseFirestore.getInstance().collection("pedidosmovies")
+                                .add(pedidoData)
                                 .addOnSuccessListener {
                                     enviarCorreoNuevoPedido(pedido)
                                     Toast.makeText(
                                         requireContext(),
-                                        "Actualisaremos tu saldo",
+                                        "Actualizaremos tu saldo",
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 }
@@ -1223,8 +1162,7 @@ class PeliculasFragment : RowsSupportFragment() {
                         }
                         .show()
                 } else {
-                    Toast.makeText(requireContext(), "Usuario no encontrado", Toast.LENGTH_SHORT)
-                        .show()
+                    Toast.makeText(requireContext(), "Usuario no encontrado", Toast.LENGTH_SHORT).show()
                 }
             }.addOnFailureListener { e ->
                 Toast.makeText(
@@ -1237,6 +1175,7 @@ class PeliculasFragment : RowsSupportFragment() {
             Toast.makeText(requireContext(), "Usuario no autenticado", Toast.LENGTH_SHORT).show()
         }
     }
+
     private var publicidadDialog: Dialog? = null
 
     private fun mostrarPublicidad() {
@@ -1333,6 +1272,25 @@ class PeliculasFragment : RowsSupportFragment() {
     override fun onStart() {
         super.onStart()
 
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+        val userId = user.uid
+        val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId)
+        val connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected")
+
+        connectedRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val connected = snapshot.getValue(Boolean::class.java) ?: false
+                if (connected) {
+                    userRef.child("enlinea").setValue(true)
+                    userRef.child("enlinea").onDisconnect().setValue(false)
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                // Log or handle error
+            }
+        })
+
         val context = requireContext() // <-- contexto correcto para Fragment
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -1345,7 +1303,124 @@ class PeliculasFragment : RowsSupportFragment() {
                 AudioManager.AUDIOFOCUS_GAIN
             )
         }
+        isLoggingOut = false
+        iniciarVerificacionDeEstadoDeCuenta()
     }
+
+    override fun onStop() {
+        super.onStop()
+        eliminarListener()
+        Log.d("PeliculasFragment", "Listener de estado de cuenta detenido.")
+        publicidadDialog?.dismiss()
+        publicidadDialog = null
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        eliminarListener()
+        publicidadDialog?.dismiss()
+        publicidadDialog = null
+    }
+
+
+    private fun iniciarVerificacionDeEstadoDeCuenta() {
+        val currentUser = FirebaseAuth.getInstance().currentUser ?: return
+
+        // Evitar revisar para usuarios invitados
+        if (currentUser.email == "invitado@fulltv.com") return
+
+        val userRef = databaseRef.child("usuarios").child(currentUser.uid)
+
+        userStatusListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val mainActivity = activity as? Main
+                if (mainActivity == null) {
+                    Log.e("PeliculasFragment", "La Activity contenedora no es 'Main' o es nula.")
+                    return
+                }
+
+                if (mainActivity.haProcesadoEliminacion) {
+                    Log.d("PeliculasFragment", "Ya se procesó la eliminación. Listener ignorado.")
+                    userRef.removeEventListener(this)
+                    return
+                }
+
+                val estado = snapshot.child("estado").getValue(String::class.java)
+
+                if (!snapshot.exists() || estado == "eliminado") {
+                    Log.w("PeliculasFragment", "Cuenta eliminada detectada. Cerrando sesión...")
+
+                    mainActivity.haProcesadoEliminacion = true
+                    mostrarDialogoEliminado()
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.w("PeliculasFragment", "Error en el listener de Realtime Database.", error.toException())
+            }
+        }
+
+        userRef.addValueEventListener(userStatusListener!!)
+    }
+
+
+
+    private fun mostrarDialogoEliminado() {
+        if (!isAdded || requireActivity().isFinishing || requireActivity().isDestroyed) {
+            Log.w("PeliculasFragment", "Actividad o Fragmento no está en estado válido para mostrar diálogo.")
+            return
+        }
+
+        eliminarListener()
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Cuenta Eliminada")
+            .setMessage("Tu cuenta ha sido eliminada del sistema. Serás redirigido a la pantalla de inicio.")
+            .setCancelable(false)
+            .setPositiveButton("Aceptar") { dialog, _ ->
+                dialog.dismiss()
+                goToLoginActivity()
+            }
+            .create()
+            .show()
+    }
+
+    private fun goToLoginActivity() {
+        if (!isAdded || activity == null || requireActivity().isFinishing) {
+            Log.w("PeliculasFragment", "No se puede navegar a Login, el contexto es inválido.")
+            return
+        }
+
+        FirebaseAuth.getInstance().signOut()
+
+        val intent = Intent(requireContext(), Login::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+
+        requireActivity().finish()
+    }
+    private fun eliminarListener() {
+        userStatusListener?.let {
+            val userId = FirebaseAuth.getInstance().currentUser?.uid
+            if (userId != null) {
+                databaseRef.child("usuarios").child(userId).removeEventListener(it)
+            }
+        }
+        userStatusListener = null
+    }
+    override fun onResume() {
+        super.onResume()
+
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        currentUser?.let {
+            FirebaseDatabase.getInstance().reference
+                .child("usuarios")
+                .child(it.uid)
+                .child("enlinea")
+                .setValue(true)
+        }
+    }
+
 
 }
 

@@ -2,13 +2,10 @@ package com.creativem.tvfullurl.adapter
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
@@ -41,7 +38,7 @@ class PedidosAdapter(
         // Asigna los datos a las vistas
         holder.userNameTextView.text = movie.nombre.ifEmpty { "Usuario desconocido" }
         holder.titleTextView.text = movie.title.ifEmpty { "Título no disponible" }
-        holder.yearTextView.text = movie.year.ifEmpty { "Año no disponible" }
+        holder.castvTextView.text = "CasTV: ${movie.castv}"
         holder.emailTextView.text = movie.email.ifEmpty { "Email no disponible" }
 
         // Maneja el clic en el email
@@ -92,7 +89,7 @@ class PedidosAdapter(
         val userNameTextView: TextView = itemView.findViewById(R.id.tvUserName)
         val titleTextView: TextView = itemView.findViewById(R.id.tvTitle)
         val emailTextView: TextView = itemView.findViewById(R.id.tvEmail)
-        val yearTextView: TextView = itemView.findViewById(R.id.tvYear)
+        val castvTextView: TextView = itemView.findViewById(R.id.tvYear)
 
         // El botón de eliminar siempre se muestra
         val deleteButton: TextView = itemView.findViewById(R.id.deleteButton) // Asegúrate de que sea un Button o ImageButton
@@ -106,7 +103,7 @@ class PedidosAdapter(
             movieList.filter {
                 it.nombre.contains(query, ignoreCase = true) ||
                         it.title.contains(query, ignoreCase = true) ||
-                        it.year.contains(query, ignoreCase = true)
+                        it.castv.toString().contains(query, ignoreCase = true)
             }
         }
         notifyDataSetChanged()

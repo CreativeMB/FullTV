@@ -49,6 +49,7 @@ dependencies {
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)
+    implementation(libs.volley)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -58,6 +59,6 @@ dependencies {
     annotationProcessor ("com.github.bumptech.glide:compiler:4.15.1")
     implementation ("com.google.firebase:firebase-firestore:24.5.0")
     implementation ("com.google.firebase:firebase-database:20.0.3")
-
+    implementation ("org.json:json:20240303")
 
 }

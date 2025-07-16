@@ -13,6 +13,11 @@ import com.creativem.tvfullurl.databinding.FragmentCastvBinding
 import com.creativem.tvfullurl.modelo.User
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
+import org.json.JSONObject
+import com.android.volley.Request
+import com.android.volley.toolbox.JsonObjectRequest
+import com.android.volley.toolbox.Volley
+import com.google.firebase.firestore.FieldValue
 
 class CastvFragment : Fragment() {
 
@@ -36,7 +41,6 @@ class CastvFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         db = FirebaseFirestore.getInstance()
-
         iniciarRecycler()
         cargarUsuarios()
         verificarEstadosDeConexion()
@@ -56,47 +60,45 @@ class CastvFragment : Fragment() {
 
     // Cargar usuarios desde Firestore
     private fun cargarUsuarios() {
-        userList.clear() // Limpiar la lista antes de cargar nuevos datos
-        db.collection("users").get()
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    for (document in task.result!!) {
-                        val user: User = document.toObject(User::class.java).copy(id = document.id)
-                        userList.add(user)
+        userList.clear() // Limpiar lista antes de cargar
+
+        val databaseRef = FirebaseDatabase.getInstance().reference.child("usuarios")
+
+        databaseRef.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                for (userSnapshot in snapshot.children) {
+                    val user = userSnapshot.getValue(User::class.java)
+                    user?.let {
+                        val userWithId = it.copy(id = userSnapshot.key ?: "")
+                        userList.add(userWithId)
                     }
-                    castvAdapter.notifyDataSetChanged() // Notificar al adaptador que los datos han cambiado
-                } else {
-                    Log.e("Users", "Error getting documents: ", task.exception)
                 }
+                castvAdapter.notifyDataSetChanged() // Notificar cambios
+            } else {
+                Log.d("Users", "No se encontraron usuarios.")
             }
-            .addOnFailureListener { e ->
-                Log.e("Users", "Error loading users", e)
-            }
+        }.addOnFailureListener { e ->
+            Log.e("Users", "Error al cargar usuarios", e)
+        }
     }
+
     private fun verificarEstadosDeConexion() {
-        // Referencia al nodo 'usuarios_conectados' en Realtime Database
-        val realtimeDb = FirebaseDatabase.getInstance().reference.child("usuarios_conectados")
+        val usuariosRef = FirebaseDatabase.getInstance().reference.child("usuarios")
 
-        // Log para verificar que estamos accediendo al nodo correcto
-        Log.d("Conexion", "Accediendo al nodo 'usuarios_conectados' de Realtime Database.")
+        Log.d("Conexion", "Accediendo al nodo 'usuarios' en Realtime Database para verificar 'enlinea'.")
 
-        // Obtener los estados de conexión
-        realtimeDb.get().addOnCompleteListener { task ->
+        usuariosRef.get().addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val snapshot = task.result
-                // Verificar si el snapshot tiene datos
                 if (snapshot != null && snapshot.exists()) {
                     val estadosDeConexion = mutableMapOf<String, Boolean>()
 
-                    // Log para verificar la cantidad de datos obtenidos
                     Log.d("Conexion", "Datos obtenidos: ${snapshot.childrenCount} usuarios.")
 
-                    // Iterar sobre cada entrada para construir el mapa de estados de conexión
                     for (userSnapshot in snapshot.children) {
                         val userId = userSnapshot.key
-                        val isOnline = userSnapshot.getValue(Boolean::class.java) ?: false
+                        val isOnline = userSnapshot.child("enlinea").getValue(Boolean::class.java) ?: false
 
-                        // Log para verificar el estado de cada usuario
                         Log.d("Conexion", "Usuario ID: $userId, Estado de Conexión: $isOnline")
 
                         if (userId != null) {
@@ -106,23 +108,20 @@ class CastvFragment : Fragment() {
 
                     // Actualizar `isOnline` para cada usuario en `userList`
                     for (user in userList) {
-                        // Log para verificar si el estado de conexión se ha actualizado
-                        Log.d("Conexion", "Actualizando estado de conexión para ${user.nombre} (${user.id}): ${estadosDeConexion[user.id] ?: false}")
                         user.isOnline = estadosDeConexion[user.id] ?: false
+                        Log.d("Conexion", "Actualizado ${user.nombre} (${user.id}): ${user.isOnline}")
                     }
 
-                    // Notificar al adaptador que los datos han cambiado
                     castvAdapter.notifyDataSetChanged()
-                    Log.d("Conexion", "Adaptador notificado: Datos actualizados.")
-
+                    Log.d("Conexion", "Adaptador notificado: estados 'enlinea' actualizados.")
                 } else {
-                    Log.e("Conexion", "No se encontraron datos en Realtime Database.")
+                    Log.e("Conexion", "No se encontraron usuarios.")
                 }
             } else {
-                Log.e("Conexion", "Error al obtener estados de conexión.", task.exception)
+                Log.e("Conexion", "Error al acceder al nodo 'usuarios'.", task.exception)
             }
         }.addOnFailureListener { e ->
-            Log.e("Conexion", "Error al verificar los estados de conexión.", e)
+            Log.e("Conexion", "Error al verificar conexión de usuarios.", e)
         }
     }
 
@@ -131,7 +130,7 @@ class CastvFragment : Fragment() {
         // Inicializar el adaptador de usuarios con las acciones de editar y eliminar
         castvAdapter = CastvAdapter(
             userList,
-            onEditClick = { userId, newPoints -> updatePoints(userId, newPoints) },
+            onEditClick = { userId, newPoints -> updateCastv(userId, newPoints) },
             onDeleteClick = { userId -> deleteUsers(userId) }
         )
 
@@ -143,48 +142,79 @@ class CastvFragment : Fragment() {
     }
 
     // Actualizar solo el campo de puntos de un usuario
-    private fun updatePoints(userId: String, newPoints: Int) {
-        db.collection("users").document(userId)
-            .update("puntos", newPoints)
+    private fun updateCastv(userId: String, newPoints: Int) {
+        val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId)
+
+        userRef.child("castv").setValue(newPoints)
             .addOnSuccessListener {
-                Toast.makeText(requireContext(), "Puntos actualizados", Toast.LENGTH_SHORT).show()
-                cargarUsuarios() // Recargar los usuarios después de la actualización
+                Toast.makeText(requireContext(), "CasTV actualizado", Toast.LENGTH_SHORT).show()
+                cargarUsuarios() // Recargar usuarios si lo necesitas en pantalla
             }
             .addOnFailureListener { e ->
-                Toast.makeText(requireContext(), "Error al actualizar los puntos", Toast.LENGTH_SHORT).show()
-                Log.e("Usuarios", "Error actualizando puntos", e)
+                Toast.makeText(requireContext(), "Error al actualizar CasTV", Toast.LENGTH_SHORT).show()
+                Log.e("Usuarios", "Error actualizando castv", e)
             }
     }
+
 
     private fun deleteUsers(userId: String) {
-        val db = FirebaseFirestore.getInstance()
-        val realtimeDb = FirebaseDatabase.getInstance().reference
+        val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId)
 
-        // Eliminar el usuario de Firestore
-        db.collection("users").document(userId).delete()
+        userRef.child("estado").setValue("eliminado")
             .addOnSuccessListener {
-                Toast.makeText(requireContext(), "Usuario eliminado de Firestore", Toast.LENGTH_SHORT).show()
-
-                // Eliminar el usuario de Realtime Database
-                realtimeDb.child("usuarios_conectados").child(userId).removeValue()
-                    .addOnSuccessListener {
-                        Toast.makeText(requireContext(), "Usuario eliminado de Realtime Database", Toast.LENGTH_SHORT).show()
-                        cargarUsuarios() // Recargar usuarios después de eliminar
-                    }
-                    .addOnFailureListener { e ->
-                        Toast.makeText(requireContext(), "Error al eliminar de Realtime Database", Toast.LENGTH_SHORT).show()
-                        Log.e("Usuarios", "Error eliminando usuario de Realtime Database", e)
-                    }
+                Toast.makeText(requireContext(), "Usuario marcado como eliminado", Toast.LENGTH_SHORT).show()
+                llamarEliminacionEnFly(userId)
             }
             .addOnFailureListener { e ->
-                Toast.makeText(requireContext(), "Error al eliminar el usuario de Firestore", Toast.LENGTH_SHORT).show()
-                Log.e("Usuarios", "Error eliminando usuario de Firestore", e)
+                Log.e("Usuarios", "Error al actualizar estado", e)
+                Toast.makeText(requireContext(), "Error al marcar como eliminado", Toast.LENGTH_SHORT).show()
             }
     }
+
+    private fun llamarEliminacionEnFly(userId: String) {
+        val url = "https://server-csks8w.fly.dev/eliminar-usuario"
+        Log.d("FlyServer", "Preparando solicitud a $url con UID: $userId")
+
+        val json = JSONObject().apply {
+            put("uid", userId)
+        }
+
+        Log.d("FlyServer", "Cuerpo JSON a enviar: $json")
+
+        val request = object : JsonObjectRequest(
+            Request.Method.POST, url, json,
+            { response ->
+                Log.d("FlyServer", "Respuesta recibida del servidor: $response")
+                val mensaje = response.optString("mensaje", "Usuario eliminado desde servidor")
+                Toast.makeText(requireContext(), mensaje, Toast.LENGTH_LONG).show()
+            },
+            { error ->
+                Log.e("FlyServer", "❌ Error en la solicitud: ${error.message}")
+                error.networkResponse?.let { networkResponse ->
+                    val statusCode = networkResponse.statusCode
+                    val data = networkResponse.data?.decodeToString()
+                    Log.e("FlyServer", "Código HTTP: $statusCode, Respuesta: $data")
+                } ?: Log.e("FlyServer", "No hay respuesta del servidor (puede ser problema de red o TLS)")
+
+                Toast.makeText(requireContext(), "Error al comunicar con el servidor", Toast.LENGTH_LONG).show()
+            }
+        ) {
+            override fun getHeaders(): MutableMap<String, String> {
+                val headers = hashMapOf("Content-Type" to "application/json")
+                Log.d("FlyServer", "Encabezados de la solicitud: $headers")
+                return headers
+            }
+        }
+
+        Log.d("FlyServer", "Enviando solicitud POST a $url...")
+        Volley.newRequestQueue(requireContext()).add(request)
+    }
+
 
 
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
     }
+
 }
