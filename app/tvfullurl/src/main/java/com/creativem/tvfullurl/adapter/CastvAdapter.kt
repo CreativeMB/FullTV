@@ -78,12 +78,12 @@ class CastvAdapter(
         // Editar puntos
         holder.editImage.setOnClickListener {
             val newPoints = holder.userCastv.text.toString().toIntOrNull() ?: 0
-            onEditClick(user.id, newPoints)
+            onEditClick(user.userId, newPoints)
         }
 
         // Eliminar usuario
         holder.deleteImage.setOnClickListener {
-            onDeleteClick(user.id)
+            onDeleteClick(user.userId)
         }
     }
 

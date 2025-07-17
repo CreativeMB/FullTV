@@ -58,7 +58,7 @@ class CastvFragment : Fragment() {
         })
     }
 
-    // Cargar usuarios desde Firestore
+    // Cargar usuarios desde Firebase Realtime Database
     private fun cargarUsuarios() {
         userList.clear() // Limpiar lista antes de cargar
 
@@ -67,10 +67,16 @@ class CastvFragment : Fragment() {
         databaseRef.get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
                 for (userSnapshot in snapshot.children) {
+                    // Obtiene el objeto User de los datos del snapshot
                     val user = userSnapshot.getValue(User::class.java)
+
                     user?.let {
-                        val userWithId = it.copy(id = userSnapshot.key ?: "")
-                        userList.add(userWithId)
+                        // ¡AQUÍ ESTÁ LA CORRECCIÓN!
+                        // Asignamos el UID (userSnapshot.key) al campo 'userId' de nuestro objeto
+                        it.userId = userSnapshot.key ?: ""
+
+                        // Añadimos el objeto 'it' (que ahora tiene el ID correcto) a la lista
+                        userList.add(it)
                     }
                 }
                 castvAdapter.notifyDataSetChanged() // Notificar cambios
@@ -97,7 +103,15 @@ class CastvFragment : Fragment() {
 
                     for (userSnapshot in snapshot.children) {
                         val userId = userSnapshot.key
-                        val isOnline = userSnapshot.child("enlinea").getValue(Boolean::class.java) ?: false
+//                        val isOnline = userSnapshot.child("enlinea").getValue(Boolean::class.java) ?: false
+
+                        val estado = userSnapshot.child("estado").getValue(String::class.java)
+                        val isOnline = if (estado == "activo") {
+                            userSnapshot.child("enlinea").getValue(Boolean::class.java) ?: false
+                        } else {
+                            false // Usuario eliminado no debe marcarse como en línea
+                        }
+
 
                         Log.d("Conexion", "Usuario ID: $userId, Estado de Conexión: $isOnline")
 

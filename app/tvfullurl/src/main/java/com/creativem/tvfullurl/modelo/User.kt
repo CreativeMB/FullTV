@@ -4,6 +4,7 @@ import java.security.Timestamp
 
 
 data class User(
+    var userId: String = "",
     val email: String = "",
     val nombre: String = "",  // Cambiado de 'name' a 'nombre'
     var title: String = "", // Cambiado de 'points' a 'puntos'

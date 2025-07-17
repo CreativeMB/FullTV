@@ -77,6 +77,7 @@ import java.io.File
 import com.creativem.fulltv.BuildConfig
 import kotlinx.coroutines.withContext
 import android.os.Build
+import androidx.core.app.ActivityCompat.finishAffinity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.android.volley.Request
 import com.creativem.fulltv.CastvHelper
@@ -88,6 +89,7 @@ import com.creativem.fulltv.principal.Main
 import kotlinx.coroutines.Job
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
+import kotlin.system.exitProcess
 
 class PeliculasFragment : RowsSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
@@ -113,37 +115,46 @@ class PeliculasFragment : RowsSupportFragment() {
         val view = super.onCreateView(inflater, container, savedInstanceState)
         // Ya no inflar ni añadir loading_overlay
         binding = FragmentPeliculasBinding.bind(requireActivity().findViewById(R.id.main))
-
+        verificarSiUsuarioExiste()
         loadingContainer = binding.loadingOverlay
         progressBar = binding.progressBar
         loadingText = binding.loadingText
 
         auth = FirebaseAuth.getInstance()
-        val currentUserUid = auth.currentUser?.uid
+        val currentUser = auth.currentUser
 
-        if (currentUserUid != null) {
-            val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(currentUserUid)
-
-            // Escuchar cambios de conexión y actualizar campo "enlinea"
+        if (currentUser == null) {
+            // Si no hay usuario, no deberíamos estar aquí.
+            // Podrías redirigir al login inmediatamente.
+            // Por ahora, solo evitamos configurar listeners.
+            Log.e("PeliculasFragment", "Usuario nulo, no se configurarán listeners de estado.")
+        } else {
+            // El usuario está autenticado.
+            val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(currentUser.uid)
             val connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected")
+
+            // Listener para el estado de la conexión a internet.
+            // ESTE LISTENER YA NO MANEJARÁ onDisconnect.
             connectedRef.addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val connected = snapshot.getValue(Boolean::class.java) ?: false
                     if (connected) {
-                        userRef.child("enlinea").setValue(true)
-                        userRef.child("enlinea").onDisconnect().setValue(false)
+                        // Solo verificamos si el usuario es válido antes de marcarlo como online.
+                        userRef.get().addOnSuccessListener { userSnapshot ->
+                            if (userSnapshot.exists() && userSnapshot.child("estado").getValue(String::class.java) != "eliminado") {
+                                userRef.child("enlinea").setValue(true)
+                                Log.d("Connection", "Usuario válido conectado. Estado 'enlinea' establecido a true.")
+                            }
+                        }
                     }
                 }
-
                 override fun onCancelled(error: DatabaseError) {
-                    Log.e("Connection", "Error al verificar conexión: ${error.message}")
+                    Log.e("Connection", "Error en listener de .info/connected: ${error.message}")
                 }
             })
-        } else {
-            Log.e("Connection", "Usuario no autenticado")
         }
 
-        // Mantener pantalla encendida
+// Mantener pantalla encendida
         requireActivity().window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // Configura clic en ítems tipo Movie
@@ -1272,44 +1283,50 @@ class PeliculasFragment : RowsSupportFragment() {
     override fun onStart() {
         super.onStart()
 
-        val user = FirebaseAuth.getInstance().currentUser ?: return
-        val userId = user.uid
-        val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId)
-        val connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected")
-
-        connectedRef.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val connected = snapshot.getValue(Boolean::class.java) ?: false
-                if (connected) {
-                    userRef.child("enlinea").setValue(true)
-                    userRef.child("enlinea").onDisconnect().setValue(false)
-                }
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                // Log or handle error
-            }
-        })
-
-        val context = requireContext() // <-- contexto correcto para Fragment
-
+        isLoggingOut = false
+        iniciarVerificacionDeEstadoDeCuenta()
+        // AudioFocus
+        val context = requireContext()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             AudioFocusHelper.requestAudioFocus(context)
         } else {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             audioManager.requestAudioFocus(
-                { /* puedes manejar cambios si quieres */ },
+                { /* opcional */ },
                 AudioManager.STREAM_MUSIC,
                 AudioManager.AUDIOFOCUS_GAIN
             )
         }
-        isLoggingOut = false
-        iniciarVerificacionDeEstadoDeCuenta()
+
+        // *** NUEVA LÓGICA DE onDisconnect ***
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser != null) {
+            val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(currentUser.uid)
+            // Verificamos una última vez si el usuario es válido ANTES de establecer la regla
+            userRef.get().addOnSuccessListener { userSnapshot ->
+                if (userSnapshot.exists() && userSnapshot.child("estado").getValue(String::class.java) != "eliminado") {
+                    // Si es válido, ESTABLECEMOS la regla de desconexión
+                    userRef.child("enlinea").onDisconnect().setValue(false)
+                    Log.d("Lifecycle", "Regla onDisconnect establecida en onStart.")
+                }
+            }
+        }
     }
+
+
 
     override fun onStop() {
         super.onStop()
         eliminarListener()
+        // *** NUEVA LÓGICA DE CANCELACIÓN de onDisconnect ***
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser != null) {
+            val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(currentUser.uid)
+            // CANCELAMOS la regla de desconexión para evitar que se ejecute si la app se cierra.
+            userRef.child("enlinea").onDisconnect().cancel()
+            Log.d("Lifecycle", "Regla onDisconnect cancelada en onStop.")
+        }
+
         Log.d("PeliculasFragment", "Listener de estado de cuenta detenido.")
         publicidadDialog?.dismiss()
         publicidadDialog = null
@@ -1326,7 +1343,6 @@ class PeliculasFragment : RowsSupportFragment() {
     private fun iniciarVerificacionDeEstadoDeCuenta() {
         val currentUser = FirebaseAuth.getInstance().currentUser ?: return
 
-        // Evitar revisar para usuarios invitados
         if (currentUser.email == "invitado@fulltv.com") return
 
         val userRef = databaseRef.child("usuarios").child(currentUser.uid)
@@ -1341,7 +1357,7 @@ class PeliculasFragment : RowsSupportFragment() {
 
                 if (mainActivity.haProcesadoEliminacion) {
                     Log.d("PeliculasFragment", "Ya se procesó la eliminación. Listener ignorado.")
-                    userRef.removeEventListener(this)
+                    userRef.removeEventListener(this) // Asegúrate de remover el listener
                     return
                 }
 
@@ -1364,41 +1380,33 @@ class PeliculasFragment : RowsSupportFragment() {
     }
 
 
-
     private fun mostrarDialogoEliminado() {
         if (!isAdded || requireActivity().isFinishing || requireActivity().isDestroyed) {
             Log.w("PeliculasFragment", "Actividad o Fragmento no está en estado válido para mostrar diálogo.")
             return
         }
 
+        // Primero, elimina todos los listeners para evitar escrituras no deseadas
         eliminarListener()
 
         AlertDialog.Builder(requireContext())
             .setTitle("Cuenta Eliminada")
-            .setMessage("Tu cuenta ha sido eliminada del sistema. Serás redirigido a la pantalla de inicio.")
+            .setMessage("Tu cuenta ha sido eliminada del sistema. La aplicación se cerrará.")
             .setCancelable(false)
             .setPositiveButton("Aceptar") { dialog, _ ->
                 dialog.dismiss()
-                goToLoginActivity()
+
+                // ¡ESTA ES LA ÚNICA LÍNEA QUE DEBE QUEDAR!
+                // Esta función cierra la sesión localmente y mata la app SIN escribir en la BD.
+                forzarCierreTotal()
+
             }
             .create()
             .show()
     }
 
-    private fun goToLoginActivity() {
-        if (!isAdded || activity == null || requireActivity().isFinishing) {
-            Log.w("PeliculasFragment", "No se puede navegar a Login, el contexto es inválido.")
-            return
-        }
 
-        FirebaseAuth.getInstance().signOut()
 
-        val intent = Intent(requireContext(), Login::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-
-        requireActivity().finish()
-    }
     private fun eliminarListener() {
         userStatusListener?.let {
             val userId = FirebaseAuth.getInstance().currentUser?.uid
@@ -1408,17 +1416,62 @@ class PeliculasFragment : RowsSupportFragment() {
         }
         userStatusListener = null
     }
+
     override fun onResume() {
         super.onResume()
+        // Ya no realizamos ninguna acción aquí, todo se gestiona en onStart() o en otro lugar
+    }
 
+
+
+    private fun verificarSiUsuarioExiste() {
         val currentUser = FirebaseAuth.getInstance().currentUser
-        currentUser?.let {
-            FirebaseDatabase.getInstance().reference
-                .child("usuarios")
-                .child(it.uid)
-                .child("enlinea")
-                .setValue(true)
+        if (currentUser != null) {
+            val userId = currentUser.uid
+            val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(userId)
+
+            userRef.addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!snapshot.exists()) {
+                        // Si el usuario está autenticado pero no existe en la BD,
+                        // es un estado inválido. Forzar cierre.
+                        Log.w("Verificacion", "Usuario autenticado pero no existe en Realtime DB. Forzando cierre.")
+                        forzarCierreTotal()
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("RealtimeDB", "Error al verificar usuario: ${error.message}")
+                }
+            })
         }
+    }
+
+    private fun forzarCierreTotal() {
+        // Asegurarnos de que no se ejecute en un contexto inválido
+        if (!isAdded || activity == null || requireActivity().isFinishing) {
+            Log.w("CierreForzado", "Contexto inválido, no se puede ejecutar el cierre.")
+            return
+        }
+
+        Log.d("CierreForzado", "Iniciando cierre forzado de sesión y aplicación.")
+
+        // 1. Cerrar la sesión de autenticación. Es el paso más importante.
+        // Esto borra el token local y currentUser se volverá null.
+        FirebaseAuth.getInstance().signOut()
+
+        // 2. Limpiar cualquier dato local guardado (buena práctica)
+        val prefs = requireActivity().getSharedPreferences("tus_preferencias", Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()
+
+        // 3. Informar al usuario
+        Toast.makeText(requireContext(), "Tu cuenta ya no existe. La aplicación se cerrará.", Toast.LENGTH_LONG).show()
+
+        // 4. Finalizar la aplicación de forma abrupta para evitar cualquier
+        // listener o proceso en segundo plano que intente reconectarse.
+        requireActivity().finishAffinity()
+        android.os.Process.killProcess(android.os.Process.myPid())
+        exitProcess(0)
     }
 
 
