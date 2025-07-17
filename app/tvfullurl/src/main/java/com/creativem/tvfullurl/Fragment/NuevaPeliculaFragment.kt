@@ -28,7 +28,7 @@ class NuevaPeliculaFragment : Fragment() {
 
     // Define variables for movie details at the class level
     private var title: String = ""
-    private var year: String = ""
+    private var castv: Int = 0
     private var imageUrl: String = ""
     private var streamUrl: String = ""
     private var trailerUrl: String = ""
@@ -165,22 +165,23 @@ class NuevaPeliculaFragment : Fragment() {
     }
 
     private fun validarCampos(): Boolean {
-        // Actualiza las variables globales con los valores de los campos
+        // Actualiza las variables con los valores del formulario
         title = binding.titleEditText.text.toString().trim()
-        year = binding.castvEditText.text.toString().trim()
+        castv = binding.castvEditText.text.toString().toIntOrNull() ?: 0
         imageUrl = binding.imageUrlEditText.text.toString().trim()
         streamUrl = binding.streamUrlEditText.text.toString().trim()
         trailerUrl = binding.trailerUrlEditText.text.toString().trim()
         originalTitle = binding.originalTitleEditText.text.toString().trim()
 
         // Verificar si los campos están completos
-        if (title.isEmpty() || year.isEmpty() || imageUrl.isEmpty()) {
-            Toast.makeText(requireContext(), "Todos los campos son obligatorios", Toast.LENGTH_LONG)
-                .show()
+        if (title.isEmpty() || castv <= 0 || imageUrl.isEmpty()) {
+            Toast.makeText(requireContext(), "Todos los campos son obligatorios", Toast.LENGTH_LONG).show()
             return false
         }
 
-        // Validar las URLs
+        return true
+
+    // Validar las URLs
         if (!URLUtil.isValidUrl(imageUrl)) {
             Toast.makeText(requireContext(), "URL de imagen inválida", Toast.LENGTH_SHORT).show()
             return false
@@ -201,7 +202,7 @@ class NuevaPeliculaFragment : Fragment() {
             val movie: MutableMap<String, Any> = mutableMapOf(
                 "title" to title,
                 "originalTitle" to originalTitle,
-                "year" to year,
+                "castv" to castv,
                 "imageUrl" to imageUrl,
                 "streamUrl" to streamUrl,
                 "trailerUrl" to trailerUrl,

@@ -16,7 +16,8 @@ data class Movie(
     var isActive: Boolean = true,
     val castv: Int = 0,
     var estado: String = "activo",
-    val countdownMinutes: Int = 0
+    val countdownMinutes: Int = 0,
+    val releaseDate: String = ""
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
         id = parcel.readString() ?: "",
@@ -28,7 +29,8 @@ data class Movie(
         createdAt = Timestamp(parcel.readLong(), parcel.readInt()), // segundos, nanosegundos
         isValid = parcel.readByte() != 0.toByte(),
         isActive = parcel.readByte() != 0.toByte(),
-        countdownMinutes = parcel.readInt()
+        countdownMinutes = parcel.readInt(),
+        releaseDate = parcel.readString() ?: ""
     )
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {
@@ -43,6 +45,7 @@ data class Movie(
         parcel.writeByte(if (isActive) 1 else 0)
         parcel.writeInt(castv)
         parcel.writeInt(countdownMinutes)
+        parcel.writeString(releaseDate)
     }
 
 

@@ -103,14 +103,22 @@ class ApiPeliculaActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
+            val tituloConFecha = if (movieActual != null) {
+                val fecha = movieActual?.releaseDate ?: movieReleaseDate
+                "${movieActual?.title} $fecha"
+            } else {
+                "$movieTitle $movieReleaseDate"
+            }
+
             val intent = Intent(this, PlayerPeliculas::class.java).apply {
                 putExtra("EXTRA_STREAM_URL", streamUrlGuardado)
-                putExtra("EXTRA_MOVIE_TITLE", movieActual?.title ?: movieTitle)
+                putExtra("EXTRA_MOVIE_TITLE", tituloConFecha)
                 putExtra("EXTRA_MOVIE_CASTV", movieActual?.castv ?: movieCastv)
                 putExtra("EXTRA_MOVIE_IMAGE_URL", movieActual?.imageUrl ?: movieImageUrl)
                 putExtra("EXTRA_COUNTDOWN", movieActual?.countdownMinutes ?: movieCountdown)
             }
             startActivity(intent)
+
         }
 
         tvReproducir.isFocusableInTouchMode = true
@@ -152,10 +160,10 @@ class ApiPeliculaActivity : AppCompatActivity() {
                     carteleraAdapter = PelisCarteleraAdapter(peliculasTotales) { movieSeleccionado ->
 
                         val releaseDate = movieSeleccionado.release_date ?: "N/A"
-                        val releaseYear = releaseDate.take(4) // Extrae solo el año (los 4 primeros caracteres)
+                        val tituloConFecha = "${movieSeleccionado.title} (${releaseDate})"
 
                         movieActual = Movie(
-                            title = movieSeleccionado.title,
+                            title = tituloConFecha,
                             originalTitle = movieSeleccionado.original_title ?: movieSeleccionado.title,
                             imageUrl = movieSeleccionado.imageUrl,
                             streamUrl = movieSeleccionado.streamUrl,
@@ -169,13 +177,15 @@ class ApiPeliculaActivity : AppCompatActivity() {
                         movieCastv = movieSeleccionado.castv ?: 50
                         movieImageUrl = movieSeleccionado.imageUrl
                         movieCountdown = 60
-                        movieReleaseDate = releaseYear // 🔧 nuevo campo, si necesitas usarlo
+                        movieReleaseDate = releaseDate
 
                         mostrarPelicula(movieSeleccionado)
                     }
+
                     recyclerCartelera.adapter = carteleraAdapter
                 }
             }
+
         }
     }
 

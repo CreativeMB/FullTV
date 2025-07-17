@@ -23,6 +23,9 @@ import java.util.Date
 import java.util.Locale
 
 class HeaderPresenter : Presenter() {
+
+    private var usuariosListener: ValueEventListener? = null
+
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_encabezado_peliculas, parent, false)
@@ -60,13 +63,13 @@ class HeaderPresenter : Presenter() {
             return
         }
 
-        // 🔄 Obtener datos del usuario desde Realtime Database
+        // Obtener datos del usuario
         CastvHelper.obtenerDatosUsuario(
             userId = usuarioId,
             onSuccess = { nombre, correo, castv, enlinea ->
                 textUsuario.text = "\uD83E\uDDD1 $nombre" + if (enlinea) " 🟢" else " 🔴"
 
-                // 📊 Obtener cantidad de películas
+                // Obtener cantidad de películas
                 firestore.collection("movies")
                     .get()
                     .addOnSuccessListener { result ->
@@ -83,7 +86,7 @@ class HeaderPresenter : Presenter() {
             }
         )
 
-        // 🖼️ Foto del usuario
+        // Foto del usuario
         val photoUrl = usuario.photoUrl
         if (photoUrl != null) {
             Glide.with(context)
@@ -96,23 +99,25 @@ class HeaderPresenter : Presenter() {
             imagenUser.setImageResource(R.drawable.icono)
         }
 
-        // ✅ Contar usuarios en línea usando el campo "enlinea" en "usuarios"
-        realtimeDb.child("usuarios")
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    var on = 0
-                    var off = 0
-                    for (userSnapshot in snapshot.children) {
-                        val conectado = userSnapshot.child("enlinea").getValue(Boolean::class.java) ?: false
-                        if (conectado) on++ else off++
-                    }
-                    userOnline.text = "ON-$on"
-                    userOff.text = "OFF-$off"
+        // Listener de usuarios conectados (en tiempo real)
+        usuariosListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                var on = 0
+                var off = 0
+                for (userSnapshot in snapshot.children) {
+                    val conectado = userSnapshot.child("enlinea").getValue(Boolean::class.java) ?: false
+                    if (conectado) on++ else off++
                 }
+                userOnline.text = "ON-$on"
+                userOff.text = "OFF-$off"
+            }
 
-                override fun onCancelled(error: DatabaseError) {}
-            })
-        // 🧾 Pedidos recientes
+            override fun onCancelled(error: DatabaseError) {}
+        }
+
+        realtimeDb.child("usuarios").addValueEventListener(usuariosListener!!)
+
+        // Pedidos recientes
         firestore.collection("pedidosmovies")
             .get()
             .addOnSuccessListener { result ->
@@ -157,7 +162,12 @@ class HeaderPresenter : Presenter() {
             }
     }
 
-    override fun onUnbindViewHolder(viewHolder: ViewHolder?) {}
+    override fun onUnbindViewHolder(viewHolder: ViewHolder?) {
+        usuariosListener?.let {
+            FirebaseDatabase.getInstance().getReference("usuarios").removeEventListener(it)
+        }
+        usuariosListener = null
+    }
 
     private fun obtenerFechaActual(): String {
         val fecha = SimpleDateFormat("EEEE dd MM yy", Locale.getDefault()).format(Date())

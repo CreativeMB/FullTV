@@ -183,27 +183,35 @@ class Login : AppCompatActivity() {
     }
 
     private fun nuevosusuarios(userId: String, nombre: String, email: String?) {
-        val user = mapOf(
-            "nombre" to nombre,
-            "correo" to email,
-            "castv" to 10,
-            "userId" to userId,
-            "estado" to "activo",
-            "enlinea" to false
-        )
-
         val databaseRef = database.reference.child("usuarios").child(userId)
 
-        databaseRef.setValue(user)
-            .addOnSuccessListener {
-                Log.d(TAG, "Usuario agregado a Realtime Database correctamente.")
-            }
-            .addOnFailureListener { e ->
-                Log.w(TAG, "Error al agregar usuario a Realtime Database.", e)
-                Toast.makeText(this, "Error al agregar usuario a la base de datos.", Toast.LENGTH_SHORT).show()
-            }
-    }
+        databaseRef.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                Log.d(TAG, "El usuario ya existe. No se sobreescribe castv.")
+            } else {
+                val user = mapOf(
+                    "nombre" to nombre,
+                    "correo" to email,
+                    "castv" to 10,
+                    "userId" to userId,
+                    "estado" to "activo",
+                    "enlinea" to false
+                )
 
+                databaseRef.setValue(user)
+                    .addOnSuccessListener {
+                        Log.d(TAG, "Usuario agregado a Realtime Database correctamente.")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.w(TAG, "Error al agregar usuario a Realtime Database.", e)
+                        Toast.makeText(this, "Error al agregar usuario a la base de datos.", Toast.LENGTH_SHORT).show()
+                    }
+            }
+        }.addOnFailureListener { e ->
+            Log.w(TAG, "Error al verificar existencia del usuario.", e)
+            Toast.makeText(this, "Error al verificar el usuario.", Toast.LENGTH_SHORT).show()
+        }
+    }
 
 
 }
