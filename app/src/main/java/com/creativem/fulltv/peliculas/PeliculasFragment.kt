@@ -1336,36 +1336,43 @@ class PeliculasFragment : RowsSupportFragment() {
 
         iniciarVerificacionDeEstadoDeCuenta()
     }
-
     override fun onStop() {
         super.onStop()
+
         eliminarListener()
 
-        val userId = FirebaseAuth.getInstance().currentUser?.uid
-        val ref = FirebaseDatabase.getInstance().getReference("usuarios").child(userId ?: "")
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user == null) {
+            Log.w("PeliculasFragment", "No hay usuario autenticado. No se realizará ninguna operación.")
+            return
+        }
+
+        val userId = user.uid
+        val ref = FirebaseDatabase.getInstance().getReference("usuarios").child(userId)
 
         // 🔁 Remover el listener de datos del usuario
-        if (userId != null && datosUsuarioListener != null) {
+        if (datosUsuarioListener != null) {
             ref.removeEventListener(datosUsuarioListener!!)
             datosUsuarioListener = null
         }
 
-        // ✅ Solo actualizar "enlinea" si el nodo del usuario existe
-        if (userId != null) {
-            ref.get().addOnSuccessListener { snapshot ->
-                if (snapshot.exists()) {
-                    ref.child("enlinea").setValue(false)
-                    Log.d("PeliculasFragment", "Campo 'enlinea' marcado como false.")
-                } else {
-                    Log.w("PeliculasFragment", "No se actualizó 'enlinea' porque el usuario no existe.")
-                }
+        // ✅ Verificar existencia del nodo antes de actualizar
+        ref.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                ref.child("enlinea").setValue(false)
+                Log.d("PeliculasFragment", "Campo 'enlinea' marcado como false.")
+            } else {
+                Log.w("PeliculasFragment", "Usuario no existe en DB. No se actualizó 'enlinea'.")
             }
         }
 
-        Log.d("PeliculasFragment", "Listener de estado de cuenta y datos removidos.")
+        Log.d("PeliculasFragment", "Listener removido correctamente.")
         publicidadDialog?.dismiss()
         publicidadDialog = null
     }
+
+
+
 
 
     override fun onDestroyView() {
