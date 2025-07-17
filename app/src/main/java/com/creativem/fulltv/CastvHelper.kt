@@ -3,6 +3,7 @@ package com.creativem.fulltv
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -12,7 +13,6 @@ object CastvHelper {
 
     private const val TAG = "CastvHelper"
 
-    // Crear usuario en Realtime DB con castv inicial = 10 si no existe
     fun actualizarCastvSiNoExiste(
         context: Context,
         userId: String,
@@ -23,6 +23,15 @@ object CastvHelper {
 
         userRef.get()
             .addOnSuccessListener { snapshot ->
+                val estado = snapshot.child("estado").getValue(String::class.java)
+
+                if (estado == "eliminado") {
+                    // Usuario está eliminado, cerrar sesión
+                    Toast.makeText(context, "Tu cuenta ha sido eliminada. No puedes volver a ingresar.", Toast.LENGTH_LONG).show()
+                    FirebaseAuth.getInstance().signOut()
+                    return@addOnSuccessListener
+                }
+
                 if (!snapshot.exists()) {
                     val user = mapOf(
                         "nombre" to nombre,
@@ -48,6 +57,7 @@ object CastvHelper {
                 Toast.makeText(context, "Error al verificar usuario", Toast.LENGTH_SHORT).show()
             }
     }
+
 
     // Consultar el valor actual del castv
     fun obtenerCastv(
@@ -90,6 +100,55 @@ object CastvHelper {
 
         ref.addValueEventListener(listener)
         return listener // Devuelve el listener para poder removerlo si se necesita más adelante
+    }
+    fun nuevosusuarios(
+        context: Context,
+        userId: String,
+        nombre: String,
+        email: String?
+    ) {
+        val database = FirebaseDatabase.getInstance()
+        val databaseRef = database.reference.child("usuarios").child(userId)
+
+        databaseRef.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                val estado = snapshot.child("estado").getValue(String::class.java)
+
+                if (estado == "eliminado") {
+                    Log.w("CastvHelper", "Cuenta eliminada detectada para $email. No se permitirá el acceso.")
+                    FirebaseAuth.getInstance().signOut()
+                    Toast.makeText(context, "Tu cuenta ha sido eliminada. No puedes ingresar.", Toast.LENGTH_LONG).show()
+                    if (context is android.app.Activity) {
+                        context.finish()
+                    }
+                    return@addOnSuccessListener
+                }
+
+                Log.d("CastvHelper", "El usuario ya existe. No se sobreescribe castv.")
+            } else {
+                // Crear nuevo usuario
+                val user = mapOf(
+                    "nombre" to nombre,
+                    "correo" to email,
+                    "castv" to 10,
+                    "userId" to userId,
+                    "estado" to "activo",
+                    "enlinea" to true
+                )
+
+                databaseRef.setValue(user)
+                    .addOnSuccessListener {
+                        Log.d("CastvHelper", "Usuario agregado a Realtime Database correctamente.")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.w("CastvHelper", "Error al agregar usuario a Realtime Database.", e)
+                        Toast.makeText(context, "Error al agregar usuario a la base de datos.", Toast.LENGTH_SHORT).show()
+                    }
+            }
+        }.addOnFailureListener { e ->
+            Log.w("CastvHelper", "Error al verificar existencia del usuario.", e)
+            Toast.makeText(context, "Error al verificar el usuario.", Toast.LENGTH_SHORT).show()
+        }
     }
 
 

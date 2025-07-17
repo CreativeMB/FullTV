@@ -7,6 +7,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.creativem.fulltv.CastvHelper
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -115,22 +116,53 @@ class Login : AppCompatActivity() {
         auth.signInWithCredential(credential)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
-                    // Inicio de sesión exitoso
-                    Log.d(TAG, "signInWithCredential:success")
                     val user = auth.currentUser
-                    user?.let {
-                        nuevosusuarios(it.uid, it.displayName ?: "", it.email ?: "")
+                    if (user != null) {
+                        val userRef = database.reference.child("usuarios").child(user.uid)
+
+                        userRef.get().addOnSuccessListener { snapshot ->
+                            val estado = snapshot.child("estado").getValue(String::class.java)
+
+                            if (estado == "eliminado") {
+                                Log.w(TAG, "Cuenta eliminada detectada para ${user.email}. Cerrando sesión.")
+
+                                // Cerrar sesión inmediatamente
+                                FirebaseAuth.getInstance().signOut()
+
+                                Toast.makeText(
+                                    this,
+                                    "Tu cuenta ha sido eliminada. No puedes volver a ingresar.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                // Opcional: mostrar diálogo o regresar al login
+                                return@addOnSuccessListener
+                            }
+
+                            // Usuario válido: crear si no existe
+                            CastvHelper.nuevosusuarios(
+                                context = this,
+                                userId = user.uid,
+                                nombre = user.displayName ?: "Usuario",
+                                email = user.email
+                            )
+
+
+                            val intent = Intent(this, Main::class.java)
+                            startActivity(intent)
+                            finish()
+                        }.addOnFailureListener {
+                            Log.e(TAG, "Error al verificar estado del usuario", it)
+                            Toast.makeText(this, "Error al validar tu cuenta.", Toast.LENGTH_SHORT).show()
+                        }
                     }
-                    val intent = Intent(this, Main::class.java)
-                    startActivity(intent)
-                    finish()
                 } else {
-                    // Fallo en el inicio de sesión
                     Log.w(TAG, "signInWithCredential:failure", task.exception)
                     Toast.makeText(this, "Autenticación fallida.", Toast.LENGTH_SHORT).show()
                 }
             }
     }
+
 
     private fun signInAsDefaultUser() {
         val defaultEmail = "invitado@fulltv.com"
@@ -163,7 +195,13 @@ class Login : AppCompatActivity() {
                                     val nombre = "Estas En Invitado"
                                     val email = user.email
                                     val userId = user.uid
-                                    nuevosusuarios(userId, nombre, email)
+                                    CastvHelper.nuevosusuarios(
+                                        context = this,
+                                        userId = userId,
+                                        nombre = nombre,
+                                        email = email
+                                    )
+
                                 }
 
                                 val intent = Intent(this, Main::class.java)
@@ -182,36 +220,6 @@ class Login : AppCompatActivity() {
             }
     }
 
-    private fun nuevosusuarios(userId: String, nombre: String, email: String?) {
-        val databaseRef = database.reference.child("usuarios").child(userId)
-
-        databaseRef.get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                Log.d(TAG, "El usuario ya existe. No se sobreescribe castv.")
-            } else {
-                val user = mapOf(
-                    "nombre" to nombre,
-                    "correo" to email,
-                    "castv" to 10,
-                    "userId" to userId,
-                    "estado" to "activo",
-                    "enlinea" to false
-                )
-
-                databaseRef.setValue(user)
-                    .addOnSuccessListener {
-                        Log.d(TAG, "Usuario agregado a Realtime Database correctamente.")
-                    }
-                    .addOnFailureListener { e ->
-                        Log.w(TAG, "Error al agregar usuario a Realtime Database.", e)
-                        Toast.makeText(this, "Error al agregar usuario a la base de datos.", Toast.LENGTH_SHORT).show()
-                    }
-            }
-        }.addOnFailureListener { e ->
-            Log.w(TAG, "Error al verificar existencia del usuario.", e)
-            Toast.makeText(this, "Error al verificar el usuario.", Toast.LENGTH_SHORT).show()
-        }
-    }
 
 
 }

@@ -115,7 +115,6 @@ class PeliculasFragment : RowsSupportFragment() {
         val view = super.onCreateView(inflater, container, savedInstanceState)
         // Ya no inflar ni añadir loading_overlay
         binding = FragmentPeliculasBinding.bind(requireActivity().findViewById(R.id.main))
-        verificarSiUsuarioExiste()
         loadingContainer = binding.loadingOverlay
         progressBar = binding.progressBar
         loadingText = binding.loadingText
@@ -126,24 +125,37 @@ class PeliculasFragment : RowsSupportFragment() {
         if (currentUserUid != null) {
             val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(currentUserUid)
 
-            // Escuchar cambios de conexión y actualizar campo "enlinea"
-            val connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected")
-            connectedRef.addValueEventListener(object : ValueEventListener {
+            userRef.addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
-                    val connected = snapshot.getValue(Boolean::class.java) ?: false
-                    if (connected) {
-                        userRef.child("enlinea").setValue(true)
-                        userRef.child("enlinea").onDisconnect().setValue(false)
+                    val estado = snapshot.child("estado").getValue(String::class.java)
+
+                    if (!snapshot.exists() || estado == "eliminado") {
+                        Log.w("Seguridad", "El usuario fue eliminado o no existe. No crear nodo enlinea.")
+                        return
                     }
+
+                    val connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected")
+                    connectedRef.addValueEventListener(object : ValueEventListener {
+                        override fun onDataChange(snapshot: DataSnapshot) {
+                            val connected = snapshot.getValue(Boolean::class.java) ?: false
+                            if (connected) {
+                                userRef.child("enlinea").setValue(true)
+                                userRef.child("enlinea").onDisconnect().setValue(false)
+                            }
+                        }
+
+                        override fun onCancelled(error: DatabaseError) {
+                            Log.e("Connection", "Error al verificar conexión: ${error.message}")
+                        }
+                    })
                 }
 
                 override fun onCancelled(error: DatabaseError) {
-                    Log.e("Connection", "Error al verificar conexión: ${error.message}")
+                    Log.e("Seguridad", "Error al obtener estado del usuario: ${error.message}")
                 }
             })
-        } else {
-            Log.e("Connection", "Usuario no autenticado")
         }
+
 
 // Mantener pantalla encendida
         requireActivity().window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -208,9 +220,9 @@ class PeliculasFragment : RowsSupportFragment() {
             val email = currentUser.email
             val nombre = currentUser.displayName ?: "Usuario sin nombre"
 
-            // ✅ Solo crear/actualizar el usuario en Realtime si no existe
             CastvHelper.actualizarCastvSiNoExiste(requireContext(), userId, nombre, email)
         }
+
 
         CoroutineScope(Dispatchers.IO).launch {
             Validacioneslista.cargarPeliculas()
@@ -1277,43 +1289,84 @@ class PeliculasFragment : RowsSupportFragment() {
         val user = FirebaseAuth.getInstance().currentUser ?: return
         val userId = user.uid
 
-        // Guardar el listener para eliminarlo después en onStop
+        // 🟢 Esperamos a que el nodo exista antes de verificar el estado
+        val ref = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId)
+        ref.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                val estado = snapshot.child("estado").getValue(String::class.java)
+                if (estado == "eliminado") {
+                    mostrarDialogoEliminado()
+                    return@addOnSuccessListener
+                }
+
+                // ✅ Ya existe, podemos continuar normalmente
+                iniciarEscuchaDeUsuario(userId)
+            } else {
+                // 🕓 Si aún no existe, esperamos 500ms y volvemos a intentar
+                Handler(Looper.getMainLooper()).postDelayed({
+                    onStart() // reintentar
+                }, 500)
+            }
+        }.addOnFailureListener {
+            Log.e("PeliculasFragment", "Error consultando estado", it)
+        }
+
+        // 🎧 Audio focus
+        val context = requireContext()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioFocusHelper.requestAudioFocus(context)
+        } else {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+        }
+
+        isLoggingOut = false
+    }
+
+    private fun iniciarEscuchaDeUsuario(userId: String) {
         datosUsuarioListener = CastvHelper.obtenerDatosUsuario(
             userId = userId,
             onSuccess = { nombre, correo, castv, enlinea ->
                 Log.d("PeliculasFragment", "Usuario: $nombre, En línea: $enlinea, Castv: $castv")
-                // Aquí podrías actualizar un TextView o ícono si lo tienes en la vista
             },
             onFailure = {
                 Log.e("PeliculasFragment", "Error al obtener datos de usuario", it)
             }
         )
 
-        val context = requireContext()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioFocusHelper.requestAudioFocus(context)
-        } else {
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            audioManager.requestAudioFocus(
-                { /* manejar cambios si se requiere */ },
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN
-            )
-        }
-
-        isLoggingOut = false
         iniciarVerificacionDeEstadoDeCuenta()
     }
-
-
 
     override fun onStop() {
         super.onStop()
         eliminarListener()
-        Log.d("PeliculasFragment", "Listener de estado de cuenta detenido.")
+
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        val ref = FirebaseDatabase.getInstance().getReference("usuarios").child(userId ?: "")
+
+        // 🔁 Remover el listener de datos del usuario
+        if (userId != null && datosUsuarioListener != null) {
+            ref.removeEventListener(datosUsuarioListener!!)
+            datosUsuarioListener = null
+        }
+
+        // ✅ Solo actualizar "enlinea" si el nodo del usuario existe
+        if (userId != null) {
+            ref.get().addOnSuccessListener { snapshot ->
+                if (snapshot.exists()) {
+                    ref.child("enlinea").setValue(false)
+                    Log.d("PeliculasFragment", "Campo 'enlinea' marcado como false.")
+                } else {
+                    Log.w("PeliculasFragment", "No se actualizó 'enlinea' porque el usuario no existe.")
+                }
+            }
+        }
+
+        Log.d("PeliculasFragment", "Listener de estado de cuenta y datos removidos.")
         publicidadDialog?.dismiss()
         publicidadDialog = null
     }
+
 
     override fun onDestroyView() {
         super.onDestroyView()
@@ -1427,30 +1480,27 @@ class PeliculasFragment : RowsSupportFragment() {
         // Ya no realizamos ninguna acción aquí, todo se gestiona en onStart() o en otro lugar
     }
 
+    fun verificarSiUsuarioExisteOEsValido() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val ref = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId)
 
+        ref.get().addOnSuccessListener { snapshot ->
+            if (!snapshot.exists()) {
+                Log.d("PeliculasFragment", "Usuario no existe en DB. Es un nuevo usuario.")
+                return@addOnSuccessListener // 🔁 No mostrar diálogo si es nuevo
+            }
 
-    private fun verificarSiUsuarioExiste() {
-        val currentUser = FirebaseAuth.getInstance().currentUser
-        if (currentUser != null) {
-            val userId = currentUser.uid
-            val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(userId)
+            val estado = snapshot.child("estado").getValue(String::class.java)
 
-            userRef.addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    if (!snapshot.exists()) {
-                        // Si el usuario está autenticado pero no existe en la BD,
-                        // es un estado inválido. Forzar cierre.
-                        Log.w("Verificacion", "Usuario autenticado pero no existe en Realtime DB. Forzando cierre.")
-                        forzarCierreTotal()
-                    }
-                }
-
-                override fun onCancelled(error: DatabaseError) {
-                    Log.e("RealtimeDB", "Error al verificar usuario: ${error.message}")
-                }
-            })
+            if (estado == "eliminado") {
+                Log.w("PeliculasFragment", "Cuenta marcada como eliminada.")
+                mostrarDialogoEliminado()
+            }
+        }.addOnFailureListener {
+            Log.e("PeliculasFragment", "Error verificando usuario", it)
         }
     }
+
 
     private fun forzarCierreTotal() {
         // Asegurarnos de que no se ejecute en un contexto inválido
