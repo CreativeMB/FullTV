@@ -120,7 +120,6 @@ class PeliculasFragment : RowsSupportFragment() {
             CastvHelper.actualizarCastvSiNoExiste(requireContext(), currentUser.uid, currentUser.displayName ?: "Usuario", currentUser.email!!)
         }
 
-        obtenerNoticia()
     }
 
     // --- Métodos de Carga de Películas ---
@@ -298,61 +297,6 @@ class PeliculasFragment : RowsSupportFragment() {
         requestQueue.add(jsonRequest)
     }
 
-    // --- Lógica de Actualización de App (Reintegrada) ---
-
-    private fun obtenerNoticia() {
-        db.collection("noticia").document("us4vaaf0VPezu9vuc4ns").get().addOnSuccessListener { document ->
-            if (document.exists()) {
-                val versionLocal = BuildConfig.VERSION_NAME
-                val versionRemota = document.getString("versionapk") ?: ""
-                versionRemotaGlobal = versionRemota
-
-                if (versionRemota > versionLocal) {
-                    val mensaje = "¡Hay una nueva versión ($versionRemota) disponible!\nActualiza para obtener las últimas mejoras."
-                    AlertDialog.Builder(requireContext())
-                        .setTitle("🎉 Nueva Versión Disponible")
-                        .setMessage(mensaje)
-                        .setCancelable(false)
-                        .setPositiveButton("Actualizar ahora") { _, _ ->
-                            descargarActualizacion(versionRemota)
-                        }
-                        .setNegativeButton("Más tarde", null)
-                        .show()
-                }
-            }
-        }
-    }
-
-    private fun descargarActualizacion(versionRemota: String) {
-        val url = "https://github.com/CreativeMB/FullTV/releases/download/fulltv/FullTV_update.apk"
-        val fileName = "FullTV_update.apk"
-        val apkFile = File(requireContext().getExternalFilesDir(null), fileName)
-        if (apkFile.exists()) apkFile.delete()
-
-        val request = DownloadManager.Request(Uri.parse(url))
-            .setTitle("Descargando FullTV v$versionRemota")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationUri(Uri.fromFile(apkFile))
-
-        val downloadManager = requireContext().getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        val downloadId = downloadManager.enqueue(request)
-        Toast.makeText(requireContext(), "Iniciando descarga de la actualización...", Toast.LENGTH_LONG).show()
-
-        // Aquí podrías agregar un BroadcastReceiver para detectar la finalización de la descarga e iniciar la instalación.
-    }
-
-    private fun instalarAPK(apkFile: File) {
-        val apkUri = FileProvider.getUriForFile(requireContext(), "${requireContext().packageName}.provider", apkFile)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(apkUri, "application/vnd.android.package-archive")
-            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        try {
-            startActivity(intent)
-        } catch (e: Exception) {
-            Toast.makeText(requireContext(), "No se pudo abrir el instalador", Toast.LENGTH_LONG).show()
-        }
-    }
 
     // --- Ciclo de Vida y Estado de Usuario ---
 

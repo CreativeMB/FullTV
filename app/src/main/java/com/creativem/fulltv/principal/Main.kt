@@ -71,6 +71,7 @@ import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -511,13 +512,12 @@ class Main : FragmentActivity() {
 
 
     private fun mostrarPublicidad() {
-        if (yaMostroPublicidad) return // 👈 Ya la mostró antes
+        if (yaMostroPublicidad) return
         if (isFinishing || isDestroyed || publicidadDialog?.isShowing == true) return
 
-        yaMostroPublicidad = true // ✅ Marcar que ya se mostró
+        yaMostroPublicidad = true
 
         val view = layoutInflater.inflate(R.layout.dialog_publicidad, null)
-
         val imgPublicidad = view.findViewById<ImageView>(R.id.imgPublicidad)
         val btnCerrar = view.findViewById<ImageButton>(R.id.btnCerrarPublicidad)
         val txtContador = view.findViewById<TextView>(R.id.txtContadorPublicidad)
@@ -528,9 +528,35 @@ class Main : FragmentActivity() {
             show()
         }
 
+        // 🔥 Listar archivos en la carpeta "FulltvPublicidad"
+        val storageRef = FirebaseStorage.getInstance().reference.child("FulltvPublicidad")
+        storageRef.listAll()
+            .addOnSuccessListener { listResult ->
+                val items = listResult.items
+                if (items.isNotEmpty()) {
+                    val randomRef = items.random()
+                    randomRef.downloadUrl.addOnSuccessListener { uri ->
+                        Glide.with(this)
+                            .load(uri)
+                            .placeholder(R.drawable.pelifondo) // opcional
+                            .error(R.drawable.icono)         // opcional
+                            .into(imgPublicidad)
+                    }.addOnFailureListener {
+                        Toast.makeText(this, "Error al cargar imagen", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(this, "No hay imágenes disponibles", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Error al acceder a Firebase Storage", Toast.LENGTH_SHORT).show()
+            }
+
+        // 🎯 Foco inicial
         btnCerrar.isFocusableInTouchMode = true
         btnCerrar.requestFocus()
 
+        // ⏱️ Contador
         var segundosRestantes = 10
         txtContador.text = "$segundosRestantes s"
         val handler = Handler(Looper.getMainLooper())
@@ -547,10 +573,12 @@ class Main : FragmentActivity() {
         }
         handler.postDelayed(runnable, 1000)
 
+        // ❌ Botón cerrar
         btnCerrar.setOnClickListener {
             publicidadDialog?.dismiss()
         }
     }
+
 
     override fun onDestroy() {
         super.onDestroy() // Es muy importante llamar a super.onDestroy()
@@ -924,7 +952,8 @@ class Main : FragmentActivity() {
     private fun descargarActualizacion(versionRemota: String) {
         val versionLocal = BuildConfig.VERSION_NAME
 
-        if (versionRemota == versionLocal) {
+        if (esNuevaVersionDisponible(versionRemota, versionLocal))
+        {
             // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
             AlertDialog.Builder(this)
                 .setTitle("✅ Ya tienes la última versión (versión $versionRemota)")
@@ -1233,6 +1262,21 @@ class Main : FragmentActivity() {
         }
 
         alertDialog.show()
+    }
+    fun esNuevaVersionDisponible(versionRemota: String, versionLocal: String): Boolean {
+        val vRemota = versionRemota.split(".").map { it.toIntOrNull() ?: 0 }
+        val vLocal = versionLocal.split(".").map { it.toIntOrNull() ?: 0 }
+
+        val maxLength = maxOf(vRemota.size, vLocal.size)
+        val remotaPadded = vRemota + List(maxLength - vRemota.size) { 0 }
+        val localPadded = vLocal + List(maxLength - vLocal.size) { 0 }
+
+        for (i in 0 until maxLength) {
+            if (remotaPadded[i] > localPadded[i]) return true
+            if (remotaPadded[i] < localPadded[i]) return false
+        }
+
+        return false // Son iguales
     }
 
 }
