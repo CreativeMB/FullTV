@@ -236,7 +236,7 @@ class Main : FragmentActivity() {
                     startActivity(intent)
                 }
                 "TV" -> navegarATv()
-                "Cuenta" -> cerrarSesion()
+                "Cerrar" -> cerrarSesion()
                 else -> Toast.makeText(this, "${item.name} seleccionado", Toast.LENGTH_SHORT).show()
             }
         }

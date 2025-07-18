@@ -17,6 +17,9 @@ import org.json.JSONObject
 import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FieldValue
 
 class CastvFragment : Fragment() {
@@ -58,35 +61,47 @@ class CastvFragment : Fragment() {
         })
     }
 
-    // Cargar usuarios desde Firebase Realtime Database
     private fun cargarUsuarios() {
-        userList.clear() // Limpiar lista antes de cargar
-
         val databaseRef = FirebaseDatabase.getInstance().reference.child("usuarios")
 
-        databaseRef.get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                for (userSnapshot in snapshot.children) {
-                    // Obtiene el objeto User de los datos del snapshot
-                    val user = userSnapshot.getValue(User::class.java)
+        databaseRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                userList.clear()
 
-                    user?.let {
-                        // ¡AQUÍ ESTÁ LA CORRECCIÓN!
-                        // Asignamos el UID (userSnapshot.key) al campo 'userId' de nuestro objeto
-                        it.userId = userSnapshot.key ?: ""
+                if (snapshot.exists()) {
+                    for (userSnapshot in snapshot.children) {
+                        val user = userSnapshot.getValue(User::class.java)
+                        user?.let {
+                            it.userId = userSnapshot.key ?: ""
 
-                        // Añadimos el objeto 'it' (que ahora tiene el ID correcto) a la lista
-                        userList.add(it)
+                            if (it.estado != "eliminado") {
+                                it.isOnline = it.estado == "activo" &&
+                                        (userSnapshot.child("enlinea").getValue(Boolean::class.java) ?: false)
+
+                                userList.add(it)
+                            }
+                        }
                     }
+
+                    // Ordenar por fechaCreacion y luego por email
+                    userList.sortWith(
+                        compareByDescending<User> { it.fechaCreacion }
+                            .thenByDescending { it.correo } // ← esto debe devolver String
+                    )
+
+                    castvAdapter.filter("") // Actualizar la vista
+                } else {
+                    Log.d("Usuarios", "No se encontraron usuarios.")
                 }
-                castvAdapter.notifyDataSetChanged() // Notificar cambios
-            } else {
-                Log.d("Users", "No se encontraron usuarios.")
             }
-        }.addOnFailureListener { e ->
-            Log.e("Users", "Error al cargar usuarios", e)
-        }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("Usuarios", "Error en la base de datos: ${error.message}")
+            }
+        })
     }
+
+
 
     private fun verificarEstadosDeConexion() {
         val usuariosRef = FirebaseDatabase.getInstance().reference.child("usuarios")
@@ -122,7 +137,7 @@ class CastvFragment : Fragment() {
 
                     // Actualizar `isOnline` para cada usuario en `userList`
                     for (user in userList) {
-                        user.isOnline = estadosDeConexion[user.id] ?: false
+                        user.isOnline = estadosDeConexion[user.userId] ?: false
                         Log.d("Conexion", "Actualizado ${user.nombre} (${user.id}): ${user.isOnline}")
                     }
 

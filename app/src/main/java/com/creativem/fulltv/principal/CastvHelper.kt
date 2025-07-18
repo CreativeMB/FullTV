@@ -33,14 +33,22 @@ object CastvHelper {
                 }
 
                 if (!snapshot.exists()) {
+
+                    // Crear fecha formateada
+                    val formato = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+                    val fechaFormateada = formato.format(java.util.Date())
+
+// Crear mapa del usuario
                     val user = mapOf(
                         "nombre" to nombre,
                         "correo" to email,
                         "castv" to 10,
                         "userId" to userId,
                         "estado" to "activo",
-                        "enlinea" to true
+                        "enlinea" to true,
+                        "fechaCreacion" to fechaFormateada // ✅ Ya viene formateada
                     )
+
 
                     userRef.setValue(user)
                         .addOnSuccessListener {
@@ -126,15 +134,21 @@ object CastvHelper {
 
                 Log.d("CastvHelper", "El usuario ya existe. No se sobreescribe castv.")
             } else {
-                // Crear nuevo usuario
+                // Crear fecha formateada
+                val formato = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+                val fechaFormateada = formato.format(java.util.Date())
+
+// Crear mapa del usuario
                 val user = mapOf(
                     "nombre" to nombre,
                     "correo" to email,
                     "castv" to 10,
                     "userId" to userId,
                     "estado" to "activo",
-                    "enlinea" to true
+                    "enlinea" to true,
+                    "fechaCreacion" to fechaFormateada // ✅ Ya viene formateada
                 )
+
 
                 databaseRef.setValue(user)
                     .addOnSuccessListener {

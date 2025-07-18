@@ -17,6 +17,7 @@ data class Movie(
     val castv: Int = 0,
     var estado: String = "activo",
     val countdownMinutes: Int = 0,
+    var fechaCreacion: Long = 0L,
     val releaseDate: String = ""
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
