@@ -79,8 +79,11 @@ import androidx.media3.common.util.UnstableApi
 import androidx.recyclerview.widget.RecyclerView
 import java.util.concurrent.TimeUnit
 import com.android.volley.Request
-import com.creativem.fulltv.CastvHelper
-import com.creativem.fulltv.principal.NosotrosFragment
+import com.creativem.fulltv.principal.CastvHelper
+import com.creativem.fulltv.principal.Main
+import com.creativem.fulltv.principal.Nosotros
+
+
 import com.google.firebase.database.FirebaseDatabase
 
 
@@ -869,10 +872,8 @@ class PlayerPeliculas : AppCompatActivity() {
         linkNosotros.setTextColor(Color.RED)
         linkNosotros.paintFlags = linkNosotros.paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
         linkNosotros.setOnClickListener {
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, NosotrosFragment()) // Asegúrate que este ID exista en el layout
-                .addToBackStack(null) // Esto permite volver atrás con el botón de regreso
-                .commit()
+            val intent = Intent(this, Nosotros::class.java)
+            startActivity(intent)
         }
 
         val alertDialog = AlertDialog.Builder(this)
@@ -984,9 +985,8 @@ class PlayerPeliculas : AppCompatActivity() {
                                         Toast.LENGTH_LONG
                                     ).show()
                                     supportFragmentManager.beginTransaction()
-                                        .replace(R.id.fragment_container, NosotrosFragment()) // Asegúrate que este ID exista en el layout
-                                        .addToBackStack(null) // Esto permite volver atrás con el botón de regreso
-                                        .commit()
+                                    val intent = Intent(this, Nosotros::class.java)
+                                    startActivity(intent)
                                     finish()
                                 }
                             }
@@ -1084,9 +1084,8 @@ class PlayerPeliculas : AppCompatActivity() {
                     .addOnSuccessListener {
                         Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
                         supportFragmentManager.beginTransaction()
-                            .replace(R.id.fragment_container, NosotrosFragment()) // Asegúrate que este ID exista en el layout
-                            .addToBackStack(null) // Esto permite volver atrás con el botón de regreso
-                            .commit()
+                        val intent = Intent(this, Nosotros::class.java)
+                        startActivity(intent)
                         startActivity(intent)
                         finish()
                     }
@@ -1105,9 +1104,8 @@ class PlayerPeliculas : AppCompatActivity() {
                     Toast.LENGTH_LONG
                 ).show()
                 supportFragmentManager.beginTransaction()
-                    .replace(R.id.fragment_container, NosotrosFragment()) // Asegúrate que este ID exista en el layout
-                    .addToBackStack(null) // Esto permite volver atrás con el botón de regreso
-                    .commit()
+                val intent = Intent(this, Nosotros::class.java)
+                startActivity(intent)
                 startActivity(intent)
                 finish()
             }
@@ -1416,6 +1414,5 @@ class PlayerPeliculas : AppCompatActivity() {
         }
 
     }
-
 
 }

@@ -78,14 +78,6 @@ class PelisCarteleraAdapter(
             .placeholder(R.drawable.pelifondo)
             .error(R.drawable.icono)
             .into(holder.poster)
-
-        // Fondo según si está seleccionado
-        holder.itemView.setBackgroundColor(
-            if (position == selectedPosition)
-                ContextCompat.getColor(holder.itemView.context, R.color.colorSelected)
-            else
-                ContextCompat.getColor(holder.itemView.context, R.color.colorNotSelected)
-        )
     }
 
     override fun getItemCount(): Int = items.size

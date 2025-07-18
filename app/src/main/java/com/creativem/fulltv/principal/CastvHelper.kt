@@ -1,4 +1,4 @@
-package com.creativem.fulltv
+package com.creativem.fulltv.principal
 
 import android.content.Context
 import android.util.Log

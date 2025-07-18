@@ -27,7 +27,7 @@ import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.creativem.fulltv.BuildConfig
-import com.creativem.fulltv.CastvHelper
+import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Movie

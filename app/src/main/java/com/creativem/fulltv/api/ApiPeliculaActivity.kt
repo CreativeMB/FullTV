@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.peliculas.PlayerPeliculas
+import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Movie
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
@@ -272,8 +273,5 @@ class ApiPeliculaActivity : AppCompatActivity() {
             Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(ivPoster)
         }
     }
-        override fun onBackPressed() {
-        super.onBackPressed()
-        finish()
-    }
+
 }

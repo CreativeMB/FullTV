@@ -1,5 +1,6 @@
 package com.creativem.fulltv.principal
 
+import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.Dialog
 import android.app.DownloadManager
@@ -38,7 +39,6 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
-import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
@@ -52,19 +52,17 @@ import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.BuildConfig
-import com.creativem.fulltv.CastvHelper
 import com.creativem.fulltv.R
-import com.creativem.fulltv.UsuarioEstadoManager
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.api.PeliculasApiFragment
 import com.creativem.fulltv.api.TMDbApiClient
-import com.creativem.fulltv.databinding.MainPrincipalBinding
+import com.creativem.fulltv.databinding.MainPrincipalfragmentBinding
+import com.creativem.fulltv.enlinea.UsuarioEstadoManager
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
 import com.creativem.fulltv.menu.MenuPrincipalItem
 import com.creativem.fulltv.peliculas.PeliculasFragment
 import com.creativem.fulltv.peliculasvalidas.PeliculasValidasFragment
 import com.creativem.fulltv.tv.TvFragment
-import com.google.firebase.Firebase
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -73,7 +71,6 @@ import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.storage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -85,8 +82,8 @@ import java.io.File
 
 class Main : FragmentActivity() {
     var haProcesadoEliminacion = false
-
-    private lateinit var binding: MainPrincipalBinding
+    private var yaMostroPublicidad = false
+    private lateinit var binding: MainPrincipalfragmentBinding
     private var publicidadDialog: Dialog? = null
     private var versionRemotaGlobal: String? = null
     private var userStatusListener: ValueEventListener? = null
@@ -116,7 +113,7 @@ class Main : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        binding = MainPrincipalBinding.inflate(layoutInflater)
+        binding = MainPrincipalfragmentBinding.inflate(layoutInflater)
         setContentView(binding.root)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -125,7 +122,7 @@ class Main : FragmentActivity() {
             WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         )
-//        iniciarVerificacionDeEstadoDeCuenta()
+
         if (savedInstanceState == null) {
             navegarA(PeliculasFragment())
             haProcesadoEliminacion = false
@@ -134,6 +131,7 @@ class Main : FragmentActivity() {
         cargarMenuPrincipal()
         mostrarPublicidad()
         obtenerNoticia()
+
     }
 
     private fun navegarA(fragment: Fragment) {
@@ -155,18 +153,6 @@ class Main : FragmentActivity() {
      fun navegarAPeliculasApi() {
         navegarA(PeliculasApiFragment())
      }
-    fun navegarNosotros() {
-        navegarA(NosotrosFragment())
-    }
-/*    fun hideLoading() {
-        // Usa su propio binding para ocultar la carga
-        binding.layoutCargando.visibility = View.GONE
-    }
-    fun showLoading(message: String) {
-        // Usa su propio binding para mostrar la carga
-        binding.loadingText.text = message
-        binding.layoutCargando.visibility = View.VISIBLE
-    }*/
     fun updateBackground(imageUrl: String?) {
         // Detener la animación del fondo por defecto si se está ejecutando
         handler.removeCallbacksAndMessages(null)
@@ -212,6 +198,7 @@ class Main : FragmentActivity() {
             }
         }, 1500)
     }
+
     private fun cargarMenuPrincipal() {
         val recycler = binding.menuPrincipal
         if (recycler == null) {
@@ -220,12 +207,12 @@ class Main : FragmentActivity() {
         }
 
         val menuItems = listOf("Inicio",
-            "TV Gratis", "Pelis Gratis", "Peliculas", "Buscar Pelicula", "Pedir Pelicula",
-            "Activar Paquete", "¿Como Pago?", "Cerrar Cuenta"
+            "TV", "Gratis", "Peliculas", "Buscar", "Pedir",
+            "Paquete", "Pago", "Cerrar"
         )
 
         val menuIcons = listOf(
-            R.drawable.tv,
+            R.drawable.home,
             R.drawable.tv, R.drawable.cartelera,
             R.drawable.cine, R.drawable.buscar, R.drawable.pedido,
             R.drawable.activacion, R.drawable.pago, R.drawable.cerrrar
@@ -236,17 +223,19 @@ class Main : FragmentActivity() {
         }
 
         val adapter = MenuPrincipalAdapter(menuList) { item ->
-            Log.d("PeliculasValidasFragment", "Menu item clicked: ${item.name}")
             when (item.name) {
                 "Inicio" -> navegarInicio()
-                "Buscar Pelicula" -> buscarPeliculaDialogo()
-                "Pedir Pelicula" -> mostrarDialogoPedido()
-                "Activar Paquete" -> activarpaquete()
-                "Pelis Gratis" -> navegarAPeliculasValidas()
+                "Buscar" -> buscarPeliculaDialogo()
+                "Pedir" -> mostrarDialogoPedido()
+                "Paquete" -> activarpaquete()
+                "Gratis" -> navegarAPeliculasValidas()
                 "Peliculas"-> navegarAPeliculasApi()
-                "¿Como Pago?" -> navegarNosotros()
-                "TV Gratis" -> navegarATv()
-                "Cerrar Cuenta" -> cerrarSesion()
+                "Pago" -> {
+                    val intent = Intent(this, Nosotros::class.java)
+                    startActivity(intent)
+                }
+                "TV" -> navegarATv()
+                "Cuenta" -> cerrarSesion()
                 else -> Toast.makeText(this, "${item.name} seleccionado", Toast.LENGTH_SHORT).show()
             }
         }
@@ -520,19 +509,19 @@ class Main : FragmentActivity() {
         }
     }
 
+
     private fun mostrarPublicidad() {
-        // CAMBIO: La comprobación 'isAdded' se reemplaza por 'isFinishing' o 'isDestroyed'
+        if (yaMostroPublicidad) return // 👈 Ya la mostró antes
         if (isFinishing || isDestroyed || publicidadDialog?.isShowing == true) return
 
-        // CORRECCIÓN: Se usa 'layoutInflater' que ya es una propiedad de la Activity
+        yaMostroPublicidad = true // ✅ Marcar que ya se mostró
+
         val view = layoutInflater.inflate(R.layout.dialog_publicidad, null)
 
         val imgPublicidad = view.findViewById<ImageView>(R.id.imgPublicidad)
         val btnCerrar = view.findViewById<ImageButton>(R.id.btnCerrarPublicidad)
         val txtContador = view.findViewById<TextView>(R.id.txtContadorPublicidad)
 
-
-        // CORRECCIÓN: Se usa 'this' como contexto para el Dialog
         publicidadDialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen).apply {
             setContentView(view)
             setCancelable(false)
@@ -542,7 +531,6 @@ class Main : FragmentActivity() {
         btnCerrar.isFocusableInTouchMode = true
         btnCerrar.requestFocus()
 
-        // El resto de la lógica del diálogo no necesita cambios...
         var segundosRestantes = 10
         txtContador.text = "$segundosRestantes s"
         val handler = Handler(Looper.getMainLooper())
@@ -562,41 +550,8 @@ class Main : FragmentActivity() {
         btnCerrar.setOnClickListener {
             publicidadDialog?.dismiss()
         }
-
-
-
-        var progreso = 0
-        val progresoHandler = Handler(Looper.getMainLooper())
-        val progresoRunnable = object : Runnable {
-            override fun run() {
-                if (progreso < 100) {
-                    progreso += 25  // carga mucho más rápido
-                    if (progreso > 100) progreso = 100
-                    progresoHandler.postDelayed(this, 40) // cada 40ms
-                }
-            }
-        }
-        progresoHandler.post(progresoRunnable)
-
-        val folderRef = Firebase.storage.reference.child("FulltvPublicidad")
-        folderRef.listAll().addOnSuccessListener { listResult ->
-            val archivos = listResult.items
-            if (archivos.isNotEmpty()) {
-                val imagenAleatoria = archivos.random()
-                imagenAleatoria.downloadUrl.addOnSuccessListener { uri ->
-                    // CAMBIO: Se quita 'isAdded' y se verifica si la actividad sigue viva
-                    if (!isFinishing && !isDestroyed) {
-                        // CORRECCIÓN: Se usa 'this' para Glide
-                        Glide.with(this)
-                            .load(uri)
-                            .into(imgPublicidad)
-
-
-                    }
-                }
-            }
-        }
     }
+
     override fun onDestroy() {
         super.onDestroy() // Es muy importante llamar a super.onDestroy()
         eliminarListener()
@@ -1213,20 +1168,71 @@ class Main : FragmentActivity() {
             datosUsuarioListener = null
         }
 
-        // ✅ Verificar existencia del nodo antes de actualizar
-        ref.get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                ref.child("enlinea").setValue(false)
-                Log.d("PeliculasFragment", "Campo 'enlinea' marcado como false.")
-            } else {
-                Log.w("PeliculasFragment", "Usuario no existe en DB. No se actualizó 'enlinea'.")
-            }
-        }
 
         Log.d("PeliculasFragment", "Listener removido correctamente.")
         publicidadDialog?.dismiss()
         publicidadDialog = null
     }
+    override fun onBackPressed() {
+        val fragmentActual = supportFragmentManager.findFragmentById(R.id.fragment_container)
 
+        // Si hay más de un fragmento en el stack, retrocede normalmente
+        if (supportFragmentManager.backStackEntryCount > 0) {
+            super.onBackPressed()
+            return
+        }
+
+        // Si estamos en el fragmento raíz o único, mostrar el diálogo
+        mostrarConfirmacionSalida()
+    }
+    @SuppressLint("SetTextI18n")
+    private fun mostrarConfirmacionSalida() {
+        var segundosRestantes = 5
+
+        val alertDialog = AlertDialog.Builder(this)
+            .setTitle("¿Desea Salir de la aplicación? ($segundosRestantes)")
+            .setCancelable(false)
+            .setPositiveButton("Sí") { _, _ ->
+                finish()
+            }
+            .setNegativeButton("No") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .create()
+
+        val handler = Handler(Looper.getMainLooper())
+        val runnable = object : Runnable {
+            override fun run() {
+                segundosRestantes--
+                if (segundosRestantes > 0) {
+                    alertDialog.setTitle("¿Desea Salir de la aplicación? ($segundosRestantes)")
+                    handler.postDelayed(this, 1000)
+                } else {
+                    // Simula hacer clic en el botón "No"
+                    alertDialog.dismiss()
+                }
+            }
+        }
+
+        alertDialog.setOnShowListener {
+            val btnSi = alertDialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            val btnNo = alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+
+            val focusSelector = R.drawable.focus_selector
+            listOf(btnSi, btnNo).forEach {
+                it.setBackgroundResource(focusSelector)
+                it.isFocusable = true
+                it.isFocusableInTouchMode = true
+            }
+
+            // Focus inicial en "No"
+            btnNo.requestFocus()
+
+            // Inicia el contador
+            handler.postDelayed(runnable, 1000)
+        }
+
+        alertDialog.show()
+    }
 
 }

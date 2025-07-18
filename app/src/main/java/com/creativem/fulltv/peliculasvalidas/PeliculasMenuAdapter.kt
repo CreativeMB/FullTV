@@ -67,19 +67,11 @@ class PeliculasMenuAdapter(
 
         }
 
-
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
             .placeholder(R.drawable.pelifondo)
             .error(R.drawable.icono)
             .into(holder.movieImage)
-
-        holder.itemView.setBackgroundColor(
-            if (position == selectedPosition)
-                ContextCompat.getColor(holder.itemView.context, R.color.colorSelected)
-            else
-                ContextCompat.getColor(holder.itemView.context, R.color.colorNotSelected)
-        )
         // 🔵 El focus se controla desde el ítem
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             holder.movieTitle.isSelected = hasFocus // 🔹 Solo se mueve el que tiene el foco

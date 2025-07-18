@@ -34,7 +34,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FullTV.tv"
         android:usesCleartextTraffic="true"
-        android:name=".FullTVApp"
+        android:name=".enlinea.FullTVApp"
         tools:ignore="UnusedAttribute">
         <activity
             android:name=".api.ApiPeliculaActivity"
