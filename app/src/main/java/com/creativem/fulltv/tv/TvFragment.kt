@@ -38,12 +38,9 @@ class TvFragment : RowsSupportFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        // Inicializar referencias
-        progressBar = requireActivity().findViewById(R.id.progressBar)
-        loadingText = requireActivity().findViewById(R.id.loadingText)
-        loadingContainer = requireActivity().findViewById(R.id.layoutCargando)
+
 // Referenciar fondo dinámico del Activity
-        val fondoDinamico = requireActivity().findViewById<ImageView>(R.id.fondoDinamico)
+        val fondoDinamico = requireActivity().findViewById<ImageView>(R.id.mainBackgroundImage)
 
 // Detectar ítem seleccionado y cambiar fondo
         setOnItemViewSelectedListener { _, item, _, _ ->
@@ -62,7 +59,7 @@ class TvFragment : RowsSupportFragment() {
     }
 
     private fun loadTvChannels() {
-        mostrarCargando()
+
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -70,7 +67,7 @@ class TvFragment : RowsSupportFragment() {
                 val canales = snapshot.toObjects(Movie::class.java)
 
                 withContext(Dispatchers.Main) {
-                    ocultarCargando()
+
                     if (canales.isNotEmpty()) {
                         organizarEnFilas(canales)
                     } else {
@@ -79,7 +76,7 @@ class TvFragment : RowsSupportFragment() {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    ocultarCargando()
+
                     Log.e("TvFragment", "Error cargando canales", e)
                 }
             }
@@ -100,7 +97,7 @@ class TvFragment : RowsSupportFragment() {
     }
 
 
-    private fun mostrarCargando() {
+ /*   private fun mostrarCargando() {
         progreso = 0
         loadingContainer.visibility = View.VISIBLE
         progressBar.progress = 0
@@ -122,7 +119,7 @@ class TvFragment : RowsSupportFragment() {
             delay(100)
             loadingContainer.visibility = View.GONE
         }
-    }
+    }*/
 
 
 

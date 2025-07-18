@@ -6,7 +6,7 @@
     android:textColor="@android:color/white"
     android:textSize="20sp"
     android:padding="8dp"
-    android:background="?attr/selectableItemBackground"
+    android:background="@drawable/card_focused_background"
     android:focusable="true"
     android:textStyle="bold"
     android:focusableInTouchMode="true"

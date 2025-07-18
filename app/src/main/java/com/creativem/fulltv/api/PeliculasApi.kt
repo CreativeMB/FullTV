@@ -2,6 +2,7 @@ package com.creativem.fulltv.api
 import android.os.Bundle
 import androidx.fragment.app.FragmentActivity
 
+/*
 class PeliculasApi : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -13,4 +14,4 @@ class PeliculasApi : FragmentActivity() {
             .replace(android.R.id.content, fragment)
             .commit()
     }
-}
+}*/

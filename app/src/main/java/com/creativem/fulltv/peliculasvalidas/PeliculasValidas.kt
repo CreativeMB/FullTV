@@ -1,3 +1,4 @@
+/*
 package com.creativem.fulltv.peliculasvalidas
 
 import android.os.Bundle
@@ -28,4 +29,4 @@ class PeliculasValidas : FragmentActivity() {
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         )
     }
-}
+}*/

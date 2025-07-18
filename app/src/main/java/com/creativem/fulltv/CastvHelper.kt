@@ -39,7 +39,7 @@ object CastvHelper {
                         "castv" to 10,
                         "userId" to userId,
                         "estado" to "activo",
-                        "enlinea" to false
+                        "enlinea" to true
                     )
 
                     userRef.setValue(user)
@@ -89,7 +89,7 @@ object CastvHelper {
                 val nombre = snapshot.child("nombre").getValue(String::class.java) ?: "Sin nombre"
                 val correo = snapshot.child("correo").getValue(String::class.java) ?: ""
                 val castv = snapshot.child("castv").getValue(Int::class.java) ?: 0
-                val enlinea = snapshot.child("enlinea").getValue(Boolean::class.java) ?: false
+                val enlinea = snapshot.child("enlinea").getValue(Boolean::class.java) ?: true
                 onSuccess(nombre, correo, castv, enlinea)
             }
 

@@ -66,7 +66,7 @@ import androidx.activity.addCallback
 import com.bumptech.glide.Glide
 
 import com.creativem.fulltv.databinding.PlayerBinding
-import com.creativem.fulltv.principal.Nosotros
+
 
 
 import androidx.annotation.OptIn
@@ -80,6 +80,7 @@ import androidx.recyclerview.widget.RecyclerView
 import java.util.concurrent.TimeUnit
 import com.android.volley.Request
 import com.creativem.fulltv.CastvHelper
+import com.creativem.fulltv.principal.NosotrosFragment
 import com.google.firebase.database.FirebaseDatabase
 
 
@@ -868,7 +869,10 @@ class PlayerPeliculas : AppCompatActivity() {
         linkNosotros.setTextColor(Color.RED)
         linkNosotros.paintFlags = linkNosotros.paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
         linkNosotros.setOnClickListener {
-            startActivity(Intent(this, Nosotros::class.java))
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, NosotrosFragment()) // Asegúrate que este ID exista en el layout
+                .addToBackStack(null) // Esto permite volver atrás con el botón de regreso
+                .commit()
         }
 
         val alertDialog = AlertDialog.Builder(this)
@@ -979,7 +983,10 @@ class PlayerPeliculas : AppCompatActivity() {
                                         "¡Ho! No tienes Saldo de CasTV para poder Alquilar.",
                                         Toast.LENGTH_LONG
                                     ).show()
-                                    startActivity(Intent(this, Nosotros::class.java))
+                                    supportFragmentManager.beginTransaction()
+                                        .replace(R.id.fragment_container, NosotrosFragment()) // Asegúrate que este ID exista en el layout
+                                        .addToBackStack(null) // Esto permite volver atrás con el botón de regreso
+                                        .commit()
                                     finish()
                                 }
                             }
@@ -1076,7 +1083,10 @@ class PlayerPeliculas : AppCompatActivity() {
                 userRef.child("castv").setValue(nuevoCastv)
                     .addOnSuccessListener {
                         Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
-                        val intent = Intent(this, Nosotros::class.java)
+                        supportFragmentManager.beginTransaction()
+                            .replace(R.id.fragment_container, NosotrosFragment()) // Asegúrate que este ID exista en el layout
+                            .addToBackStack(null) // Esto permite volver atrás con el botón de regreso
+                            .commit()
                         startActivity(intent)
                         finish()
                     }
@@ -1094,7 +1104,10 @@ class PlayerPeliculas : AppCompatActivity() {
                     "¡Ho! No tienes Saldo de CasTV para poder Alquilar",
                     Toast.LENGTH_LONG
                 ).show()
-                val intent = Intent(this, Nosotros::class.java)
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, NosotrosFragment()) // Asegúrate que este ID exista en el layout
+                    .addToBackStack(null) // Esto permite volver atrás con el botón de regreso
+                    .commit()
                 startActivity(intent)
                 finish()
             }

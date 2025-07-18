@@ -5,6 +5,7 @@ import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import com.creativem.fulltv.R
 
+/*
 class Tv : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -27,4 +28,4 @@ class Tv : FragmentActivity() {
         )
 
     }
-}
+}*/
