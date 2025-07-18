@@ -38,6 +38,7 @@ import android.widget.ListView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -123,6 +124,19 @@ class Main : FragmentActivity() {
             WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         )
+
+        // Manejo personalizado del botón atrás
+        onBackPressedDispatcher.addCallback(this) {
+            val fragmentActual = supportFragmentManager.findFragmentById(R.id.fragment_container)
+
+            if (supportFragmentManager.backStackEntryCount > 0) {
+                // Si hay fragmentos en la pila, retrocede normalmente
+                supportFragmentManager.popBackStack()
+            } else {
+                // Si no hay más fragmentos, mostrar el diálogo de confirmación
+                mostrarConfirmacionSalida()
+            }
+        }
 
         if (savedInstanceState == null) {
             navegarA(PeliculasFragment())
@@ -1218,18 +1232,7 @@ class Main : FragmentActivity() {
         publicidadDialog?.dismiss()
         publicidadDialog = null
     }
-    override fun onBackPressed() {
-        val fragmentActual = supportFragmentManager.findFragmentById(R.id.fragment_container)
 
-        // Si hay más de un fragmento en el stack, retrocede normalmente
-        if (supportFragmentManager.backStackEntryCount > 0) {
-            super.onBackPressed()
-            return
-        }
-
-        // Si estamos en el fragmento raíz o único, mostrar el diálogo
-        mostrarConfirmacionSalida()
-    }
     @SuppressLint("SetTextI18n")
     private fun mostrarConfirmacionSalida() {
         var segundosRestantes = 5
