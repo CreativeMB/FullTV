@@ -952,12 +952,11 @@ class Main : FragmentActivity() {
     private fun descargarActualizacion(versionRemota: String) {
         val versionLocal = BuildConfig.VERSION_NAME
 
-        if (esNuevaVersionDisponible(versionRemota, versionLocal))
-        {
-            // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
+        // ✅ Cambiar la lógica: si NO hay nueva versión, mostrar alerta
+        if (!esNuevaVersionDisponible(versionRemota, versionLocal)) {
             AlertDialog.Builder(this)
-                .setTitle("✅ Ya tienes la última versión (versión $versionRemota)")
-                .setMessage("No es necesario actualizar. Estás usando la (versión $versionRemota) más reciente de FullTV.")
+                .setTitle("✅ Ya tienes la última versión (versión $versionLocal)")
+                .setMessage("No es necesario actualizar. Estás usando la versión más reciente de FullTV.")
                 .setPositiveButton("Aceptar", null)
                 .show()
             return
@@ -1073,6 +1072,23 @@ class Main : FragmentActivity() {
             }
         })
     }
+
+    private fun esNuevaVersionDisponible(versionRemota: String, versionLocal: String): Boolean {
+        val remoteParts = versionRemota.split(".")
+        val localParts = versionLocal.split(".")
+
+        val maxLength = maxOf(remoteParts.size, localParts.size)
+
+        for (i in 0 until maxLength) {
+            val remote = remoteParts.getOrNull(i)?.toIntOrNull() ?: 0
+            val local = localParts.getOrNull(i)?.toIntOrNull() ?: 0
+
+            if (remote > local) return true
+            if (remote < local) return false
+        }
+        return false // Son iguales
+    }
+
     private fun simulateFinalProgress(
         progressBar: ProgressBar,
         texto: TextView,
@@ -1263,20 +1279,7 @@ class Main : FragmentActivity() {
 
         alertDialog.show()
     }
-    fun esNuevaVersionDisponible(versionRemota: String, versionLocal: String): Boolean {
-        val vRemota = versionRemota.split(".").map { it.toIntOrNull() ?: 0 }
-        val vLocal = versionLocal.split(".").map { it.toIntOrNull() ?: 0 }
 
-        val maxLength = maxOf(vRemota.size, vLocal.size)
-        val remotaPadded = vRemota + List(maxLength - vRemota.size) { 0 }
-        val localPadded = vLocal + List(maxLength - vLocal.size) { 0 }
 
-        for (i in 0 until maxLength) {
-            if (remotaPadded[i] > localPadded[i]) return true
-            if (remotaPadded[i] < localPadded[i]) return false
-        }
-
-        return false // Son iguales
-    }
 
 }
