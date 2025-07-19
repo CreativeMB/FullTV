@@ -115,15 +115,20 @@ class Login : AppCompatActivity() {
                 if (task.isSuccessful) {
                     val user = auth.currentUser
                     if (user != null) {
-                        val userRef = database.reference.child("usuarios").child(user.uid)
+                        val email = user.email
+                        if (email.isNullOrBlank()) {
+                            Toast.makeText(this, "Correo inválido", Toast.LENGTH_SHORT).show()
+                            return@addOnCompleteListener
+                        }
+
+                        val correoKey = email.replace(".", "_").replace("@", "_")
+                        val userRef = database.reference.child("usuarios").child(correoKey)
 
                         userRef.get().addOnSuccessListener { snapshot ->
                             val estado = snapshot.child("estado").getValue(String::class.java)
 
                             if (estado == "eliminado") {
-                                Log.w(TAG, "Cuenta eliminada detectada para ${user.email}. Cerrando sesión.")
-
-                                // Cerrar sesión inmediatamente
+                                Log.w(TAG, "Cuenta eliminada detectada para $email. Cerrando sesión.")
                                 FirebaseAuth.getInstance().signOut()
 
                                 Toast.makeText(
@@ -131,23 +136,20 @@ class Login : AppCompatActivity() {
                                     "Tu cuenta ha sido eliminada. No puedes volver a ingresar.",
                                     Toast.LENGTH_LONG
                                 ).show()
-
-                                // Opcional: mostrar diálogo o regresar al login
                                 return@addOnSuccessListener
                             }
 
-                            // Usuario válido: crear si no existe
+                            // Crear el usuario si no existe
                             CastvHelper.nuevosusuarios(
                                 context = this,
-                                userId = user.uid,
                                 nombre = user.displayName ?: "Usuario",
-                                email = user.email
+                                email = email
                             )
 
-
-                            val intent = Intent(this, Main::class.java)
-                            startActivity(intent)
+                            // Continuar a la app
+                            startActivity(Intent(this, Main::class.java))
                             finish()
+
                         }.addOnFailureListener {
                             Log.e(TAG, "Error al verificar estado del usuario", it)
                             Toast.makeText(this, "Error al validar tu cuenta.", Toast.LENGTH_SHORT).show()
@@ -168,14 +170,12 @@ class Login : AppCompatActivity() {
         auth.signInWithEmailAndPassword(defaultEmail, defaultPassword)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
-                    // Inicio de sesión como usuario predeterminado exitoso
                     Log.d(TAG, "signInAsDefaultUser:success")
                     Toast.makeText(this, "Ingresaste como invitado.", Toast.LENGTH_SHORT).show()
-                    val intent = Intent(this, Main::class.java)
-                    startActivity(intent)
+                    startActivity(Intent(this, Main::class.java))
                     finish()
                 } else {
-                    // Si falla, intenta crear el usuario predeterminado
+                    // Si falla el login, intentar crear la cuenta
                     auth.createUserWithEmailAndPassword(defaultEmail, defaultPassword)
                         .addOnCompleteListener { createTask ->
                             if (createTask.isSuccessful) {
@@ -186,23 +186,17 @@ class Login : AppCompatActivity() {
                                     Toast.LENGTH_SHORT
                                 ).show()
 
-                                // 🟢 Agregar a Realtime Database con Castv = 10
+                                // ✅ Agregar a Realtime Database como invitado
                                 val user = auth.currentUser
                                 if (user != null) {
-                                    val nombre = "Estas En Invitado"
-                                    val email = user.email
-                                    val userId = user.uid
                                     CastvHelper.nuevosusuarios(
                                         context = this,
-                                        userId = userId,
-                                        nombre = nombre,
-                                        email = email
+                                        nombre = "Estas En Invitado",
+                                        email = defaultEmail
                                     )
-
                                 }
 
-                                val intent = Intent(this, Main::class.java)
-                                startActivity(intent)
+                                startActivity(Intent(this, Main::class.java))
                                 finish()
                             } else {
                                 Log.w(TAG, "Error al crear usuario invitado.", createTask.exception)

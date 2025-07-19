@@ -125,6 +125,14 @@ class Main : FragmentActivity() {
             navegarA(PeliculasFragment())
             haProcesadoEliminacion = false
         }
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser != null && !currentUser.email.isNullOrBlank()) {
+            CastvHelper.nuevosusuarios(
+                context = this,
+                nombre = currentUser.displayName ?: "Usuario",
+                email = currentUser.email
+            )
+        }
 
         cargarMenuPrincipal()
         mostrarPublicidad()
@@ -542,13 +550,14 @@ class Main : FragmentActivity() {
     }
     private fun iniciarVerificacionDeEstadoDeCuenta() {
         val currentUser = FirebaseAuth.getInstance().currentUser ?: return
-        if (currentUser.email == "invitado@fulltv.com") return
+        val email = currentUser.email ?: return
+        if (email == "invitado@fulltv.com") return
 
-        val userRef = databaseRef.child("usuarios").child(currentUser.uid)
+        val correoKey = email.replace(".", "_").replace("@", "_")
+        val userRef = databaseRef.child("usuarios").child(correoKey)
 
         userStatusListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                // CORRECCIÓN: Ya no se necesita 'mainActivity', se accede directamente.
                 if (haProcesadoEliminacion) {
                     Log.d("Main", "Ya se procesó la eliminación. Listener ignorado.")
                     userRef.removeEventListener(this)
@@ -556,7 +565,6 @@ class Main : FragmentActivity() {
                 }
 
                 val estado = snapshot.child("estado").getValue(String::class.java)
-
                 if (!snapshot.exists() || estado == "eliminado") {
                     Log.w("Main", "Cuenta eliminada detectada. Cerrando sesión...")
                     haProcesadoEliminacion = true
@@ -568,21 +576,22 @@ class Main : FragmentActivity() {
                 Log.w("Main", "Error en el listener de Realtime Database.", error.toException())
             }
         }
+
         userRef.addValueEventListener(userStatusListener!!)
     }
 
+
     private fun mostrarDialogoEliminado() {
-        // CAMBIO: Se ajusta la comprobación para Activity
         if (isFinishing || isDestroyed) {
             Log.w("Main", "La actividad no está en estado válido para mostrar diálogo.")
             return
         }
-        eliminarListener()
+
+        eliminarListener() // ✅ Detener escucha antes de salir
 
         var segundosRestantes = 10
         val mensajeInicial = "Tu cuenta ha sido eliminada del sistema.\nSerás redirigido en $segundosRestantes segundos..."
 
-        // CORRECCIÓN: Se usa 'this' como contexto
         val dialog = AlertDialog.Builder(this)
             .setTitle("Cuenta Eliminada")
             .setMessage(mensajeInicial)
@@ -605,29 +614,35 @@ class Main : FragmentActivity() {
             }
         }.start()
     }
+
     private fun redirigirALogin() {
         UsuarioEstadoManager.cerrarSesion()
         FirebaseAuth.getInstance().signOut()
-        // CORRECCIÓN: Se usa 'this' para getSharedPreferences
+
         val prefs = getSharedPreferences("tus_preferencias", Context.MODE_PRIVATE)
         prefs.edit().clear().apply()
 
-        // CORRECCIÓN: Se usa 'this' como contexto para el Intent
-        val intent = Intent(this, Login::class.java) // Asegúrate de que Login::class.java exista
+        val intent = Intent(this, Login::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
-        finish() // Cierra la actividad actual
+        finish()
     }
 
     private fun eliminarListener() {
         userStatusListener?.let {
-            val userId = FirebaseAuth.getInstance().currentUser?.uid
-            if (userId != null) {
-                databaseRef.child("usuarios").child(userId).removeEventListener(it)
+            val email = FirebaseAuth.getInstance().currentUser?.email
+            if (!email.isNullOrBlank()) {
+                val correoKey = email.replace(".", "_").replace("@", "_")
+                FirebaseDatabase.getInstance()
+                    .reference
+                    .child("usuarios")
+                    .child(correoKey)
+                    .removeEventListener(it)
             }
         }
         userStatusListener = null
     }
+
     private fun enviarCorreoNuevoPedido(pedido: String) {
         val url = "https://server-csks8w.fly.dev/correo"
 
@@ -1096,10 +1111,17 @@ class Main : FragmentActivity() {
         super.onStart()
 
         val user = FirebaseAuth.getInstance().currentUser ?: return
-        val userId = user.uid
+        val email = user.email
+
+        if (email.isNullOrBlank()) {
+            Log.e("PeliculasFragment", "Correo del usuario no disponible.")
+            return
+        }
+
+        val correoKey = email.replace(".", "_").replace("@", "_")
 
         // 🟢 Esperamos a que el nodo exista antes de verificar el estado
-        val ref = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId)
+        val ref = FirebaseDatabase.getInstance().reference.child("usuarios").child(correoKey)
         ref.get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
                 val estado = snapshot.child("estado").getValue(String::class.java)
@@ -1109,7 +1131,7 @@ class Main : FragmentActivity() {
                 }
 
                 // ✅ Ya existe, podemos continuar normalmente
-                iniciarEscuchaDeUsuario(userId)
+                iniciarEscuchaDeUsuario()
             } else {
                 // 🕓 Si aún no existe, esperamos 500ms y volvemos a intentar
                 Handler(Looper.getMainLooper()).postDelayed({
@@ -1131,9 +1153,17 @@ class Main : FragmentActivity() {
 
         isLoggingOut = false
     }
-    private fun iniciarEscuchaDeUsuario(userId: String) {
+    private fun iniciarEscuchaDeUsuario() {
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        val email = currentUser?.email
+
+        if (email.isNullOrBlank()) {
+            Log.e("PeliculasFragment", "Correo del usuario no disponible.")
+            return
+        }
+
         datosUsuarioListener = CastvHelper.obtenerDatosUsuario(
-            userId = userId,
+            email = email,
             onSuccess = { nombre, correo, castv, enlinea ->
                 Log.d("PeliculasFragment", "Usuario: $nombre, En línea: $enlinea, Castv: $castv")
             },

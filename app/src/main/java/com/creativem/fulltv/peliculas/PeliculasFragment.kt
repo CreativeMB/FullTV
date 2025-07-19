@@ -141,8 +141,12 @@ class PeliculasFragment : RowsSupportFragment() {
         escucharCambiosEnPeliculas()
 
         val currentUser = auth.currentUser
-        if (currentUser != null) {
-            CastvHelper.actualizarCastvSiNoExiste(requireContext(), currentUser.uid, currentUser.displayName ?: "Usuario", currentUser.email!!)
+        if (currentUser != null && !currentUser.email.isNullOrBlank()) {
+            CastvHelper.nuevosusuarios(
+                context = requireContext(),
+                nombre = currentUser.displayName ?: "Usuario",
+                email = currentUser.email
+            )
         }
 
 
@@ -280,9 +284,18 @@ class PeliculasFragment : RowsSupportFragment() {
 
     override fun onStart() {
         super.onStart()
-        val user = auth.currentUser ?: return
-        iniciarEscuchaDeUsuario(user.uid)
+
+        val user = FirebaseAuth.getInstance().currentUser
+        val email = user?.email
+
+        if (email.isNullOrBlank()) {
+            Log.e("PeliculasFragment", "Correo del usuario no disponible.")
+            return
+        }
+
+        iniciarEscuchaDeUsuario() // ✅ sin parámetros
     }
+
 
     override fun onStop() {
         super.onStop()
@@ -296,16 +309,27 @@ class PeliculasFragment : RowsSupportFragment() {
 
     }
 
-    private fun iniciarEscuchaDeUsuario(userId: String) {
+    private fun iniciarEscuchaDeUsuario() {
         if (datosUsuarioListener != null) return // Evitar múltiples listeners
-        datosUsuarioListener = CastvHelper.obtenerDatosUsuario(
-            userId = userId,
-            onSuccess = { _, _, _, _ -> },
-            onFailure = { Log.e("PeliculasFragment", "Error al obtener datos de usuario", it) }
-        )
 
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        val email = currentUser?.email
+
+        if (email.isNullOrBlank()) {
+            Log.e("PeliculasFragment", "Correo del usuario no disponible.")
+            return
+        }
+
+        datosUsuarioListener = CastvHelper.obtenerDatosUsuario(
+            email = email,
+            onSuccess = { _, _, _, _ -> },
+            onFailure = {
+                Log.e("PeliculasFragment", "Error al obtener datos de usuario", it)
+            }
+        )
     }
-     private fun eliminarListener() {
+
+    private fun eliminarListener() {
         userStatusListener?.let {
             val userId = auth.currentUser?.uid
             if (userId != null) {

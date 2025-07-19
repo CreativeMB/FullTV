@@ -8,6 +8,7 @@ import com.google.firebase.Timestamp
 data class Movie(
     val id: String = "",
     val title: String = "",
+    val correo: String = "",
     val originalTitle: String = "",
     val imageUrl: String = "",
     val streamUrl: String = "",

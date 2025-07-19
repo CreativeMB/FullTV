@@ -802,7 +802,7 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
     @SuppressLint("SetTextI18n")
-    private fun showErrorDialog(movieTitle: String, movieCastv: Int, userId: String) {
+    private fun showErrorDialog(movieTitle: String, movieCastv: Int, correoUsuario: String) {
         val dialogView = layoutInflater.inflate(R.layout.player_alerdialogo, null)
         val messageText = dialogView.findViewById<TextView>(R.id.messageText)
         val linkNosotros = dialogView.findViewById<TextView>(R.id.linkNosotros)
@@ -846,26 +846,40 @@ class PlayerPeliculas : AppCompatActivity() {
 
         messageText.text = spannable
 
-        // 🔄 Reemplazar datos reales al obtenerlos desde Realtime DB
-        CastvHelper.obtenerDatosUsuario(
-            userId,
-            onSuccess = { nombre, correo, castv, _ ->
-                val usuarioIndex = spannable.indexOf("Usuario: Consultando...")
-                if (usuarioIndex != -1) {
-                    spannable.replace(usuarioIndex, usuarioIndex + "Usuario: Consultando...".length, "Usuario: $nombre")
-                }
+        val correoUsuario = FirebaseAuth.getInstance().currentUser?.email ?: ""
 
-                val saldoIndex = spannable.indexOf("Saldo actual: Consultando...")
-                if (saldoIndex != -1) {
-                    spannable.replace(saldoIndex, saldoIndex + "Saldo actual: Consultando...".length, "Saldo actual: $castv CasTV")
-                }
+        if (correoUsuario.isNotEmpty()) {
+            CastvHelper.obtenerDatosUsuario(
+                correoUsuario,
+                onSuccess = { nombre, correo, castv, _ ->
+                    val usuarioIndex = spannable.indexOf("Usuario: Consultando...")
+                    if (usuarioIndex != -1) {
+                        spannable.replace(
+                            usuarioIndex,
+                            usuarioIndex + "Usuario: Consultando...".length,
+                            "Usuario: $nombre"
+                        )
+                    }
 
-                messageText.text = spannable
-            },
-            onFailure = { e ->
-                Log.e("Error", "Error obteniendo datos del usuario: ${e.message}")
-            }
-        )
+                    val saldoIndex = spannable.indexOf("Saldo actual: Consultando...")
+                    if (saldoIndex != -1) {
+                        spannable.replace(
+                            saldoIndex,
+                            saldoIndex + "Saldo actual: Consultando...".length,
+                            "Saldo actual: $castv CasTV"
+                        )
+                    }
+
+                    messageText.text = spannable
+                },
+                onFailure = { e ->
+                    Log.e("CastvHelper", "❌ Error obteniendo datos del usuario: ${e.message}")
+                }
+            )
+        } else {
+            Log.e("CastvHelper", "⚠️ Correo del usuario es nulo o vacío")
+        }
+
 
         // Botones
         linkNosotros.text = "Más información aquí"

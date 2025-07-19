@@ -63,28 +63,38 @@ class HeaderPresenter : Presenter() {
             return
         }
 
-        // Obtener datos del usuario
-        CastvHelper.obtenerDatosUsuario(
-            userId = usuarioId,
-            onSuccess = { nombre, correo, castv, enlinea ->
-                textUsuario.text = "\uD83E\uDDD1 $nombre" + if (enlinea) " 🟢" else " 🔴"
+        // Obtener el correo del usuario autenticado
+        val usuarioEmail = FirebaseAuth.getInstance().currentUser?.email
 
-                // Obtener cantidad de películas
-                firestore.collection("movies")
-                    .get()
-                    .addOnSuccessListener { result ->
-                        val cantidadPeliculas = result.size()
-                        textCastv.text = "🎬 Películas: $cantidadPeliculas | ⭐ Castv: $castv"
-                    }
-                    .addOnFailureListener {
-                        textCastv.text = "🎬 Películas: 0 | ⭐ Castv: $castv"
-                    }
-            },
-            onFailure = {
-                textUsuario.text = "Usuario desconocido"
-                textCastv.text = "🎬 Películas: 0 | ⭐ Castv: 0"
-            }
-        )
+        if (!usuarioEmail.isNullOrBlank()) {
+            // Obtener datos del usuario desde el correo
+            CastvHelper.obtenerDatosUsuario(
+                email = usuarioEmail,
+                onSuccess = { nombre, correo, castv, enlinea ->
+                    textUsuario.text = "\uD83E\uDDD1 $nombre" + if (enlinea) " 🟢" else " 🔴"
+
+                    // Obtener cantidad de películas desde Firestore
+                    firestore.collection("movies")
+                        .get()
+                        .addOnSuccessListener { result ->
+                            val cantidadPeliculas = result.size()
+                            textCastv.text = "🎬 Películas: $cantidadPeliculas | ⭐ Castv: $castv"
+                        }
+                        .addOnFailureListener {
+                            textCastv.text = "🎬 Películas: 0 | ⭐ Castv: $castv"
+                        }
+                },
+                onFailure = {
+                    textUsuario.text = "Usuario desconocido"
+                    textCastv.text = "🎬 Películas: 0 | ⭐ Castv: 0"
+                }
+            )
+        } else {
+            // No se pudo obtener el correo
+            textUsuario.text = "Usuario no autenticado"
+            textCastv.text = "🎬 Películas: 0 | ⭐ Castv: 0"
+        }
+
 
         // Foto del usuario
         val photoUrl = usuario.photoUrl

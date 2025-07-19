@@ -200,12 +200,12 @@ class CastvFragment : Fragment() {
             }
     }
 
-    private fun llamarEliminacionEnFly(userId: String) {
+    private fun llamarEliminacionEnFly(email: String) {
         val url = "https://server-csks8w.fly.dev/eliminar-usuario"
-        Log.d("FlyServer", "Preparando solicitud a $url con UID: $userId")
+        Log.d("FlyServer", "Preparando solicitud a $url con email: $email")
 
         val json = JSONObject().apply {
-            put("uid", userId)
+            put("email", email)
         }
 
         Log.d("FlyServer", "Cuerpo JSON a enviar: $json")
@@ -238,6 +238,7 @@ class CastvFragment : Fragment() {
         Log.d("FlyServer", "Enviando solicitud POST a $url...")
         Volley.newRequestQueue(requireContext()).add(request)
     }
+
 
 
 
