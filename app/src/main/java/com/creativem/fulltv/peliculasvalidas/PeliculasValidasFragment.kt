@@ -34,14 +34,8 @@ class PeliculasValidasFragment : RowsSupportFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Manejador al hacer clic en un ítem
-        setOnItemViewClickedListener { _, item, _, _ ->
-            val movie = item as? Movie
-            if (movie != null) {
-                // Aquí puedes abrir la actividad para reproducir la película, por ejemplo.
-            }
-        }
-
+        // Manejador al hacer clic en un ítem (usa la clase que sí tiene navegación)
+        setOnItemViewClickedListener(ItemViewClickedListener())
         // Manejador al seleccionar un ítem (para cambiar el fondo)
         setOnItemViewSelectedListener { _, item, _, _ ->
             val movie = item as? Movie

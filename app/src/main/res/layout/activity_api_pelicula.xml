@@ -163,14 +163,6 @@
                 android:layout_marginTop="8dp"
                 android:orientation="vertical">
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="🎬 Películas en cartelera casTV $50 para Alquilar"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:textColor="@android:color/white" />
-
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/peliscartelera"
                     android:layout_width="match_parent"
@@ -189,7 +181,7 @@
         android:id="@+id/backgroundImageView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:alpha="0.2"
+        android:alpha="0.1"
         android:scaleType="centerCrop"
         android:visibility="visible" />
 </FrameLayout>

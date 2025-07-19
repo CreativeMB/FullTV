@@ -43,7 +43,6 @@ import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.creativem.fulltv.R
-import com.creativem.fulltv.peliculasvalidas.PeliculasMenuAdapter
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -79,9 +78,10 @@ import androidx.media3.common.util.UnstableApi
 import androidx.recyclerview.widget.RecyclerView
 import java.util.concurrent.TimeUnit
 import com.android.volley.Request
+import com.creativem.fulltv.peliculasvalidas.PeliculasMenuAdapter
 import com.creativem.fulltv.principal.CastvHelper
-import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Nosotros
+
 
 
 import com.google.firebase.database.FirebaseDatabase
@@ -317,7 +317,7 @@ class PlayerPeliculas : AppCompatActivity() {
         }
     }
 
-        private fun mostarpelis() {
+    private fun mostarpelis() {
         val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
 
         if (menuAbierto) {
@@ -338,46 +338,37 @@ class PlayerPeliculas : AppCompatActivity() {
         }
     }
 
+
     private fun initializeRecyclerView() {
-        // Crear el adaptador inicialmente con una lista vacía
+        // Instancia el adaptador con callback al hacer clic en una película
         adapter = PeliculasMenuAdapter(mutableListOf()) { movie ->
             startMoviePlayback(movie.streamUrl, movie.title, movie.castv, movie.imageUrl)
         }
 
-
+        // Busca el RecyclerView del layout
         val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
 
-        menuPelis.layoutManager = LinearLayoutManager(
-            this@PlayerPeliculas,
-            LinearLayoutManager.HORIZONTAL,
-            false
-        )
-
+        // Configura el RecyclerView horizontal
+        menuPelis.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         menuPelis.adapter = adapter
 
-
-        // Cargar las películas desde Firestore
+        // Carga las películas válidas
         loadMovies()
     }
 
-
-
     private fun loadMovies() {
         CoroutineScope(Dispatchers.Main).launch {
-            // Usamos las que ya fueron cargadas y validadas previamente
-            val peliculasOrdenadasValidas = Validacioneslista.obtenerPeliculasValidas()
-            val peliculasInvalidas = Validacioneslista.obtenerPeliculasInvalidas()
+            Validacioneslista.esperarCarga()
+            val peliculasValidas = Validacioneslista.obtenerPeliculasValidas()
 
-            // Log para verificar
-            Log.d(
-                "MoviesData",
-                "Películas válidas ordenadas: ${peliculasOrdenadasValidas.size}, Películas inválidas: ${peliculasInvalidas.size}"
-            )
-
-            // Actualizar el adaptador
-            adapter.updateMovies(peliculasOrdenadasValidas)
+            if (peliculasValidas.isNotEmpty()) {
+                adapter.updateMovies(peliculasValidas)
+            } else {
+                Toast.makeText(this@PlayerPeliculas, "No hay películas válidas", Toast.LENGTH_SHORT).show()
+            }
         }
     }
+
     // Método que llama al repositorio de Firestore para validar la URL
     private suspend fun isUrlValidInFirestore(url: String?): Boolean {
         // Verifica si la URL está vacía o es nula

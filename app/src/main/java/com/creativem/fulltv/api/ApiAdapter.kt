@@ -1,6 +1,4 @@
-package com.creativem.fulltv.peliculasvalidas
-
-import android.graphics.Color
+package com.creativem.fulltv.api
 import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
@@ -11,13 +9,14 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
-import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Movie
+import android.graphics.Color
+import com.creativem.fulltv.principal.Main
 
-class PeliculasMenuAdapter(
+class ApiAdapter(
     private val movieList: MutableList<Movie>,
     private val onMovieClick: (Movie) -> Unit
-) : RecyclerView.Adapter<PeliculasMenuAdapter.SmallMovieViewHolder>() {
+) : RecyclerView.Adapter<ApiAdapter.SmallMovieViewHolder>() {
 
     private var selectedPosition = RecyclerView.NO_POSITION
 
@@ -52,14 +51,17 @@ class PeliculasMenuAdapter(
                 if (position != RecyclerView.NO_POSITION) {
                     val movie = movieList[position]
 
+                    // 🔄 Fondo dinámico
                     if (!movie.imageUrl.isNullOrEmpty()) {
                         (view.context as? Main)?.setFondoDesdeUrl(movie.imageUrl)
                     } else {
                         (view.context as? Main)?.restaurarFondoAnimado()
                     }
 
+                    // 🔁 Ejecutar callback
                     onMovieClick(movie)
 
+                    // 🔁 Marcar como seleccionado visualmente
                     notifyItemChanged(selectedPosition)
                     selectedPosition = position
                     notifyItemChanged(selectedPosition)
@@ -70,25 +72,17 @@ class PeliculasMenuAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SmallMovieViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_menu_peliculas_validas, parent, false).apply {
-                // Margen opcional para separar ítems
-                val layoutParams = ViewGroup.MarginLayoutParams(layoutParams)
-                layoutParams.setMargins(8, 8, 8, 8)
-                this.layoutParams = layoutParams
-            }
-
+            .inflate(R.layout.item_menu_peliculas_validas, parent, false)
         return SmallMovieViewHolder(view)
     }
 
     override fun onBindViewHolder(holder: SmallMovieViewHolder, position: Int) {
         val movie = movieList[position]
 
-        // Etiqueta
-        holder.etiquetaValida.text = "Gratis ✅"
-        holder.etiquetaValida.setBackgroundColor(Color.parseColor("#006064"))
+        holder.etiquetaValida.text = "Alquilar $50💳"
+        holder.etiquetaValida.setBackgroundColor(Color.parseColor("#880E4F"))
         holder.etiquetaValida.visibility = View.VISIBLE
 
-        // Título
         holder.movieTitle.apply {
             text = movie.title
             textSize = 18f
@@ -102,7 +96,6 @@ class PeliculasMenuAdapter(
             setHorizontallyScrolling(true)
         }
 
-        // Imagen
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
             .placeholder(R.drawable.pelifondo)

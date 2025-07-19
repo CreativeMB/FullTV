@@ -1,18 +1,12 @@
 package com.creativem.fulltv.api
 
 import android.content.Intent
-import android.graphics.Matrix
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.TransitionDrawable
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
-import android.widget.ImageView
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -20,7 +14,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
 
 import com.creativem.fulltv.menu.MenuSuperiorAdapter
-import com.creativem.fulltv.peliculasvalidas.PeliculasMenuAdapter
 import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Movie
 import com.google.firebase.Timestamp
@@ -34,7 +27,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 class PeliculasApiFragment : Fragment() {
     private lateinit var recyclerView: RecyclerView
-    private lateinit var adapter: PeliculasMenuAdapter
+    private lateinit var adapter: ApiAdapter
     private lateinit var apiService: TMDbApiService
     private val apiKey = "678193d2c735c6f37840cee035f4d69a"
     private var layoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
@@ -87,7 +80,7 @@ class PeliculasApiFragment : Fragment() {
             }
         }
 
-        adapter = PeliculasMenuAdapter(mutableListOf()) { movie ->
+        adapter = ApiAdapter(mutableListOf()) { movie ->
 
             val intent = Intent(requireContext(), ApiPeliculaActivity::class.java).apply {
                 putExtra("EXTRA_STREAM_URL", movie.streamUrl)

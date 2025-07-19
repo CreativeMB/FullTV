@@ -1,5 +1,6 @@
 package com.creativem.fulltv.api
 
+import android.graphics.Color
 import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
@@ -21,6 +22,7 @@ class PelisCarteleraAdapter(
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val poster: ImageView = view.findViewById(R.id.itemPoster)
         val title: TextView = view.findViewById(R.id.itemTitle)
+        val etiquetaValida: TextView = view.findViewById(R.id.etiqueta)
 
         init {
             view.setOnClickListener {
@@ -60,6 +62,10 @@ class PelisCarteleraAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val movie = items[position]
+        holder.etiquetaValida.text = "Alquilar $50💳"
+        holder.etiquetaValida.setBackgroundColor(Color.parseColor("#880E4F"))
+        holder.etiquetaValida.visibility = View.VISIBLE
+
         holder.title.apply {
             text = movie.title
             textSize = 16f
