@@ -8,6 +8,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 
 object CastvHelper {
@@ -62,6 +63,9 @@ object CastvHelper {
                 userRef.setValue(user)
                     .addOnSuccessListener {
                         Log.d(TAG, "✅ Usuario creado correctamente en Realtime DB.")
+                        // ✅ Configurar onDisconnect justo después de crear el usuario
+                        userRef.child("enlinea").onDisconnect().setValue(false)
+                        userRef.child("ultimaConexion").onDisconnect().setValue(ServerValue.TIMESTAMP)
                     }
                     .addOnFailureListener { e ->
                         Log.e(TAG, "❌ Error al crear usuario", e)

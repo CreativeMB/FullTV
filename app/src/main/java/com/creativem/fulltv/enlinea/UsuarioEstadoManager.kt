@@ -9,22 +9,24 @@ object UsuarioEstadoManager {
     private const val TAG = "UsuarioEstadoManager"
     private var isOnlineAlreadySet = false
 
-    // ✅ Se llama desde ActivityLifecycleHandler para marcar en línea o fuera de línea
-    fun marcarUsuarioEnLineaDesdeApp(enLinea: Boolean) {
-        marcarUsuarioEnLinea(enLinea)
+    // 🔐 Codifica el correo como clave segura para Firebase
+    private fun codificarCorreo(correo: String): String {
+        return correo.replace(".", "_").replace("@", "_")
     }
 
-    private fun marcarUsuarioEnLinea(enLinea: Boolean) {
+    fun marcarUsuarioEnLineaDesdeApp(enLinea: Boolean) {
         val user = FirebaseAuth.getInstance().currentUser ?: return
-        val userId = user.uid
-        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(userId)
+        val correo = user.email ?: return
+        val correoKey = codificarCorreo(correo)
 
-        Log.d(TAG, "🔄 marcarUsuarioEnLinea llamado con enLinea=$enLinea para UID=$userId")
+        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
+
+        Log.d(TAG, "🔄 marcarUsuarioEnLinea llamado con enLinea=$enLinea para usuario: $correoKey")
 
         userRef.get().addOnSuccessListener { snapshot ->
             val estado = snapshot.child("estado").getValue(String::class.java)
             if (!snapshot.exists() || estado == "eliminado") {
-                Log.w(TAG, "Usuario no existe o está eliminado. No se actualiza enlinea.")
+                Log.w(TAG, "⚠️ Usuario no existe o está eliminado. No se actualiza 'enlinea'.")
                 return@addOnSuccessListener
             }
 
@@ -33,12 +35,21 @@ object UsuarioEstadoManager {
                     Log.d(TAG, "🟡 Ya estaba en línea. No se repite escritura.")
                     return@addOnSuccessListener
                 }
+
                 isOnlineAlreadySet = true
+
+                // Configura la desconexión automática
+                userRef.child("enlinea").onDisconnect().setValue(false)
+                userRef.child("ultimaConexion").onDisconnect().setValue(ServerValue.TIMESTAMP)
+
+                // Marca como en línea ahora
                 userRef.child("enlinea").setValue(true)
-                Log.d(TAG, "✅ Usuario marcado EN LÍNEA")
+                Log.d(TAG, "✅ Usuario marcado EN LÍNEA y onDisconnect configurado")
+
             } else {
                 isOnlineAlreadySet = false
                 userRef.child("enlinea").setValue(false)
+                userRef.child("ultimaConexion").setValue(ServerValue.TIMESTAMP)
                 Log.d(TAG, "⛔ Usuario marcado FUERA DE LÍNEA")
             }
 
@@ -47,24 +58,26 @@ object UsuarioEstadoManager {
         }
     }
 
-
-    // 🔴 Llamar esta función desde tu opción de cerrar sesión
     fun cerrarSesion() {
         val user = FirebaseAuth.getInstance().currentUser ?: return
-        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(user.uid)
+        val correo = user.email ?: return
+        val correoKey = codificarCorreo(correo)
+
+        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
 
         userRef.get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
                 userRef.child("enlinea").setValue(false).addOnCompleteListener {
-                    Log.d(TAG, "Cerrar sesión: usuario ${user.uid} marcado como 'false' en 'enlinea'.")
+                    userRef.child("ultimaConexion").setValue(ServerValue.TIMESTAMP)
+                    Log.d(TAG, "🔒 Usuario marcado fuera de línea al cerrar sesión.")
                     finalizarCierreDeSesion()
                 }
             } else {
-                Log.w(TAG, "Cerrar sesión: El usuario ${user.uid} no existe en la DB.")
+                Log.w(TAG, "⚠️ Usuario no encontrado en la base de datos.")
                 finalizarCierreDeSesion()
             }
         }.addOnFailureListener {
-            Log.e(TAG, "Cerrar sesión: Error al comprobar la existencia del usuario.", it)
+            Log.e(TAG, "❌ Error al acceder al usuario al cerrar sesión", it)
             finalizarCierreDeSesion()
         }
     }
@@ -72,6 +85,6 @@ object UsuarioEstadoManager {
     private fun finalizarCierreDeSesion() {
         isOnlineAlreadySet = false
         FirebaseAuth.getInstance().signOut()
-        Log.d(TAG, "Sesión cerrada correctamente.")
+        Log.d(TAG, "👋 Sesión cerrada correctamente.")
     }
 }
