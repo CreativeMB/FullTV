@@ -1,13 +1,10 @@
 package com.creativem.fulltv.peliculas
 
 // ... (todas tus importaciones necesarias van aquí, he incluido las más importantes)
-import android.app.AlertDialog
-import android.app.DownloadManager
-import android.content.Context
+
 import android.content.Intent
 import android.content.res.Resources
 import android.graphics.drawable.GradientDrawable
-import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -15,33 +12,27 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.Toast
-import androidx.core.content.FileProvider
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
-import com.android.volley.Response
-import com.android.volley.toolbox.JsonObjectRequest
-import com.android.volley.toolbox.Volley
-import com.creativem.fulltv.BuildConfig
-import com.creativem.fulltv.principal.CastvHelper
+import com.bumptech.glide.Glide
+import com.creativem.fulltv.R
 import com.creativem.fulltv.api.ApiPeliculaActivity
-import com.creativem.fulltv.principal.Main
+import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Movie
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.io.File
 
 
 class PeliculasFragment : RowsSupportFragment() {
@@ -51,27 +42,34 @@ class PeliculasFragment : RowsSupportFragment() {
 
 
 
-
-    private lateinit var mainBackgroundImage: ImageView
-
     // --- Firebase & Estado ---
     private val db = FirebaseFirestore.getInstance()
     private lateinit var auth: FirebaseAuth
     private val databaseRef by lazy { FirebaseDatabase.getInstance().reference }
     private var datosUsuarioListener: ValueEventListener? = null
     private var userStatusListener: ValueEventListener? = null
-    private var isLoggingOut = false
-    private var versionRemotaGlobal: String? = null
 
 
     // --- Fondo Animado ---
-    private var fondoActual: GradientDrawable? = null
+
     private val handler = Handler(Looper.getMainLooper())
     private var fondoAnimando = false
-    private var matrizX = 0f
-    private var direccion = 1
     private var colorIndex = 0
+    private lateinit var fondoDinamico: ImageView
 
+    private val coloresFluorescentes = listOf(
+        intArrayOf(0x66FF5E3A.toInt(), 0x66FF2D55.toInt()), // verde claro a fucsia
+        intArrayOf(0x6690EE90.toInt(), 0x66DA70D6.toInt()), // verde pastel a violeta claro
+        intArrayOf(0x66FFD700.toInt(), 0x66FF69B4.toInt()), // dorado a rosa
+        intArrayOf(0x6640E0D0.toInt(), 0x66FF1493.toInt()), // turquesa a fucsia
+        intArrayOf(0x66ADD8E6.toInt(), 0x668A2BE2.toInt()), // celeste a violeta
+        intArrayOf(0x66FF4500.toInt(), 0x66DAA520.toInt()), // naranja fuerte a dorado suave
+        intArrayOf(0x664682B4.toInt(), 0x66E6E6FA.toInt()), // azul acero a lavanda
+        intArrayOf(0x66FF7F50.toInt(), 0x6600CED1.toInt()), // coral a azul claro
+        intArrayOf(0x66DC143C.toInt(), 0x669370DB.toInt()), // rojo rubí a lila
+        intArrayOf(0x66B0E0E6.toInt(), 0x66BA55D3.toInt())
+
+    )
 
 
     override fun onCreateView(
@@ -79,11 +77,29 @@ class PeliculasFragment : RowsSupportFragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        val view = super.onCreateView(inflater, container, savedInstanceState)
-
+        val fragmentRoot = FrameLayout(requireContext())
         auth = FirebaseAuth.getInstance()
+        // Creamos el fondo dinámico
+        fondoDinamico = ImageView(requireContext()).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            alpha = 0.6f
+        }
 
-        return view
+        // Inflamos el contenido del fragmento
+        val rowsView = super.onCreateView(inflater, container, savedInstanceState)
+
+        // Agregamos primero el fondo, luego el contenido encima
+        fragmentRoot.addView(fondoDinamico)
+        fragmentRoot.addView(rowsView)
+
+        setDefaultBackground()
+
+
+        return fragmentRoot
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -92,6 +108,8 @@ class PeliculasFragment : RowsSupportFragment() {
             Validacioneslista.cargarPeliculas()
             withContext(Dispatchers.Main) {
                 actualizarSoloEtiquetas()
+                setDefaultBackground() // Para que siempre inicie con fondo animado
+
             }
         }
 
@@ -103,23 +121,58 @@ class PeliculasFragment : RowsSupportFragment() {
         }
 
         setOnItemViewSelectedListener { _, item, _, _ ->
-            if (item is Movie) {
-                // Llama al método de la Activity para la imagen de la película
-                (activity as? Main)?.updateBackground(item.imageUrl)
-            } else {
-                // Llama al método de la Activity para el fondo por defecto
-                (activity as? Main)?.setDefaultBackground()
-            }
+            val movie = item as? Movie
+            if (movie != null && !movie.imageUrl.isNullOrEmpty()) {
+                handler.removeCallbacksAndMessages(null)
+                fondoAnimando = false
 
+                Glide.with(requireContext())
+                    .load(movie.imageUrl)
+                    .error(R.drawable.icono)
+                    .into(fondoDinamico)
+
+                fondoDinamico.alpha = 0.6f
+                fondoDinamico.scaleType = ImageView.ScaleType.CENTER_CROP
+            } else {
+                setDefaultBackground()
+            }
         }
-        (activity as? Main)?.setDefaultBackground()
+
         escucharCambiosEnPeliculas()
-        // Carga inicial
+
         val currentUser = auth.currentUser
         if (currentUser != null) {
             CastvHelper.actualizarCastvSiNoExiste(requireContext(), currentUser.uid, currentUser.displayName ?: "Usuario", currentUser.email!!)
         }
 
+
+    }
+    fun setDefaultBackground() {
+        if (fondoAnimando) return
+        fondoAnimando = true
+        handler.removeCallbacksAndMessages(null)
+
+        fun cambiarColores() {
+            val colores = coloresFluorescentes[colorIndex % coloresFluorescentes.size]
+            colorIndex++
+            val nuevoFondo = GradientDrawable(GradientDrawable.Orientation.TL_BR, colores).apply {
+                gradientType = GradientDrawable.LINEAR_GRADIENT
+            }
+            fondoDinamico.setImageDrawable(nuevoFondo)
+            fondoDinamico.apply {
+                alpha = 0.9f
+                scaleType = ImageView.ScaleType.MATRIX
+            }
+        }
+
+        cambiarColores()
+
+        handler.postDelayed(object : Runnable {
+            override fun run() {
+                cambiarColores()
+                handler.postDelayed(this, 1500)
+            }
+        }, 1500)
     }
 
     // --- Métodos de Carga de Películas ---
@@ -211,17 +264,6 @@ class PeliculasFragment : RowsSupportFragment() {
         }
     }
 
-    // --- Métodos de UI (Fondo y Carga) ---
-
-    /*private fun mostrarCarga(mensaje: String = "Cargando...") {
-        (activity as? Main)?.showLoading(mensaje)
-    }
-
-    private fun ocultarCarga() {
-        (activity as? Main)?.hideLoading()
-    }*/
-
-
 
     private fun irAlReproductor(movie: Movie) {
         val intent = Intent(requireContext(), ApiPeliculaActivity::class.java).apply {
@@ -235,70 +277,6 @@ class PeliculasFragment : RowsSupportFragment() {
         }
         startActivity(intent)
     }
-
-    // --- Lógica de Pedidos y Pagos (Reintegrada) ---
-
-    private fun subirPedidoAFirestore(pedido: String) {
-        val userId = auth.currentUser?.uid ?: return
-        val userRef = databaseRef.child("usuarios").child(userId)
-
-        userRef.get().addOnSuccessListener { snapshot ->
-            if (!snapshot.exists()) {
-                Toast.makeText(requireContext(), "Usuario no encontrado", Toast.LENGTH_SHORT).show()
-                return@addOnSuccessListener
-            }
-            val nombreUsuario = snapshot.child("nombre").getValue(String::class.java) ?: "N/A"
-            val emailUsuario = snapshot.child("correo").getValue(String::class.java) ?: "N/A"
-            val castvActual = snapshot.child("castv").getValue(Int::class.java) ?: 0
-            val puntosDescontar = 20
-
-            if (castvActual >= puntosDescontar) {
-                val mensaje = "Confirmas el pedido de '$pedido' por $puntosDescontar CasTV?"
-                AlertDialog.Builder(requireContext())
-                    .setTitle("Confirmar Pedido")
-                    .setMessage(mensaje)
-                    .setPositiveButton("Confirmar") { _, _ ->
-                        val pedidoData = hashMapOf(
-                            "title" to pedido, "userId" to userId, "email" to emailUsuario,
-                            "nombre" to nombreUsuario, "CasTV" to puntosDescontar.toString()
-                        )
-                        db.collection("pedidosmovies").add(pedidoData)
-                            .addOnSuccessListener {
-                                descontarPuntos(userId, puntosDescontar)
-                                enviarCorreoNuevoPedido(pedido)
-                            }
-                            .addOnFailureListener { e ->
-                                Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                    }
-                    .setNegativeButton("Cancelar", null).show()
-            } else {
-                Toast.makeText(requireContext(), "No tienes suficientes puntos", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    private fun descontarPuntos(userId: String, puntosADescontar: Int) {
-        val userRef = databaseRef.child("usuarios").child(userId)
-        userRef.child("castv").setValue(ServerValue.increment(-puntosADescontar.toLong()))
-            .addOnSuccessListener {
-                Toast.makeText(requireContext(), "Pedido enviado y CasTV descontado", Toast.LENGTH_SHORT).show()
-            }
-    }
-
-    private fun enviarCorreoNuevoPedido(pedido: String) {
-        val url = "https://server-csks8w.fly.dev/correo"
-        val jsonBody = JSONObject().put("titulo", pedido)
-        val requestQueue = Volley.newRequestQueue(requireContext())
-        val jsonRequest = object : JsonObjectRequest(Method.POST, url, jsonBody,
-            Response.Listener { Log.d("Email", "Correo enviado: $it") },
-            Response.ErrorListener { Log.e("Email", "Error correo: ${it.message}") }
-        ) { override fun getBodyContentType() = "application/json; charset=utf-8" }
-        requestQueue.add(jsonRequest)
-    }
-
-
-    // --- Ciclo de Vida y Estado de Usuario ---
 
     override fun onStart() {
         super.onStart()

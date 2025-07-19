@@ -93,24 +93,6 @@ class Main : FragmentActivity() {
     private val databaseRef: DatabaseReference = FirebaseDatabase.getInstance().reference
     private var isLoggingOut = false
     private val handler = Handler(Looper.getMainLooper())
-    private var fondoAnimando = false
-
-    private var colorIndex = 0
-    private val coloresFluorescentes = listOf(
-        intArrayOf(0x66FF5E3A.toInt(), 0x66FF2D55.toInt()), // verde claro a fucsia
-        intArrayOf(0x6690EE90.toInt(), 0x66DA70D6.toInt()), // verde pastel a violeta claro
-        intArrayOf(0x66FFD700.toInt(), 0x66FF69B4.toInt()), // dorado a rosa
-        intArrayOf(0x6640E0D0.toInt(), 0x66FF1493.toInt()), // turquesa a fucsia
-        intArrayOf(0x66ADD8E6.toInt(), 0x668A2BE2.toInt()), // celeste a violeta
-        intArrayOf(0x66FF4500.toInt(), 0x66DAA520.toInt()), // naranja fuerte a dorado suave
-        intArrayOf(0x664682B4.toInt(), 0x66E6E6FA.toInt()), // azul acero a lavanda
-        intArrayOf(0x66FF7F50.toInt(), 0x6600CED1.toInt()), // coral a azul claro
-        intArrayOf(0x66DC143C.toInt(), 0x669370DB.toInt()), // rojo rubí a lila
-        intArrayOf(0x66B0E0E6.toInt(), 0x66BA55D3.toInt())
-
-    )
-
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -124,6 +106,7 @@ class Main : FragmentActivity() {
             WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         )
+
 
         // Manejo personalizado del botón atrás
         onBackPressedDispatcher.addCallback(this) {
@@ -157,6 +140,7 @@ class Main : FragmentActivity() {
     }
     fun navegarInicio() {
         navegarA(PeliculasFragment())
+
     }
     fun navegarAPeliculasValidas() {
         navegarA(PeliculasValidasFragment())
@@ -168,51 +152,6 @@ class Main : FragmentActivity() {
      fun navegarAPeliculasApi() {
         navegarA(PeliculasApiFragment())
      }
-    fun updateBackground(imageUrl: String?) {
-        // Detener la animación del fondo por defecto si se está ejecutando
-        handler.removeCallbacksAndMessages(null)
-        fondoAnimando = false
-
-        if (imageUrl.isNullOrEmpty()) {
-            setDefaultBackground() // Si la URL es nula, establece el fondo animado
-            return
-        }
-
-        Glide.with(this)
-            .load(imageUrl)
-            .centerCrop()
-            .into(binding.mainBackgroundImage)
-        binding.mainBackgroundImage.alpha = 0.6f
-        binding.mainBackgroundImage.scaleType = ImageView.ScaleType.CENTER_CROP
-    }
-    fun setDefaultBackground() {
-        if (fondoAnimando) return
-        fondoAnimando = true
-        handler.removeCallbacksAndMessages(null)
-
-        fun cambiarColores() {
-            val colores = coloresFluorescentes[colorIndex % coloresFluorescentes.size]
-            colorIndex++
-            val nuevoFondo = GradientDrawable(GradientDrawable.Orientation.TL_BR, colores).apply {
-                gradientType = GradientDrawable.LINEAR_GRADIENT
-            }
-            // Usa el binding de la Activity para acceder a la vista
-            binding.mainBackgroundImage.setImageDrawable(nuevoFondo)
-            binding.mainBackgroundImage.apply {
-                alpha = 0.9f
-                scaleType = ImageView.ScaleType.MATRIX
-            }
-        }
-
-        cambiarColores() // Llama la primera vez
-
-        handler.postDelayed(object : Runnable {
-            override fun run() {
-                cambiarColores()
-                handler.postDelayed(this, 1500)
-            }
-        }, 1500)
-    }
 
     private fun cargarMenuPrincipal() {
         val recycler = binding.menuPrincipal
