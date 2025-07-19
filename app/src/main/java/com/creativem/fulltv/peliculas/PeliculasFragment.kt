@@ -24,6 +24,7 @@ import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.principal.CastvHelper
+import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Movie
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
@@ -39,81 +40,38 @@ class PeliculasFragment : RowsSupportFragment() {
 
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
     private val validaciones = Validaciones()
-
-
-
     // --- Firebase & Estado ---
     private val db = FirebaseFirestore.getInstance()
     private lateinit var auth: FirebaseAuth
     private val databaseRef by lazy { FirebaseDatabase.getInstance().reference }
     private var datosUsuarioListener: ValueEventListener? = null
     private var userStatusListener: ValueEventListener? = null
-
-
-    // --- Fondo Animado ---
-
     private val handler = Handler(Looper.getMainLooper())
     private var fondoAnimando = false
-    private var colorIndex = 0
-    private lateinit var fondoDinamico: ImageView
-
-    private val coloresFluorescentes = listOf(
-        intArrayOf(0x66FF5E3A.toInt(), 0x66FF2D55.toInt()), // verde claro a fucsia
-        intArrayOf(0x6690EE90.toInt(), 0x66DA70D6.toInt()), // verde pastel a violeta claro
-        intArrayOf(0x66FFD700.toInt(), 0x66FF69B4.toInt()), // dorado a rosa
-        intArrayOf(0x6640E0D0.toInt(), 0x66FF1493.toInt()), // turquesa a fucsia
-        intArrayOf(0x66ADD8E6.toInt(), 0x668A2BE2.toInt()), // celeste a violeta
-        intArrayOf(0x66FF4500.toInt(), 0x66DAA520.toInt()), // naranja fuerte a dorado suave
-        intArrayOf(0x664682B4.toInt(), 0x66E6E6FA.toInt()), // azul acero a lavanda
-        intArrayOf(0x66FF7F50.toInt(), 0x6600CED1.toInt()), // coral a azul claro
-        intArrayOf(0x66DC143C.toInt(), 0x669370DB.toInt()), // rojo rubí a lila
-        intArrayOf(0x66B0E0E6.toInt(), 0x66BA55D3.toInt())
-
-    )
-
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        val fragmentRoot = FrameLayout(requireContext())
         auth = FirebaseAuth.getInstance()
-        // Creamos el fondo dinámico
-        fondoDinamico = ImageView(requireContext()).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            alpha = 0.6f
-        }
-
-        // Inflamos el contenido del fragmento
-        val rowsView = super.onCreateView(inflater, container, savedInstanceState)
-
-        // Agregamos primero el fondo, luego el contenido encima
-        fragmentRoot.addView(fondoDinamico)
-        fragmentRoot.addView(rowsView)
-
-        setDefaultBackground()
-
-
-        return fragmentRoot
+        return super.onCreateView(inflater, container, savedInstanceState)
     }
+
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
         CoroutineScope(Dispatchers.IO).launch {
             Validacioneslista.cargarPeliculas()
             withContext(Dispatchers.Main) {
                 actualizarSoloEtiquetas()
-                setDefaultBackground() // Para que siempre inicie con fondo animado
-
+                (activity as? Main)?.restaurarFondoAnimado()
             }
         }
 
         adapter = rowsAdapter
+
         setOnItemViewClickedListener { _, item, _, _ ->
             if (item is Movie) {
                 irAlReproductor(item)
@@ -126,15 +84,9 @@ class PeliculasFragment : RowsSupportFragment() {
                 handler.removeCallbacksAndMessages(null)
                 fondoAnimando = false
 
-                Glide.with(requireContext())
-                    .load(movie.imageUrl)
-                    .error(R.drawable.icono)
-                    .into(fondoDinamico)
-
-                fondoDinamico.alpha = 0.6f
-                fondoDinamico.scaleType = ImageView.ScaleType.CENTER_CROP
+                (activity as? Main)?.setFondoDesdeUrl(movie.imageUrl)
             } else {
-                setDefaultBackground()
+                (activity as? Main)?.restaurarFondoAnimado()
             }
         }
 
@@ -148,35 +100,6 @@ class PeliculasFragment : RowsSupportFragment() {
                 email = currentUser.email
             )
         }
-
-
-    }
-    fun setDefaultBackground() {
-        if (fondoAnimando) return
-        fondoAnimando = true
-        handler.removeCallbacksAndMessages(null)
-
-        fun cambiarColores() {
-            val colores = coloresFluorescentes[colorIndex % coloresFluorescentes.size]
-            colorIndex++
-            val nuevoFondo = GradientDrawable(GradientDrawable.Orientation.TL_BR, colores).apply {
-                gradientType = GradientDrawable.LINEAR_GRADIENT
-            }
-            fondoDinamico.setImageDrawable(nuevoFondo)
-            fondoDinamico.apply {
-                alpha = 0.9f
-                scaleType = ImageView.ScaleType.MATRIX
-            }
-        }
-
-        cambiarColores()
-
-        handler.postDelayed(object : Runnable {
-            override fun run() {
-                cambiarColores()
-                handler.postDelayed(this, 1500)
-            }
-        }, 1500)
     }
 
     // --- Métodos de Carga de Películas ---

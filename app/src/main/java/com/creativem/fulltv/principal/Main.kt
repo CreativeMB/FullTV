@@ -52,6 +52,8 @@ import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.resource.bitmap.CenterCrop
+import com.bumptech.glide.request.RequestOptions
 import com.creativem.fulltv.BuildConfig
 import com.creativem.fulltv.R
 import com.creativem.fulltv.api.ApiPeliculaActivity
@@ -73,6 +75,7 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import jp.wasabeef.glide.transformations.BlurTransformation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -92,39 +95,74 @@ class Main : FragmentActivity() {
     private var datosUsuarioListener: ValueEventListener? = null
     private val databaseRef: DatabaseReference = FirebaseDatabase.getInstance().reference
     private var isLoggingOut = false
+    private lateinit var fondoDinamico: ImageView
     private val handler = Handler(Looper.getMainLooper())
+    private var fondoAnimando = false
+    private val handlerFondo = Handler(Looper.getMainLooper())
+    private var fondoRunnable: Runnable? = null
 
+    private val coloresFluorescentes = listOf(
+        intArrayOf(0x66FF5E3A.toInt(), 0x66FF2D55.toInt()),
+        intArrayOf(0x6690EE90.toInt(), 0x66DA70D6.toInt()),
+        intArrayOf(0x66FFD700.toInt(), 0x66FF69B4.toInt()),
+        intArrayOf(0x6640E0D0.toInt(), 0x66FF1493.toInt()),
+        intArrayOf(0x66ADD8E6.toInt(), 0x668A2BE2.toInt()),
+        intArrayOf(0x66FF4500.toInt(), 0x66DAA520.toInt()),
+        intArrayOf(0x664682B4.toInt(), 0x66E6E6FA.toInt()),
+        intArrayOf(0x66FF7F50.toInt(), 0x6600CED1.toInt()),
+        intArrayOf(0x66DC143C.toInt(), 0x669370DB.toInt()),
+        intArrayOf(0x66B0E0E6.toInt(), 0x66BA55D3.toInt())
+    )
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        binding = MainPrincipalfragmentBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        // 🟢 Creamos FrameLayout raíz que contendrá el fondo y el layout original
+        val rootLayout = FrameLayout(this)
+
+        // 🟢 Creamos fondo dinámico y lo agregamos primero
+        fondoDinamico = ImageView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            alpha = 0.6f
+        }
+        rootLayout.addView(fondoDinamico) // 🔴 Agregamos fondo al fondo
+
+        // 🟢 Inflamos el layout original y lo agregamos encima del fondo
+        binding = MainPrincipalfragmentBinding.inflate(layoutInflater)
+        rootLayout.addView(binding.root)
+
+        // 🟢 Usamos el nuevo root como contenido
+        setContentView(rootLayout)
+
+        // 🔧 Configuración de pantalla completa
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setFlags(
             WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         )
 
-
-        // Manejo personalizado del botón atrás
+        // 🔄 Botón atrás personalizado
         onBackPressedDispatcher.addCallback(this) {
             val fragmentActual = supportFragmentManager.findFragmentById(R.id.fragment_container)
-
             if (supportFragmentManager.backStackEntryCount > 0) {
-                // Si hay fragmentos en la pila, retrocede normalmente
                 supportFragmentManager.popBackStack()
             } else {
-                // Si no hay más fragmentos, mostrar el diálogo de confirmación
                 mostrarConfirmacionSalida()
             }
         }
+        // 🚀 Fondo animado
+        iniciarFondoAnimado()
 
         if (savedInstanceState == null) {
             navegarA(PeliculasFragment())
             haProcesadoEliminacion = false
         }
+
         val currentUser = FirebaseAuth.getInstance().currentUser
         if (currentUser != null && !currentUser.email.isNullOrBlank()) {
             CastvHelper.nuevosusuarios(
@@ -137,8 +175,59 @@ class Main : FragmentActivity() {
         cargarMenuPrincipal()
         mostrarPublicidad()
         obtenerNoticia()
-
     }
+    fun setFondoDesdeUrl(url: String?) {
+        fondoRunnable?.let { handlerFondo.removeCallbacks(it) }
+        fondoAnimando = false
+
+        if (!url.isNullOrEmpty()) {
+            val opciones = RequestOptions()
+                .transform(CenterCrop(), BlurTransformation(5, 1)) // (radio, sampling)
+
+            Glide.with(this)
+                .load(url)
+                .apply(opciones)
+                .error(R.drawable.icono)
+                .into(fondoDinamico)
+
+            fondoDinamico.alpha = 0.4f
+            fondoDinamico.scaleType = ImageView.ScaleType.CENTER_CROP
+        }
+    }
+
+    fun iniciarFondoAnimado() {
+        if (fondoAnimando) return
+        fondoAnimando = true
+        var colorIndex = 0
+
+        fondoRunnable = object : Runnable {
+            override fun run() {
+                val colores = coloresFluorescentes[colorIndex % coloresFluorescentes.size]
+                colorIndex++
+
+                val drawable = GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    colores
+                ).apply {
+                    gradientType = GradientDrawable.LINEAR_GRADIENT
+                }
+
+                fondoDinamico.setImageDrawable(drawable)
+                fondoDinamico.alpha = 0.9f
+                fondoDinamico.scaleType = ImageView.ScaleType.MATRIX
+
+                handlerFondo.postDelayed(this, 1500)
+            }
+        }
+
+        handlerFondo.post(fondoRunnable!!)
+    }
+
+    fun restaurarFondoAnimado() {
+        setFondoDesdeUrl(null)
+        iniciarFondoAnimado()
+    }
+
 
     private fun navegarA(fragment: Fragment) {
         supportFragmentManager.beginTransaction()

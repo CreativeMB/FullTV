@@ -21,6 +21,7 @@ import com.creativem.fulltv.R
 
 import com.creativem.fulltv.menu.MenuSuperiorAdapter
 import com.creativem.fulltv.peliculasvalidas.PeliculasMenuAdapter
+import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Movie
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.CoroutineScope
@@ -36,7 +37,6 @@ class PeliculasApiFragment : Fragment() {
     private lateinit var adapter: PeliculasMenuAdapter
     private lateinit var apiService: TMDbApiService
     private val apiKey = "678193d2c735c6f37840cee035f4d69a"
-    private lateinit var mainBackgroundImage: ImageView
     private var layoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
 
     override fun onCreateView(
@@ -47,10 +47,7 @@ class PeliculasApiFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        mainBackgroundImage = view.findViewById(R.id.mainBackgroundImage)
-        establecerFondoPorDefecto()
 
-        // 🔹 Menu horizontal
         val menuOpciones = listOf(
             "Populares", "Mejor valoradas", "En cartelera", "Acción", "Aventura", "Animación",
             "Comedia", "Crimen", "Documental", "Drama", "Familia", "Fantasía",
@@ -70,18 +67,12 @@ class PeliculasApiFragment : Fragment() {
             }
         }
 
-        // 🔹 Recycler de películas
         recyclerView = view.findViewById(R.id.recycler_populares)
 
         layoutListener = ViewTreeObserver.OnGlobalLayoutListener {
-            // Añade una comprobación de seguridad: si el fragmento no está adjunto, no hagas nada.
-            if (!isAdded) {
-                return@OnGlobalLayoutListener
-            }
-
+            if (!isAdded) return@OnGlobalLayoutListener
             val spanCount = calcularElementosPorFila(recyclerView.width)
             val currentLayoutManager = recyclerView.layoutManager as? GridLayoutManager
-
             if (currentLayoutManager == null || currentLayoutManager.spanCount != spanCount) {
                 recyclerView.layoutManager = GridLayoutManager(requireContext(), spanCount)
             }
@@ -92,12 +83,12 @@ class PeliculasApiFragment : Fragment() {
             if (recyclerView.layoutManager !is GridLayoutManager ||
                 (recyclerView.layoutManager as GridLayoutManager).spanCount != spanCount
             ) {
-
                 recyclerView.layoutManager = GridLayoutManager(requireContext(), spanCount)
             }
         }
 
         adapter = PeliculasMenuAdapter(mutableListOf()) { movie ->
+
             val intent = Intent(requireContext(), ApiPeliculaActivity::class.java).apply {
                 putExtra("EXTRA_STREAM_URL", movie.streamUrl)
                 putExtra("EXTRA_MOVIE_TITLE", movie.title)
@@ -108,93 +99,14 @@ class PeliculasApiFragment : Fragment() {
             }
             startActivity(intent)
         }
-        recyclerView.adapter = adapter
 
+        recyclerView.adapter = adapter
         setupApiService()
         cargarPeliculasPopulares()
+
+        // 🔄 Restaurar fondo animado al iniciar
+        (activity as? Main)?.restaurarFondoAnimado()
     }
-
-    //fondo animado de colores
-    private var fondoActual: GradientDrawable? = null
-    private val handler = Handler(Looper.getMainLooper())
-    private var fondoAnimando = false
-    private var matrizX = 0f
-    private var direccion = 1
-    private var colorIndex = 0
-
-    private val coloresFluorescentes = listOf(
-        intArrayOf(0x88000000.toInt(), 0xFF1a1a1a.toInt()), // negro a gris muy oscuro
-        intArrayOf(0xFF1b2735.toInt(), 0xFF090a0f.toInt()), // azul grisáceo oscuro a negro absoluto
-        intArrayOf(0xFF2c3e50.toInt(), 0xFF34495e.toInt()), // azul pizarra oscuro
-        intArrayOf(0xFF3a3f44.toInt(), 0xFF1e272e.toInt()), // gris acero a gris muy oscuro
-        intArrayOf(0xFF0f2027.toInt(), 0xFF203a43.toInt()), // tonos carbón
-        intArrayOf(0xFF2c2c2c.toInt(), 0xFF1c1c1c.toInt()), // gris profundo a negro
-        intArrayOf(0xFF1f1c2c.toInt(), 0xFF928dab.toInt()), // violeta muy oscuro a lavanda grisácea
-        intArrayOf(0xFF232526.toInt(), 0xFF414345.toInt()), // gris carbón a gris acero
-        intArrayOf(0xFF373737.toInt(), 0xFF232323.toInt()), // gris oscuro a casi negro
-        intArrayOf(0xFF0f0c29.toInt(), 0xFF302b63.toInt())  // azul medianoche a azul profundo
-    )
-
-
-    private fun establecerFondoPorDefecto() {
-        if (fondoAnimando) return
-        fondoAnimando = true
-        handler.removeCallbacksAndMessages(null)
-
-        // 1. Cambios de colores rápidos
-        fun cambiarColores() {
-            val colores = coloresFluorescentes[colorIndex % coloresFluorescentes.size]
-            colorIndex++
-
-            val nuevo = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                colores
-            ).apply {
-                gradientType = GradientDrawable.LINEAR_GRADIENT
-            }
-
-            fondoActual?.let { anterior ->
-                val transicion = TransitionDrawable(arrayOf(anterior, nuevo))
-                mainBackgroundImage.setImageDrawable(transicion)
-                transicion.isCrossFadeEnabled = true
-                transicion.startTransition(600)
-            } ?: run {
-                mainBackgroundImage.setImageDrawable(nuevo)
-            }
-
-            mainBackgroundImage.apply {
-                alpha = 0.9f
-                scaleType = ImageView.ScaleType.MATRIX
-            }
-
-            fondoActual = nuevo
-        }
-
-        cambiarColores()
-
-        handler.postDelayed(object : Runnable {
-            override fun run() {
-                cambiarColores()
-                handler.postDelayed(this, 1500)
-            }
-        }, 1500)
-
-        // 2. Movimiento escaneado
-        handler.post(object : Runnable {
-            override fun run() {
-                val matrix = Matrix().apply {
-                    matrizX += direccion * 1.5f
-                    if (matrizX > 120f || matrizX < -120f) direccion *= -1
-                    setTranslate(matrizX, 0f)
-                }
-
-                mainBackgroundImage.imageMatrix = matrix
-                handler.postDelayed(this, 16)
-            }
-        })
-
-    }
-
 
     private fun setupApiService() {
         val client = OkHttpClient.Builder().hostnameVerifier { _, _ -> true }.build()

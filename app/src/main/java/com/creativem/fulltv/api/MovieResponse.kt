@@ -17,9 +17,17 @@ data class TmdbMovie(
     val streamUrl: String = "",         // Puedes manejar esto con una función si lo generas tú
     val imageUrl: String = "",          // Alternativa a poster_path si la construyes tú
     val castv: Int = 0,           // Puedes usar vote_average o un campo auxiliar
-) {
+)
 
-}
+    {
+        // URL de imagen unificada
+        val imagenFinal: String?
+        get() = when {
+            !imageUrl.isNullOrEmpty() -> imageUrl
+            !poster_path.isNullOrEmpty() -> "https://image.tmdb.org/t/p/w500$poster_path"
+            else -> null
+        }
+    }
 
 data class CreditsResponse(
     val cast: List<CastMember>,

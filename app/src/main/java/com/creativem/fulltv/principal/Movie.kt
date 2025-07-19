@@ -20,6 +20,7 @@ data class Movie(
     val countdownMinutes: Int = 0,
     var fechaCreacion: Long = 0L,
     val releaseDate: String = ""
+
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
         id = parcel.readString() ?: "",

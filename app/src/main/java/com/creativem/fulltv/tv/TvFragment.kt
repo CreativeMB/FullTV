@@ -12,6 +12,7 @@ import androidx.leanback.widget.*
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.AudioFocusHelper
+import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Movie
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
@@ -25,13 +26,10 @@ class TvFragment : RowsSupportFragment() {
 
     private val db = FirebaseFirestore.getInstance()
     private val channels = ArrayObjectAdapter(ListRowPresenter())
-    private lateinit var loadingContainer: FrameLayout
     private lateinit var progressBar: ProgressBar
-    private lateinit var loadingText: View
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
 
         adapter = channels
     }
@@ -39,24 +37,24 @@ class TvFragment : RowsSupportFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-// Referenciar fondo dinámico del Activity
-        val fondoDinamico = requireActivity().findViewById<ImageView>(R.id.mainBackgroundImage)
+        adapter = channels
 
-// Detectar ítem seleccionado y cambiar fondo
+        // Notificar a la Activity que restaure el fondo animado por defecto
+        (activity as? Main)?.restaurarFondoAnimado()
+
+        // Al seleccionar un canal, actualizar fondo con su imagen
         setOnItemViewSelectedListener { _, item, _, _ ->
             val movie = item as? Movie
             if (movie != null && !movie.imageUrl.isNullOrEmpty()) {
-                Glide.with(requireContext())
-                    .load(movie.imageUrl)
-                    .error(R.drawable.icono)
-                    .into(fondoDinamico)
+                (activity as? Main)?.setFondoDesdeUrl(movie.imageUrl)
+            } else {
+                (activity as? Main)?.restaurarFondoAnimado()
             }
         }
 
-
-        loadTvChannels() // Cargar los canales antes de asignar el adapter
-
+        loadTvChannels()
     }
+
 
     private fun loadTvChannels() {
 
