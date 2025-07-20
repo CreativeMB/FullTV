@@ -395,25 +395,21 @@ class Main : FragmentActivity() {
         }
     }
     private fun mostrarDialogoPedido() {
-        // CORRECCIÓN: Se usa 'this' como contexto
         val builder = AlertDialog.Builder(this)
         builder.setTitle("Solicitar Película")
 
-        // CORRECCIÓN: Se usa 'this' como contexto para el LinearLayout
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 16)
 
-            // CORRECCIÓN: Se usa 'this' como contexto para el TextView
-            val indicacionTextView = TextView(this.context).apply {
+            val indicacionTextView = TextView(context).apply {
                 text = "Por favor, ingrese el título y Año de estreno.\n" +
-                        "Recuerde; no se pueden Alquilar películas con menos de un mes de estreno."
+                        "Recuerde; no se pueden alquilar películas con menos de un mes de estreno."
                 textSize = 14f
                 setPadding(0, 0, 0, 16)
             }
 
-            // CORRECCIÓN: Se usa 'this' como contexto para el EditText
-            val inputPedido = EditText(this.context).apply {
+            val inputPedido = EditText(context).apply {
                 hint = "Moana 2 2024"
                 setMinLines(3)
                 setMaxLines(5)
@@ -434,36 +430,32 @@ class Main : FragmentActivity() {
             if (pedido.isNotEmpty()) {
                 subirPedidoAFirestore(pedido)
             } else {
-                // CORRECCIÓN: Se usa 'this' para el Toast
                 Toast.makeText(this, "Debe ingresar un pedido", Toast.LENGTH_SHORT).show()
             }
         }
-        builder.setNegativeButton("Cancelar") { dialog, _ ->
-            dialog.dismiss()
-        }
+
+        builder.setNegativeButton("Cancelar") { dialog, _ -> dialog.dismiss() }
 
         builder.create().show()
     }
-    private fun activarpaquete() {
-        // CORRECCIÓN: Se usa 'this' como contexto
-        val builder = AlertDialog.Builder(this)
-        builder.setTitle("Activacion de Paquete")
 
-        // CORRECCIÓN: Se usa 'this' como contexto para el LinearLayout
+
+    private fun activarpaquete() {
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Activación de Paquete")
+
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 16)
 
-            // CORRECCIÓN: Se usa 'this' como contexto para el TextView
-            val indicacionTextView = TextView(this.context).apply {
-                text = "Nombre Completo titular de Cuenta que realizo el pago y fecha\n" +
+            val indicacionTextView = TextView(context).apply {
+                text = "Nombre completo del titular que realizó el pago y fecha.\n" +
                         "Ejemplo: Ernesto Dias 01/02/25: Paquete Plata"
                 textSize = 14f
                 setPadding(0, 0, 0, 16)
             }
 
-            // CORRECCIÓN: Se usa 'this' como contexto para el EditText
-            val inputPedido = EditText(this.context).apply {
+            val inputPedido = EditText(context).apply {
                 hint = "Ernesto Dias 01/02/25: Paquete Plata"
                 isSingleLine = true
                 setTypeface(null, Typeface.BOLD)
@@ -482,89 +474,65 @@ class Main : FragmentActivity() {
             if (pedido.isNotEmpty()) {
                 comprobantepago(pedido)
             } else {
-                // CORRECCIÓN: Se usa 'this' para el Toast
-                Toast.makeText(this, "Debe ingresar numero de referencia o numero de comprobante de pago", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Debe ingresar nombre y fecha de pago", Toast.LENGTH_SHORT).show()
             }
         }
-        builder.setNegativeButton("Cancelar") { dialog, _ ->
-            dialog.dismiss()
-        }
+
+        builder.setNegativeButton("Cancelar") { dialog, _ -> dialog.dismiss() }
 
         builder.create().show()
     }
+
     private fun comprobantepago(pedido: String) {
-        val auth = FirebaseAuth.getInstance()
-        val userId = auth.currentUser?.uid
+        val email = FirebaseAuth.getInstance().currentUser?.email
 
-        if (userId != null) {
-            val userRef = databaseRef.child("usuarios").child(userId)
+        if (email == null) {
+            Toast.makeText(this, "Usuario no autenticado", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-            userRef.get().addOnSuccessListener { snapshot ->
-                if (snapshot.exists()) {
-                    val nombreUsuario = snapshot.child("nombre").getValue(String::class.java) ?: "Nombre no disponible"
-                    val emailUsuario = snapshot.child("correo").getValue(String::class.java) ?: "Email no disponible"
-                    val puntosActuales = snapshot.child("castv").getValue(Int::class.java) ?: 0
-
-                    val mensaje = """
-                Usuario: $nombreUsuario
-                Email: $emailUsuario
-                Saldo CasTV: $puntosActuales
+        CastvHelper.obtenerDatosUsuario(
+            email,
+            onSuccess = { nombre, correo, castv, _ ->
+                val mensaje = """
+                Usuario: $nombre
+                Email: $correo
+                Saldo CasTV: $castv
                 Pedido: $pedido
             """.trimIndent()
 
-                    // CORRECCIÓN: Se usa 'this' como contexto
-                    AlertDialog.Builder(this)
-                        .setTitle("Confirmar Activación de Paquete")
-                        .setMessage(mensaje)
-                        .setPositiveButton("Registrar") { _, _ ->
-                            val pedidoData = hashMapOf(
-                                "title" to pedido,
-                                "userId" to userId,
-                                "email" to emailUsuario,
-                                "nombre" to nombreUsuario
-                            )
+                AlertDialog.Builder(this)
+                    .setTitle("Confirmar Activación de Paquete")
+                    .setMessage(mensaje)
+                    .setPositiveButton("Registrar") { _, _ ->
+                        val correoKey = CastvHelper.getCorreoKey(correo)
 
-                            FirebaseFirestore.getInstance().collection("pedidosmovies")
-                                .add(pedidoData)
-                                .addOnSuccessListener {
-                                    enviarCorreoNuevoPedido(pedido) // Asegúrate de tener este método
-                                    // CORRECCIÓN: Se usa 'this' como contexto
-                                    Toast.makeText(
-                                        this,
-                                        "Actualizaremos tu saldo",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                                .addOnFailureListener { e ->
-                                    // CORRECCIÓN: Se usa 'this' como contexto
-                                    Toast.makeText(
-                                        this,
-                                        "Error al enviar pedido: ${e.message}",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                        }
-                        .setNegativeButton("Cancelar") { dialog, _ ->
-                            dialog.dismiss()
-                        }
-                        .show()
-                } else {
-                    // CORRECCIÓN: Se usa 'this' como contexto
-                    Toast.makeText(this, "Usuario no encontrado", Toast.LENGTH_SHORT).show()
-                }
-            }.addOnFailureListener { e ->
-                // CORRECCIÓN: Se usa 'this' como contexto
-                Toast.makeText(
-                    this,
-                    "Error al obtener usuario: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
+                        val pedidoData = hashMapOf(
+                            "title" to pedido,
+                            "correo" to correo,
+                            "correoKey" to correoKey,
+                            "nombre" to nombre
+                        )
+
+                        FirebaseFirestore.getInstance().collection("pedidosmovies")
+                            .add(pedidoData)
+                            .addOnSuccessListener {
+                                enviarCorreoNuevoPedido(pedido)
+                                Toast.makeText(this, "Actualizaremos tu saldo", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener { e ->
+                                Toast.makeText(this, "Error al enviar pedido: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                    }
+                    .setNegativeButton("Cancelar") { dialog, _ -> dialog.dismiss() }
+                    .show()
+            },
+            onFailure = {
+                Toast.makeText(this, "No se pudo obtener datos del usuario", Toast.LENGTH_SHORT).show()
             }
-        } else {
-            // CORRECCIÓN: Se usa 'this' como contexto
-            Toast.makeText(this, "Usuario no autenticado", Toast.LENGTH_SHORT).show()
-        }
+        )
     }
+
 
 
     private fun mostrarPublicidad() {
@@ -808,22 +776,26 @@ class Main : FragmentActivity() {
     }
     private fun subirPedidoAFirestore(pedido: String) {
         val auth = FirebaseAuth.getInstance()
-        val database = FirebaseDatabase.getInstance()
-        val userId = auth.currentUser?.uid
+        val email = auth.currentUser?.email
 
-        if (userId != null) {
-            val userRef = database.reference.child("usuarios").child(userId)
+        if (email == null) {
+            Toast.makeText(this, "Usuario no autenticado", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-            userRef.get().addOnSuccessListener { snapshot ->
-                if (snapshot.exists()) {
-                    val nombreUsuario = snapshot.child("nombre").getValue(String::class.java) ?: "Nombre no disponible"
-                    val emailUsuario = snapshot.child("correo").getValue(String::class.java) ?: "Email no disponible"
-                    val castvActual = snapshot.child("castv").getValue(Int::class.java) ?: 0
+        val correoKey = CastvHelper.getCorreoKey(email)
+        val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(correoKey)
 
-                    val puntosDescontar = 20
+        userRef.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                val nombreUsuario = snapshot.child("nombre").getValue(String::class.java) ?: "Nombre no disponible"
+                val emailUsuario = snapshot.child("correo").getValue(String::class.java) ?: "Email no disponible"
+                val castvActual = snapshot.child("castv").getValue(Int::class.java) ?: 0
 
-                    if (castvActual >= puntosDescontar) {
-                        val mensaje = """
+                val puntosDescontar = 20
+
+                if (castvActual >= puntosDescontar) {
+                    val mensaje = """
                     Usuario: $nombreUsuario
                     Email: $emailUsuario
                     Saldo CasTV: $castvActual
@@ -831,105 +803,43 @@ class Main : FragmentActivity() {
                     Pedido: $pedido
                 """.trimIndent()
 
-                        // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
-                        AlertDialog.Builder(this)
-                            .setTitle("Confirmar Pedido")
-                            .setMessage(mensaje)
-                            .setPositiveButton("Confirmar") { _, _ ->
-                                val pedidoData = hashMapOf(
-                                    "title" to pedido,
-                                    "userId" to userId,
-                                    "email" to emailUsuario,
-                                    "nombre" to nombreUsuario,
-                                    "CasTV" to puntosDescontar.toString()
-                                )
+                    AlertDialog.Builder(this)
+                        .setTitle("Confirmar Pedido")
+                        .setMessage(mensaje)
+                        .setPositiveButton("Confirmar") { _, _ ->
+                            val pedidoData = hashMapOf(
+                                "title" to pedido,
+                                "correo" to emailUsuario,
+                                "correoKey" to correoKey,
+                                "nombre" to nombreUsuario,
+                                "CasTV" to puntosDescontar.toString()
+                            )
 
-                                FirebaseFirestore.getInstance().collection("pedidosmovies")
-                                    .add(pedidoData)
-                                    .addOnSuccessListener {
-                                        // Asegúrate de que estos métodos también existan en tu Activity
-                                        descontarPuntos(userId, puntosDescontar)
-                                        enviarCorreoNuevoPedido(pedido)
-                                    }
-                                    .addOnFailureListener { e ->
-                                        // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
-                                        Toast.makeText(
-                                            this,
-                                            "Error al enviar pedido: ${e.message}",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                            }
-                            .setNegativeButton("Cancelar") { dialog, _ ->
-                                dialog.dismiss()
-                            }
-                            .show()
-                    } else {
-                        // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
-                        Toast.makeText(
-                            this,
-                            "No tienes suficientes puntos",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                } else {
-                    // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
-                    Toast.makeText(this, "Usuario no encontrado", Toast.LENGTH_SHORT).show()
-                }
-            }.addOnFailureListener { e ->
-                // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
-                Toast.makeText(
-                    this,
-                    "Error al obtener usuario: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        } else {
-            // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
-            Toast.makeText(this, "Usuario no autenticado", Toast.LENGTH_SHORT).show()
-        }
-    }
-    private fun descontarPuntos(userId: String, puntosADescontar: Int) {
-        val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId)
-
-        userRef.get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                val castvActual = snapshot.child("castv").getValue(Int::class.java) ?: 0
-
-                if (castvActual >= puntosADescontar) {
-                    val nuevoCastv = castvActual - puntosADescontar
-
-                    userRef.child("castv").setValue(nuevoCastv)
-                        .addOnSuccessListener {
-                            // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
-                            Toast.makeText(
-                                this,
-                                "Pedido enviado y CasTV descontado",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            FirebaseFirestore.getInstance().collection("pedidosmovies")
+                                .add(pedidoData)
+                                .addOnSuccessListener {
+                                    descontarPuntos(correoKey, puntosDescontar)
+                                    enviarCorreoNuevoPedido(pedido)
+                                }
+                                .addOnFailureListener { e ->
+                                    Toast.makeText(
+                                        this,
+                                        "Error al enviar pedido: ${e.message}",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                         }
-                        .addOnFailureListener { e ->
-                            // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
-                            Toast.makeText(
-                                this,
-                                "Error al descontar CasTV: ${e.message}",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                        .setNegativeButton("Cancelar") { dialog, _ ->
+                            dialog.dismiss()
                         }
+                        .show()
                 } else {
-                    // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
-                    Toast.makeText(
-                        this,
-                        "No tienes suficientes CasTV para esta acción",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(this, "No tienes suficientes puntos", Toast.LENGTH_SHORT).show()
                 }
             } else {
-                // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
                 Toast.makeText(this, "Usuario no encontrado", Toast.LENGTH_SHORT).show()
             }
         }.addOnFailureListener { e ->
-            // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
             Toast.makeText(
                 this,
                 "Error al obtener usuario: ${e.message}",
@@ -937,6 +847,16 @@ class Main : FragmentActivity() {
             ).show()
         }
     }
+
+    private fun descontarPuntos(correoKey: String, puntos: Int) {
+        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
+        userRef.child("castv").get().addOnSuccessListener { snapshot ->
+            val castvActual = snapshot.getValue(Int::class.java) ?: 0
+            val nuevoCastv = castvActual - puntos
+            userRef.child("castv").setValue(nuevoCastv)
+        }
+    }
+
     private fun obtenerNoticia() {
         val db = FirebaseFirestore.getInstance()
         val noticiaRef = db.collection("noticia").document("us4vaaf0VPezu9vuc4ns")

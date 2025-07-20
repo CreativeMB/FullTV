@@ -166,7 +166,7 @@
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/peliscartelera"
                     android:layout_width="match_parent"
-                    android:layout_height="220dp"
+                    android:layout_height="240dp"
                     android:background="@android:color/transparent"
                     android:orientation="horizontal"
                     android:overScrollMode="never"
