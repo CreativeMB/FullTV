@@ -6,7 +6,8 @@ import java.security.Timestamp
 data class User(
     var userId: String = "",
     var fechaCreacion: String = "",
-    var correo: String = "",
+    val ultimaConexion: Any? = null,
+        var correo: String = "",
     val nombre: String = "",  // Cambiado de 'name' a 'nombre'
     var title: String = "", // Cambiado de 'points' a 'puntos'
     val id: String = "",      // Para almacenar el ID del documento

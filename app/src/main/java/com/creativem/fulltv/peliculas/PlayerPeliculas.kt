@@ -942,94 +942,107 @@ class PlayerPeliculas : AppCompatActivity() {
         }
     }
     private fun enviarPedido() {
-            if (isProcessingOrder) return
-            isProcessingOrder = true
+        if (isProcessingOrder) return
+        isProcessingOrder = true
 
-            val query = firestore.collection("pedidosmovies")
-                .whereEqualTo("title", movieTitle)
-                .whereEqualTo("castv", movieCastv)
+        val query = firestore.collection("pedidosmovies")
+            .whereEqualTo("title", movieTitle)
+            .whereEqualTo("castv", movieCastv)
 
-            query.get().addOnSuccessListener { querySnapshot ->
-                if (querySnapshot.isEmpty) {
-                    val user = auth.currentUser
-                    if (user != null) {
-                        val userId = user.uid
+        query.get().addOnSuccessListener { querySnapshot ->
+            if (querySnapshot.isEmpty) {
+                val user = auth.currentUser
+                if (user != null) {
+                    val userId = user.uid
+                    val correoUsuario = user.email ?: run {
+                        Toast.makeText(this, "Correo inválido", Toast.LENGTH_SHORT).show()
+                        isProcessingOrder = false
+                        return@addOnSuccessListener
+                    }
 
-                        // 🔄 Leer desde Realtime Database
-                        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(userId)
-                        userRef.get().addOnSuccessListener { snapshot ->
-                            val userName = snapshot.child("nombre").value?.toString() ?: "Sin nombre"
-                            val userEmail = snapshot.child("correo").value?.toString() ?: "Sin correo"
-                            val costoPedido = movieCastv
+                    val correoKey = correoUsuario.replace(".", "_").replace("@", "_")
+                    val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
+                    userRef.get().addOnSuccessListener { snapshot ->
+                        val userName = snapshot.child("nombre").value?.toString() ?: "Sin nombre"
+                        val userEmail = snapshot.child("correo").value?.toString() ?: "Sin correo"
 
-                            verificarPuntos(userId, costoPedido) { tienePuntos ->
-                                if (tienePuntos) {
-                                    val datos = hashMapOf(
-                                        "title" to movieTitle,
-                                        "castv" to movieCastv,
-                                        "email" to userEmail,
-                                        "nombre" to userName,
-                                        "userId" to userId
-                                    )
+                        CastvHelper.verificarPuntos(this, correoUsuario, movieCastv) { tienePuntos ->
+                            if (tienePuntos) {
+                                val datos = hashMapOf(
+                                    "title" to movieTitle,
+                                    "castv" to movieCastv,
+                                    "email" to userEmail,
+                                    "nombre" to userName,
+                                    "userId" to userId
+                                )
 
-                                    firestore.collection("pedidosmovies")
-                                        .add(datos)
-                                        .addOnSuccessListener {
-                                            descontarPuntos(userId, costoPedido.toLong())
-                                            enviarCorreoNuevoPedido(movieTitle)
-                                            Toast.makeText(this, "Pedido realizado con éxito.", Toast.LENGTH_SHORT).show()
-                                        }
-                                        .addOnFailureListener { e ->
-                                            Log.e("Firestore", "Error al agregar la película: ${e.message}")
-                                            Toast.makeText(this, "Error al realizar el pedido: ${e.message}", Toast.LENGTH_SHORT).show()
-                                        }
-                                } else {
-                                    Toast.makeText(
-                                        this,
-                                        "¡Ho! No tienes Saldo de CasTV para poder Alquilar.",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                    supportFragmentManager.beginTransaction()
-                                    val intent = Intent(this, Nosotros::class.java)
-                                    startActivity(intent)
-                                    finish()
-                                }
+                                firestore.collection("pedidosmovies")
+                                    .add(datos)
+                                    .addOnSuccessListener {
+                                        CastvHelper.descontarPuntos(
+                                            context = this,
+                                            correo = correoUsuario,
+                                            puntosADescontar = movieCastv.toLong(),
+                                            onSuccess = {
+                                                enviarCorreoNuevoPedido(movieTitle)
+                                                Toast.makeText(this, "Pedido realizado con éxito.", Toast.LENGTH_SHORT).show()
+
+                                                // 👉 Ir a la actividad Nosotros
+                                                val intent = Intent(this, Nosotros::class.java)
+                                                startActivity(intent)
+                                                finish() // Finaliza la actividad actual
+                                            },
+                                            onFailure = { e ->
+                                                Log.w("Castv", "❌ Error al descontar: ${e?.message}")
+                                            }
+                                        )
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Log.e("Firestore", "❌ Error al agregar la película: ${e.message}")
+                                        Toast.makeText(this, "Error al realizar el pedido: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                            } else {
+                                showErrorDialog(movieTitle, movieCastv, correoUsuario)
                             }
-                        }.addOnFailureListener { e ->
-                            Toast.makeText(this, "Error al obtener usuario: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
-                    } else {
-                        Toast.makeText(this, "No hay usuario autenticado.", Toast.LENGTH_SHORT).show()
+                    }.addOnFailureListener { e ->
+                        Toast.makeText(this, "Error al obtener usuario: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    Toast.makeText(
-                        this,
-                        "La película '$movieTitle' ya fue pedida; puedes alquilar más...",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    finish()
+                    Toast.makeText(this, "No hay usuario autenticado.", Toast.LENGTH_SHORT).show()
                 }
-            }.addOnFailureListener { e ->
-                Log.e("Firestore", "Error al consultar la película: ${e.message}")
-                Toast.makeText(this, "Error al consultar la película: ${e.message}", Toast.LENGTH_SHORT).show()
-            }.addOnCompleteListener {
-                isProcessingOrder = false
+            } else {
+                Toast.makeText(
+                    this,
+                    "La película '$movieTitle' ya fue pedida; puedes alquilar más...",
+                    Toast.LENGTH_LONG
+                ).show()
+                finish()
             }
-        }
-
-
-        private fun verificarPuntos(userId: String, costo: Int, callback: (Boolean) -> Unit) {
-        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(userId)
-
-        userRef.child("castv").get().addOnSuccessListener { snapshot ->
-            val puntosActuales = snapshot.getValue(Int::class.java) ?: 0
-            callback(puntosActuales >= costo) // true si tiene saldo suficiente
         }.addOnFailureListener { e ->
-            Log.e("RealtimeDB", "Error al verificar puntos: ${e.message}")
-            Toast.makeText(this, "Error al verificar puntos: ${e.message}", Toast.LENGTH_SHORT).show()
-            callback(false) // En caso de error, asumimos que no tiene puntos suficientes
+            Log.e("Firestore", "Error al consultar la película: ${e.message}")
+            Toast.makeText(this, "Error al consultar la película: ${e.message}", Toast.LENGTH_SHORT).show()
+        }.addOnCompleteListener {
+            isProcessingOrder = false
         }
     }
+
+
+
+//
+//    private fun verificarPuntos(correoKey: String, costo: Int, callback: (Boolean) -> Unit) {
+//        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
+//
+//        userRef.child("castv").get().addOnSuccessListener { snapshot ->
+//            val puntosActuales = snapshot.getValue(Int::class.java) ?: 0
+//            callback(puntosActuales >= costo)
+//        }.addOnFailureListener { e ->
+//            Log.e("RealtimeDB", "Error al verificar puntos: ${e.message}")
+//            Toast.makeText(this, "Error al verificar puntos: ${e.message}", Toast.LENGTH_SHORT).show()
+//            callback(false)
+//        }
+//    }
+
 
     private fun enviarCorreoNuevoPedido(movieTitle: String) {
         val url = "https://server-csks8w.fly.dev/correo"
@@ -1053,73 +1066,41 @@ class PlayerPeliculas : AppCompatActivity() {
 
         requestQueue.add(jsonRequest)
     }
-
-
-//    private fun enviarCorreoNuevoPedido(movieTitle: String) {
-//        val tituloCodificado = URLEncoder.encode(movieTitle, "UTF-8")
-//        val url = "https://eo8uyhrlz1e6vs2.m.pipedream.net/send?titulo=$tituloCodificado"
 //
-//        val requestQueue = Volley.newRequestQueue(this)
+//    private fun descontarPuntos(
+//        correoKey: String,
+//        puntosADescontar: Long,
+//        onSuccess: () -> Unit = {},
+//        onFailure: (Exception?) -> Unit = {}
+//    ) {
+//        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
 //
-//        val stringRequest = object : StringRequest(
-//            Request.Method.GET, url,
-//            Response.Listener { response ->
-//                Log.d("Email", "✅ Correo enviado exitosamente: $response")
-//            },
-//            Response.ErrorListener { error ->
-//                Log.e("Email", "❌ Error al enviar el correo: ${error.message}")
+//        userRef.get().addOnSuccessListener { snapshot ->
+//            val castvActual = snapshot.child("castv").getValue(Long::class.java) ?: 0
+//
+//            if (castvActual >= puntosADescontar) {
+//                val nuevoCastv = castvActual - puntosADescontar
+//                userRef.child("castv").setValue(nuevoCastv)
+//                    .addOnSuccessListener {
+//                        Toast.makeText(this, "Se descontaron $puntosADescontar CasTV", Toast.LENGTH_SHORT).show()
+//                        onSuccess()
+//                    }
+//                    .addOnFailureListener { e ->
+//                        Log.e("RealtimeDB", "❌ Error al descontar puntos: ${e.message}")
+//                        Toast.makeText(this, "Error al descontar CasTV: ${e.message}", Toast.LENGTH_SHORT).show()
+//                        onFailure(e)
+//                    }
+//            } else {
+//                Toast.makeText(this, "Saldo insuficiente de CasTV", Toast.LENGTH_LONG).show()
+//                showErrorDialog(movieTitle, movieCastv, correoKey.replace("_", ".")) // Mostrar el diálogo personalizado
+//                onFailure(null)
 //            }
-//        ) {}
-//
-//        requestQueue.add(stringRequest)
+//        }.addOnFailureListener { e ->
+//            Log.e("RealtimeDB", "❌ Error al obtener usuario: ${e.message}")
+//            Toast.makeText(this, "Error al obtener usuario: ${e.message}", Toast.LENGTH_SHORT).show()
+//            onFailure(e)
+//        }
 //    }
-
-    private fun descontarPuntos(
-        userId: String,
-        puntosADescontar: Long
-    ) {
-        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(userId)
-
-        userRef.get().addOnSuccessListener { snapshot ->
-            val castvActual = snapshot.child("castv").getValue(Long::class.java) ?: 0
-
-            if (castvActual >= puntosADescontar) {
-                val nuevoCastv = castvActual - puntosADescontar
-                userRef.child("castv").setValue(nuevoCastv)
-                    .addOnSuccessListener {
-                        Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
-                        supportFragmentManager.beginTransaction()
-                        val intent = Intent(this, Nosotros::class.java)
-                        startActivity(intent)
-                        startActivity(intent)
-                        finish()
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("RealtimeDB", "Error al descontar puntos: ${e.message}")
-                        Toast.makeText(
-                            this,
-                            "Error al descontar CasTV: ${e.message}",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-            } else {
-                Toast.makeText(
-                    this,
-                    "¡Ho! No tienes Saldo de CasTV para poder Alquilar",
-                    Toast.LENGTH_LONG
-                ).show()
-                supportFragmentManager.beginTransaction()
-                val intent = Intent(this, Nosotros::class.java)
-                startActivity(intent)
-                startActivity(intent)
-                finish()
-            }
-        }.addOnFailureListener { e ->
-            Log.e("RealtimeDB", "Error al obtener usuario: ${e.message}")
-            Toast.makeText(this, "Error al obtener usuario: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
 
 
     override fun onResume() {

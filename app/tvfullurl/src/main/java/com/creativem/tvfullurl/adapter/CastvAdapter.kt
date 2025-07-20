@@ -62,7 +62,7 @@ class CastvAdapter(
         }
 
         holder.userEmail.text = user.correo
-        holder.userFecha.text = "📅 ${parsearFecha(user.fechaCreacion)}"
+        holder.userFecha.text = "${parsearFecha(user.ultimaConexion)}"
         holder.userCastv.setText(user.castv.toString())
 
 

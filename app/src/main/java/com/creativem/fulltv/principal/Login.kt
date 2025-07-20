@@ -121,7 +121,7 @@ class Login : AppCompatActivity() {
                             return@addOnCompleteListener
                         }
 
-                        val correoKey = email.replace(".", "_").replace("@", "_")
+                        val correoKey = CastvHelper.getCorreoKey(email)
                         val userRef = database.reference.child("usuarios").child(correoKey)
 
                         userRef.get().addOnSuccessListener { snapshot ->
@@ -140,15 +140,22 @@ class Login : AppCompatActivity() {
                             }
 
                             // Crear el usuario si no existe
-                            CastvHelper.nuevosusuarios(
-                                context = this,
-                                nombre = user.displayName ?: "Usuario",
-                                email = email
-                            )
+                            CastvHelper.existeUsuario(email) { existe ->
+                                if (!existe) {
+                                    CastvHelper.nuevosusuarios(
+                                        context = this,
+                                        nombre = user.displayName ?: "Usuario",
+                                        email = email
+                                    )
+                                } else {
+                                    Log.d(TAG, "Usuario ya registrado. No se crea uno nuevo.")
+                                }
 
-                            // Continuar a la app
-                            startActivity(Intent(this, Main::class.java))
-                            finish()
+                                // Siempre continuamos al Main
+                                startActivity(Intent(this, Main::class.java))
+                                finish()
+                            }
+
 
                         }.addOnFailureListener {
                             Log.e(TAG, "Error al verificar estado del usuario", it)

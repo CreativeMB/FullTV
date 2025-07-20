@@ -172,6 +172,12 @@ class Main : FragmentActivity() {
             )
         }
 
+        val email = FirebaseAuth.getInstance().currentUser?.email
+        if (!email.isNullOrBlank()) {
+            CastvHelper.actualizarUltimaConexion(email)
+        }
+
+
         cargarMenuPrincipal()
         mostrarPublicidad()
         obtenerNoticia()
@@ -642,7 +648,8 @@ class Main : FragmentActivity() {
         val email = currentUser.email ?: return
         if (email == "invitado@fulltv.com") return
 
-        val correoKey = email.replace(".", "_").replace("@", "_")
+        val correoKey = CastvHelper.getCorreoKey(email)
+
         val userRef = databaseRef.child("usuarios").child(correoKey)
 
         userStatusListener = object : ValueEventListener {
@@ -721,7 +728,8 @@ class Main : FragmentActivity() {
         userStatusListener?.let {
             val email = FirebaseAuth.getInstance().currentUser?.email
             if (!email.isNullOrBlank()) {
-                val correoKey = email.replace(".", "_").replace("@", "_")
+                val correoKey = CastvHelper.getCorreoKey(email)
+
                 FirebaseDatabase.getInstance()
                     .reference
                     .child("usuarios")
@@ -1207,7 +1215,7 @@ class Main : FragmentActivity() {
             return
         }
 
-        val correoKey = email.replace(".", "_").replace("@", "_")
+        val correoKey = CastvHelper.getCorreoKey(email)
 
         // 🟢 Esperamos a que el nodo exista antes de verificar el estado
         val ref = FirebaseDatabase.getInstance().reference.child("usuarios").child(correoKey)
