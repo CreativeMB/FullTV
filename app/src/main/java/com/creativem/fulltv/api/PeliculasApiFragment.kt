@@ -139,7 +139,14 @@ class PeliculasApiFragment : Fragment() {
                 }
             }
             withContext(Dispatchers.Main) {
+                val focusedPos = adapter.getFocusedPosition()
                 adapter.updateMovies(allMovies)
+                // ✅ Enfocar el primer ítem cuando termine de cargar
+                recyclerView.post {
+                    val viewHolder = recyclerView.findViewHolderForAdapterPosition(0)
+                    viewHolder?.itemView?.requestFocus()
+                }
+
             }
         }
     }
@@ -172,7 +179,13 @@ class PeliculasApiFragment : Fragment() {
                 }
             }
             withContext(Dispatchers.Main) {
+                val focusedPos = adapter.getFocusedPosition()
                 adapter.updateMovies(allMovies)
+                // ✅ Enfocar el primer ítem cuando termine de cargar
+                recyclerView.post {
+                    val viewHolder = recyclerView.findViewHolderForAdapterPosition(0)
+                    viewHolder?.itemView?.requestFocus()
+                }
             }
         }
     }
@@ -230,7 +243,13 @@ class PeliculasApiFragment : Fragment() {
                 }
             }
             withContext(Dispatchers.Main) {
+                val focusedPos = adapter.getFocusedPosition()
                 adapter.updateMovies(allMovies)
+                // ✅ Enfocar el primer ítem cuando termine de cargar
+                recyclerView.post {
+                    val viewHolder = recyclerView.findViewHolderForAdapterPosition(0)
+                    viewHolder?.itemView?.requestFocus()
+                }
             }
         }
     }
@@ -263,7 +282,13 @@ class PeliculasApiFragment : Fragment() {
                 }
             }
             withContext(Dispatchers.Main) {
+                val focusedPos = adapter.getFocusedPosition()
                 adapter.updateMovies(allMovies)
+                // ✅ Enfocar el primer ítem cuando termine de cargar
+                recyclerView.post {
+                    val viewHolder = recyclerView.findViewHolderForAdapterPosition(0)
+                    viewHolder?.itemView?.requestFocus()
+                }
             }
         }
     }
@@ -271,7 +296,7 @@ class PeliculasApiFragment : Fragment() {
     // Función para calcular cuántos elementos caben según el ancho real del RecyclerView
     private fun calcularElementosPorFila(anchoRecyclerPx: Int): Int {
         if (!isAdded || anchoRecyclerPx <= 0) return 1
-        val anchoTarjetaDp = 120
+        val anchoTarjetaDp = 140
         val anchoTarjetaPx = (anchoTarjetaDp * resources.displayMetrics.density).toInt()
         return (anchoRecyclerPx / anchoTarjetaPx).coerceAtLeast(1)
     }

@@ -3,6 +3,8 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:gravity="center_horizontal"
+    android:padding="6dp"
+    android:focusable="true"
     android:layout_margin="8dp">
 
     <!-- Contenedor de imagen + etiqueta superpuesta -->
@@ -15,7 +17,7 @@
             android:id="@+id/itemPoster"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:scaleType="centerCrop"
+            android:scaleType="fitXY"
             android:contentDescription="Imagen de película"
             android:src="@drawable/icono" />
 

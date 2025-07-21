@@ -32,11 +32,17 @@ class MenuSuperiorAdapter(
             }
 
             view.setOnFocusChangeListener { v, hasFocus ->
-                v.setBackgroundColor(
-                    if (hasFocus) ContextCompat.getColor(v.context, R.color.colorhover2)
-                    else ContextCompat.getColor(v.context, R.color.colorNotSelected)
-                )
+                // Fondo con drawable elegante
+                v.background = if (hasFocus)
+                    ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
+                else
+                    null
+
+                // Efecto zoom animado
+                val scale = if (hasFocus) 1.05f else 1f
+                v.animate().scaleX(scale).scaleY(scale).setDuration(150).start()
             }
+
         }
     }
 

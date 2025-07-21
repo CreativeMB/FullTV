@@ -11,6 +11,7 @@ import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 import android.graphics.Color
+import android.view.animation.DecelerateInterpolator
 import com.creativem.fulltv.principal.Main
 
 class ApiAdapter(
@@ -26,25 +27,37 @@ class ApiAdapter(
         val etiquetaValida: TextView = view.findViewById(R.id.etiqueta)
 
         init {
+            // Asegura que el itemView es enfocable
+            view.isFocusable = true
+            view.isFocusableInTouchMode = true
+
             view.setOnFocusChangeListener { v, hasFocus ->
                 movieTitle.isSelected = hasFocus
 
+
                 if (hasFocus) {
-                    val movie = movieList[bindingAdapterPosition]
-                    if (!movie.imageUrl.isNullOrEmpty()) {
+                    val position = bindingAdapterPosition
+                    if (position != RecyclerView.NO_POSITION) {
+                        selectedPosition = position
+                        val movie = movieList[position]
                         (v.context as? Main)?.setFondoDesdeUrl(movie.imageUrl)
-                    } else {
-                        (v.context as? Main)?.restaurarFondoAnimado()
                     }
                 }
 
-                v.setBackgroundColor(
-                    if (hasFocus)
-                        ContextCompat.getColor(view.context, R.color.colorhover2)
-                    else
-                        ContextCompat.getColor(view.context, R.color.colorNotSelected)
-                )
+                v.background = if (hasFocus)
+                    ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
+                else
+                    null
+
+                val scale = if (hasFocus) 1.1f else 1f
+                v.animate()
+                    .scaleX(scale)
+                    .scaleY(scale)
+                    .setDuration(150)
+                    .setInterpolator(DecelerateInterpolator())
+                    .start()
             }
+
 
             view.setOnClickListener {
                 val position = bindingAdapterPosition
@@ -65,6 +78,7 @@ class ApiAdapter(
                     notifyItemChanged(selectedPosition)
                     selectedPosition = position
                     notifyItemChanged(selectedPosition)
+                    view.requestFocus()
                 }
             }
         }
@@ -89,11 +103,15 @@ class ApiAdapter(
             setTextColor(Color.WHITE)
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.MARQUEE
-            marqueeRepeatLimit = -1
-            isSingleLine = true
-            isFocusable = true
-            isFocusableInTouchMode = true
+            isFocusable = false // ❗ importante
+            isFocusableInTouchMode = false // ❗ importante
             setHorizontallyScrolling(true)
+            marqueeRepeatLimit = -1
+
+        }
+        // ✅ Restaura foco visual cuando se vuelve a enlazar
+        if (position == selectedPosition) {
+            holder.itemView.requestFocus()
         }
 
         Glide.with(holder.itemView.context)
@@ -105,14 +123,14 @@ class ApiAdapter(
 
     override fun getItemCount(): Int = movieList.size
 
+    fun getFocusedPosition(): Int {
+        return selectedPosition
+    }
     fun updateMovies(newMovies: List<Movie>) {
         movieList.clear()
-        val validMovies = newMovies.filter { isUrlValid(it.streamUrl) }
-        movieList.addAll(validMovies)
+        movieList.addAll(newMovies)
         notifyDataSetChanged()
     }
 
-    private fun isUrlValid(url: String): Boolean {
-        return url.isNotEmpty() && (url.startsWith("http://") || url.startsWith("https://"))
-    }
+
 }

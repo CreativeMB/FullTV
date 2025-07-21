@@ -65,7 +65,8 @@ class MenuPrincipalAdapter(
         holder.icon.setImageResource(item.iconResId)
         holder.text.text = item.name
 
-        val hasFocus = position == lastFocusedPosition
+        val hasFocus = holder.itemView.hasFocus()
+
         holder.text.visibility = if (hasFocus) View.VISIBLE else View.INVISIBLE
         holder.text.isSelected = hasFocus
 

@@ -34,11 +34,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
     private lateinit var recyclerCartelera: RecyclerView
     private lateinit var carteleraAdapter: PelisCarteleraAdapter
     private lateinit var progressBar: ProgressBar
-    private lateinit var loadingText: View
-    private lateinit var loadingContainer: FrameLayout
-
     private var progreso = 0
-    private var cargandoMostrado = false
     private val progresoHandler = Handler(Looper.getMainLooper())
     private val progresoRunnable = object : Runnable {
         override fun run() {

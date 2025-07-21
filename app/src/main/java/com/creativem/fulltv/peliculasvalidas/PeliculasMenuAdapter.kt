@@ -39,13 +39,17 @@ class PeliculasMenuAdapter(
                     }
                 }
 
-                v.setBackgroundColor(
-                    if (hasFocus)
-                        ContextCompat.getColor(view.context, R.color.colorhover2)
-                    else
-                        ContextCompat.getColor(view.context, R.color.colorNotSelected)
-                )
+                // Fondo elegante (drawable) en lugar de color plano
+                v.background = if (hasFocus)
+                    ContextCompat.getDrawable(view.context, R.drawable.card_focused_background)
+                else
+                    null
+
+                // Efecto de escala (zoom al enfocar)
+                val scale = if (hasFocus) 1.05f else 1f
+                v.animate().scaleX(scale).scaleY(scale).setDuration(150).start()
             }
+
 
             view.setOnClickListener {
                 val position = bindingAdapterPosition

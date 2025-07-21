@@ -36,21 +36,20 @@ class PelisCarteleraAdapter(
             }
 
             view.setOnFocusChangeListener { v, hasFocus ->
-                // Foco visual
-                v.setBackgroundColor(
-                    if (hasFocus)
-                        ContextCompat.getColor(v.context, R.color.colorhover2)
-                    else
-                        ContextCompat.getColor(v.context, R.color.colorNotSelected)
-                )
+                // Fondo visual (usa un drawable en lugar de color plano)
+                v.background = if (hasFocus)
+                    ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
+                else
+                    null
 
-                // Escala
+                // Efecto de escala tipo Android TV
                 v.scaleX = if (hasFocus) 1.05f else 1f
                 v.scaleY = if (hasFocus) 1.05f else 1f
 
-                // Activar marquee
+                // Activa marquee en el título
                 title.isSelected = hasFocus
             }
+
         }
     }
 

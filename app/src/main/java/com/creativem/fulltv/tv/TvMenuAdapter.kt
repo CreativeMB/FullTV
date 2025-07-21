@@ -40,17 +40,23 @@ class TvMenuAdapter(
             holder.imageView.setImageResource(R.drawable.icono)
         }
 
-        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
-            holder.itemView.setBackgroundColor(
-                if (hasFocus) ContextCompat.getColor(context, R.color.colorhover2)
-                else ContextCompat.getColor(context, R.color.colorNotSelected)
-            )
+        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+            // Fondo visual con drawable
+            view.background = if (hasFocus)
+                ContextCompat.getDrawable(context, R.drawable.card_focused_background)
+            else
+                null
 
+            // Animación de escala (efecto TV)
+            val scale = if (hasFocus) 1.05f else 1f
+            view.animate().scaleX(scale).scaleY(scale).setDuration(150).start()
+
+            // Lógica adicional al enfocar
             if (hasFocus) {
-                // Llama a la función en PlayerTv si el context es una instancia válida
                 (context as? PlayerTv)?.reiniciarTemporizadorMenu()
             }
         }
+
 
 
 
@@ -64,14 +70,6 @@ class TvMenuAdapter(
             clickListener(tvItem)
         }
 
-
-        // ✅ Cambia color al recibir foco (para control remoto/teclado)
-        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
-            holder.itemView.setBackgroundColor(
-                if (hasFocus) ContextCompat.getColor(context, R.color.colorhover2)
-                else ContextCompat.getColor(context, R.color.colorNotSelected)
-            )
-        }
     }
 
     override fun getItemCount(): Int = tvList.size
