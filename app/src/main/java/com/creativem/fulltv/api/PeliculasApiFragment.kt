@@ -32,6 +32,11 @@ class PeliculasApiFragment : Fragment() {
     private val apiKey = "678193d2c735c6f37840cee035f4d69a"
     private var layoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
 
+    private var currentPage = 1
+    private var isLoading = false
+    private var currentCategory = "Populares"
+    private val totalPagesToLoad = 10
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -51,8 +56,10 @@ class PeliculasApiFragment : Fragment() {
         val menuRecycler = view.findViewById<RecyclerView>(R.id.menu_horizontal)
         menuRecycler.layoutManager =
             LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
+
         menuRecycler.adapter = MenuSuperiorAdapter(menuOpciones) { seleccion ->
-            Log.d("MenuSuperiorAdapter", "Seleccionado: $seleccion")
+            currentPage = 1
+            currentCategory = seleccion
             when (seleccion) {
                 "Populares" -> cargarPeliculasPopulares()
                 "Mejor valoradas" -> cargarPeliculasTopRated()
@@ -62,7 +69,6 @@ class PeliculasApiFragment : Fragment() {
         }
 
         recyclerView = view.findViewById(R.id.recycler_populares)
-
         layoutListener = ViewTreeObserver.OnGlobalLayoutListener {
             if (!isAdded) return@OnGlobalLayoutListener
             val spanCount = calcularElementosPorFila(recyclerView.width)
@@ -71,18 +77,9 @@ class PeliculasApiFragment : Fragment() {
                 recyclerView.layoutManager = GridLayoutManager(requireContext(), spanCount)
             }
         }
-
-        recyclerView.viewTreeObserver.addOnGlobalLayoutListener {
-            val spanCount = calcularElementosPorFila(recyclerView.width)
-            if (recyclerView.layoutManager !is GridLayoutManager ||
-                (recyclerView.layoutManager as GridLayoutManager).spanCount != spanCount
-            ) {
-                recyclerView.layoutManager = GridLayoutManager(requireContext(), spanCount)
-            }
-        }
+        recyclerView.viewTreeObserver.addOnGlobalLayoutListener(layoutListener)
 
         adapter = ApiAdapter(mutableListOf()) { movie ->
-
             val intent = Intent(requireContext(), ApiPeliculaActivity::class.java).apply {
                 putExtra("EXTRA_STREAM_URL", movie.streamUrl)
                 putExtra("EXTRA_MOVIE_TITLE", movie.title)
@@ -96,10 +93,32 @@ class PeliculasApiFragment : Fragment() {
 
         recyclerView.adapter = adapter
         setupApiService()
+        setupScrollListener()
+
         cargarPeliculasPopulares()
 
-        // 🔄 Restaurar fondo animado al iniciar
         (activity as? Main)?.restaurarFondoAnimado()
+    }
+
+    private fun setupScrollListener() {
+        recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+                val layoutManager = recyclerView.layoutManager as GridLayoutManager
+                val lastVisibleItemPosition = layoutManager.findLastVisibleItemPosition()
+                val totalItemCount = layoutManager.itemCount
+
+                if (!isLoading && currentPage < totalPagesToLoad && lastVisibleItemPosition + layoutManager.spanCount * 2 >= totalItemCount && totalItemCount > 0) {
+                    currentPage++
+                    when (currentCategory) {
+                        "Populares" -> cargarPeliculasPopulares()
+                        "Mejor valoradas" -> cargarPeliculasTopRated()
+                        "En cartelera" -> cargarPeliculasNowPlaying()
+                        else -> cargarPeliculasPorGenero(currentCategory)
+                    }
+                }
+            }
+        })
     }
 
     private fun setupApiService() {
@@ -112,164 +131,98 @@ class PeliculasApiFragment : Fragment() {
         apiService = retrofit.create(TMDbApiService::class.java)
     }
 
-    private fun cargarPeliculasPopulares() {
-        CoroutineScope(Dispatchers.IO).launch {
-            val allMovies = mutableListOf<Movie>()
-            for (page in 1..5) {
-                try {
-                    val response =
-                        apiService.getPopularMovies(apiKey, "es-MX", page).awaitResponse()
-                    if (response.isSuccessful) {
-                        val peliculas = response.body()?.results ?: emptyList()
-                        val mapped = peliculas.map { movie ->
-                            Movie(
-                                id = movie.id.toString(),
-                                title = "${movie.title} (${movie.release_date ?: "N/A"})",
-                                originalTitle = movie.original_title,
-                                imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}",
-                                streamUrl = "https://tuservidor.com/stream/${movie.id}",
-                                castv = 50,
-                                countdownMinutes = 60,
-                                createdAt = Timestamp.now()
-                            )
-                        }
-                        allMovies.addAll(mapped)
-                    }
-                } catch (e: Exception) {
-                    Log.e("PeliculasApiFragment", "Fallo en página $page", e)
+    private fun handleDataResponse(mapped: List<Movie>) {
+        // ✅ Guarda el ítem enfocado antes de cargar nuevos datos
+        val focusedView = recyclerView.findFocus()
+        val focusedPosition = if (focusedView != null)
+            recyclerView.getChildAdapterPosition(focusedView)
+        else
+            RecyclerView.NO_POSITION
+
+        if (currentPage == 1) {
+            adapter.updateMovies(mapped)
+
+            // ✅ Enfocar primer ítem al cambiar de categoría o inicio
+            recyclerView.post {
+                recyclerView.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+            }
+        } else {
+            adapter.addMovies(mapped)
+
+            // ✅ Restaurar el foco en el ítem que ya tenía foco
+            if (focusedPosition != RecyclerView.NO_POSITION) {
+                recyclerView.post {
+                    recyclerView.findViewHolderForAdapterPosition(focusedPosition)?.itemView?.requestFocus()
                 }
             }
-            withContext(Dispatchers.Main) {
-                adapter.updateMovies(allMovies)
-            }
+        }
+
+        isLoading = false
+    }
+
+
+    private fun cargarPeliculasPopulares() {
+        if (isLoading) return; isLoading = true
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val response = apiService.getPopularMovies(apiKey, "es-MX", currentPage).awaitResponse()
+                if (response.isSuccessful) {
+                    val mapped = response.body()?.results?.map { movie -> Movie(id = movie.id.toString(), title = "${movie.title} (${movie.release_date?.take(4) ?: "N/A"})", originalTitle = movie.original_title, imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}", streamUrl = "", castv = 50, countdownMinutes = 60, createdAt = Timestamp.now()) } ?: emptyList()
+                    withContext(Dispatchers.Main) { handleDataResponse(mapped) }
+                } else { withContext(Dispatchers.Main) { isLoading = false } }
+            } catch (e: Exception) { withContext(Dispatchers.Main) { isLoading = false }; Log.e("PeliculasApiFragment", "Fallo", e) }
         }
     }
 
     private fun cargarPeliculasTopRated() {
+        if (isLoading) return; isLoading = true
         CoroutineScope(Dispatchers.IO).launch {
-            val allMovies = mutableListOf<Movie>()
-            for (page in 1..5) {
-                try {
-                    val response =
-                        apiService.getTopRatedMovies(apiKey, "es-MX", page).awaitResponse()
-                    if (response.isSuccessful) {
-                        val peliculas = response.body()?.results ?: emptyList()
-                        val mapped = peliculas.map { movie ->
-                            Movie(
-                                id = movie.id.toString(),
-                                title = "${movie.title} (${movie.release_date ?: "N/A"})",
-                                originalTitle = movie.original_title,
-                                imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}",
-                                streamUrl = "https://tuservidor.com/stream/${movie.id}",
-                                castv = 50,
-                                countdownMinutes = 60,
-                                createdAt = Timestamp.now()
-                            )
-                        }
-                        allMovies.addAll(mapped)
-                    }
-                } catch (e: Exception) {
-                    Log.e("PeliculasApiFragment", "Fallo en TopRated página $page", e)
-                }
-            }
-            withContext(Dispatchers.Main) {
-                adapter.updateMovies(allMovies)
-            }
+            try {
+                val response = apiService.getTopRatedMovies(apiKey, "es-MX", currentPage).awaitResponse()
+                if (response.isSuccessful) {
+                    val mapped = response.body()?.results?.map { movie -> Movie(id = movie.id.toString(), title = "${movie.title} (${movie.release_date?.take(4) ?: "N/A"})", originalTitle = movie.original_title, imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}", streamUrl = "", castv = 50, countdownMinutes = 60, createdAt = Timestamp.now()) } ?: emptyList()
+                    withContext(Dispatchers.Main) { handleDataResponse(mapped) }
+                } else { withContext(Dispatchers.Main) { isLoading = false } }
+            } catch (e: Exception) { withContext(Dispatchers.Main) { isLoading = false }; Log.e("PeliculasApiFragment", "Fallo", e) }
         }
     }
 
     private fun cargarPeliculasPorGenero(genero: String) {
+        if (isLoading) return; isLoading = true
         val genreId = when (genero) {
-            "Acción" -> 28
-            "Aventura" -> 12
-            "Animación" -> 16
-            "Comedia" -> 35
-            "Crimen" -> 80
-            "Documental" -> 99
-            "Drama" -> 18
-            "Familia" -> 10751
-            "Fantasía" -> 14
-            "Historia" -> 36
-            "Terror" -> 27
-            "Música" -> 10402
-            "Misterio" -> 9648
-            "Romance" -> 10749
-            "Ciencia ficción" -> 878
-            "Película de TV" -> 10770
-            "Suspenso" -> 53
-            "Bélica" -> 10752
-            "Western" -> 37
+            "Acción" -> 28; "Aventura" -> 12; "Animación" -> 16; "Comedia" -> 35
+            "Crimen" -> 80; "Documental" -> 99; "Drama" -> 18; "Familia" -> 10751
+            "Fantasía" -> 14; "Historia" -> 36; "Terror" -> 27; "Música" -> 10402
+            "Misterio" -> 9648; "Romance" -> 10749; "Ciencia ficción" -> 878
+            "Película de TV" -> 10770; "Suspenso" -> 53; "Bélica" -> 10752; "Western" -> 37
             else -> 0
         }
-
-        if (genreId == 0) return
+        if (genreId == 0) { isLoading = false; return }
 
         CoroutineScope(Dispatchers.IO).launch {
-            val allMovies = mutableListOf<Movie>()
-            for (page in 1..5) {
-                try {
-                    val response =
-                        apiService.getMoviesByGenre(apiKey, "es-MX", genreId, page).awaitResponse()
-                    if (response.isSuccessful) {
-                        val peliculas = response.body()?.results ?: emptyList()
-                        val mapped = peliculas.map { movie ->
-                            Movie(
-                                id = movie.id.toString(),
-                                title = "${movie.title} (${movie.release_date ?: "N/A"})",
-                                originalTitle = movie.original_title,
-                                imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}",
-                                streamUrl = "https://tuservidor.com/stream/${movie.id}",
-                                castv = 50,
-                                countdownMinutes = 60,
-                                createdAt = Timestamp.now()
-                            )
-                        }
-                        allMovies.addAll(mapped)
-                    }
-                } catch (e: Exception) {
-                    Log.e("PeliculasApiFragment", "Fallo en género $genero página $page", e)
-                }
-            }
-            withContext(Dispatchers.Main) {
-                adapter.updateMovies(allMovies)
-            }
+            try {
+                val response = apiService.getMoviesByGenre(apiKey, "es-MX", genreId, currentPage).awaitResponse()
+                if (response.isSuccessful) {
+                    val mapped = response.body()?.results?.map { movie -> Movie(id = movie.id.toString(), title = "${movie.title} (${movie.release_date?.take(4) ?: "N/A"})", originalTitle = movie.original_title, imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}", streamUrl = "", castv = 50, countdownMinutes = 60, createdAt = Timestamp.now()) } ?: emptyList()
+                    withContext(Dispatchers.Main) { handleDataResponse(mapped) }
+                } else { withContext(Dispatchers.Main) { isLoading = false } }
+            } catch (e: Exception) { withContext(Dispatchers.Main) { isLoading = false }; Log.e("PeliculasApiFragment", "Fallo", e) }
         }
     }
 
     private fun cargarPeliculasNowPlaying() {
+        if (isLoading) return; isLoading = true
         CoroutineScope(Dispatchers.IO).launch {
-            val allMovies = mutableListOf<Movie>()
-            for (page in 1..6) {
-                try {
-                    val response =
-                        apiService.getNowPlayingMovies(apiKey, "es-MX", page).awaitResponse()
-                    if (response.isSuccessful) {
-                        val peliculas = response.body()?.results ?: emptyList()
-                        val mapped = peliculas.map { movie ->
-                            Movie(
-                                id = movie.id.toString(),
-                                title = "${movie.title} (${movie.release_date ?: "N/A"})",
-                                originalTitle = movie.original_title,
-                                imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}",
-                                streamUrl = "https://tuservidor.com/stream/${movie.id}",
-                                castv = 50,
-                                countdownMinutes = 60,
-                                createdAt = Timestamp.now()
-                            )
-                        }
-                        allMovies.addAll(mapped)
-                    }
-                } catch (e: Exception) {
-                    Log.e("PeliculasApiFragment", "Fallo en Now Playing: ${e.message}", e)
-                }
-            }
-            withContext(Dispatchers.Main) {
-                adapter.updateMovies(allMovies)
-            }
+            try {
+                val response = apiService.getNowPlayingMovies(apiKey, "es-MX", currentPage).awaitResponse()
+                if (response.isSuccessful) {
+                    val mapped = response.body()?.results?.map { movie -> Movie(id = movie.id.toString(), title = "${movie.title} (${movie.release_date?.take(4) ?: "N/A"})", originalTitle = movie.original_title, imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}", streamUrl = "", castv = 50, countdownMinutes = 60, createdAt = Timestamp.now()) } ?: emptyList()
+                    withContext(Dispatchers.Main) { handleDataResponse(mapped) }
+                } else { withContext(Dispatchers.Main) { isLoading = false } }
+            } catch (e: Exception) { withContext(Dispatchers.Main) { isLoading = false }; Log.e("PeliculasApiFragment", "Fallo", e) }
         }
     }
 
-    // Función para calcular cuántos elementos caben según el ancho real del RecyclerView
     private fun calcularElementosPorFila(anchoRecyclerPx: Int): Int {
         if (!isAdded || anchoRecyclerPx <= 0) return 1
         val anchoTarjetaDp = 140
@@ -279,8 +232,6 @@ class PeliculasApiFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-
-        // Espera a que el recyclerView esté ya medido antes de calcular
         recyclerView.post {
             val ancho = recyclerView.width
             if (ancho > 0) {
@@ -292,14 +243,12 @@ class PeliculasApiFragment : Fragment() {
             }
         }
     }
+
     override fun onDestroyView() {
         super.onDestroyView()
-        // Es crucial eliminar el listener para evitar crashes y fugas de memoria.
         if (layoutListener != null) {
             recyclerView.viewTreeObserver.removeOnGlobalLayoutListener(layoutListener)
         }
-        // También es bueno limpiar la referencia.
         layoutListener = null
     }
-
 }

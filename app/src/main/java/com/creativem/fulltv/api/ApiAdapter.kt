@@ -1,4 +1,5 @@
 package com.creativem.fulltv.api
+
 import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
@@ -12,6 +13,7 @@ import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 import android.graphics.Color
 import android.view.animation.DecelerateInterpolator
+import androidx.recyclerview.widget.DiffUtil
 import com.creativem.fulltv.principal.Main
 
 class ApiAdapter(
@@ -19,31 +21,25 @@ class ApiAdapter(
     private val onMovieClick: (Movie) -> Unit
 ) : RecyclerView.Adapter<ApiAdapter.SmallMovieViewHolder>() {
 
-    private var selectedPosition = RecyclerView.NO_POSITION
-
     inner class SmallMovieViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val movieImage: ImageView = view.findViewById(R.id.movieimage)
         val movieTitle: TextView = view.findViewById(R.id.movietitle)
         val etiquetaValida: TextView = view.findViewById(R.id.etiqueta)
 
         init {
-            // Asegura que el itemView es enfocable
             view.isFocusable = true
             view.isFocusableInTouchMode = true
 
             view.setOnFocusChangeListener { v, hasFocus ->
                 movieTitle.isSelected = hasFocus
 
-
-                if (hasFocus) {
-                    val position = bindingAdapterPosition
-                    if (position != RecyclerView.NO_POSITION) {
-                        selectedPosition = position
-                        val movie = movieList[position]
-                        (v.context as? Main)?.setFondoDesdeUrl(movie.imageUrl)
-                    }
+                val position = bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION && hasFocus) {
+                    val movie = movieList[position]
+                    (v.context as? Main)?.setFondoDesdeUrl(movie.imageUrl)
                 }
 
+                // Aplica animación SOLO si está enfocado
                 v.background = if (hasFocus)
                     ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
                 else
@@ -58,24 +54,16 @@ class ApiAdapter(
                     .start()
             }
 
-
             view.setOnClickListener {
                 val position = bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
                     val movie = movieList[position]
-
-                    // 🔄 Fondo dinámico
                     if (!movie.imageUrl.isNullOrEmpty()) {
                         (view.context as? Main)?.setFondoDesdeUrl(movie.imageUrl)
                     } else {
                         (view.context as? Main)?.restaurarFondoAnimado()
                     }
-
-                    // Ejecutar callback
                     onMovieClick(movie)
-
-                    // Solo actualizamos posición seleccionada (sin perder foco)
-                    selectedPosition = position
                 }
             }
         }
@@ -100,11 +88,10 @@ class ApiAdapter(
             setTextColor(Color.WHITE)
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.MARQUEE
-            isFocusable = false // ❗ importante
-            isFocusableInTouchMode = false // ❗ importante
+            isFocusable = false
+            isFocusableInTouchMode = false
             setHorizontallyScrolling(true)
             marqueeRepeatLimit = -1
-
         }
 
         Glide.with(holder.itemView.context)
@@ -112,17 +99,45 @@ class ApiAdapter(
             .placeholder(R.drawable.pelifondo)
             .error(R.drawable.icono)
             .into(holder.movieImage)
+
+        // ❌ Ya no necesitas aplicar fondo/escala aquí. Lo hace el sistema al enfocar.
     }
 
     override fun getItemCount(): Int = movieList.size
 
     fun updateMovies(newMovies: List<Movie>) {
-        movieList.clear()
-        movieList.addAll(newMovies)
-        notifyDataSetChanged()
+        val diffCallback = MovieDiffCallback(this.movieList, newMovies)
+        val diffResult = DiffUtil.calculateDiff(diffCallback)
+        this.movieList.clear()
+        this.movieList.addAll(newMovies)
+        diffResult.dispatchUpdatesTo(this)
     }
 
+    fun addMovies(newMovies: List<Movie>) {
+        val startPosition = movieList.size
+        movieList.addAll(newMovies)
+        notifyItemRangeInserted(startPosition, newMovies.size)
+    }
 
+    // 🔁 Comparador para DiffUtil
+    class MovieDiffCallback(
+        private val oldList: List<Movie>,
+        private val newList: List<Movie>
+    ) : DiffUtil.Callback() {
 
+        override fun getOldListSize(): Int = oldList.size
+
+        override fun getNewListSize(): Int = newList.size
+
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            // Compara por ID único
+            return oldList[oldItemPosition].id == newList[newItemPosition].id
+        }
+
+        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            // Compara el contenido completo
+            return oldList[oldItemPosition] == newList[newItemPosition]
+        }
+    }
 
 }
