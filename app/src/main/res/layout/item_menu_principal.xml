@@ -1,29 +1,39 @@
-<LinearLayout
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="@dimen/menu_item_width_collapsed"
+    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:gravity="center"
     android:padding="6dp"
     android:background="@android:color/transparent">
 
-    <ImageView
-        android:id="@+id/iconoMenu"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
-        android:layout_gravity="center"
-        android:src="@drawable/icono" />
-
-    <TextView
-        android:id="@+id/textoMenu"
+    <LinearLayout
+        android:id="@+id/contenedorMenu"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Título"
-        android:textColor="@android:color/white"
-        android:textSize="14sp"
-        android:visibility="invisible"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:gravity="center"
-        android:textAlignment="center" />
-</LinearLayout>
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:id="@+id/iconoMenu"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:src="@drawable/icono"
+            android:layout_marginEnd="8dp"/>
+
+        <TextView
+            android:id="@+id/textoMenu"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:text="Texto largo de prueba"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:maxLines="1"
+            android:ellipsize="none"
+            android:singleLine="true"
+            android:scrollHorizontally="true"
+            android:marqueeRepeatLimit="1"
+            android:focusable="false"
+            android:focusableInTouchMode="false"/>
+    </LinearLayout>
+
+</FrameLayout>

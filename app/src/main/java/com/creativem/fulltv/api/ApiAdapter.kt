@@ -71,14 +71,11 @@ class ApiAdapter(
                         (view.context as? Main)?.restaurarFondoAnimado()
                     }
 
-                    // 🔁 Ejecutar callback
+                    // Ejecutar callback
                     onMovieClick(movie)
 
-                    // 🔁 Marcar como seleccionado visualmente
-                    notifyItemChanged(selectedPosition)
+                    // Solo actualizamos posición seleccionada (sin perder foco)
                     selectedPosition = position
-                    notifyItemChanged(selectedPosition)
-                    view.requestFocus()
                 }
             }
         }
@@ -109,10 +106,6 @@ class ApiAdapter(
             marqueeRepeatLimit = -1
 
         }
-        // ✅ Restaura foco visual cuando se vuelve a enlazar
-        if (position == selectedPosition) {
-            holder.itemView.requestFocus()
-        }
 
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
@@ -123,14 +116,13 @@ class ApiAdapter(
 
     override fun getItemCount(): Int = movieList.size
 
-    fun getFocusedPosition(): Int {
-        return selectedPosition
-    }
     fun updateMovies(newMovies: List<Movie>) {
         movieList.clear()
         movieList.addAll(newMovies)
         notifyDataSetChanged()
     }
+
+
 
 
 }

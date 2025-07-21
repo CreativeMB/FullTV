@@ -47,6 +47,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentTransaction
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.android.volley.Request
 import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
@@ -301,15 +302,26 @@ class Main : FragmentActivity() {
         recycler.adapter = adapter
 
         // 🔄 Restaurar el último foco al entrar
+        // 🔄 Restaurar el último foco al entrar al RecyclerView
         recycler.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
                 recycler.post {
-                    val pos = adapter.lastFocusedPosition
-                    val viewHolder = recycler.findViewHolderForAdapterPosition(pos)
-                    viewHolder?.itemView?.requestFocus()
+                    val position = adapter.lastFocusedPosition
+                    if (position != RecyclerView.NO_POSITION && position < adapter.itemCount) {
+                        val viewHolder = recycler.findViewHolderForAdapterPosition(position)
+                        if (viewHolder != null) {
+                            viewHolder.itemView.requestFocus()
+                        } else {
+                            recycler.scrollToPosition(position)
+                            recycler.post {
+                                recycler.findViewHolderForAdapterPosition(position)?.itemView?.requestFocus()
+                            }
+                        }
+                    }
                 }
             }
         }
+
 
         // ✅ Enfocar el primer ítem al cargar por primera vez
         recycler.post {

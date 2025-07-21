@@ -10,48 +10,51 @@ import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
 
 class MenuPrincipalAdapter(
+
     private val items: List<MenuPrincipalItem>,
     private val onItemClick: (MenuPrincipalItem) -> Unit
 ) : RecyclerView.Adapter<MenuPrincipalAdapter.MenuViewHolder>() {
 
-    var lastFocusedPosition: Int = 0  // Se puede usar desde el Fragmento para restaurar foco
+    var lastFocusedPosition: Int = 0  // Se actualiza desde el ViewHolder cuando recibe foco
 
     inner class MenuViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.iconoMenu)
         val text: TextView = view.findViewById(R.id.textoMenu)
 
         init {
+            // ✅ Asegurar que cada ítem sea enfocable
+            view.isFocusable = true
+            view.isFocusableInTouchMode = true
+
             view.setOnClickListener {
-                val item = items[bindingAdapterPosition]
-                onItemClick(item)
+                val position = bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    onItemClick(items[position])
+                }
             }
 
             view.setOnFocusChangeListener { v, hasFocus ->
-                // Fondo y escala
                 v.background = if (hasFocus)
                     ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
                 else
                     null
 
-                val layoutParams = v.layoutParams
-                if (hasFocus) {
-                    layoutParams.width = ViewGroup.LayoutParams.WRAP_CONTENT // Expande al tamaño del contenido (título)
-                } else {
-                    layoutParams.width = v.context.resources.getDimensionPixelSize(R.dimen.menu_item_width_collapsed)
-                }
-                v.layoutParams = layoutParams
+                val scale = if (hasFocus) 1.05f else 1f
+                v.animate().scaleX(scale).scaleY(scale).setDuration(150).start()
 
-                // Mostrar texto solo cuando tiene focus
-                text.visibility = if (hasFocus) View.VISIBLE else View.INVISIBLE
-                text.isSelected = hasFocus
+                // ✅ Mostrar el texto completo solo cuando tenga foco
+                text.visibility = if (hasFocus) View.VISIBLE else View.GONE
 
                 if (hasFocus) {
                     lastFocusedPosition = bindingAdapterPosition
                 }
             }
 
-        }
 
+
+
+
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MenuViewHolder {
@@ -65,14 +68,10 @@ class MenuPrincipalAdapter(
         holder.icon.setImageResource(item.iconResId)
         holder.text.text = item.name
 
-        val hasFocus = holder.itemView.hasFocus()
-
-        holder.text.visibility = if (hasFocus) View.VISIBLE else View.INVISIBLE
-        holder.text.isSelected = hasFocus
-
-        val scale = if (hasFocus) 1.1f else 1f
-        holder.itemView.scaleX = scale
-        holder.itemView.scaleY = scale
+        // Opcional: puedes restaurar visualmente si tiene el foco
+        val hasFocus = position == lastFocusedPosition
+        holder.itemView.scaleX = if (hasFocus) 1.05f else 1f
+        holder.itemView.scaleY = if (hasFocus) 1.05f else 1f
     }
 
     override fun getItemCount(): Int = items.size

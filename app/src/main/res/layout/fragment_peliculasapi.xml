@@ -1,5 +1,6 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/populares_container"
+ android:layout_marginStart="35dp"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -18,9 +19,11 @@
         android:layout_width="match_parent"
         android:layout_height="50dp"
         android:layout_marginTop="8dp"
-        android:clipToPadding="false"
-        android:overScrollMode="never"
-        android:layout_gravity="top" />
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:descendantFocusability="afterDescendants"
+        android:layout_gravity="top"/>
+
 
     <!-- Películas -->
     <androidx.recyclerview.widget.RecyclerView
@@ -32,6 +35,5 @@
         android:clipToPadding="false"
         android:overScrollMode="never"
         android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:descendantFocusability="afterDescendants" />
+        android:focusableInTouchMode="true"/>
 </FrameLayout>

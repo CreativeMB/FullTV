@@ -52,6 +52,7 @@ class PeliculasApiFragment : Fragment() {
         menuRecycler.layoutManager =
             LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
         menuRecycler.adapter = MenuSuperiorAdapter(menuOpciones) { seleccion ->
+            Log.d("MenuSuperiorAdapter", "Seleccionado: $seleccion")
             when (seleccion) {
                 "Populares" -> cargarPeliculasPopulares()
                 "Mejor valoradas" -> cargarPeliculasTopRated()
@@ -139,14 +140,7 @@ class PeliculasApiFragment : Fragment() {
                 }
             }
             withContext(Dispatchers.Main) {
-                val focusedPos = adapter.getFocusedPosition()
                 adapter.updateMovies(allMovies)
-                // ✅ Enfocar el primer ítem cuando termine de cargar
-                recyclerView.post {
-                    val viewHolder = recyclerView.findViewHolderForAdapterPosition(0)
-                    viewHolder?.itemView?.requestFocus()
-                }
-
             }
         }
     }
@@ -179,13 +173,7 @@ class PeliculasApiFragment : Fragment() {
                 }
             }
             withContext(Dispatchers.Main) {
-                val focusedPos = adapter.getFocusedPosition()
                 adapter.updateMovies(allMovies)
-                // ✅ Enfocar el primer ítem cuando termine de cargar
-                recyclerView.post {
-                    val viewHolder = recyclerView.findViewHolderForAdapterPosition(0)
-                    viewHolder?.itemView?.requestFocus()
-                }
             }
         }
     }
@@ -243,13 +231,7 @@ class PeliculasApiFragment : Fragment() {
                 }
             }
             withContext(Dispatchers.Main) {
-                val focusedPos = adapter.getFocusedPosition()
                 adapter.updateMovies(allMovies)
-                // ✅ Enfocar el primer ítem cuando termine de cargar
-                recyclerView.post {
-                    val viewHolder = recyclerView.findViewHolderForAdapterPosition(0)
-                    viewHolder?.itemView?.requestFocus()
-                }
             }
         }
     }
@@ -282,13 +264,7 @@ class PeliculasApiFragment : Fragment() {
                 }
             }
             withContext(Dispatchers.Main) {
-                val focusedPos = adapter.getFocusedPosition()
                 adapter.updateMovies(allMovies)
-                // ✅ Enfocar el primer ítem cuando termine de cargar
-                recyclerView.post {
-                    val viewHolder = recyclerView.findViewHolderForAdapterPosition(0)
-                    viewHolder?.itemView?.requestFocus()
-                }
             }
         }
     }
