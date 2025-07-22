@@ -62,7 +62,9 @@ class CastvAdapter(
         }
 
         holder.userEmail.text = user.correo
-        holder.userFecha.text = "${parsearFecha(user.ultimaConexion)}"
+
+        holder.userFecha.text = parsearFecha(user.ultimaConexion)
+
         holder.userCastv.setText(user.castv.toString())
 
 
@@ -108,10 +110,17 @@ class CastvAdapter(
                 val sdf = SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault())
                 sdf.format(Date(fecha))
             }
+            is Double -> {
+                val millis = fecha.toLong()
+                val sdf = SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault())
+                sdf.format(Date(millis))
+            }
             is String -> fecha
             else -> "Sin fecha"
         }
     }
+
+
 
 
 }

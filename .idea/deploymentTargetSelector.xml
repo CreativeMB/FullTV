@@ -15,7 +15,7 @@
       </SelectionState>
       <SelectionState runConfigName="app.tvfullurl">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2025-07-19T23:52:52.632789600Z">
+        <DropdownSelection timestamp="2025-07-22T18:07:02.749579100Z">
           <Target type="DEFAULT_BOOT">
             <handle>
               <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\Oficina\.android\avd\Pixel_8a_API_35.avd" />
