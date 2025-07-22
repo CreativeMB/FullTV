@@ -156,24 +156,17 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Cartelera -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="0dp"
-                android:orientation="vertical">
-
-                <androidx.recyclerview.widget.RecyclerView
+                       <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/peliscartelera"
-                    android:layout_width="match_parent"
-                    android:layout_height="235dp"
-                    android:background="@android:color/transparent"
-                    android:orientation="horizontal"
-                    android:overScrollMode="never"
-                    android:padding="2dp"
-                    android:scrollbars="none"
+                           android:layout_width="match_parent"
+                           android:layout_height="match_parent"
+
+                           android:background="@android:color/transparent"
+                           android:padding="12dp"
+                           android:clipToPadding="false"
+                           android:overScrollMode="never"
                    />
-            </LinearLayout>
+
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 

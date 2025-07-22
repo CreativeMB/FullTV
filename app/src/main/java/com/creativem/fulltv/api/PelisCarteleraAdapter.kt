@@ -5,6 +5,7 @@ import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.DecelerateInterpolator
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -23,66 +24,75 @@ class PelisCarteleraAdapter(
         val poster: ImageView = view.findViewById(R.id.itemPoster)
         val title: TextView = view.findViewById(R.id.itemTitle)
         val etiquetaValida: TextView = view.findViewById(R.id.etiqueta)
-
-        init {
-            view.setOnClickListener {
-                val position = bindingAdapterPosition
-                if (position != RecyclerView.NO_POSITION && selectedPosition != position) {
-                    notifyItemChanged(selectedPosition)
-                    selectedPosition = position
-                    notifyItemChanged(selectedPosition)
-                    onClick(items[position])
-                }
-            }
-
-            view.setOnFocusChangeListener { v, hasFocus ->
-                // Fondo visual (usa un drawable en lugar de color plano)
-                v.background = if (hasFocus)
-                    ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
-                else
-                    null
-
-                // Efecto de escala tipo Android TV
-                v.scaleX = if (hasFocus) 1.05f else 1f
-                v.scaleY = if (hasFocus) 1.05f else 1f
-
-                // Activa marquee en el título
-                title.isSelected = hasFocus
-            }
-
-        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_pelis_cartelera, parent, false)
+        view.isFocusable = true
+        view.isFocusableInTouchMode = true
         return ViewHolder(view)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val movie = items[position]
+
+        // Configuración de la etiqueta
         holder.etiquetaValida.text = "Alquilar $50💳"
         holder.etiquetaValida.setBackgroundColor(Color.parseColor("#880E4F"))
         holder.etiquetaValida.visibility = View.VISIBLE
 
+        // Configuración del título
         holder.title.apply {
             text = movie.title
             textSize = 16f
-            setTextColor(ContextCompat.getColor(context, android.R.color.white))
+            setTextColor(Color.WHITE)
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.MARQUEE
             marqueeRepeatLimit = -1
             isSingleLine = true
-            isFocusable = true
-            isFocusableInTouchMode = true
+            isFocusable = false
+            isFocusableInTouchMode = false
             setHorizontallyScrolling(true)
+            isSelected = holder.itemView.isFocused // para marquee
         }
 
+        // Cargar imagen
         Glide.with(holder.itemView.context)
             .load("https://image.tmdb.org/t/p/w500${movie.poster_path}")
             .placeholder(R.drawable.pelifondo)
             .error(R.drawable.icono)
             .into(holder.poster)
+
+        // Manejo de enfoque
+        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+            holder.title.isSelected = hasFocus
+            holder.title.setTextColor(if (hasFocus) Color.YELLOW else Color.WHITE)
+
+            view.background = if (hasFocus)
+                ContextCompat.getDrawable(view.context, R.drawable.card_focused_background)
+            else
+                null
+
+            val scale = if (hasFocus) 1.1f else 1f
+            view.animate()
+                .scaleX(scale)
+                .scaleY(scale)
+                .setDuration(150)
+                .setInterpolator(DecelerateInterpolator())
+                .start()
+        }
+
+        // Manejo de clic
+        holder.itemView.setOnClickListener {
+            val pos = holder.bindingAdapterPosition
+            if (pos != RecyclerView.NO_POSITION && selectedPosition != pos) {
+                notifyItemChanged(selectedPosition)
+                selectedPosition = pos
+                notifyItemChanged(selectedPosition)
+                onClick(items[pos])
+            }
+        }
     }
 
     override fun getItemCount(): Int = items.size

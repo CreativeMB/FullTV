@@ -167,7 +167,7 @@ class PeliculasApiFragment : Fragment() {
             try {
                 val response = apiService.getPopularMovies(apiKey, "es-MX", currentPage).awaitResponse()
                 if (response.isSuccessful) {
-                    val mapped = response.body()?.results?.map { movie -> Movie(id = movie.id.toString(), title = "${movie.title} (${movie.release_date?.take(4) ?: "N/A"})", originalTitle = movie.original_title, imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}", streamUrl = "", castv = 50, countdownMinutes = 60, createdAt = Timestamp.now()) } ?: emptyList()
+                    val mapped = response.body()?.results?.map { movie -> Movie(id = movie.id.toString(), title = "${movie.title} (${movie.release_date?.take(4) ?: "N/A"})", originalTitle = movie.original_title, imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}", streamUrl = "https://image.tmdb.org", castv = 50, countdownMinutes = 60, createdAt = Timestamp.now()) } ?: emptyList()
                     withContext(Dispatchers.Main) { handleDataResponse(mapped) }
                 } else { withContext(Dispatchers.Main) { isLoading = false } }
             } catch (e: Exception) { withContext(Dispatchers.Main) { isLoading = false }; Log.e("PeliculasApiFragment", "Fallo", e) }
@@ -180,7 +180,7 @@ class PeliculasApiFragment : Fragment() {
             try {
                 val response = apiService.getTopRatedMovies(apiKey, "es-MX", currentPage).awaitResponse()
                 if (response.isSuccessful) {
-                    val mapped = response.body()?.results?.map { movie -> Movie(id = movie.id.toString(), title = "${movie.title} (${movie.release_date?.take(4) ?: "N/A"})", originalTitle = movie.original_title, imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}", streamUrl = "", castv = 50, countdownMinutes = 60, createdAt = Timestamp.now()) } ?: emptyList()
+                    val mapped = response.body()?.results?.map { movie -> Movie(id = movie.id.toString(), title = "${movie.title} (${movie.release_date?.take(4) ?: "N/A"})", originalTitle = movie.original_title, imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}", streamUrl = "https://image.tmdb.org", castv = 50, countdownMinutes = 60, createdAt = Timestamp.now()) } ?: emptyList()
                     withContext(Dispatchers.Main) { handleDataResponse(mapped) }
                 } else { withContext(Dispatchers.Main) { isLoading = false } }
             } catch (e: Exception) { withContext(Dispatchers.Main) { isLoading = false }; Log.e("PeliculasApiFragment", "Fallo", e) }

@@ -17,61 +17,21 @@ import androidx.recyclerview.widget.DiffUtil
 import com.creativem.fulltv.principal.Main
 
 class ApiAdapter(
-    private val movieList: MutableList<Movie>,
-    private val onMovieClick: (Movie) -> Unit
+private val movieList: MutableList<Movie>,
+private val onMovieClick: (Movie) -> Unit
 ) : RecyclerView.Adapter<ApiAdapter.SmallMovieViewHolder>() {
 
     inner class SmallMovieViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val movieImage: ImageView = view.findViewById(R.id.movieimage)
         val movieTitle: TextView = view.findViewById(R.id.movietitle)
         val etiquetaValida: TextView = view.findViewById(R.id.etiqueta)
-
-        init {
-            view.isFocusable = true
-            view.isFocusableInTouchMode = true
-
-            view.setOnFocusChangeListener { v, hasFocus ->
-                movieTitle.isSelected = hasFocus
-
-                val position = bindingAdapterPosition
-                if (position != RecyclerView.NO_POSITION && hasFocus) {
-                    val movie = movieList[position]
-                    (v.context as? Main)?.setFondoDesdeUrl(movie.imageUrl)
-                }
-
-                // Aplica animación SOLO si está enfocado
-                v.background = if (hasFocus)
-                    ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
-                else
-                    null
-
-                val scale = if (hasFocus) 1.1f else 1f
-                v.animate()
-                    .scaleX(scale)
-                    .scaleY(scale)
-                    .setDuration(150)
-                    .setInterpolator(DecelerateInterpolator())
-                    .start()
-            }
-
-            view.setOnClickListener {
-                val position = bindingAdapterPosition
-                if (position != RecyclerView.NO_POSITION) {
-                    val movie = movieList[position]
-                    if (!movie.imageUrl.isNullOrEmpty()) {
-                        (view.context as? Main)?.setFondoDesdeUrl(movie.imageUrl)
-                    } else {
-                        (view.context as? Main)?.restaurarFondoAnimado()
-                    }
-                    onMovieClick(movie)
-                }
-            }
-        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SmallMovieViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_menu_peliculas_validas, parent, false)
+        view.isFocusable = true
+        view.isFocusableInTouchMode = true
         return SmallMovieViewHolder(view)
     }
 
@@ -84,23 +44,53 @@ class ApiAdapter(
 
         holder.movieTitle.apply {
             text = movie.title
-            textSize = 18f
-            setTextColor(Color.WHITE)
+            textSize = 16f
+            setTextColor(ContextCompat.getColor(context, android.R.color.white))
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.MARQUEE
-            isFocusable = false
-            isFocusableInTouchMode = false
-            setHorizontallyScrolling(true)
             marqueeRepeatLimit = -1
+            isSingleLine = true
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setHorizontallyScrolling(true)
         }
 
+        // Imagen
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
             .placeholder(R.drawable.pelifondo)
             .error(R.drawable.icono)
             .into(holder.movieImage)
 
-        // ❌ Ya no necesitas aplicar fondo/escala aquí. Lo hace el sistema al enfocar.
+        // Eventos de foco y clic
+        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+            holder.movieTitle.isSelected = hasFocus
+            holder.movieTitle.setTextColor(if (hasFocus) Color.YELLOW else Color.WHITE)
+
+            if (hasFocus) {
+                (view.context as? Main)?.setFondoDesdeUrl(movie.imageUrl)
+                view.background = ContextCompat.getDrawable(view.context, R.drawable.card_focused_background)
+            } else {
+                view.background = null
+            }
+
+            val scale = if (hasFocus) 1.1f else 1f
+            view.animate()
+                .scaleX(scale)
+                .scaleY(scale)
+                .setDuration(150)
+                .setInterpolator(DecelerateInterpolator())
+                .start()
+        }
+
+        holder.itemView.setOnClickListener {
+            if (!movie.imageUrl.isNullOrEmpty()) {
+                (holder.itemView.context as? Main)?.setFondoDesdeUrl(movie.imageUrl)
+            } else {
+                (holder.itemView.context as? Main)?.restaurarFondoAnimado()
+            }
+            onMovieClick(movie)
+        }
     }
 
     override fun getItemCount(): Int = movieList.size
@@ -119,25 +109,20 @@ class ApiAdapter(
         notifyItemRangeInserted(startPosition, newMovies.size)
     }
 
-    // 🔁 Comparador para DiffUtil
     class MovieDiffCallback(
         private val oldList: List<Movie>,
         private val newList: List<Movie>
     ) : DiffUtil.Callback() {
 
         override fun getOldListSize(): Int = oldList.size
-
         override fun getNewListSize(): Int = newList.size
 
         override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-            // Compara por ID único
             return oldList[oldItemPosition].id == newList[newItemPosition].id
         }
 
         override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-            // Compara el contenido completo
             return oldList[oldItemPosition] == newList[newItemPosition]
         }
     }
-
 }
