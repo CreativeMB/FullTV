@@ -33,6 +33,12 @@ class CastvAdapter(
         val editImage: ImageView = itemView.findViewById(R.id.editImage)
         val deleteImage: ImageView = itemView.findViewById(R.id.deleteImage)
     }
+    init {
+        filteredList = userList.sortedWith(compareByDescending<User> { it.isOnline }
+            .thenByDescending { obtenerTimestamp(it.ultimaConexion) })
+    }
+
+
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_castv, parent, false)
@@ -46,9 +52,13 @@ class CastvAdapter(
             userList.filter { user ->
                 user.nombre.contains(query, ignoreCase = true)
             }
-        }
+        }.sortedWith(compareByDescending<User> { it.isOnline }
+            .thenByDescending { obtenerTimestamp(it.ultimaConexion) })
+
         notifyDataSetChanged()
     }
+
+
 
     override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
         val user = filteredList[position]
@@ -117,6 +127,22 @@ class CastvAdapter(
             }
             is String -> fecha
             else -> "Sin fecha"
+        }
+    }
+    private fun obtenerTimestamp(fecha: Any?): Long {
+        return when (fecha) {
+            is Long -> fecha
+            is Double -> fecha.toLong()
+            is String -> {
+                // Si la fecha es una cadena, intenta parsearla
+                try {
+                    val sdf = SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault())
+                    sdf.parse(fecha)?.time ?: 0L
+                } catch (e: Exception) {
+                    0L
+                }
+            }
+            else -> 0L
         }
     }
 
