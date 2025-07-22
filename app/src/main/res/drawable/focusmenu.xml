@@ -4,14 +4,14 @@
     <!-- Estado: Cuando la vista tiene el foco -->
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <solid android:color="@color/colorhover2" /> <!-- Tu color de hover -->
+            <solid android:color="#CC1D1D1D" /> <!-- Tu color de hover -->
         </shape>
     </item>
 
     <!-- Estado: Cuando la vista está presionada -->
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <solid android:color="@color/colorSelected" /> <!-- Tu color de selección/presionado -->
+            <solid android:color="@color/colorFocused" /> <!-- Tu color de selección/presionado -->
         </shape>
     </item>
 

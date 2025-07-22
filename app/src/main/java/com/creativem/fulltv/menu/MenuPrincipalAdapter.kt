@@ -15,14 +15,13 @@ class MenuPrincipalAdapter(
     private val onItemClick: (MenuPrincipalItem) -> Unit
 ) : RecyclerView.Adapter<MenuPrincipalAdapter.MenuViewHolder>() {
 
-    var lastFocusedPosition: Int = 0  // Se actualiza desde el ViewHolder cuando recibe foco
+    var lastFocusedPosition: Int = 0
 
     inner class MenuViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.iconoMenu)
         val text: TextView = view.findViewById(R.id.textoMenu)
 
         init {
-            // ✅ Asegurar que cada ítem sea enfocable
             view.isFocusable = true
             view.isFocusableInTouchMode = true
 
@@ -32,26 +31,38 @@ class MenuPrincipalAdapter(
                     onItemClick(items[position])
                 }
             }
-
             view.setOnFocusChangeListener { v, hasFocus ->
+                // Cambiar fondo si tiene foco
                 v.background = if (hasFocus)
-                    ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
+                    ContextCompat.getDrawable(v.context, R.drawable.focusmenu)
                 else
                     null
 
-                val scale = if (hasFocus) 1.05f else 1f
-                v.animate().scaleX(scale).scaleY(scale).setDuration(150).start()
+                // Escala que se aplicará
+                val scale = if (hasFocus) 1.5f else 1f
 
-                // ✅ Mostrar el texto completo solo cuando tenga foco
+                // 🔍 Animar el ícono
+                icon.animate()
+                    .scaleX(scale)
+                    .scaleY(scale)
+                    .setDuration(200)
+                    .start()
+
+                // 🔤 Animar el texto
+                text.animate()
+                    .scaleX(scale)
+                    .scaleY(scale)
+                    .setDuration(200)
+                    .start()
+
+                // Mostrar u ocultar el texto según foco (opcional)
                 text.visibility = if (hasFocus) View.VISIBLE else View.GONE
 
+                // Guardar posición enfocada
                 if (hasFocus) {
                     lastFocusedPosition = bindingAdapterPosition
                 }
             }
-
-
-
 
 
         }
@@ -68,10 +79,7 @@ class MenuPrincipalAdapter(
         holder.icon.setImageResource(item.iconResId)
         holder.text.text = item.name
 
-        // Opcional: puedes restaurar visualmente si tiene el foco
-        val hasFocus = position == lastFocusedPosition
-        holder.itemView.scaleX = if (hasFocus) 1.05f else 1f
-        holder.itemView.scaleY = if (hasFocus) 1.05f else 1f
+
     }
 
     override fun getItemCount(): Int = items.size

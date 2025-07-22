@@ -1,39 +1,35 @@
-<FrameLayout
+<androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:padding="6dp"
-    android:background="@android:color/transparent">
+    android:padding="5dp"
+    android:clipChildren="false"
+    android:clipToPadding="false">
 
-    <LinearLayout
-        android:id="@+id/contenedorMenu"
+    <ImageView
+        android:id="@+id/iconoMenu"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:src="@drawable/icono"
+        android:scaleType="centerInside"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/textoMenu"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:text="Texto"
+        android:textColor="@android:color/white"
+        android:textSize="14sp"
+        android:padding="10dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/iconoMenu"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-        <ImageView
-            android:id="@+id/iconoMenu"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:src="@drawable/icono"
-            android:layout_marginEnd="8dp"/>
-
-        <TextView
-            android:id="@+id/textoMenu"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="gone"
-            android:text="Texto largo de prueba"
-            android:textColor="@android:color/white"
-            android:textSize="14sp"
-            android:maxLines="1"
-            android:ellipsize="none"
-            android:singleLine="true"
-            android:scrollHorizontally="true"
-            android:marqueeRepeatLimit="1"
-            android:focusable="false"
-            android:focusableInTouchMode="false"/>
-    </LinearLayout>
-
-</FrameLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>
