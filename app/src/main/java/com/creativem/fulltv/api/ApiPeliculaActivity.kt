@@ -15,9 +15,11 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.peliculas.PlayerPeliculas
+import com.creativem.fulltv.peliculas.Validacioneslista
 import com.creativem.fulltv.principal.Movie
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -96,7 +98,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
         movieCastv = intent.getIntExtra("EXTRA_MOVIE_CASTV", 0)
         movieImageUrl = intent.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
         movieCountdown = intent.getIntExtra("EXTRA_COUNTDOWN", 0)
-
+        actualizarTextoBotonReproducir()
 
 
         recyclerCartelera = findViewById(R.id.peliscartelera)
@@ -136,6 +138,26 @@ class ApiPeliculaActivity : AppCompatActivity() {
         cargarCartelera()
         buscarPelicula(movieOriginalTitle.ifBlank { movieTitle })
     }
+
+    private fun actualizarTextoBotonReproducir() {
+        if (streamUrlGuardado.isBlank()) {
+            tvReproducir.text = "Alquilar" // Texto por defecto si no hay URL
+            return
+        }
+
+        GlobalScope.launch(Dispatchers.Main) {
+            try {
+                Validacioneslista.esperarCarga()
+                val peliculasValidas = Validacioneslista.obtenerPeliculasValidas()
+                val esValida = peliculasValidas.any { it.streamUrl == streamUrlGuardado }
+
+                tvReproducir.text = if (esValida) "▶ Reproducir" else "Alquilar \uD83D\uDCB3"
+            } catch (e: Exception) {
+                tvReproducir.text = "Alquilar" // En caso de error, texto por defecto
+            }
+        }
+    }
+
 
     private fun cargarCartelera() {
         CoroutineScope(Dispatchers.IO).launch {
@@ -260,6 +282,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
             override fun onFailure(call: Call<CreditsResponse>, t: Throwable) {}
         })
+        actualizarTextoBotonReproducir()
     }
 
     private fun mostrarContenidoLocal() {
