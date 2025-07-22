@@ -4,12 +4,14 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
+import com.bumptech.glide.Glide
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,6 +53,8 @@ object CastvHelper {
                     if (context is Activity) context.finish()
                 } else {
                     Log.d(TAG, "🔓 Usuario válido, ya registrado. Continuando...")
+                    limpiarCacheGlideSiEsNecesario(context)
+
                     userRef.child("enlinea").onDisconnect().setValue(false)
                     userRef.child("ultimaConexion").setValue(obtenerFechaActual())
                 }
@@ -187,5 +191,35 @@ object CastvHelper {
         val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
         userRef.child("ultimaConexion").setValue(obtenerFechaActual())
     }
+
+
+    private fun limpiarCacheGlideSiEsNecesario(context: Context) {
+        try {
+            val cacheDir = File(context.cacheDir, "image_manager_disk_cache")
+            if (!cacheDir.exists()) return
+
+            val sizeMB = cacheDir.walkBottomUp()
+                .filter { it.isFile }
+                .map { it.length() }
+                .sum() / (1024 * 1024)
+
+            if (sizeMB >= 50) {
+                Thread {
+                    try {
+                        Glide.get(context).clearDiskCache()
+                    } catch (_: Exception) {
+                    }
+                }.start()
+
+                try {
+                    Glide.get(context).clearMemory()
+                } catch (_: Exception) {
+                }
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+
 
 }
