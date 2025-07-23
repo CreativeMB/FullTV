@@ -16,6 +16,7 @@ import androidx.leanback.widget.ImageCardView
 import androidx.leanback.widget.Presenter
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
+import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Movie
 import java.lang.reflect.Field
 
@@ -104,15 +105,12 @@ class CardPresenterTV : Presenter() {
             setOnFocusChangeListener { v, hasFocus -> v.isSelected = hasFocus }
         }
 
-        cardView.mainImageView?.apply {
-            scaleType = ImageView.ScaleType.FIT_XY
-            adjustViewBounds = false
 
-            Glide.with(context)
-                .load(item.imageUrl)
-                .placeholder(R.drawable.pelifondo)
-                .error(R.drawable.icono)
-                .into(this)
+        cardView.mainImageView?.let { imageView ->
+            imageView.scaleType = ImageView.ScaleType.FIT_XY
+            imageView.adjustViewBounds = false
+
+            CastvHelper.loadImage(cardView.context, imageView, item.imageUrl)
         }
 
         // Simulación de validez (reemplaza esta lógica según tu criterio)
