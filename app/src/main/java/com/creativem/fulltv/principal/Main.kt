@@ -158,8 +158,7 @@ class Main : FragmentActivity() {
         }
         // 🚀 Fondo animado
         iniciarFondoAnimado()
-
-        if (savedInstanceState == null) {
+               if (savedInstanceState == null) {
             navegarA(PeliculasFragment())
             haProcesadoEliminacion = false
         }
@@ -1138,7 +1137,9 @@ class Main : FragmentActivity() {
 
     override fun onStart() {
         super.onStart()
-
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CastvHelper.solicitarAudioFocus(this)
+        }
         val user = FirebaseAuth.getInstance().currentUser ?: return
         val email = user.email
 
@@ -1170,17 +1171,6 @@ class Main : FragmentActivity() {
         }.addOnFailureListener {
             Log.e("PeliculasFragment", "Error consultando estado", it)
         }
-
-        // 🎧 Audio focus
-        val context = this
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioFocusHelper.requestAudioFocus(context)
-        } else {
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
-        }
-
-        isLoggingOut = false
     }
     private fun iniciarEscuchaDeUsuario() {
         val currentUser = FirebaseAuth.getInstance().currentUser
@@ -1207,6 +1197,9 @@ class Main : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CastvHelper.liberarAudioFocus()
+        }
 
         eliminarListener()
 
@@ -1280,7 +1273,6 @@ class Main : FragmentActivity() {
 
         alertDialog.show()
     }
-
 
 
 }

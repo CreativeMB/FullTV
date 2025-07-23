@@ -8,6 +8,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
+import com.creativem.fulltv.principal.CastvHelper
 
 class ActoresAdapter(private val actores: List<CastMember>) :
     RecyclerView.Adapter<ActoresAdapter.ActorViewHolder>() {
@@ -23,11 +24,7 @@ class ActoresAdapter(private val actores: List<CastMember>) :
         holder.personaje.text = actor.character
 
         val url = "https://image.tmdb.org/t/p/w200${actor.profile_path}"
-        Glide.with(holder.itemView)
-            .load(url)
-            .placeholder(R.drawable.pelifondo)
-            .error(R.drawable.icono)
-            .into(holder.foto)
+        CastvHelper.loadImage(holder.itemView.context, holder.foto, url)
     }
 
     override fun getItemCount() = actores.size

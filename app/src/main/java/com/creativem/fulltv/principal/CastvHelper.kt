@@ -2,9 +2,18 @@ package com.creativem.fulltv.principal
 
 import android.app.Activity
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Build
 import android.util.Log
+import android.widget.ImageView
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import com.bumptech.glide.Glide
+import com.bumptech.glide.GlideBuilder
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.creativem.fulltv.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -19,7 +28,8 @@ import java.util.Locale
 object CastvHelper {
 
     private const val TAG = "CastvHelper"
-
+    private lateinit var audioManager: AudioManager
+    private var focusRequest: AudioFocusRequest? = null
     private fun codificarCorreo(correo: String): String {
         return correo
             .replace(".", "_")
@@ -217,6 +227,59 @@ object CastvHelper {
                 }
             }
         } catch (_: Exception) {
+        }
+    }
+    fun limpiarCacheGlide(context: Context) {
+        // Limpia caché en disco (requiere background thread)
+        Thread {
+            try {
+                Glide.get(context).clearDiskCache()
+                Log.d(TAG, "✅ Caché de disco de Glide limpiada.")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error al limpiar caché de disco", e)
+            }
+        }.start()
+
+        // Limpia caché en memoria (debe ir en el hilo principal)
+        try {
+            Glide.get(context).clearMemory()
+            Log.d(TAG, "✅ Caché de memoria de Glide limpiada.")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error al limpiar caché de memoria", e)
+        }
+    }
+    fun loadImage(context: Context, imageView: ImageView, url: String) {
+        Glide.with(context)
+            .load(url)
+            .placeholder(R.drawable.pelifondo)
+            .error(R.drawable.icono)
+            .diskCacheStrategy(DiskCacheStrategy.ALL) // Usa caché completa (memoria + disco)
+            .into(imageView)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun solicitarAudioFocus(context: Context): Boolean {
+        audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+        focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+                    .build()
+            )
+            .setOnAudioFocusChangeListener { /* puedes manejar cambios si lo deseas */ }
+            .setWillPauseWhenDucked(true)
+            .build()
+
+        val result = audioManager.requestAudioFocus(focusRequest!!)
+        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun liberarAudioFocus() {
+        if (::audioManager.isInitialized && focusRequest != null) {
+            audioManager.abandonAudioFocusRequest(focusRequest!!)
         }
     }
 

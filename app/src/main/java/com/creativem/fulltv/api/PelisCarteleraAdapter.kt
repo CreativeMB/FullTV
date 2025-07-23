@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
+import com.creativem.fulltv.principal.CastvHelper
 
 class PelisCarteleraAdapter(
     private val items: List<TmdbMovie>,
@@ -56,13 +57,8 @@ class PelisCarteleraAdapter(
             setHorizontallyScrolling(true)
             isSelected = holder.itemView.isFocused // para marquee
         }
-
-        // Cargar imagen
-        Glide.with(holder.itemView.context)
-            .load("https://image.tmdb.org/t/p/w500${movie.poster_path}")
-            .placeholder(R.drawable.pelifondo)
-            .error(R.drawable.icono)
-            .into(holder.poster)
+        val imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}"
+        CastvHelper.loadImage(holder.itemView.context, holder.poster, imageUrl)
 
         // Manejo de enfoque
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->

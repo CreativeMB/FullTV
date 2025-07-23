@@ -52,6 +52,7 @@ import org.json.JSONObject
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.os.CountDownTimer
 import android.text.Spannable
 import android.text.SpannableStringBuilder
@@ -1066,42 +1067,6 @@ class PlayerPeliculas : AppCompatActivity() {
 
         requestQueue.add(jsonRequest)
     }
-//
-//    private fun descontarPuntos(
-//        correoKey: String,
-//        puntosADescontar: Long,
-//        onSuccess: () -> Unit = {},
-//        onFailure: (Exception?) -> Unit = {}
-//    ) {
-//        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
-//
-//        userRef.get().addOnSuccessListener { snapshot ->
-//            val castvActual = snapshot.child("castv").getValue(Long::class.java) ?: 0
-//
-//            if (castvActual >= puntosADescontar) {
-//                val nuevoCastv = castvActual - puntosADescontar
-//                userRef.child("castv").setValue(nuevoCastv)
-//                    .addOnSuccessListener {
-//                        Toast.makeText(this, "Se descontaron $puntosADescontar CasTV", Toast.LENGTH_SHORT).show()
-//                        onSuccess()
-//                    }
-//                    .addOnFailureListener { e ->
-//                        Log.e("RealtimeDB", "❌ Error al descontar puntos: ${e.message}")
-//                        Toast.makeText(this, "Error al descontar CasTV: ${e.message}", Toast.LENGTH_SHORT).show()
-//                        onFailure(e)
-//                    }
-//            } else {
-//                Toast.makeText(this, "Saldo insuficiente de CasTV", Toast.LENGTH_LONG).show()
-//                showErrorDialog(movieTitle, movieCastv, correoKey.replace("_", ".")) // Mostrar el diálogo personalizado
-//                onFailure(null)
-//            }
-//        }.addOnFailureListener { e ->
-//            Log.e("RealtimeDB", "❌ Error al obtener usuario: ${e.message}")
-//            Toast.makeText(this, "Error al obtener usuario: ${e.message}", Toast.LENGTH_SHORT).show()
-//            onFailure(e)
-//        }
-//    }
-
 
     override fun onResume() {
         super.onResume()
@@ -1400,5 +1365,16 @@ class PlayerPeliculas : AppCompatActivity() {
         }
 
     }
-
+    override fun onStart() {
+        super.onStart()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CastvHelper.solicitarAudioFocus(this)
+        }
+    }
+    override fun onStop() {
+        super.onStop()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CastvHelper.liberarAudioFocus()
+        }
+    }
 }

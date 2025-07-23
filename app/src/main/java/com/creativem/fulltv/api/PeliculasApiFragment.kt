@@ -1,6 +1,7 @@
 package com.creativem.fulltv.api
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -14,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
 
 import com.creativem.fulltv.menu.MenuSuperiorAdapter
+import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Movie
 import com.google.firebase.Timestamp
@@ -94,7 +96,7 @@ class PeliculasApiFragment : Fragment() {
         recyclerView.adapter = adapter
         setupApiService()
         setupScrollListener()
-
+        CastvHelper.limpiarCacheGlide(requireContext()) // en Fragment
         cargarPeliculasPopulares()
 
         (activity as? Main)?.restaurarFondoAnimado()
@@ -251,4 +253,19 @@ class PeliculasApiFragment : Fragment() {
         }
         layoutListener = null
     }
+
+    override fun onStart() {
+        super.onStart()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CastvHelper.solicitarAudioFocus(requireContext()) // más seguro
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CastvHelper.liberarAudioFocus()
+        }
+    }
+
 }

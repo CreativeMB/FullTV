@@ -5,6 +5,7 @@ package com.creativem.fulltv.peliculas
 import android.content.Intent
 import android.content.res.Resources
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -91,6 +92,7 @@ class PeliculasFragment : RowsSupportFragment() {
         }
 
         escucharCambiosEnPeliculas()
+        CastvHelper.limpiarCacheGlide(requireContext()) // en Fragment
 
         val currentUser = auth.currentUser
         if (currentUser != null && !currentUser.email.isNullOrBlank()) {
@@ -215,13 +217,19 @@ class PeliculasFragment : RowsSupportFragment() {
             Log.e("PeliculasFragment", "Correo del usuario no disponible.")
             return
         }
-
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CastvHelper.solicitarAudioFocus(requireContext()) // más seguro
+        }
         iniciarEscuchaDeUsuario() // ✅ sin parámetros
     }
 
 
     override fun onStop() {
         super.onStop()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CastvHelper.liberarAudioFocus()
+        }
+
         eliminarListener()
     }
 
@@ -269,4 +277,6 @@ class PeliculasFragment : RowsSupportFragment() {
         }
         datosUsuarioListener = null
     }
+
+
 }

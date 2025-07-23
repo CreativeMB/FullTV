@@ -18,6 +18,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import com.creativem.fulltv.api.ApiPeliculaActivity
+import com.creativem.fulltv.principal.CastvHelper
 import java.lang.reflect.Field
 
 class CardPresenter: Presenter(){
@@ -127,12 +128,9 @@ class CardPresenter: Presenter(){
             imageView.scaleType = ImageView.ScaleType.FIT_XY
             imageView.adjustViewBounds = false
 
-            Glide.with(cardView.context)
-                .load(movie.imageUrl)
-                .placeholder(R.drawable.pelifondo)
-                .error(R.drawable.icono)
-                .into(imageView)
+            CastvHelper.loadImage(cardView.context, imageView, movie.imageUrl)
         }
+
 
         val createdAtMillis = movie.createdAt.toDate().time
         val countdownDurationMillis = TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())

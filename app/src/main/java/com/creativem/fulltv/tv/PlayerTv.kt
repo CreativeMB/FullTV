@@ -40,7 +40,7 @@ import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.databinding.PlayerBinding
-import com.creativem.fulltv.principal.AudioFocusHelper
+import com.creativem.fulltv.principal.CastvHelper
 import com.google.firebase.firestore.FirebaseFirestore
 
 class PlayerTv : AppCompatActivity() {
@@ -416,33 +416,30 @@ class PlayerTv : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         releasePlayer()
-        playerHandler.removeCallbacksAndMessages(null) // Limpiar todos los mensajes del Handler
+
+    }
+    override fun onStart() {
+        super.onStart()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioFocusHelper.abandonAudioFocus()
+            CastvHelper.solicitarAudioFocus(this)
         }
     }
-
+    override fun onStop() {
+        super.onStop()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CastvHelper.liberarAudioFocus()
+        }
+    }
     override fun onResume() {
         super.onResume()
 
         if (player == null && !playerReleased) {
-            // Solicitar audio focus antes de reproducir
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val granted = AudioFocusHelper.requestAudioFocus(this)
-                if (granted) {
-                    player = ExoPlayer.Builder(this).build()
-                    binding.reproductor.player = player
-                    initializePlayer()
-                } else {
-                    Log.d("AudioFocus", "No se pudo obtener el audio focus")
-                }
-            } else {
                 // Para versiones < Oreo no se requiere AudioFocusRequest
                 player = ExoPlayer.Builder(this).build()
                 binding.reproductor.player = player
                 initializePlayer()
             }
-        }
+
     }
 
 

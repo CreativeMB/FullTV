@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
+import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Movie
 
@@ -107,11 +108,7 @@ class PeliculasMenuAdapter(
         }
 
         // Imagen
-        Glide.with(holder.itemView.context)
-            .load(movie.imageUrl)
-            .placeholder(R.drawable.pelifondo)
-            .error(R.drawable.icono)
-            .into(holder.movieImage)
+        CastvHelper.loadImage(holder.itemView.context, holder.movieImage, movie.imageUrl)
     }
 
     override fun getItemCount(): Int = movieList.size

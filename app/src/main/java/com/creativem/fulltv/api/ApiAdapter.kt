@@ -14,6 +14,7 @@ import com.creativem.fulltv.principal.Movie
 import android.graphics.Color
 import android.view.animation.DecelerateInterpolator
 import androidx.recyclerview.widget.DiffUtil
+import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Main
 
 class ApiAdapter(
@@ -56,12 +57,7 @@ private val onMovieClick: (Movie) -> Unit
         }
 
         // Imagen
-        Glide.with(holder.itemView.context)
-            .load(movie.imageUrl)
-            .placeholder(R.drawable.pelifondo)
-            .error(R.drawable.icono)
-            .into(holder.movieImage)
-
+        CastvHelper.loadImage(holder.itemView.context, holder.movieImage, movie.imageUrl)
         // Eventos de foco y clic
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             holder.movieTitle.isSelected = hasFocus

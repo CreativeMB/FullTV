@@ -1,6 +1,7 @@
 package com.creativem.fulltv.api
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -16,6 +17,7 @@ import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.peliculas.PlayerPeliculas
 import com.creativem.fulltv.peliculas.Validacioneslista
+import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Movie
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -99,6 +101,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
         movieImageUrl = intent.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
         movieCountdown = intent.getIntExtra("EXTRA_COUNTDOWN", 0)
         actualizarTextoBotonReproducir()
+        CastvHelper.limpiarCacheGlide(this) // en Activity
 
 
         recyclerCartelera = findViewById(R.id.peliscartelera)
@@ -299,6 +302,19 @@ class ApiPeliculaActivity : AppCompatActivity() {
             tvCalificacion.text = "⭐ 50"
             tvSinopsis.text = "Tiempo válido: $movieCountdown min"
             Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(ivPoster)
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CastvHelper.solicitarAudioFocus(this)
+        }
+    }
+    override fun onStop() {
+        super.onStop()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CastvHelper.liberarAudioFocus()
         }
     }
 

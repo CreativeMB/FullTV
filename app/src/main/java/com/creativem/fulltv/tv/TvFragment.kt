@@ -11,7 +11,7 @@ import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.*
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
-import com.creativem.fulltv.principal.AudioFocusHelper
+import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Movie
 import com.google.firebase.firestore.FirebaseFirestore
@@ -142,22 +142,17 @@ class TvFragment : RowsSupportFragment() {
             channels.add(ListRow(header, listRowAdapter))
         }
     }
-    override fun onResume() {
-        super.onResume()
+
+    override fun onStart() {
+        super.onStart()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val context = requireContext()
-            val granted = AudioFocusHelper.requestAudioFocus(context)
-            if (granted) {
-                // Lógica si se obtiene el foco
-            }
+            CastvHelper.solicitarAudioFocus(requireContext())
         }
     }
-
-    override fun onPause() {
-        super.onPause()
+    override fun onStop() {
+        super.onStop()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioFocusHelper.abandonAudioFocus()
+            CastvHelper.liberarAudioFocus()
         }
     }
-
 }
