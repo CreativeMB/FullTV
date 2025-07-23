@@ -63,7 +63,6 @@ object CastvHelper {
                     if (context is Activity) context.finish()
                 } else {
                     Log.d(TAG, "🔓 Usuario válido, ya registrado. Continuando...")
-                    limpiarCacheGlideSiEsNecesario(context)
 
                     userRef.child("enlinea").onDisconnect().setValue(false)
                     userRef.child("ultimaConexion").setValue(obtenerFechaActual())
@@ -203,7 +202,45 @@ object CastvHelper {
     }
 
 
-    private fun limpiarCacheGlideSiEsNecesario(context: Context) {
+// -------------------------------
+// Glide Helper Methods (CastvHelper)
+// -------------------------------
+
+    fun loadImage(context: Context, imageView: ImageView, url: String?) {
+        if (url.isNullOrBlank()) {
+            imageView.setImageResource(R.drawable.icono)
+            return
+        }
+
+        Glide.with(context)
+            .load(url)
+            .placeholder(R.drawable.pelifondo)
+            .error(R.drawable.icono)
+            .diskCacheStrategy(DiskCacheStrategy.ALL) // Guarda original y transformada
+            .into(imageView)
+    }
+
+    // ✅ Limpieza manual completa (por ejemplo, al cerrar sesión o forzar limpieza)
+    fun limpiarCacheGlide(context: Context) {
+        Thread {
+            try {
+                Glide.get(context).clearDiskCache()
+                Log.d(TAG, "✅ Caché de disco de Glide limpiada.")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error al limpiar caché de disco", e)
+            }
+        }.start()
+
+        try {
+            Glide.get(context).clearMemory()
+            Log.d(TAG, "✅ Caché de memoria de Glide limpiada.")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error al limpiar caché de memoria", e)
+        }
+    }
+
+    // ✅ Limpieza automática si el tamaño de caché supera 50MB
+    fun limpiarCacheGlideSiEsNecesario(context: Context) {
         try {
             val cacheDir = File(context.cacheDir, "image_manager_disk_cache")
             if (!cacheDir.exists()) return
@@ -214,48 +251,31 @@ object CastvHelper {
                 .sum() / (1024 * 1024)
 
             if (sizeMB >= 50) {
-                Thread {
-                    try {
-                        Glide.get(context).clearDiskCache()
-                    } catch (_: Exception) {
-                    }
-                }.start()
-
-                try {
-                    Glide.get(context).clearMemory()
-                } catch (_: Exception) {
-                }
+                limpiarCacheGlide(context)
             }
-        } catch (_: Exception) {
-        }
-    }
-    fun limpiarCacheGlide(context: Context) {
-        // Limpia caché en disco (requiere background thread)
-        Thread {
-            try {
-                Glide.get(context).clearDiskCache()
-                Log.d(TAG, "✅ Caché de disco de Glide limpiada.")
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Error al limpiar caché de disco", e)
-            }
-        }.start()
-
-        // Limpia caché en memoria (debe ir en el hilo principal)
-        try {
-            Glide.get(context).clearMemory()
-            Log.d(TAG, "✅ Caché de memoria de Glide limpiada.")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error al limpiar caché de memoria", e)
+            Log.e(TAG, "❌ Error al verificar caché de Glide", e)
         }
     }
-    fun loadImage(context: Context, imageView: ImageView, url: String) {
-        Glide.with(context)
-            .load(url)
-            .placeholder(R.drawable.pelifondo)
-            .error(R.drawable.icono)
-            .diskCacheStrategy(DiskCacheStrategy.ALL) // Usa caché completa (memoria + disco)
-            .into(imageView)
+
+    // ✅ Guardar hora de salida para saber cuándo el usuario dejó la app
+    fun guardarHoraSalida(context: Context) {
+        val prefs = context.getSharedPreferences("app_cache", Context.MODE_PRIVATE)
+        prefs.edit().putLong("ultima_salida", System.currentTimeMillis()).apply()
     }
+
+    // ✅ Verificar si ha pasado mucho tiempo desde la última salida y limpiar la caché
+    fun verificarYLimpiarCachePorTiempo(context: Context) {
+        val prefs = context.getSharedPreferences("app_cache", Context.MODE_PRIVATE)
+        val ultimaSalida = prefs.getLong("ultima_salida", 0L)
+        val ahora = System.currentTimeMillis()
+        val LIMITE = 6 * 60 * 60 * 1000 // 6 horas
+
+        if (ahora - ultimaSalida > LIMITE) {
+            limpiarCacheGlide(context)
+        }
+    }
+
 
     @RequiresApi(Build.VERSION_CODES.O)
     fun solicitarAudioFocus(context: Context): Boolean {

@@ -176,8 +176,8 @@ class Main : FragmentActivity() {
         if (!email.isNullOrBlank()) {
             CastvHelper.actualizarUltimaConexion(email)
         }
-
-
+        CastvHelper.verificarYLimpiarCachePorTiempo(this)
+        CastvHelper.limpiarCacheGlideSiEsNecesario(this) //
         cargarMenuPrincipal()
         mostrarPublicidad()
         obtenerNoticia()
@@ -1222,6 +1222,8 @@ class Main : FragmentActivity() {
         Log.d("PeliculasFragment", "Listener removido correctamente.")
         publicidadDialog?.dismiss()
         publicidadDialog = null
+        CastvHelper.guardarHoraSalida(this)
+
     }
 
     @SuppressLint("SetTextI18n")
