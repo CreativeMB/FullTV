@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
+    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:layout_margin="8dp"
     app:cardCornerRadius="8dp"
@@ -9,45 +9,62 @@
     android:padding="12dp">
 
     <RelativeLayout
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:padding="8dp">
+        android:minHeight="100dp">
 
-        <!-- LinearLayout con la información del usuario -->
+        <!-- Contenedor de texto -->
         <LinearLayout
+            android:id="@+id/textContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="8dp"
+            android:layout_toStartOf="@+id/deleteButton"
+            android:layout_alignParentStart="true">
 
-            <!-- Nombre del Usuario -->
-            <TextView
-                android:id="@+id/tvUserName"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Nombre del Usuario"
-                android:textSize="12sp"
-                android:layout_marginBottom="4dp"
-                 />
-
-            <!-- Línea para Año y Correo -->
+            <!-- Fila: Nombre y Fecha -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:layout_marginBottom="4dp">
 
-                <!-- Año -->
+                <TextView
+                    android:id="@+id/tvUserName"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="5"
+                    android:textStyle="bold"
+                    android:text="Nombre del Usuario"
+                    android:textSize="10sp" />
+
+                <TextView
+                    android:id="@+id/tvFecha"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="5"
+                    android:text="Fecha: 2025-07-25"
+                    android:textSize="10sp"
+                    android:textColor="#666666"
+                    android:paddingStart="8dp" />
+            </LinearLayout>
+
+            <!-- CasTV y correo -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="4dp">
+
                 <TextView
                     android:id="@+id/tvYear"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="CasTV"
                     android:textSize="12sp"
-                    android:layout_marginEnd="10dp"
-                     />
+                    android:layout_marginEnd="10dp" />
 
-                <!-- Correo del Usuario -->
                 <TextView
                     android:id="@+id/tvEmail"
                     android:layout_width="0dp"
@@ -58,11 +75,10 @@
                     android:textSize="18sp"
                     android:clickable="true"
                     android:focusable="true"
-                    android:background="?android:attr/selectableItemBackground"
-                     />
+                    android:background="?android:attr/selectableItemBackground" />
             </LinearLayout>
 
-            <!-- Título del Pedido en negrita -->
+            <!-- Título del pedido -->
             <TextView
                 android:id="@+id/tvTitle"
                 android:layout_width="match_parent"
@@ -74,15 +90,17 @@
                 android:layout_marginBottom="8dp" />
         </LinearLayout>
 
-        <!-- Botón de eliminar centrado al lado derecho -->
+        <!-- Ícono de eliminar alineado al final y ocupando todo el alto -->
         <TextView
             android:id="@+id/deleteButton"
-            android:layout_width="40dp"
-            android:layout_height="50dp"
+            android:layout_width="48dp"
+            android:layout_height="80dp"
             android:layout_alignParentEnd="true"
+            android:layout_alignParentTop="true"
             android:layout_alignParentBottom="true"
+            android:gravity="center"
             android:background="@drawable/delete"
+            android:contentDescription="Eliminar"
             android:padding="10dp" />
-
     </RelativeLayout>
 </androidx.cardview.widget.CardView>

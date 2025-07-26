@@ -9,7 +9,8 @@ data class Movie(
     var title: String = "",    // Título de la película, valor por defecto vacío
     var originalTitle: String = "",
     val castv: Int = 0,
-    val email: String = "",
+    val correo: String = "",
+    val fecha: String = "",
     var imageUrl: String = "", // URL de la imagen de la película
     var streamUrl: String = "",
     var trailerUrl: String = "",// URL del stream para ver la película

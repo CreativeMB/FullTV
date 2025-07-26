@@ -70,8 +70,7 @@ object CastvHelper {
             } else {
                 // Solo creamos usuario si sabemos que es nuevo (o fue borrado)
                 val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-                val fechaFormateada = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
-
+                val fechaFormateada = obtenerFechaActual() // ya no repites SimpleDateFormat
                 val user = mapOf(
                     "nombre" to nombre,
                     "correo" to email,
@@ -192,9 +191,13 @@ object CastvHelper {
             onFailure(e)
         }
     }
-    private fun obtenerFechaActual(): String {
-        return SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
+
+
+    fun obtenerFechaActual(): String {
+        return SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault()).format(Date())
     }
+
+
     fun actualizarUltimaConexion(email: String) {
         val correoKey = codificarCorreo(email)
         val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)

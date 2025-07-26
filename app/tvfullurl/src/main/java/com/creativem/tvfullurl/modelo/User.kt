@@ -7,7 +7,6 @@ data class User(
     var userId: String = "",
     var fechaCreacion: String = "",
     var ultimaConexion: Any? = null,
-
     var correo: String = "",
     val nombre: String = "",  // Cambiado de 'name' a 'nombre'
     var title: String = "", // Cambiado de 'points' a 'puntos'

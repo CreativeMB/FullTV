@@ -13,6 +13,8 @@ import com.creativem.tvfullurl.adapter.PedidosAdapter
 import com.creativem.tvfullurl.databinding.FragmentPedidosBinding
 import com.google.android.gms.tasks.Task
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
 
 
@@ -21,7 +23,7 @@ class PedidosFragment : Fragment() {
 
     private lateinit var pedidosAdapter: PedidosAdapter
     private var movieList: MutableList<Movie> = mutableListOf() // Lista de películas
-
+    private var pedidosListener: ListenerRegistration? = null
     private lateinit var db: FirebaseFirestore
 
     override fun onCreateView(
@@ -32,7 +34,7 @@ class PedidosFragment : Fragment() {
         db = FirebaseFirestore.getInstance()
 
         iniciarRecycler()
-        cargarPedidos()
+        escucharPedidosTiempoReal()
 
 
 
@@ -51,37 +53,49 @@ class PedidosFragment : Fragment() {
         return binding.root
     }
 
-    private fun cargarPedidos() {
-        movieList.clear()
 
-        db.collection("pedidosmovies").get()
-            .addOnCompleteListener { task: Task<QuerySnapshot> ->
-                if (task.isSuccessful) {
-                    for (document in task.result!!) {
-                        val nombre = document.getString("nombre") ?: ""
-                        val email = document.getString("email") ?: ""
-                        val title = document.getString("title") ?: ""
-                        val castv = document.getLong("castv")?.toInt() ?: 0
-                        val id = document.id
+    private fun escucharPedidosTiempoReal() {
+        pedidosListener?.remove() // Detener si ya estaba escuchando
+
+        pedidosListener = FirebaseFirestore.getInstance()
+            .collection("pedidosmovies")
+            .orderBy("fecha", Query.Direction.DESCENDING) // más nuevos primero
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("PedidosFragment", "❌ Error en tiempo real: ${error.message}")
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null && !snapshot.isEmpty) {
+                    val nuevosPedidos = mutableListOf<Movie>()
+
+                    for (doc in snapshot.documents) {
+                        val nombre = doc.getString("nombre") ?: ""
+                        val correo = doc.getString("correo") ?: ""
+                        val title = doc.getString("title") ?: ""
+                        val castv = doc.getLong("castv")?.toInt() ?: 0
+                        val fecha = doc.getString("fecha") ?: ""
+                        val id = doc.id
 
                         val movie = Movie(
                             id = id,
                             nombre = nombre,
-                            email = email,
+                            correo = correo,
                             title = title,
-                            castv = castv // ya es Int
+                            castv = castv,
+                            fecha = fecha
                         )
-                        movieList.add(movie)
+                        nuevosPedidos.add(movie)
                     }
-                    pedidosAdapter.updateMovieList(movieList)
+
+                    pedidosAdapter.updateMovieList(nuevosPedidos)
                 } else {
-                    Log.e("PedidosFragment", "Error getting documents: ", task.exception)
+                    pedidosAdapter.updateMovieList(emptyList()) // sin datos
                 }
             }
-            .addOnFailureListener { e ->
-                Log.e("PedidosFragment", "Error loading pedidos", e)
-            }
     }
+
+
 
 
     private fun iniciarRecycler() {
@@ -126,6 +140,10 @@ class PedidosFragment : Fragment() {
                 // Mostrar mensaje de error
                 Toast.makeText(requireContext(), "Error al eliminar pedido: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+    }
+    override fun onDestroyView() {
+        super.onDestroyView()
+        pedidosListener?.remove()
     }
 
 }

@@ -84,6 +84,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 
 class Main : FragmentActivity() {
@@ -495,19 +498,24 @@ class Main : FragmentActivity() {
     }
 
     private fun comprobantepago(pedido: String) {
-        val email = FirebaseAuth.getInstance().currentUser?.email
+        val user = FirebaseAuth.getInstance().currentUser
+        val email = user?.email
+        val userId = user?.uid
 
-        if (email == null) {
+        if (email == null || userId == null) {
             Toast.makeText(this, "Usuario no autenticado", Toast.LENGTH_SHORT).show()
             return
         }
+
+        // Obtener fecha actual formateada
+        val fechaActual = CastvHelper.obtenerFechaActual()
 
         CastvHelper.obtenerDatosUsuario(
             email,
             onSuccess = { nombre, correo, castv, _ ->
                 val mensaje = """
                 Usuario: $nombre
-                Email: $correo
+                Correo: $correo
                 Saldo CasTV: $castv
                 Pedido: $pedido
             """.trimIndent()
@@ -516,23 +524,25 @@ class Main : FragmentActivity() {
                     .setTitle("Confirmar Activación de Paquete")
                     .setMessage(mensaje)
                     .setPositiveButton("Registrar") { _, _ ->
-                        val correoKey = CastvHelper.getCorreoKey(correo)
+                        val valorPaquete = 0 // ✅ o el valor real según el tipo de paquete
 
                         val pedidoData = hashMapOf(
                             "title" to pedido,
+                            "nombre" to nombre,
                             "correo" to correo,
-                            "correoKey" to correoKey,
-                            "nombre" to nombre
+                            "castv" to valorPaquete, // ✅ valor descontado, no saldo
+                            "fecha" to fechaActual,
+                            "userId" to userId
                         )
 
                         FirebaseFirestore.getInstance().collection("pedidosmovies")
                             .add(pedidoData)
                             .addOnSuccessListener {
                                 enviarCorreoNuevoPedido(pedido)
-                                Toast.makeText(this, "Actualizaremos tu saldo", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this, "Pedido registrado y saldo en proceso", Toast.LENGTH_SHORT).show()
                             }
                             .addOnFailureListener { e ->
-                                Toast.makeText(this, "Error al enviar pedido: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this, "Error al guardar pedido: ${e.message}", Toast.LENGTH_SHORT).show()
                             }
                     }
                     .setNegativeButton("Cancelar") { dialog, _ -> dialog.dismiss() }
@@ -785,17 +795,22 @@ class Main : FragmentActivity() {
         }
         startActivity(intent) // Inicia la actividad del reproductor
     }
+
+
     private fun subirPedidoAFirestore(pedido: String) {
         val auth = FirebaseAuth.getInstance()
-        val email = auth.currentUser?.email
+        val user = auth.currentUser
+        val email = user?.email
+        val userId = user?.uid
 
-        if (email == null) {
+        if (email == null || userId == null) {
             Toast.makeText(this, "Usuario no autenticado", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val correoKey = CastvHelper.getCorreoKey(email)
-        val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(correoKey)
+        val userRef = FirebaseDatabase.getInstance().reference
+            .child("usuarios")
+            .child(CastvHelper.getCorreoKey(email)) // solo para obtener los datos
 
         userRef.get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
@@ -818,31 +833,29 @@ class Main : FragmentActivity() {
                         .setTitle("Confirmar Pedido")
                         .setMessage(mensaje)
                         .setPositiveButton("Confirmar") { _, _ ->
+                            val fechaActual = CastvHelper.obtenerFechaActual()
+
                             val pedidoData = hashMapOf(
                                 "title" to pedido,
-                                "correo" to emailUsuario,
-                                "correoKey" to correoKey,
                                 "nombre" to nombreUsuario,
-                                "CasTV" to puntosDescontar.toString()
+                                "correo" to emailUsuario,
+                                "castv" to puntosDescontar, // ✔ SOLO lo que se descuenta
+                                "fecha" to fechaActual,
+                                "userId" to userId
                             )
 
                             FirebaseFirestore.getInstance().collection("pedidosmovies")
                                 .add(pedidoData)
                                 .addOnSuccessListener {
-                                    descontarPuntos(correoKey, puntosDescontar)
+                                    descontarPuntos(CastvHelper.getCorreoKey(emailUsuario), puntosDescontar)
                                     enviarCorreoNuevoPedido(pedido)
+                                    Toast.makeText(this, "Pedido registrado correctamente", Toast.LENGTH_SHORT).show()
                                 }
                                 .addOnFailureListener { e ->
-                                    Toast.makeText(
-                                        this,
-                                        "Error al enviar pedido: ${e.message}",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                    Toast.makeText(this, "Error al enviar pedido: ${e.message}", Toast.LENGTH_SHORT).show()
                                 }
                         }
-                        .setNegativeButton("Cancelar") { dialog, _ ->
-                            dialog.dismiss()
-                        }
+                        .setNegativeButton("Cancelar") { dialog, _ -> dialog.dismiss() }
                         .show()
                 } else {
                     Toast.makeText(this, "No tienes suficientes puntos", Toast.LENGTH_SHORT).show()
@@ -851,13 +864,10 @@ class Main : FragmentActivity() {
                 Toast.makeText(this, "Usuario no encontrado", Toast.LENGTH_SHORT).show()
             }
         }.addOnFailureListener { e ->
-            Toast.makeText(
-                this,
-                "Error al obtener usuario: ${e.message}",
-                Toast.LENGTH_SHORT
-            ).show()
+            Toast.makeText(this, "Error al obtener usuario: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
+
 
     private fun descontarPuntos(correoKey: String, puntos: Int) {
         val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)

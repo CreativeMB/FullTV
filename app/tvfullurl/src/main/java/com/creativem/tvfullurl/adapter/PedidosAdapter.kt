@@ -39,11 +39,12 @@ class PedidosAdapter(
         holder.userNameTextView.text = movie.nombre.ifEmpty { "Usuario desconocido" }
         holder.titleTextView.text = movie.title.ifEmpty { "Título no disponible" }
         holder.castvTextView.text = "CasTV: ${movie.castv}"
-        holder.emailTextView.text = movie.email.ifEmpty { "Email no disponible" }
+        holder.emailTextView.text = movie.correo.ifEmpty { "Email no disponible" }
+        holder.fechaTextView.text = "${movie.fecha}"
 
         // Maneja el clic en el email
         holder.emailTextView.setOnClickListener {
-            val email = movie.email
+            val email = movie.correo
             if (email.isNotEmpty()) {
                 // Copiar el email al portapapeles
                 val clipboard = holder.itemView.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -90,9 +91,8 @@ class PedidosAdapter(
         val titleTextView: TextView = itemView.findViewById(R.id.tvTitle)
         val emailTextView: TextView = itemView.findViewById(R.id.tvEmail)
         val castvTextView: TextView = itemView.findViewById(R.id.tvYear)
-
-        // El botón de eliminar siempre se muestra
-        val deleteButton: TextView = itemView.findViewById(R.id.deleteButton) // Asegúrate de que sea un Button o ImageButton
+        val fechaTextView: TextView = itemView.findViewById(R.id.tvFecha)
+        val deleteButton: TextView = itemView.findViewById(R.id.deleteButton)
     }
 
     // Método para filtrar las películas según el query del SearchView

@@ -86,6 +86,9 @@ import com.creativem.fulltv.principal.Nosotros
 
 
 import com.google.firebase.database.FirebaseDatabase
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 
 @Suppress("DEPRECATION")
@@ -961,20 +964,24 @@ class PlayerPeliculas : AppCompatActivity() {
                         return@addOnSuccessListener
                     }
 
-                    val correoKey = correoUsuario.replace(".", "_").replace("@", "_")
+                    val correoKey = CastvHelper.getCorreoKey(correoUsuario)
                     val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
+
                     userRef.get().addOnSuccessListener { snapshot ->
                         val userName = snapshot.child("nombre").value?.toString() ?: "Sin nombre"
-                        val userEmail = snapshot.child("correo").value?.toString() ?: "Sin correo"
+                        val userCorreo = snapshot.child("correo").value?.toString() ?: "Sin correo"
 
                         CastvHelper.verificarPuntos(this, correoUsuario, movieCastv) { tienePuntos ->
                             if (tienePuntos) {
+                                val fechaActual = CastvHelper.obtenerFechaActual()
+
                                 val datos = hashMapOf(
                                     "title" to movieTitle,
                                     "castv" to movieCastv,
-                                    "email" to userEmail,
+                                    "correo" to userCorreo,
                                     "nombre" to userName,
-                                    "userId" to userId
+                                    "userId" to userId,
+                                    "fecha" to fechaActual
                                 )
 
                                 firestore.collection("pedidosmovies")
@@ -988,10 +995,9 @@ class PlayerPeliculas : AppCompatActivity() {
                                                 enviarCorreoNuevoPedido(movieTitle)
                                                 Toast.makeText(this, "Pedido realizado con éxito.", Toast.LENGTH_SHORT).show()
 
-                                                // 👉 Ir a la actividad Nosotros
                                                 val intent = Intent(this, Nosotros::class.java)
                                                 startActivity(intent)
-                                                finish() // Finaliza la actividad actual
+                                                finish()
                                             },
                                             onFailure = { e ->
                                                 Log.w("Castv", "❌ Error al descontar: ${e?.message}")
@@ -1027,6 +1033,7 @@ class PlayerPeliculas : AppCompatActivity() {
             isProcessingOrder = false
         }
     }
+
 
 
 
