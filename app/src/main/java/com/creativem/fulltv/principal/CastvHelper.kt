@@ -2,6 +2,7 @@ package com.creativem.fulltv.principal
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -149,13 +150,32 @@ object CastvHelper {
 
         userRef.child("castv").get().addOnSuccessListener { snapshot ->
             val puntos = snapshot.getValue(Int::class.java) ?: 0
-            callback(puntos >= costo)
+
+            if (puntos >= costo) {
+                callback(true)
+            } else {
+                Toast.makeText(
+                    context,
+                    "Saldo insuficiente. Recarga CasTV para continuar.",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                // Abrir pantalla "Nosotros" con mensaje
+                val intent = Intent(context, Nosotros::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    putExtra("EXTRA_MENSAJE", "Saldo insuficiente. Recarga CasTV para seguir disfrutando.")
+                }
+                context.startActivity(intent)
+
+                callback(false)
+            }
         }.addOnFailureListener { e ->
             Log.e(TAG, "❌ Error al verificar puntos: ${e.message}")
             Toast.makeText(context, "Error al verificar puntos", Toast.LENGTH_SHORT).show()
             callback(false)
         }
     }
+
     fun descontarPuntos(
         context: Context,
         correo: String,
@@ -305,7 +325,17 @@ object CastvHelper {
             audioManager.abandonAudioFocusRequest(focusRequest!!)
         }
     }
-
+    @JvmStatic
+    fun formatearFecha(fechaOriginal: String?): String {
+        return try {
+            val parser = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val date = parser.parse(fechaOriginal ?: return "Desconocida")
+            val formatter = SimpleDateFormat("d 'de' MMMM 'de' yyyy", Locale("es", "ES"))
+            formatter.format(date ?: return "Desconocida")
+        } catch (e: Exception) {
+            "Desconocida"
+        }
+    }
 
 
 }

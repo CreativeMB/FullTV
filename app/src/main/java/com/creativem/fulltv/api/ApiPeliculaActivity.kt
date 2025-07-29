@@ -143,63 +143,40 @@ class ApiPeliculaActivity : AppCompatActivity() {
     }
 
     private fun actualizarTextoBotonReproducir() {
-        // 🔴 Mostrar inmediatamente "Alquilar 💳" por defecto
+        // Siempre iniciamos mostrando "Alquilar 💳"
         tvReproducir.text = "Alquilar \uD83D\uDCB3"
 
-        // 🟡 Obtener contador
+        // Obtenemos el tiempo restante del contador
         val tiempoValido = movieActual?.countdownMinutes ?: movieCountdown
 
-        // 🟢 Si el contador es válido, cambiar inmediatamente
+        // Si el contador es válido (> 0), actualizamos inmediatamente
         if (tiempoValido > 0) {
             tvReproducir.text = "▶ Reproducir"
             return
         }
 
-        // 🔴 Si no hay URL, no validar nada más
+        // Si la URL está vacía, no seguimos con la validación
         if (streamUrlGuardado.isBlank()) return
 
-        // 🟢 Validar si la URL es válida (esto puede tardar, por eso es asíncrono)
-        CoroutineScope(Dispatchers.IO).launch {
+        // Verificamos si la URL es válida
+        GlobalScope.launch(Dispatchers.Main) {
             try {
                 Validacioneslista.esperarCarga()
+
+                // Obtener lista de películas válidas
                 val peliculasValidas = Validacioneslista.obtenerPeliculasValidas()
                 val esUrlValida = peliculasValidas.any { it.streamUrl == streamUrlGuardado }
 
-                // Solo si es válida, cambiar en el hilo principal
+                // Si la URL es válida, actualizamos el botón
                 if (esUrlValida) {
-                    withContext(Dispatchers.Main) {
-                        tvReproducir.text = "▶ Reproducir"
-                    }
+                    tvReproducir.text = "▶ Reproducir"
                 }
+                // Si no es válida, no cambiamos el texto (queda "Alquilar 💳")
             } catch (e: Exception) {
-                // No hacemos nada, se mantiene "Alquilar 💳"
+                // Si hay error, no cambiamos el texto
             }
         }
     }
-
-
-
-//    // Método antiguo para actualizar el texto del botón "Reproducir"
-
-//    private fun actualizarTextoBotonReproducir() {
-//        if (streamUrlGuardado.isBlank()) {
-//            tvReproducir.text = "Alquilar" // Texto por defecto si no hay URL
-//            return
-//        }
-//
-//        GlobalScope.launch(Dispatchers.Main) {
-//            try {
-//                Validacioneslista.esperarCarga()
-//                val peliculasValidas = Validacioneslista.obtenerPeliculasValidas()
-//                val esValida = peliculasValidas.any { it.streamUrl == streamUrlGuardado }
-//
-//                tvReproducir.text = if (esValida) "▶ Reproducir" else "Alquilar \uD83D\uDCB3"
-//            } catch (e: Exception) {
-//                tvReproducir.text = "Alquilar" // En caso de error, texto por defecto
-//            }
-//        }
-//    }
-
 
     private fun cargarCartelera() {
         CoroutineScope(Dispatchers.IO).launch {
@@ -229,7 +206,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
                     carteleraAdapter = PelisCarteleraAdapter(peliculasTotales) { movieSeleccionado ->
 
                         val releaseDate = movieSeleccionado.release_date ?: "N/A"
-                        val tituloConFecha = "${movieSeleccionado.title} (${releaseDate})"
+                        val tituloConFecha = "${movieSeleccionado.title} (${CastvHelper.formatearFecha(releaseDate)})"
 
                         movieActual = Movie(
                             title = tituloConFecha,
@@ -237,16 +214,12 @@ class ApiPeliculaActivity : AppCompatActivity() {
                             imageUrl = movieSeleccionado.imageUrl,
                             streamUrl = movieSeleccionado.streamUrl,
                             castv = movieSeleccionado.castv ?: 50,
-                            countdownMinutes = 60
-
                         )
-
                         // Asignaciones a variables globales
                         streamUrlGuardado = movieSeleccionado.streamUrl
                         movieTitle = movieSeleccionado.title
                         movieCastv = movieSeleccionado.castv ?: 50
                         movieImageUrl = movieSeleccionado.imageUrl
-                        movieCountdown = 60
                         movieReleaseDate = releaseDate
 
                         mostrarPelicula(movieSeleccionado)
@@ -329,20 +302,25 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
     private fun mostrarContenidoLocal() {
         val movie = movieActual
-        if (movie != null) {
-            tvTitulo.text = movie.title
-            tvFecha.text = "Estreno: ${movie.castv}"
-            tvCalificacion.text = "⭐ ${movie.castv}" // CasTV fijo
-            tvSinopsis.text = "Tiempo válido: ${movie.countdownMinutes} min"
-            Glide.with(this).load(movie.imageUrl).placeholder(R.drawable.icono).into(ivPoster)
-        } else {
-            tvTitulo.text = movieTitle
-            tvFecha.text = "Estreno: $movieCastv"
-            tvCalificacion.text = "⭐ 50"
-            tvSinopsis.text = "Tiempo válido: $movieCountdown min"
-            Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(ivPoster)
-        }
+
+        val titulo = movie?.title ?: movieTitle.ifBlank { "Película desconocida" }
+        val fechaEstreno = movie?.fechaCreacion ?: "Fecha no disponible"
+        val calificacion = movie?.castv ?: movieCastv.takeIf { it > 0 } ?: 50
+        val tiempoValido = movie?.countdownMinutes ?: movieCountdown.takeIf { it > 0 } ?: 0
+        val imagen = movie?.imageUrl ?: movieImageUrl
+
+        tvTitulo.text = titulo
+        tvFecha.text = "🎬 Estreno: $fechaEstreno"
+        tvCalificacion.text = "⭐ $calificacion"
+        tvSinopsis.text = "Sinopsis: No hemos encontrado datos de la película"
+
+        Glide.with(this)
+            .load(imagen)
+            .placeholder(R.drawable.icono)
+            .into(ivPoster)
     }
+
+
 
     override fun onStart() {
         super.onStart()

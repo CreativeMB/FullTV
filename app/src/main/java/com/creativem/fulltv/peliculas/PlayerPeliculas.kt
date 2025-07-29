@@ -939,6 +939,8 @@ class PlayerPeliculas : AppCompatActivity() {
                 // La película YA está pedida (por algún usuario)
                 Log.i("Firestore", "La película '$movieTitle' ya existe en la base de datos.")
                 Toast.makeText(this, "La película '$movieTitle' ya fue pedida; puedes alquilar más...", Toast.LENGTH_LONG).show()
+                // Volver atrás automáticamente
+                finish()
             }
         }.addOnFailureListener { e ->
             Log.e("Firestore", "Error al consultar: ${e.message}")
@@ -994,9 +996,6 @@ class PlayerPeliculas : AppCompatActivity() {
                                             onSuccess = {
                                                 enviarCorreoNuevoPedido(movieTitle)
                                                 Toast.makeText(this, "Pedido realizado con éxito.", Toast.LENGTH_SHORT).show()
-
-                                                val intent = Intent(this, Nosotros::class.java)
-                                                startActivity(intent)
                                                 finish()
                                             },
                                             onFailure = { e ->
