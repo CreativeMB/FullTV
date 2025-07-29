@@ -143,47 +143,39 @@ class ApiPeliculaActivity : AppCompatActivity() {
     }
 
     private fun actualizarTextoBotonReproducir() {
-        // Mostrar inmediatamente "Alquilar 💳"
+        // 🔴 Mostrar inmediatamente "Alquilar 💳" por defecto
         tvReproducir.text = "Alquilar \uD83D\uDCB3"
-        println("▶ [DEBUG] Botón por defecto: Alquilar")
 
-        // Verifica el contador
+        // 🟡 Obtener contador
         val tiempoValido = movieActual?.countdownMinutes ?: movieCountdown
-        println("▶ [DEBUG] Tiempo válido = $tiempoValido")
 
+        // 🟢 Si el contador es válido, cambiar inmediatamente
         if (tiempoValido > 0) {
             tvReproducir.text = "▶ Reproducir"
-            println("▶ [DEBUG] Se cumple contador > 0 => Reproducir")
             return
         }
 
-        // Verifica si hay URL
-        if (streamUrlGuardado.isBlank()) {
-            println("▶ [DEBUG] streamUrl vacío")
-            return
-        }
+        // 🔴 Si no hay URL, no validar nada más
+        if (streamUrlGuardado.isBlank()) return
 
-        // Verificación de URL válida
+        // 🟢 Validar si la URL es válida (esto puede tardar, por eso es asíncrono)
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 Validacioneslista.esperarCarga()
                 val peliculasValidas = Validacioneslista.obtenerPeliculasValidas()
-
                 val esUrlValida = peliculasValidas.any { it.streamUrl == streamUrlGuardado }
-                println("▶ [DEBUG] URL válida = $esUrlValida")
 
+                // Solo si es válida, cambiar en el hilo principal
                 if (esUrlValida) {
                     withContext(Dispatchers.Main) {
                         tvReproducir.text = "▶ Reproducir"
-                        println("▶ [DEBUG] Se cumple URL válida => Reproducir")
                     }
                 }
             } catch (e: Exception) {
-                println("▶ [DEBUG] Error en validación URL: ${e.message}")
+                // No hacemos nada, se mantiene "Alquilar 💳"
             }
         }
     }
-
 
 
 
@@ -245,7 +237,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
                             imageUrl = movieSeleccionado.imageUrl,
                             streamUrl = movieSeleccionado.streamUrl,
                             castv = movieSeleccionado.castv ?: 50,
-                            countdownMinutes = 0
+                            countdownMinutes = 60
 
                         )
 
