@@ -88,62 +88,10 @@ class Validaciones {
             }
         }
     }
-        // Función para obtener el nombre de usuario
-    suspend fun obtenerNombreUsuario(usuarioId: String): String {
-        return withContext(Dispatchers.IO) {
-            try {
-                val doc = firestore.collection("users").document(usuarioId).get().await()
-                return@withContext if (doc.exists()) {
-                    doc.getString("nombre") ?: "Usuario Desconocido"
-                } else {
-                    Log.e("Validaciones", "El documento no existe")
-                    "Usuario Desconocido"
-                }
-            } catch (e: Exception) {
-                Log.e("Validaciones", "Error obteniendo nombre de usuario", e)
-                "Error"
-            }
-        }
-    }
-
-    // Función para obtener la cantidad de puntos Castv
-    suspend fun obtenerCantidadCastv(usuarioId: String): Int {
-        return withContext(Dispatchers.IO) {
-            try {
-                val doc = firestore.collection("users").document(usuarioId).get().await()
-                return@withContext if (doc.exists()) {
-                    doc.getLong("puntos")?.toInt() ?: 0
-                } else {
-                    Log.e("Validaciones", "El documento no existe")
-                    0
-                }
-            } catch (e: Exception) {
-                Log.e("Validaciones", "Error obteniendo cantidad de Castv", e)
-                0
-            }
-        }
-    }
 
     // Función para obtener la referencia de la colección de películas
     fun obtenerPeliculasRef(): CollectionReference {
         return db.collection("movies") // Asegúrate de que este nombre coincida con tu colección en Firestore
     }
 
-    suspend fun obtenerPeliculasCompleta(): List<Movie> {
-        return try {
-            val snapshot = db.collection("movies") // Nombre de la colección en Firestore
-                .get()
-                .await()
-            snapshot.documents.mapNotNull { it.toObject(Movie::class.java) }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
-        }
-    }
-    // Método en el repositorio para contar la cantidad de películas
-    suspend fun obtenerCantidadPeliculas(): Int {
-        val peliculasCollection = FirebaseFirestore.getInstance().collection("movies")
-        val snapshot = peliculasCollection.get().await()
-        return snapshot.size()
-    }
 }

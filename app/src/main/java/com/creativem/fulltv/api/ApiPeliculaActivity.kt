@@ -143,23 +143,70 @@ class ApiPeliculaActivity : AppCompatActivity() {
     }
 
     private fun actualizarTextoBotonReproducir() {
-        if (streamUrlGuardado.isBlank()) {
-            tvReproducir.text = "Alquilar" // Texto por defecto si no hay URL
+        // Mostrar inmediatamente "Alquilar 💳"
+        tvReproducir.text = "Alquilar \uD83D\uDCB3"
+        println("▶ [DEBUG] Botón por defecto: Alquilar")
+
+        // Verifica el contador
+        val tiempoValido = movieActual?.countdownMinutes ?: movieCountdown
+        println("▶ [DEBUG] Tiempo válido = $tiempoValido")
+
+        if (tiempoValido > 0) {
+            tvReproducir.text = "▶ Reproducir"
+            println("▶ [DEBUG] Se cumple contador > 0 => Reproducir")
             return
         }
 
-        GlobalScope.launch(Dispatchers.Main) {
+        // Verifica si hay URL
+        if (streamUrlGuardado.isBlank()) {
+            println("▶ [DEBUG] streamUrl vacío")
+            return
+        }
+
+        // Verificación de URL válida
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 Validacioneslista.esperarCarga()
                 val peliculasValidas = Validacioneslista.obtenerPeliculasValidas()
-                val esValida = peliculasValidas.any { it.streamUrl == streamUrlGuardado }
 
-                tvReproducir.text = if (esValida) "▶ Reproducir" else "Alquilar \uD83D\uDCB3"
+                val esUrlValida = peliculasValidas.any { it.streamUrl == streamUrlGuardado }
+                println("▶ [DEBUG] URL válida = $esUrlValida")
+
+                if (esUrlValida) {
+                    withContext(Dispatchers.Main) {
+                        tvReproducir.text = "▶ Reproducir"
+                        println("▶ [DEBUG] Se cumple URL válida => Reproducir")
+                    }
+                }
             } catch (e: Exception) {
-                tvReproducir.text = "Alquilar" // En caso de error, texto por defecto
+                println("▶ [DEBUG] Error en validación URL: ${e.message}")
             }
         }
     }
+
+
+
+
+//    // Método antiguo para actualizar el texto del botón "Reproducir"
+
+//    private fun actualizarTextoBotonReproducir() {
+//        if (streamUrlGuardado.isBlank()) {
+//            tvReproducir.text = "Alquilar" // Texto por defecto si no hay URL
+//            return
+//        }
+//
+//        GlobalScope.launch(Dispatchers.Main) {
+//            try {
+//                Validacioneslista.esperarCarga()
+//                val peliculasValidas = Validacioneslista.obtenerPeliculasValidas()
+//                val esValida = peliculasValidas.any { it.streamUrl == streamUrlGuardado }
+//
+//                tvReproducir.text = if (esValida) "▶ Reproducir" else "Alquilar \uD83D\uDCB3"
+//            } catch (e: Exception) {
+//                tvReproducir.text = "Alquilar" // En caso de error, texto por defecto
+//            }
+//        }
+//    }
 
 
     private fun cargarCartelera() {
@@ -198,7 +245,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
                             imageUrl = movieSeleccionado.imageUrl,
                             streamUrl = movieSeleccionado.streamUrl,
                             castv = movieSeleccionado.castv ?: 50,
-                            countdownMinutes = 60
+                            countdownMinutes = 0
 
                         )
 

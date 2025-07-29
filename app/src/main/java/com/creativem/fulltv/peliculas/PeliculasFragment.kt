@@ -139,6 +139,8 @@ class PeliculasFragment : RowsSupportFragment() {
 
     private fun updateMovieList(peliculas: List<Movie>) {
         rowsAdapter.clear()
+        // 🔁 Esta línea aplica el reinicio de contadores vencidos
+        val peliculasProcesadas = resetearContadoresVencidos(peliculas)
 
         // ✅ Agregar encabezado
         val headerPresenter = HeaderPresenter()
@@ -158,6 +160,39 @@ class PeliculasFragment : RowsSupportFragment() {
             1
         ) // Actualiza el rango para el menú
     }
+
+    private fun resetearContadoresVencidos(peliculas: List<Movie>): List<Movie> {
+        val ahora = System.currentTimeMillis()
+        val db = FirebaseFirestore.getInstance()
+
+        return peliculas.map { pelicula ->
+            val createdAtMillis = pelicula.createdAt.toDate().time
+            val duracionMillis = pelicula.countdownMinutes * 60_000L
+            val estaVencido = pelicula.countdownMinutes > 0 && ahora >= (createdAtMillis + duracionMillis)
+
+            if (estaVencido) {
+                Log.d("ResetContador", "⏰ VENCIDO: ${pelicula.title}")
+
+                if (pelicula.id.isNotBlank()) {
+                    db.collection("movies").document(pelicula.id)
+                        .update("countdownMinutes", 0)
+                        .addOnSuccessListener {
+                            Log.d("ResetContador", "✅ Reiniciado countdown para ${pelicula.title}")
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e("ResetContador", "❌ Error al resetear countdown", e)
+                        }
+                }
+
+                // Devolvemos el objeto ya modificado
+                pelicula.copy(countdownMinutes = 0)
+            } else {
+                pelicula
+            }
+        }
+    }
+
+
     private fun actualizarSoloEtiquetas() {
         for (i in 0 until rowsAdapter.size()) {
             val row = rowsAdapter[i]
