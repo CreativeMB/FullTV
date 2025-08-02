@@ -378,12 +378,11 @@ class Main : FragmentActivity() {
                         val mapped = moviesApi.map {
                             Movie(
                                 id = it.id.toString(),
-                                title = "${it.title} (${it.release_date ?: "N/A"})",
+                                title = "${it.title} (${CastvHelper.formatearFecha(it.release_date)})",
                                 originalTitle = it.original_title,
                                 imageUrl = "https://image.tmdb.org/t/p/w500${it.poster_path}",
                                 streamUrl = "https://tuservidor.com/stream/${it.id}",
                                 castv = 50,
-                                countdownMinutes = 60,
                                 createdAt = Timestamp.now()
                             )
                         }
