@@ -967,8 +967,8 @@ class Main : FragmentActivity() {
             return
         }
 
-        val url = "https://github.com/CreativeMB/FullTV/releases/download/fulltv/FullTV_update.apk"
-        val fileName = "FullTV_update.apk"
+        val url = "https://github.com/CreativeMB/center/releases/download/apk/FullTV.apk"
+        val fileName = "FullTV.apk"
         // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
         val apkFile = File(this.getExternalFilesDir(null), fileName)
 

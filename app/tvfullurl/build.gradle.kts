@@ -60,5 +60,6 @@ dependencies {
     implementation ("com.google.firebase:firebase-firestore:24.5.0")
     implementation ("com.google.firebase:firebase-database:20.0.3")
     implementation ("org.json:json:20240303")
+    implementation("com.squareup.okhttp3:okhttp:4.11.0")
 
 }

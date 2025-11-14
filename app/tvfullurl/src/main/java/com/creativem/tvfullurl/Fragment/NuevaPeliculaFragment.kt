@@ -1,5 +1,6 @@
 package com.creativem.tvfullurl.Fragment
 
+import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -13,6 +14,7 @@ import android.widget.Toast
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.creativem.cineflexurl.modelo.Movie
+import com.creativem.tvfullurl.DownloadActivity
 import com.creativem.tvfullurl.R
 import com.creativem.tvfullurl.databinding.FragmentNuevaEditarBinding
 import com.google.firebase.Timestamp
@@ -72,6 +74,12 @@ class NuevaPeliculaFragment : Fragment() {
                 editarMovie(movieId!!)
             }
         }
+        binding.extraxtorurl.setOnClickListener {
+            // Abrir la actividad VideoDownloadAdapter desde un Fragment
+            val intent = Intent(requireContext(), DownloadActivity::class.java)
+            startActivity(intent)
+        }
+
 
     }
 
