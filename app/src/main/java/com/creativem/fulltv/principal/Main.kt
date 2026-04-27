@@ -66,6 +66,7 @@ import com.creativem.fulltv.menu.MenuPrincipalItem
 import com.creativem.fulltv.peliculas.PeliculasFragment
 import com.creativem.fulltv.peliculasvalidas.PeliculasValidasFragment
 import com.creativem.fulltv.tv.TvFragment
+import com.creativem.tvfullurl.PeliculasActivity
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -241,7 +242,14 @@ class Main : FragmentActivity() {
 
     }
     fun navegarAPeliculasValidas() {
-        navegarA(PeliculasValidasFragment())
+        // Creamos el Intent para ir a la nueva Activity
+        val intent = Intent(this, PeliculasActivity::class.java)
+
+        // Iniciamos la actividad
+        startActivity(intent)
+
+        // Opcional: Si no quieres que el usuario regrese a la pantalla anterior al presionar atrás
+        // finish()
     }
 
     fun navegarATv() {

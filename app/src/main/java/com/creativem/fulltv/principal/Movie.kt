@@ -6,7 +6,7 @@ import com.google.firebase.database.IgnoreExtraProperties
 
 @IgnoreExtraProperties
 data class Movie(
-    val id: String = "",
+    var id: String = "",
     val title: String = "",
     val correo: String = "",
     val originalTitle: String = "",

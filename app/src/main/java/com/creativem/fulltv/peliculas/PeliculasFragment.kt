@@ -102,6 +102,7 @@ class PeliculasFragment : RowsSupportFragment() {
         }
     }
 
+
     // --- Métodos de Carga de Películas ---
     private fun calcularElementosPorFila(): Int {
         val displayMetrics = Resources.getSystem().displayMetrics
