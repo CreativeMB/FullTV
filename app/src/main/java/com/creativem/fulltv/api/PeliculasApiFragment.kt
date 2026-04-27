@@ -136,7 +136,7 @@ class PeliculasApiFragment : Fragment() {
                                 streamUrl = "https://tuservidor.com/stream/${movie.id}",
                                 castv = 50,
                                 countdownMinutes = 60,
-                                createdAt = Timestamp.now()
+                                createdAt = System.currentTimeMillis()
                             )
                         }
                         allMovies.addAll(mapped)
@@ -169,7 +169,7 @@ class PeliculasApiFragment : Fragment() {
                                 streamUrl = "https://tuservidor.com/stream/${movie.id}",
                                 castv = 50,
                                 countdownMinutes = 60,
-                                createdAt = Timestamp.now()
+                                createdAt = System.currentTimeMillis()
                             )
                         }
                         allMovies.addAll(mapped)
@@ -227,7 +227,7 @@ class PeliculasApiFragment : Fragment() {
                                 streamUrl = "https://tuservidor.com/stream/${movie.id}",
                                 castv = 50,
                                 countdownMinutes = 60,
-                                createdAt = Timestamp.now()
+                                createdAt = System.currentTimeMillis()
                             )
                         }
                         allMovies.addAll(mapped)
@@ -260,7 +260,7 @@ class PeliculasApiFragment : Fragment() {
                                 streamUrl = "https://tuservidor.com/stream/${movie.id}",
                                 castv = 50,
                                 countdownMinutes = 60,
-                                createdAt = Timestamp.now()
+                                createdAt = System.currentTimeMillis()
                             )
                         }
                         allMovies.addAll(mapped)

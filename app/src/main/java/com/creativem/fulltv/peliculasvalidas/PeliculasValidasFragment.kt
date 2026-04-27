@@ -26,7 +26,8 @@ import kotlinx.coroutines.launch
 
 class PeliculasValidasFragment : RowsSupportFragment() {
     private val channels = ArrayObjectAdapter(ListRowPresenter())
-        override fun onCreate(savedInstanceState: Bundle?) {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         adapter = channels
     }
@@ -34,49 +35,40 @@ class PeliculasValidasFragment : RowsSupportFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Manejador al hacer clic en un ítem
-        setOnItemViewClickedListener { _, item, _, _ ->
-            val movie = item as? Movie
-            if (movie != null) {
-                // Aquí puedes abrir la actividad para reproducir la película, por ejemplo.
-            }
-        }
+        // ✅ ACTIVAR el manejador de clics (Antes estaba definido pero no asignado)
+        onItemViewClickedListener = ItemViewClickedListener()
 
         // Manejador al seleccionar un ítem (para cambiar el fondo)
         setOnItemViewSelectedListener { _, item, _, _ ->
             val movie = item as? Movie
             if (movie != null && !movie.imageUrl.isNullOrEmpty()) {
-                // 👉 Muestra la imagen del ítem seleccionado como fondo (detiene la animación)
                 (activity as? Main)?.setFondoDesdeUrl(movie.imageUrl)
             } else {
-                // 👉 Si no hay imagen, restaurar fondo animado
                 (activity as? Main)?.restaurarFondoAnimado()
             }
         }
 
-        // Cargar los canales desde Firestore
+        // Cargar los canales desde la NUEVA RUTA (Realtime Database)
         loadMovies()
     }
 
-
     private fun loadMovies() {
-
-
         CoroutineScope(Dispatchers.Main).launch {
-            // 🔄 Esperar a que la carga en segundo plano se complete
+            // 🔄 Esperar a que la carga de Realtime Database se complete
             Validacioneslista.esperarCarga()
 
-            // ✅ Obtener las películas válidas ya cargadas
+            // ✅ Obtener las películas de la nueva ruta ya procesadas
             val peliculasOrdenadasValidas = Validacioneslista.obtenerPeliculasValidas()
 
             if (peliculasOrdenadasValidas.isNotEmpty()) {
-                agregarALista(peliculasOrdenadasValidas, "")
+                // Limpiar antes de agregar por si hay re-carga
+                channels.clear()
+                agregarALista(peliculasOrdenadasValidas, "Películas en Línea")
             } else {
-                Log.e("PeliculasValidasFragment", "No hay películas válidas.")
+                Log.e("PeliculasValidasFragment", "No hay películas válidas en Realtime DB.")
             }
         }
     }
-
 
     private fun calcularElementosPorFila(): Int {
         val displayMetrics = Resources.getSystem().displayMetrics
@@ -86,7 +78,7 @@ class PeliculasValidasFragment : RowsSupportFragment() {
     }
 
     private fun agregarALista(peliculas: List<Movie>, titulo: String) {
-        val cardPresenter = CardPresenter() // Cambio aquí
+        val cardPresenter = CardPresenter()
         val elementosPorFila = calcularElementosPorFila()
         val chunkedPeliculas = peliculas.chunked(elementosPorFila)
 
@@ -94,38 +86,35 @@ class PeliculasValidasFragment : RowsSupportFragment() {
             val listRowAdapter = ArrayObjectAdapter(cardPresenter).apply {
                 addAll(0, chunk)
             }
-
             val header = if (index == 0) HeaderItem(0, titulo) else null
             channels.add(ListRow(header, listRowAdapter))
         }
     }
 
+    // --- MANEJADOR DE CLICS ACTUALIZADO ---
     private inner class ItemViewClickedListener : OnItemViewClickedListener {
-
         override fun onItemClicked(
             itemViewHolder: Presenter.ViewHolder?,
             item: Any?,
             rowViewHolder: RowPresenter.ViewHolder?,
             row: Row?
         ) {
-            if (item is Movie) { // Si es una película, abre PlayerPeliculas
-
+            if (item is Movie) {
                 val intent = Intent(requireContext(), ApiPeliculaActivity::class.java).apply {
+                    // IGUALAMOS los nombres de extras para que el reproductor los entienda
                     putExtra("EXTRA_STREAM_URL", item.streamUrl)
                     putExtra("EXTRA_MOVIE_TITLE", item.title)
-                    putExtra("EXTRA_MOVIE_YEAR", item.castv)
+                    putExtra("EXTRA_MOVIE_CASTV", item.castv) // Antes era EXTRA_MOVIE_YEAR
                     putExtra("EXTRA_MOVIE_IMAGE_URL", item.imageUrl)
                     putExtra("EXTRA_ORIGINAL_TITLE", item.originalTitle)
                     putExtra("EXTRA_COUNTDOWN", item.countdownMinutes)
+
+                    // PASAMOS el tiempo convertido a segundos (Importante para Realtime DB)
+                    putExtra("EXTRA_CREATED_AT", item.createdAt / 1000)
                 }
                 startActivity(intent)
-
-            } else { // Si es otro tipo de elemento, muestra un mensaje
-                Toast.makeText(
-                    requireContext(),
-                    "Elemento seleccionado: $item",
-                    Toast.LENGTH_SHORT
-                ).show()
+            } else {
+                Toast.makeText(requireContext(), "Elemento: $item", Toast.LENGTH_SHORT).show()
             }
         }
     }

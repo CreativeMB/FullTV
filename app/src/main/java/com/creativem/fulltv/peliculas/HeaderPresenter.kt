@@ -17,7 +17,6 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -25,6 +24,8 @@ import java.util.Locale
 class HeaderPresenter : Presenter() {
 
     private var usuariosListener: ValueEventListener? = null
+    // Referencia global a Realtime Database
+    private val databaseRef = FirebaseDatabase.getInstance().reference
 
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
@@ -45,9 +46,6 @@ class HeaderPresenter : Presenter() {
         val imagenUser = viewHolder.view.findViewById<ImageView>(R.id.imagenuser)
 
         val auth = FirebaseAuth.getInstance()
-        val firestore = FirebaseFirestore.getInstance()
-        val realtimeDb = FirebaseDatabase.getInstance().reference
-
         val usuario = auth.currentUser
         val usuarioId = usuario?.uid
 
@@ -63,53 +61,38 @@ class HeaderPresenter : Presenter() {
             return
         }
 
-        // Obtener el correo del usuario autenticado
-        val usuarioEmail = FirebaseAuth.getInstance().currentUser?.email
-
+        // --- LÓGICA DE USUARIO Y CONTEO DE PELÍCULAS ---
+        val usuarioEmail = auth.currentUser?.email
         if (!usuarioEmail.isNullOrBlank()) {
-            // Obtener datos del usuario desde el correo
             CastvHelper.obtenerDatosUsuario(
                 email = usuarioEmail,
                 onSuccess = { nombre, correo, castv, enlinea ->
                     textUsuario.text = "\uD83E\uDDD1 $nombre" + if (enlinea) " 🟢" else " 🔴"
 
-                    // Obtener cantidad de películas desde Firestore
-                    firestore.collection("movies")
-                        .get()
-                        .addOnSuccessListener { result ->
-                            val cantidadPeliculas = result.size()
-                            textCastv.text = "🎬 Películas: $cantidadPeliculas | ⭐ Castv: $castv"
-                        }
-                        .addOnFailureListener {
-                            textCastv.text = "🎬 Películas: 0 | ⭐ Castv: $castv"
-                        }
+                    // NUEVA RUTA: Obtener cantidad de películas desde Realtime Database
+                    databaseRef.child("movies").get().addOnSuccessListener { snapshot ->
+                        val cantidadPeliculas = snapshot.childrenCount // childrenCount es muy eficiente
+                        textCastv.text = "🎬 Películas: $cantidadPeliculas | ⭐ Castv: $castv"
+                    }.addOnFailureListener {
+                        textCastv.text = "🎬 Películas: 0 | ⭐ Castv: $castv"
+                    }
                 },
                 onFailure = {
                     textUsuario.text = "Usuario desconocido"
                     textCastv.text = "🎬 Películas: 0 | ⭐ Castv: 0"
                 }
             )
-        } else {
-            // No se pudo obtener el correo
-            textUsuario.text = "Usuario no autenticado"
-            textCastv.text = "🎬 Películas: 0 | ⭐ Castv: 0"
         }
 
-
-        // Foto del usuario
+        // Foto del usuario (se mantiene igual)
         val photoUrl = usuario.photoUrl
         if (photoUrl != null) {
-            Glide.with(context)
-                .load(photoUrl)
-                .placeholder(R.drawable.icono)
-                .error(R.drawable.icono)
-                .centerCrop()
-                .into(imagenUser)
+            Glide.with(context).load(photoUrl).placeholder(R.drawable.icono).error(R.drawable.icono).centerCrop().into(imagenUser)
         } else {
             imagenUser.setImageResource(R.drawable.icono)
         }
 
-        // Listener de usuarios conectados (en tiempo real)
+        // --- LISTENER DE USUARIOS CONECTADOS (Realtime Database) ---
         usuariosListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 var on = 0
@@ -121,60 +104,50 @@ class HeaderPresenter : Presenter() {
                 userOnline.text = "ON-$on"
                 userOff.text = "OFF-$off"
             }
-
             override fun onCancelled(error: DatabaseError) {}
         }
+        databaseRef.child("usuarios").addValueEventListener(usuariosListener!!)
 
-        realtimeDb.child("usuarios").addValueEventListener(usuariosListener!!)
-
-        // Pedidos recientes
-        firestore.collection("pedidosmovies")
-            .get()
-            .addOnSuccessListener { result ->
-                if (!result.isEmpty) {
-                    val listaPedidos = StringBuilder()
-                    for (pedido in result) {
-                        val nombre = pedido.getString("nombre") ?: "Desconocido"
-                        val title = pedido.getString("title") ?: "Película"
-                        listaPedidos.append("🎬 $nombre pidió: $title\n")
-                    }
-
-                    txtActualizacion.apply {
-                        text = listaPedidos.toString().trim()
-                        visibility = View.VISIBLE
-                        isSelected = true
-
-                        ObjectAnimator.ofArgb(
-                            this,
-                            "textColor",
-                            Color.RED,
-                            Color.parseColor("#FF9800"),
-                            Color.YELLOW,
-                            Color.GREEN,
-                            Color.BLUE,
-                            Color.parseColor("#4B0082"),
-                            Color.parseColor("#EE82EE"),
-                            Color.RED
-                        ).apply {
-                            duration = 4000L
-                            repeatCount = ValueAnimator.INFINITE
-                            repeatMode = ValueAnimator.RESTART
-                            start()
-                        }
-                    }
-                } else {
-                    txtActualizacion.visibility = View.GONE
+        // --- MARQUESINA DE PEDIDOS RECIENTES (Nueva Ruta Realtime Database) ---
+        databaseRef.child("pedidosmovies").limitToLast(10).get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                val listaPedidos = StringBuilder()
+                for (pedidoSnapshot in snapshot.children) {
+                    val nombre = pedidoSnapshot.child("nombre").value?.toString() ?: "Desconocido"
+                    val title = pedidoSnapshot.child("title").value?.toString() ?: "Película"
+                    listaPedidos.append("🎬 $nombre pidió: $title        ") // Espacio para que se lea mejor en marquesina
                 }
+
+                txtActualizacion.apply {
+                    text = listaPedidos.toString().trim()
+                    visibility = View.VISIBLE
+                    isSelected = true // Para que funcione el marquee (desplazamiento)
+
+                    // Animación de arcoíris (Mantenemos tu lógica original)
+                    ObjectAnimator.ofArgb(
+                        this, "textColor",
+                        Color.RED, Color.parseColor("#FF9800"), Color.YELLOW,
+                        Color.GREEN, Color.BLUE, Color.parseColor("#4B0082"),
+                        Color.parseColor("#EE82EE"), Color.RED
+                    ).apply {
+                        duration = 4000L
+                        repeatCount = ValueAnimator.INFINITE
+                        repeatMode = ValueAnimator.RESTART
+                        start()
+                    }
+                }
+            } else {
+                txtActualizacion.visibility = View.GONE
             }
-            .addOnFailureListener {
-                txtActualizacion.text = "Error al cargar los pedidos."
-                txtActualizacion.visibility = View.VISIBLE
-            }
+        }.addOnFailureListener {
+            txtActualizacion.visibility = View.GONE
+        }
     }
 
     override fun onUnbindViewHolder(viewHolder: ViewHolder?) {
+        // Importante: Eliminar listener para no gastar recursos
         usuariosListener?.let {
-            FirebaseDatabase.getInstance().getReference("usuarios").removeEventListener(it)
+            databaseRef.child("usuarios").removeEventListener(it)
         }
         usuariosListener = null
     }

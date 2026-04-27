@@ -42,7 +42,8 @@ import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.databinding.PlayerBinding
 import com.creativem.fulltv.principal.AudioFocusHelper
 import com.google.firebase.firestore.FirebaseFirestore
-
+import com.google.firebase.database.FirebaseDatabase // ASEGÚRATE DE TENER ESTE IMPORT
+import com.google.firebase.database.DatabaseReference
 class PlayerTv : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
@@ -67,7 +68,8 @@ class PlayerTv : AppCompatActivity() {
     private lateinit var ocultarMenuRunnable: Runnable
     private var lastMenuInteractionTime: Long = 0L
     private val menuHideDelay = 5000L // 5 segundos
-
+    // Referencia a la nueva ruta
+    private val databaseRef = FirebaseDatabase.getInstance().getReference("tv")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -230,24 +232,28 @@ class PlayerTv : AppCompatActivity() {
         loadTvCollection() // Cargar la colección de TV
     }
 
+    // --- CAMBIO PRINCIPAL: Carga desde la Nueva Ruta ---
     private fun loadTvCollection() {
-        val db = FirebaseFirestore.getInstance()
+        // Consultamos el nodo "tv" en Realtime Database
+        databaseRef.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                val tvList = mutableListOf<Movie>()
 
-        db.collection("tv")
-            .get()
-            .addOnSuccessListener { documents ->
-                val tvList = documents.map { doc ->
-                    Movie(
-                        title = doc.getString("title") ?: "Sin título",
-                        imageUrl = doc.getString("imageUrl") ?: "", // URL de la miniatura
-                        streamUrl = doc.getString("streamUrl") ?: "" // URL del streaming
-                    )
+                for (child in snapshot.children) {
+                    val canal = child.getValue(Movie::class.java)
+                    canal?.let {
+                        // Asignamos el ID desde la llave del nodo y lo añadimos a la lista
+                        tvList.add(it.copy(id = child.key ?: ""))
+                    }
                 }
-                updateRecyclerView(tvList) // Actualizar RecyclerView con la nueva lista
+
+                // Actualizamos el RecyclerView con los canales de la nueva ruta
+                updateRecyclerView(tvList)
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "Error cargando TV: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+        }.addOnFailureListener { e ->
+            Log.e("PlayerTv", "Error cargando TV desde Realtime DB: ${e.message}")
+            Toast.makeText(this, "Error al cargar la lista de canales", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun updateRecyclerView(tvList: List<Movie>) {
@@ -260,6 +266,10 @@ class PlayerTv : AppCompatActivity() {
         intent.putExtra("EXTRA_STREAM_URL", streamUrl)
         intent.putExtra("EXTRA_MOVIE_TITLE", movieTitle)
         intent.putExtra("EXTRA_MOVIE_IMAGE_URL", movieImageUrl)
+
+        // Si necesitas pasar el castv o fecha, hazlo aquí para ser consistente:
+        // intent.putExtra("EXTRA_MOVIE_CASTV", ...)
+
         startActivity(intent)
     }
 

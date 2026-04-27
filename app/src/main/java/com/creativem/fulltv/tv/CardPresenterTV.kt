@@ -122,9 +122,14 @@ class CardPresenterTV : Presenter() {
         holder.view.setOnClickListener {
             val context = it.context
             val intent = Intent(context, PlayerTv::class.java).apply {
+                // Usamos nombres consistentes con el resto de la App
                 putExtra("EXTRA_STREAM_URL", item.streamUrl)
                 putExtra("EXTRA_MOVIE_TITLE", item.title)
                 putExtra("EXTRA_MOVIE_IMAGE_URL", item.imageUrl)
+
+                // OPCIONAL: Si tu TV también usa saldo o fechas, agrégalos:
+                putExtra("EXTRA_MOVIE_CASTV", item.castv)
+                putExtra("EXTRA_CREATED_AT", item.createdAt / 1000)
             }
             context.startActivity(intent)
         }

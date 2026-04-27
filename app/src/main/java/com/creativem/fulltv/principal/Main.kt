@@ -364,7 +364,7 @@ class Main : FragmentActivity() {
                                 streamUrl = "https://tuservidor.com/stream/${it.id}",
                                 castv = 50,
                                 countdownMinutes = 60,
-                                createdAt = Timestamp.now()
+                                createdAt = System.currentTimeMillis()
                             )
                         }
 
@@ -793,7 +793,7 @@ class Main : FragmentActivity() {
             putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
             putExtra("EXTRA_ORIGINAL_TITLE", movie.originalTitle)
             putExtra("EXTRA_COUNTDOWN", movie.countdownMinutes)
-            putExtra("EXTRA_CREATED_AT", movie.createdAt.seconds)
+            putExtra("EXTRA_CREATED_AT", movie.createdAt / 1000)
 
         }
         startActivity(intent) // Inicia la actividad del reproductor

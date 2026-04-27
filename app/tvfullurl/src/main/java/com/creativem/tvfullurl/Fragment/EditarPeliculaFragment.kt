@@ -13,11 +13,15 @@ import com.creativem.cineflexurl.modelo.Movie
 import com.creativem.tvfullurl.R
 import com.creativem.tvfullurl.adapter.MoviesAdapter
 import com.creativem.tvfullurl.databinding.FragmentPedidosBinding
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.FirebaseDatabase
 
 class EditarPeliculaFragment : Fragment() {
     private lateinit var binding: FragmentPedidosBinding
-    private lateinit var db: FirebaseFirestore
+
+    // NUEVA RUTA: Usamos DatabaseReference en lugar de FirebaseFirestore
+    private lateinit var databaseRef: DatabaseReference
+
     private lateinit var moviesAdapter: MoviesAdapter
     private var movieList: MutableList<Movie> = mutableListOf()
 
@@ -26,7 +30,10 @@ class EditarPeliculaFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         binding = FragmentPedidosBinding.inflate(inflater, container, false)
-        db = FirebaseFirestore.getInstance()
+
+        // Inicializamos Realtime Database
+        databaseRef = FirebaseDatabase.getInstance().reference
+
         return binding.root
     }
 
@@ -35,7 +42,7 @@ class EditarPeliculaFragment : Fragment() {
         iniciarRecycler()
         loadMovies()
 
-        // Configurar el SearchView
+        // Configurar el SearchView (Lógica original conservada)
         binding.searchView.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
                 return false
@@ -49,23 +56,28 @@ class EditarPeliculaFragment : Fragment() {
     }
 
     private fun loadMovies() {
-        movieList.clear() // Limpiar la lista antes de agregar nuevas películas
+        movieList.clear() // Limpiar la lista
 
-        db.collection("movies").get()
-            .addOnSuccessListener { documents ->
-                for (document in documents) {
-                    // Convertir el documento en un objeto Movie y agregar el ID y el userId simulado
-                    val movie = document.toObject(Movie::class.java).copy(
-                        id = document.id,
-                    )
-                    movieList.add(movie) // Agregar la película a la lista
+        // NUEVA RUTA: Consultamos el nodo "movies"
+        databaseRef.child("movies").get()
+            .addOnSuccessListener { snapshot ->
+                for (child in snapshot.children) {
+                    // 1. Obtenemos el objeto Movie usando el sistema automático de Firebase
+                    val movie = child.getValue(Movie::class.java)
+
+                    if (movie != null) {
+                        // 2. Asignamos el ID manualmente (ya no usamos .copy)
+                        movie.id = child.key ?: ""
+
+                        movieList.add(movie)
+                    }
                 }
-                moviesAdapter.notifyDataSetChanged() // Notificar al adaptador de cambios
+                moviesAdapter.notifyDataSetChanged() // Notificar al adaptador
             }
             .addOnFailureListener {
                 Toast.makeText(
                     requireContext(),
-                    "Error al cargar las películas",
+                    "Error al cargar las películas desde la nueva ruta",
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -78,7 +90,7 @@ class EditarPeliculaFragment : Fragment() {
                 deleteMovie(movieId)
             },
             onEditClick = { movie ->
-                editMovie(movie) // Aquí pasas el objeto Movie en lugar del ID
+                editMovie(movie)
             },
             isEditable = true
         )
@@ -89,6 +101,7 @@ class EditarPeliculaFragment : Fragment() {
     }
 
     private fun editMovie(movie: Movie) {
+        // Lógica original conservada
         val bundle = Bundle().apply {
             putString("movieId", movie.id)
         }
@@ -99,9 +112,10 @@ class EditarPeliculaFragment : Fragment() {
     }
 
     private fun deleteMovie(movieId: String) {
-        db.collection("movies").document(movieId).delete()
+        // NUEVA RUTA: Eliminamos el nodo específico por su ID
+        databaseRef.child("movies").child(movieId).removeValue()
             .addOnSuccessListener {
-                Toast.makeText(requireContext(), "Película eliminada", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Película eliminada de la nueva ruta", Toast.LENGTH_SHORT).show()
                 loadMovies() // Recargar películas
             }
             .addOnFailureListener { e ->
@@ -110,7 +124,7 @@ class EditarPeliculaFragment : Fragment() {
                     "Error al eliminar la película",
                     Toast.LENGTH_SHORT
                 ).show()
-                Log.e("EditarPeliculaFragment", "Error al eliminar la película", e)
+                Log.e("EditarPeliculaFragment", "Error al eliminar en Realtime DB", e)
             }
     }
 }

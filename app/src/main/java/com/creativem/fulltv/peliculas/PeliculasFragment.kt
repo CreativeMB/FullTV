@@ -41,7 +41,7 @@ class PeliculasFragment : RowsSupportFragment() {
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
     private val validaciones = Validaciones()
     // --- Firebase & Estado ---
-    private val db = FirebaseFirestore.getInstance()
+    private var peliculasListener: ValueEventListener? = null
     private lateinit var auth: FirebaseAuth
     private val databaseRef by lazy { FirebaseDatabase.getInstance().reference }
     private var datosUsuarioListener: ValueEventListener? = null
@@ -110,29 +110,38 @@ class PeliculasFragment : RowsSupportFragment() {
         return (anchoPantalla / anchoTarjeta).coerceAtLeast(1) // Asegura al menos 1 elemento por fila
     }
     private fun escucharCambiosEnPeliculas() {
-//        mostrarCarga("Actualizando biblioteca en línea...")
-        validaciones.obtenerPeliculasRef().addSnapshotListener { snapshot, error ->
+        // Referencia al nodo "movies" que creamos con el script
+        val moviesRef = databaseRef.child("movies")
 
-            if (error != null) {
-                Log.e("PeliculasFragment", "Error al escuchar cambios: ${error.message}")
-                Toast.makeText(requireContext(), "Error al cargar películas", Toast.LENGTH_SHORT).show()
+        peliculasListener = moviesRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (snapshot.exists()) {
+                    val peliculas = mutableListOf<Movie>()
 
-                return@addSnapshotListener
-            }
+                    // Recorremos cada hijo dentro de "movies"
+                    for (child in snapshot.children) {
+                        val movie = child.getValue(Movie::class.java)
+                        if (movie != null) {
+                            // En Realtime, el ID es la llave del nodo (child.key)
+                            val movieConId = movie.copy(id = child.key ?: "")
+                            peliculas.add(movieConId)
+                        }
+                    }
 
-            if (snapshot != null && !snapshot.isEmpty) {
-                val peliculas = snapshot.documents.mapNotNull { doc ->
-                    doc.toObject(Movie::class.java)?.run { this.copy(id = doc.id) }
+                    // Ordenar por fecha (como el script pasó fechas a milisegundos, el sort funciona perfecto)
+                    val peliculasOrdenadas = peliculas.sortedByDescending { it.createdAt }
+                    updateMovieList(peliculasOrdenadas)
+                } else {
+                    Log.d("PeliculasFragment", "No se encontraron películas en Realtime Database.")
+                    updateMovieList(emptyList())
                 }
-                val peliculasOrdenadas = peliculas.sortedByDescending { it.createdAt }
-                updateMovieList(peliculasOrdenadas)
-            } else {
-                Log.d("PeliculasFragment", "No se encontraron películas.")
-
-                updateMovieList(emptyList())
             }
-            //            ocultarCarga()
-        }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("PeliculasFragment", "Error en Realtime Database: ${error.message}")
+                Toast.makeText(requireContext(), "Error al cargar películas", Toast.LENGTH_SHORT).show()
+            }
+        })
     }
 
     private fun updateMovieList(peliculas: List<Movie>) {
@@ -200,7 +209,7 @@ class PeliculasFragment : RowsSupportFragment() {
             putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
             putExtra("EXTRA_ORIGINAL_TITLE", movie.originalTitle)
             putExtra("EXTRA_COUNTDOWN", movie.countdownMinutes)
-            putExtra("EXTRA_CREATED_AT", movie.createdAt.seconds)
+            putExtra("EXTRA_CREATED_AT", movie.createdAt / 1000)
         }
         startActivity(intent)
     }
@@ -253,20 +262,28 @@ class PeliculasFragment : RowsSupportFragment() {
     }
 
     private fun eliminarListener() {
+        val userId = auth.currentUser?.uid
+
+        // 1. Limpiar listener de Status de Usuario
         userStatusListener?.let {
-            val userId = auth.currentUser?.uid
             if (userId != null) {
                 databaseRef.child("usuarios").child(userId).removeEventListener(it)
             }
         }
         userStatusListener = null
 
+        // 2. Limpiar listener de Datos de Usuario
         datosUsuarioListener?.let {
-            val userId = auth.currentUser?.uid
             if (userId != null) {
                 databaseRef.child("usuarios").child(userId).removeEventListener(it)
             }
         }
         datosUsuarioListener = null
+
+        // 3. NUEVO: Limpiar listener de Películas (el que antes era de Firestore)
+        peliculasListener?.let {
+            databaseRef.child("movies").removeEventListener(it)
+        }
+        peliculasListener = null
     }
 }

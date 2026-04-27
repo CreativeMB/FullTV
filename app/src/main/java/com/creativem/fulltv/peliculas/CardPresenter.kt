@@ -134,7 +134,7 @@ class CardPresenter: Presenter(){
                 .into(imageView)
         }
 
-        val createdAtMillis = movie.createdAt.toDate().time
+        val createdAtMillis = movie.createdAt
         val countdownDurationMillis = TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
         val currentTime = System.currentTimeMillis()
         val timeElapsed = currentTime - createdAtMillis
@@ -181,19 +181,22 @@ class CardPresenter: Presenter(){
         holder.view.setOnClickListener {
             val context = cardView.context
             val intent = Intent(context, ApiPeliculaActivity::class.java)
-            intent.putExtra("EXTRA_TITLE", movie.title)
+
+            // Usamos los nombres que tu Reproductor y Realtime Database esperan ahora
+            intent.putExtra("EXTRA_MOVIE_TITLE", movie.title)
             intent.putExtra("EXTRA_STREAM_URL", movie.streamUrl)
+            intent.putExtra("EXTRA_MOVIE_CASTV", movie.castv)
+            intent.putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
+            intent.putExtra("EXTRA_ORIGINAL_TITLE", movie.originalTitle)
+            intent.putExtra("EXTRA_COUNTDOWN", movie.countdownMinutes)
+
+            // Pasamos el tiempo convertido a segundos (Long)
+            intent.putExtra("EXTRA_CREATED_AT", movie.createdAt / 1000)
+
             context.startActivity(intent)
         }
 
 
-
-//        holder.view.setOnClickListener {
-//            val context = cardView.context
-//            val intent = Intent(context, PlayerPeliculas::class.java)
-//            intent.putExtra("EXTRA_STREAM_URL", movie.streamUrl)
-//            context.startActivity(intent)
-//        }
     }
 
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {

@@ -4,42 +4,36 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.ProgressBar
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.*
-import com.bumptech.glide.Glide
-import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.AudioFocusHelper
 import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Movie
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.database.FirebaseDatabase // NUEVO: Import de Realtime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 class TvFragment : RowsSupportFragment() {
 
-    private val db = FirebaseFirestore.getInstance()
+    // NUEVA RUTA: Referencia al nodo "tv" en Realtime Database
+    private val databaseRef = FirebaseDatabase.getInstance().getReference("tv")
+
     private val channels = ArrayObjectAdapter(ListRowPresenter())
     private lateinit var progressBar: ProgressBar
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         adapter = channels
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        adapter = channels
-
-        // Notificar a la Activity que restaure el fondo animado por defecto
+        // Restaurar fondo animado por defecto
         (activity as? Main)?.restaurarFondoAnimado()
 
         // Al seleccionar un canal, actualizar fondo con su imagen
@@ -55,71 +49,40 @@ class TvFragment : RowsSupportFragment() {
         loadTvChannels()
     }
 
-
     private fun loadTvChannels() {
-
-
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val snapshot = db.collection("tv").orderBy("createdAt").get().await()
-                val canales = snapshot.toObjects(Movie::class.java)
+                Log.d("TV_DEBUG", "Iniciando consulta a Realtime DB...")
+
+                val snapshot = databaseRef.get().await() // Prueba sin el orderBy primero
+
+                Log.d("TV_DEBUG", "¿Existe el nodo tv?: ${snapshot.exists()}")
+                Log.d("TV_DEBUG", "Cantidad de hijos: ${snapshot.childrenCount}")
+
+                val canales = mutableListOf<Movie>()
+
+                for (child in snapshot.children) {
+                    val canal = child.getValue(Movie::class.java)
+                    Log.d("TV_DEBUG", "Canal encontrado: ${canal?.title}")
+                    canal?.let {
+                        canales.add(it.copy(id = child.key ?: ""))
+                    }
+                }
 
                 withContext(Dispatchers.Main) {
-
                     if (canales.isNotEmpty()) {
                         organizarEnFilas(canales)
                     } else {
-                        Log.e("TvFragment", "No hay canales válidos.")
+                        Log.e("TV_DEBUG", "La lista de canales está vacía.")
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-
-                    Log.e("TvFragment", "Error cargando canales", e)
+                    Log.e("TV_DEBUG", "Error crítico: ${e.message}")
                 }
             }
         }
     }
-
-
-    private var progreso = 0
-    private val progresoHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private val progresoRunnable = object : Runnable {
-        override fun run() {
-            if (progreso < 95) {
-                progreso += 1
-                progressBar.progress = progreso
-                progresoHandler.postDelayed(this, 100)
-            }
-        }
-    }
-
-
- /*   private fun mostrarCargando() {
-        progreso = 0
-        loadingContainer.visibility = View.VISIBLE
-        progressBar.progress = 0
-        progresoHandler.post(progresoRunnable)
-    }
-
-
-    private fun ocultarCargando() {
-        progresoHandler.removeCallbacks(progresoRunnable)
-
-        CoroutineScope(Dispatchers.Main).launch {
-            while (progreso < 100) {
-                progreso += 5
-                if (progreso > 100) progreso = 100
-                progressBar.progress = progreso
-                delay(10)
-            }
-
-            delay(100)
-            loadingContainer.visibility = View.GONE
-        }
-    }*/
-
-
 
     private fun calcularElementosPorFila(): Int {
         val displayMetrics = android.content.res.Resources.getSystem().displayMetrics
@@ -133,23 +96,24 @@ class TvFragment : RowsSupportFragment() {
         val elementosPorFila = calcularElementosPorFila()
         val chunkedCanales = canales.chunked(elementosPorFila)
 
+        // Limpiar canales antes de agregar (por si se llama dos veces)
+        channels.clear()
+
         chunkedCanales.forEachIndexed { index, chunk ->
             val listRowAdapter = ArrayObjectAdapter(cardPresenter).apply {
                 addAll(0, chunk)
             }
 
-            val header = if (index == 0) HeaderItem(0, "") else null
+            val header = if (index == 0) HeaderItem(0, "Canales de TV") else null
             channels.add(ListRow(header, listRowAdapter))
         }
     }
+
     override fun onResume() {
         super.onResume()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val context = requireContext()
             val granted = AudioFocusHelper.requestAudioFocus(context)
-            if (granted) {
-                // Lógica si se obtiene el foco
-            }
         }
     }
 
@@ -159,5 +123,4 @@ class TvFragment : RowsSupportFragment() {
             AudioFocusHelper.abandonAudioFocus()
         }
     }
-
 }
