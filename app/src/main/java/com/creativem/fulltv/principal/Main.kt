@@ -72,6 +72,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -491,6 +492,7 @@ class Main : FragmentActivity() {
         val userId = auth.currentUser?.uid
 
         if (userId != null) {
+            // Usamos la referencia que ya tienes definida (databaseRef)
             val userRef = databaseRef.child("usuarios").child(userId)
 
             userRef.get().addOnSuccessListener { snapshot ->
@@ -500,13 +502,12 @@ class Main : FragmentActivity() {
                     val puntosActuales = snapshot.child("castv").getValue(Int::class.java) ?: 0
 
                     val mensaje = """
-                Usuario: $nombreUsuario
-                Email: $emailUsuario
-                Saldo CasTV: $puntosActuales
-                Pedido: $pedido
-            """.trimIndent()
+            Usuario: $nombreUsuario
+            Email: $emailUsuario
+            Saldo CasTV: $puntosActuales
+            Pedido: $pedido
+        """.trimIndent()
 
-                    // CORRECCIÓN: Se usa 'this' como contexto
                     AlertDialog.Builder(this)
                         .setTitle("Confirmar Activación de Paquete")
                         .setMessage(mensaje)
@@ -515,14 +516,17 @@ class Main : FragmentActivity() {
                                 "title" to pedido,
                                 "userId" to userId,
                                 "email" to emailUsuario,
-                                "nombre" to nombreUsuario
+                                "nombre" to nombreUsuario,
+                                "createdAt" to ServerValue.TIMESTAMP
                             )
 
-                            FirebaseFirestore.getInstance().collection("pedidosmovies")
-                                .add(pedidoData)
+                            // CAMBIO: Ahora guardamos en Realtime Database bajo la tabla "pedidosmovies"
+                            val pedidosRef = FirebaseDatabase.getInstance().getReference("pedidosmovies")
+                            val newPedidoKey = pedidosRef.push().key ?: return@setPositiveButton
+
+                            pedidosRef.child(newPedidoKey).setValue(pedidoData)
                                 .addOnSuccessListener {
-                                    enviarCorreoNuevoPedido(pedido) // Asegúrate de tener este método
-                                    // CORRECCIÓN: Se usa 'this' como contexto
+                                    enviarCorreoNuevoPedido(pedido)
                                     Toast.makeText(
                                         this,
                                         "Actualizaremos tu saldo",
@@ -530,7 +534,6 @@ class Main : FragmentActivity() {
                                     ).show()
                                 }
                                 .addOnFailureListener { e ->
-                                    // CORRECCIÓN: Se usa 'this' como contexto
                                     Toast.makeText(
                                         this,
                                         "Error al enviar pedido: ${e.message}",
@@ -543,11 +546,9 @@ class Main : FragmentActivity() {
                         }
                         .show()
                 } else {
-                    // CORRECCIÓN: Se usa 'this' como contexto
                     Toast.makeText(this, "Usuario no encontrado", Toast.LENGTH_SHORT).show()
                 }
             }.addOnFailureListener { e ->
-                // CORRECCIÓN: Se usa 'this' como contexto
                 Toast.makeText(
                     this,
                     "Error al obtener usuario: ${e.message}",
@@ -555,11 +556,9 @@ class Main : FragmentActivity() {
                 ).show()
             }
         } else {
-            // CORRECCIÓN: Se usa 'this' como contexto
             Toast.makeText(this, "Usuario no autenticado", Toast.LENGTH_SHORT).show()
         }
     }
-
 
     private fun mostrarPublicidad() {
         if (yaMostroPublicidad) return
@@ -804,47 +803,53 @@ class Main : FragmentActivity() {
         val userId = auth.currentUser?.uid
 
         if (userId != null) {
+            // Mantenemos la ruta de usuarios en Realtime
             val userRef = database.reference.child("usuarios").child(userId)
 
             userRef.get().addOnSuccessListener { snapshot ->
                 if (snapshot.exists()) {
-                    val nombreUsuario = snapshot.child("nombre").getValue(String::class.java) ?: "Nombre no disponible"
-                    val emailUsuario = snapshot.child("correo").getValue(String::class.java) ?: "Email no disponible"
+                    // Mantenemos nombres de variables originales
+                    val nombreUsuario = snapshot.child("nombre").value?.toString() ?: "Nombre no disponible"
+                    val emailUsuario = snapshot.child("correo").value?.toString() ?: "Email no disponible"
                     val castvActual = snapshot.child("castv").getValue(Int::class.java) ?: 0
 
                     val puntosDescontar = 20
 
                     if (castvActual >= puntosDescontar) {
                         val mensaje = """
-                    Usuario: $nombreUsuario
-                    Email: $emailUsuario
-                    Saldo CasTV: $castvActual
-                    Valor CasTV: $puntosDescontar
-                    Pedido: $pedido
-                """.trimIndent()
+                Usuario: $nombreUsuario
+                Email: $emailUsuario
+                Saldo CasTV: $castvActual
+                Valor CasTV: $puntosDescontar
+                Pedido: $pedido
+            """.trimIndent()
 
-                        // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
                         AlertDialog.Builder(this)
                             .setTitle("Confirmar Pedido")
                             .setMessage(mensaje)
                             .setPositiveButton("Confirmar") { _, _ ->
+                                // Mantenemos el nombre de la variable pedidoData
                                 val pedidoData = hashMapOf(
                                     "title" to pedido,
                                     "userId" to userId,
                                     "email" to emailUsuario,
                                     "nombre" to nombreUsuario,
-                                    "CasTV" to puntosDescontar.toString()
+                                    "CasTV" to puntosDescontar.toString(),
+                                    "createdAt" to ServerValue.TIMESTAMP
                                 )
 
-                                FirebaseFirestore.getInstance().collection("pedidosmovies")
-                                    .add(pedidoData)
+                                // CAMBIO DE RUTA: Ahora apunta a Realtime Database en "pedidosmovies"
+                                val pedidosRef = database.getReference("pedidosmovies")
+                                val newPedidoKey = pedidosRef.push().key ?: return@setPositiveButton
+
+                                pedidosRef.child(newPedidoKey).setValue(pedidoData)
                                     .addOnSuccessListener {
-                                        // Asegúrate de que estos métodos también existan en tu Activity
+                                        // Mantenemos llamadas a tus otros métodos
                                         descontarPuntos(userId, puntosDescontar)
                                         enviarCorreoNuevoPedido(pedido)
+                                        Toast.makeText(this, "Pedido enviado", Toast.LENGTH_SHORT).show()
                                     }
                                     .addOnFailureListener { e ->
-                                        // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
                                         Toast.makeText(
                                             this,
                                             "Error al enviar pedido: ${e.message}",
@@ -857,7 +862,6 @@ class Main : FragmentActivity() {
                             }
                             .show()
                     } else {
-                        // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
                         Toast.makeText(
                             this,
                             "No tienes suficientes puntos",
@@ -865,11 +869,9 @@ class Main : FragmentActivity() {
                         ).show()
                     }
                 } else {
-                    // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
                     Toast.makeText(this, "Usuario no encontrado", Toast.LENGTH_SHORT).show()
                 }
             }.addOnFailureListener { e ->
-                // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
                 Toast.makeText(
                     this,
                     "Error al obtener usuario: ${e.message}",
@@ -877,7 +879,6 @@ class Main : FragmentActivity() {
                 ).show()
             }
         } else {
-            // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
             Toast.makeText(this, "Usuario no autenticado", Toast.LENGTH_SHORT).show()
         }
     }
@@ -930,81 +931,68 @@ class Main : FragmentActivity() {
         }
     }
     private fun obtenerNoticia() {
-        val db = FirebaseFirestore.getInstance()
-        val noticiaRef = db.collection("noticia").document("us4vaaf0VPezu9vuc4ns")
+        // CAMBIO: Usamos FirebaseDatabase en lugar de FirebaseFirestore
+        val database = FirebaseDatabase.getInstance()
+        // Apuntamos a la ruta "noticia" y al ID específico
+        val noticiaRef = database.getReference("noticia").child("us4vaaf0VPezu9vuc4ns")
 
-        noticiaRef.get()
-            .addOnSuccessListener { document ->
-                if (document.exists()) {
-                    val versionLocal = BuildConfig.VERSION_NAME
-                    val mensajeBanner = document.getString("banner") ?: ""
-                    val versionRemota = document.getString("versionapk") ?: ""
-                    versionRemotaGlobal = versionRemota
+        // CAMBIO: .get() en Realtime devuelve un DataSnapshot
+        noticiaRef.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                val versionLocal = BuildConfig.VERSION_NAME
 
-                    val mensajeFinalBanner = """
+                // CAMBIO: Obtenemos los valores desde el snapshot.child(...).value
+                val mensajeBanner = snapshot.child("banner").value?.toString() ?: ""
+                val versionRemota = snapshot.child("versionapk").value?.toString() ?: ""
+                versionRemotaGlobal = versionRemota
+
+                val mensajeFinalBanner = """
                 $mensajeBanner
-
+    
                 📲 Instalada: (versión $versionLocal) 🆕 Última: (versión $versionRemota)
             """.trimIndent()
 
-                    // Esta parte es correcta siempre que 'binding' esté inicializado en la Activity
-                    binding.txtBanner.apply {
-                        text = mensajeFinalBanner
-                        visibility = View.VISIBLE
-                        isSelected = true
-                    }
+                binding.txtBanner.apply {
+                    text = mensajeFinalBanner
+                    visibility = View.VISIBLE
+                    isSelected = true
+                }
 
-                    // La lógica de comparación de versiones es correcta
-                    if (versionRemota > versionLocal) { // No es necesario .toString() en versionLocal
-                        val mensaje = """
+                // Lógica de comparación
+                if (versionRemota > versionLocal) {
+                    val mensaje = """
                     ¡Tenemos buenas noticias!
-
+    
                     Una nueva (versión $versionRemota) de la aplicación está disponible.
-
+    
                     Esta actualización incluye mejoras de rendimiento, nuevas funciones y una experiencia mucho más rápida y estable.
-
+    
                     🔄 ¡Actualiza ahora para disfrutar la mejor (versión $versionRemota) de FullTV!
                 """.trimIndent()
 
-                        val spannable = SpannableString(mensaje).apply {
-                            setSpan(
-                                RelativeSizeSpan(1.2f),
-                                0,
-                                length,
-                                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                            )
-                            setSpan(
-                                StyleSpan(Typeface.BOLD),
-                                0,
-                                25,
-                                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                            )
-                        }
-
-                        // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
-                        AlertDialog.Builder(this)
-                            .setTitle("🎉 Nueva Versión $versionRemota Disponible")
-                            .setMessage(spannable)
-                            .setCancelable(false)
-                            .setPositiveButton("Actualizar ahora") { _, _ ->
-                                versionRemotaGlobal?.let { version ->
-                                    // Asegúrate de que este método también exista en tu Activity
-                                    descargarActualizacion(version)
-                                } ?: run {
-                                    // CORRECCIÓN: Se usa 'this' en lugar de 'requireContext()'
-                                    Toast.makeText(
-                                        this,
-                                        "Versión remota no disponible",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-
-                            }
-                            .setNegativeButton("Más tarde", null)
-                            .show()
+                    val spannable = SpannableString(mensaje).apply {
+                        setSpan(RelativeSizeSpan(1.2f), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        setSpan(StyleSpan(Typeface.BOLD), 0, 25, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                     }
+
+                    AlertDialog.Builder(this)
+                        .setTitle("🎉 Nueva Versión $versionRemota Disponible")
+                        .setMessage(spannable)
+                        .setCancelable(false)
+                        .setPositiveButton("Actualizar ahora") { _, _ ->
+                            versionRemotaGlobal?.let { version ->
+                                descargarActualizacion(version)
+                            } ?: run {
+                                Toast.makeText(this, "Versión remota no disponible", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        .setNegativeButton("Más tarde", null)
+                        .show()
                 }
             }
+        }.addOnFailureListener { e ->
+            Log.e("Firebase", "Error al obtener noticia: ${e.message}")
+        }
     }
     private fun descargarActualizacion(versionRemota: String) {
         val versionLocal = BuildConfig.VERSION_NAME

@@ -127,19 +127,22 @@ class NuevaPeliculaFragment : Fragment() {
     private fun editarMovie(movieId: String) {
         if (!validarCampos()) return
 
-        val updates = Movie().apply {
-            this.id = movieId
-            this.title = title
-            this.originalTitle = originalTitle
-            this.castv = castv
-            this.imageUrl = imageUrl
-            this.streamUrl = streamUrl
-            this.trailerUrl = trailerUrl
-            this.createdAt = System.currentTimeMillis()
-            this.countdownMinutes = binding.validEditText.text.toString().toIntOrNull() ?: 0
-        }
+        // Creamos un mapa con los campos específicos que queremos actualizar
+        // Esto asegura que los campos que NO están aquí se conserven en la base de datos
+        val updates = hashMapOf<String, Any>(
+            "id" to movieId,
+            "title" to title,
+            "originalTitle" to originalTitle,
+            "castv" to castv,
+            "imageUrl" to imageUrl,
+            "streamUrl" to streamUrl,
+            "trailerUrl" to trailerUrl,
+            "createdAt" to System.currentTimeMillis(),
+            "countdownMinutes" to (binding.validEditText.text.toString().toIntOrNull() ?: 0)
+        )
 
-        databaseRef.child(movieId).setValue(updates)
+        // CAMBIO CLAVE: Usamos updateChildren en lugar de setValue
+        databaseRef.child(movieId).updateChildren(updates)
             .addOnSuccessListener {
                 Toast.makeText(requireContext(), "Película actualizada correctamente", Toast.LENGTH_LONG).show()
                 clearFields()
