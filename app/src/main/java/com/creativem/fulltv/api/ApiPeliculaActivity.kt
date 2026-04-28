@@ -138,83 +138,67 @@ class ApiPeliculaActivity : AppCompatActivity() {
     }
 
     private fun cargarCartelera() {
-        val pelisMostradas = mutableListOf<TmdbMovie>()
+        // 1. Usamos directamente Movie para que coincida con el adaptador
+        val pelisMostradas = mutableListOf<Movie>()
 
-        // 1. Configuramos el adaptador de una vez para que la lista no esté nula
         carteleraAdapter = PelisCarteleraAdapter(pelisMostradas) { movieSeleccionado ->
             actualizarPeliculaSeleccionada(movieSeleccionado)
         }
         recyclerCartelera.adapter = carteleraAdapter
 
-        // 2. Iniciamos un "observador" en tiempo real
         CoroutineScope(Dispatchers.Main).launch {
-            // Ejecutamos mientras la actividad esté viva
             while (isActive) {
                 val listaActualDelObjeto = Validacioneslista.obtenerPeliculasValidas()
 
-                // Si el objeto Singleton ha encontrado nuevas películas...
                 if (listaActualDelObjeto.size > pelisMostradas.size) {
-
-                    // Mapeamos solo las que no tenemos
-                    val mapeoActualizado = listaActualDelObjeto.map { movie ->
-                        TmdbMovie(
-                            id = 0,
-                            title = movie.title,
-                            poster_path = movie.imageUrl.replace("https://image.tmdb.org/t/p/w500", ""),
-                            release_date = "Verificada ✅",
-                            vote_average = 10.0,
-                            overview = "Cargando datos...",
-                            original_title = movie.originalTitle ?: movie.title,
-                            streamUrl = movie.streamUrl,
-                            imageUrl = movie.imageUrl,
-                            castv = movie.castv
-                        )
-                    }
-
-                    // Actualizamos la lista del adaptador
+                    // Ya no mapeamos a TmdbMovie, usamos la lista tal cual
                     pelisMostradas.clear()
-                    pelisMostradas.addAll(mapeoActualizado)
+                    pelisMostradas.addAll(listaActualDelObjeto)
+
                     carteleraAdapter.notifyDataSetChanged()
                 }
 
-                // Si el proceso global ya terminó todas las pelis del servidor, dejamos de vigilar
                 if (Validacioneslista.yaCargado()) break
-
-                // Revisa cada medio segundo para que parezca instantáneo
                 delay(500)
             }
         }
     }
-    private fun actualizarPeliculaSeleccionada(movieSeleccionado: TmdbMovie) {
+    private fun actualizarPeliculaSeleccionada(movieSeleccionado: Movie) {
         // 🟢 PASO 1: CAMBIO VISUAL INMEDIATO
-        // No esperamos a la API, pintamos ya lo que tenemos en la mano
         tvTitulo.text = movieSeleccionado.title
         tvSinopsis.text = "Cargando información detallada..."
         tvInfoAdicional.text = "Obteniendo géneros y duración..."
-        recyclerActores.adapter = null // Limpia actores de la peli anterior
+        recyclerActores.adapter = null
 
-        // Carga las imágenes de inmediato (ya las tenemos en la lista local)
-        Glide.with(this).load(movieSeleccionado.imageUrl).placeholder(R.drawable.icono).into(ivPoster)
-        Glide.with(this).load(movieSeleccionado.imageUrl).centerCrop().into(backgroundImageView)
+        // 🟢 PASO 1: CARGA DEL PÓSTER (ivPoster)
+        Glide.with(this)
+            .load(movieSeleccionado.imageUrl)
+            // Usamos lo que ya tenga el ImageView como placeholder para evitar el parpadeo
+            .placeholder(ivPoster.drawable)
+            // Forzamos a que use el caché que ya generó el adaptador
+            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+            .into(ivPoster)
+
+// 🟢 PASO 2: CARGA DEL FONDO (backgroundImageView)
+        Glide.with(this)
+            .load(movieSeleccionado.imageUrl)
+            .centerCrop()
+            // Añadimos un fundido suave para que el cambio de fondo no sea brusco
+            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
+            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+            .into(backgroundImageView)
 
         // 🟢 PASO 2: ACTUALIZAR DATOS PARA EL PLAYER
         streamUrlGuardado = movieSeleccionado.streamUrl
         movieTitle = movieSeleccionado.title
         movieImageUrl = movieSeleccionado.imageUrl
 
-        movieActual = Movie(
-            id = movieSeleccionado.id.toString(),
-            title = movieSeleccionado.title,
-            originalTitle = movieSeleccionado.original_title ?: movieSeleccionado.title,
-            imageUrl = movieSeleccionado.imageUrl,
-            streamUrl = movieSeleccionado.streamUrl,
-            castv = 50,
-            countdownMinutes = 60
-        )
+        // Asignamos directamente el objeto seleccionado
+        movieActual = movieSeleccionado
 
         // 🟢 PASO 3: CONSULTA API EN SEGUNDO PLANO
-        // Esto rellenará la sinopsis, director y actores en unos milisegundos
-        val consulta = movieSeleccionado.original_title ?: movieSeleccionado.title
+        // Usamos el título original de la clase Movie
+        val consulta = movieSeleccionado.originalTitle ?: movieSeleccionado.title
         buscarPelicula(consulta)
 
         // Foco para control remoto
@@ -246,8 +230,23 @@ class ApiPeliculaActivity : AppCompatActivity() {
         tvSinopsis.text = movie.overview ?: "Sin sinopsis disponible"
 
         val posterUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}"
-        Glide.with(this).load(posterUrl).placeholder(R.drawable.icono).into(ivPoster)
-        Glide.with(this).load(posterUrl).centerCrop().into(backgroundImageView)
+        // 2. Carga del Póster (ivPoster)
+        Glide.with(this)
+            .load(posterUrl)
+            // CLAVE: En lugar de R.drawable.icono, usamos el drawable actual
+            // Esto evita que la pantalla se ponga en blanco/icono entre cambios
+            .placeholder(ivPoster.drawable)
+            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+            .into(ivPoster)
+
+        // 3. Carga del Fondo
+        Glide.with(this)
+            .load(posterUrl)
+            .centerCrop()
+            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+            // Añadimos un pequeño fundido para que el cambio de fondo no sea brusco
+            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
+            .into(backgroundImageView)
 
         tvInfoAdicional.text = ""
         recyclerActores.adapter = null
@@ -287,20 +286,32 @@ class ApiPeliculaActivity : AppCompatActivity() {
     }
 
     private fun mostrarContenidoLocal() {
-        val movie = movieActual
-        if (movie != null) {
-            tvTitulo.text = movie.title
-            tvFecha.text = "Estreno: ${movie.castv}"
-            tvCalificacion.text = "⭐ ${movie.castv}" // CasTV fijo
-            tvSinopsis.text = "Tiempo válido: ${movie.countdownMinutes} min"
-            Glide.with(this).load(movie.imageUrl).placeholder(R.drawable.icono).into(ivPoster)
-        } else {
-            tvTitulo.text = movieTitle
-            tvFecha.text = "Estreno: $movieCastv"
-            tvCalificacion.text = "⭐ 50"
-            tvSinopsis.text = "Tiempo válido: $movieCountdown min"
-            Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(ivPoster)
-        }
+        val movie = movieActual ?: return
+
+        val url = movie.imageUrl
+
+        // Configuramos los textos (Sin los "50")
+        tvTitulo.text = movie.title
+        tvFecha.text = "Verificada ✅"
+        tvCalificacion.text = ""
+        tvSinopsis.text = "Cargando información..."
+
+        // CARGA DE IMAGEN SIN PARPADEO
+        Glide.with(this)
+            .load(url)
+            // ELIMINAMOS el placeholder(R.drawable.icono)
+            // Al no poner placeholder, Glide NO limpia el ImageView con un icono
+            .dontAnimate() // Esto hace que la carga sea inmediata sin efectos de transición
+            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+            .into(ivPoster)
+
+        // Fondo con fundido suave
+        Glide.with(this)
+            .load(url)
+            .centerCrop()
+            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
+            .into(backgroundImageView)
     }
 
 }

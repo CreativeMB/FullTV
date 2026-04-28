@@ -4,11 +4,11 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="120dp"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp"
-    android:clickable="true"
+    android:layout_margin="4dp"
     android:focusable="true"
+    android:clickable="true"
     app:cardCornerRadius="12dp"
-    app:cardElevation="6dp"
+    app:cardElevation="4dp"
     app:cardBackgroundColor="#1A1A1A">
 
     <FrameLayout
@@ -21,14 +21,15 @@
             android:orientation="vertical">
 
             <ImageView
-                android:id="@+id/itemPoster"
+                android:id="@+id/movie_image_small"
                 android:layout_width="match_parent"
-                android:layout_height="150dp"
+                android:layout_height="160dp"
                 android:scaleType="fitXY"
-                android:src="@drawable/pelifondo" />
+                android:src="@drawable/pelifondo"
+                android:contentDescription="Imagen de película" />
 
             <LinearLayout
-                android:id="@+id/infoArea"
+                android:id="@+id/infoAreaSmall"
                 android:layout_width="match_parent"
                 android:layout_height="30dp"
                 android:orientation="vertical"
@@ -36,21 +37,20 @@
                 android:paddingTop="2dp"
                 android:paddingStart="4dp"
                 android:paddingEnd="4dp"
-                android:background="#006064">
+                android:background="#880E4F">
 
                 <TextView
-                    android:id="@+id/itemTitle"
+                    android:id="@+id/movie_title_small"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Título Película"
+                    android:text="Nombre Película"
                     android:textColor="#FFFFFF"
                     android:textSize="13sp"
                     android:textStyle="normal"
-                    android:maxLines="1"
+                    android:singleLine="true"
                     android:ellipsize="marquee"
                     android:marqueeRepeatLimit="marquee_forever"
                     android:scrollHorizontally="true"
-                    android:singleLine="true"
                     android:gravity="center_horizontal"
                     android:duplicateParentState="true" />
 
@@ -58,20 +58,22 @@
         </LinearLayout>
 
         <TextView
-            android:id="@+id/txtBadge"
+            android:id="@+id/txtBadgeSmall"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="top|end"
-            android:background="#006064"
+            android:background="#880E4F"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
             android:paddingTop="3dp"
             android:paddingBottom="3dp"
-            android:text="Gratis ✅"
+            android:text="Alquilar 💳"
             android:textColor="#FFFFFF"
             android:textSize="10sp"
+            android:textStyle="bold"
             android:elevation="8dp"
-            android:translationZ="8dp" />
+            android:translationZ="8dp"
+            android:visibility="visible" />
 
     </FrameLayout>
 </androidx.cardview.widget.CardView>

@@ -43,7 +43,7 @@ import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.creativem.fulltv.R
-import com.creativem.fulltv.peliculasvalidas.PeliculasMenuAdapter
+import com.creativem.fulltv.api.PeliculasApiAdapter
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -79,6 +79,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.recyclerview.widget.RecyclerView
 import java.util.concurrent.TimeUnit
 import com.android.volley.Request
+import com.creativem.fulltv.peliculasvalidas.PelisCarteleraAdapter
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
 import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Nosotros
@@ -99,7 +100,7 @@ class PlayerPeliculas : AppCompatActivity() {
     private lateinit var movieTitle: String
     private var isLiveStream = false
     private lateinit var binding: PlayerBinding
-    private lateinit var adapter: PeliculasMenuAdapter
+    private lateinit var carteleraAdapter: PelisCarteleraAdapter
     private lateinit var firestore: FirebaseFirestore
     private lateinit var auth: FirebaseAuth
     private var isProcessingOrder = false
@@ -294,7 +295,7 @@ class PlayerPeliculas : AppCompatActivity() {
         // ⬅️ Manejar botón "Atrás"
         onBackPressedDispatcher.addCallback(this) {
             val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
-            val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
+            val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
 
             when {
                 menuPelis.visibility == View.VISIBLE -> {
@@ -321,7 +322,7 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
         private fun mostarpelis() {
-        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
+        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
 
         if (menuAbierto) {
             menuPelis.animate()
@@ -342,52 +343,58 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
     private fun initializeRecyclerView() {
-        // Crear el adaptador inicialmente con una lista vacía
-        adapter = PeliculasMenuAdapter(mutableListOf()) { movie ->
+        // 1. Usamos PelisCarteleraAdapter en lugar de PeliculasApiAdapter
+        // Pasamos una lista vacía inicialmente y la lógica de clic
+        carteleraAdapter = PelisCarteleraAdapter(mutableListOf()) { movie ->
+            // Al tocar una peli en el reproductor, la reproducimos
             startMoviePlayback(movie.streamUrl, movie.title, movie.castv, movie.imageUrl)
         }
 
+        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
 
-        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
-
+        // 2. Configuración del LayoutManager (Horizontal para TV)
         menuPelis.layoutManager = LinearLayoutManager(
             this@PlayerPeliculas,
             LinearLayoutManager.HORIZONTAL,
             false
         )
 
-        menuPelis.adapter = adapter
+        // 3. Asignamos el nuevo adaptador al RecyclerView del reproductor
+        menuPelis.adapter = carteleraAdapter
 
-
-        // Cargar las películas desde Firestore
+        // 4. Cargamos los datos (asegúrate de que loadMovies actualice ahora carteleraAdapter)
         loadMovies()
     }
 
-
-
     private fun loadMovies() {
-        // 1. Intentamos cargar lo que ya hay en memoria (instantáneo)
+        // 1. Obtenemos la lista inicial
         val peliculasValidas = Validacioneslista.obtenerPeliculasValidas()
 
         if (peliculasValidas.isNotEmpty()) {
-            adapter.updateMovies(peliculasValidas.sortedByDescending { it.createdAt })
+            // Ordenamos y enviamos al adaptador de cartelera
+            val listaOrdenada = peliculasValidas.sortedByDescending { it.createdAt }
+
+            // Si el adaptador espera TmdbMovie y recibes Movie, asegúrate de que sea la misma clase
+            carteleraAdapter.updateMovies(listaOrdenada)
         }
 
-        // 2. Si el proceso de validación sigue corriendo en segundo plano,
-        // usamos una corrutina para ir actualizando el menú conforme aparezcan más
+        // 2. Vigilamos actualizaciones en segundo plano
         lifecycleScope.launch {
+            var ultimaCantidad = peliculasValidas.size
+
             while (isActive) {
                 val listaActualizada = Validacioneslista.obtenerPeliculasValidas()
 
-                // Si el objeto Singleton encontró más películas válidas, actualizamos el menú
-                if (listaActualizada.size > peliculasValidas.size) {
-                    adapter.updateMovies(listaActualizada.sortedByDescending { it.createdAt })
+                // Si hay pelis nuevas, actualizamos el adaptador
+                if (listaActualizada.size > ultimaCantidad) {
+                    ultimaCantidad = listaActualizada.size
+                    carteleraAdapter.updateMovies(listaActualizada.sortedByDescending { it.createdAt })
                 }
 
-                // Si ya terminó de validar todo el servidor, dejamos de vigilar
+                // Si el Singleton dice que ya no hay más por cargar, salimos del bucle
                 if (Validacioneslista.yaCargado()) break
 
-                delay(2000) // Revisa cada 2 segundos para no saturar
+                delay(2000) // Espera 2 segundos antes de la siguiente revisión
             }
         }
     }
@@ -1231,7 +1238,7 @@ class PlayerPeliculas : AppCompatActivity() {
 
     private fun activarListenersEnControles() {
         val controles = binding.reproductor.findViewById<ViewGroup>(R.id.controles_reproductor)
-        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.recycler_movies_menu)
+        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
 
         // Escucha interacción en cada botón de los controles
         for (i in 0 until controles.childCount) {

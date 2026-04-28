@@ -1,4 +1,4 @@
-package com.creativem.fulltv.peliculasvalidas
+package com.creativem.fulltv.api
 
 import android.graphics.Color
 import android.graphics.Typeface
@@ -13,12 +13,11 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
-import com.creativem.fulltv.api.ApiPeliculaActivity // Asegúrate de importar esto si lo usas
 
-class PeliculasMenuAdapter(
+class PeliculasApiAdapter(
     private val movieList: MutableList<Movie>,
     private val onMovieClick: (Movie) -> Unit
-) : RecyclerView.Adapter<PeliculasMenuAdapter.SmallMovieViewHolder>() {
+) : RecyclerView.Adapter<PeliculasApiAdapter.SmallMovieViewHolder>() {
 
     private var selectedPosition = RecyclerView.NO_POSITION
 
@@ -75,7 +74,7 @@ class PeliculasMenuAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SmallMovieViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_menu_peliculas_validas, parent, false)
+            .inflate(R.layout.item_api_peluculas, parent, false)
         return SmallMovieViewHolder(view)
     }
 

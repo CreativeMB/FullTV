@@ -11,7 +11,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
 
 import com.creativem.fulltv.menu.MenuSuperiorAdapter
-import com.creativem.fulltv.peliculasvalidas.PeliculasMenuAdapter
 import com.creativem.fulltv.principal.Movie
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +23,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 class PeliculasApiActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
-    private lateinit var adapter: PeliculasMenuAdapter
+    private lateinit var adapter: PeliculasApiAdapter
     private lateinit var apiService: TMDbApiService
     private val apiKey = "678193d2c735c6f37840cee035f4d69a"
     private var layoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
@@ -82,7 +81,7 @@ class PeliculasApiActivity : AppCompatActivity() {
         }
 
         // Mantenemos el Intent con todos tus Extras
-        adapter = PeliculasMenuAdapter(mutableListOf()) { movie ->
+        adapter = PeliculasApiAdapter(mutableListOf()) { movie ->
             val intent = Intent(this, ApiPeliculaActivity::class.java).apply {
                 putExtra("EXTRA_STREAM_URL", movie.streamUrl)
                 putExtra("EXTRA_MOVIE_TITLE", movie.title)

@@ -25,14 +25,13 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <!-- Imagen del póster -->
                 <ImageView
                     android:id="@+id/ivPoster"
                     android:layout_width="160dp"
                     android:layout_height="210dp"
                     android:layout_marginEnd="8dp"
                     android:scaleType="fitXY"
-                    android:src="@drawable/icono" />
+                    android:src="@drawable/pelifondo" />
 
                 <!-- Contenedor de datos -->
                 <LinearLayout

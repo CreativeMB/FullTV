@@ -26,7 +26,7 @@ class ActoresAdapter(private val actores: List<CastMember>) :
         Glide.with(holder.itemView)
             .load(url)
             .placeholder(R.drawable.pelifondo)
-            .error(R.drawable.icono)
+            .error(R.drawable.pelifondo)
             .into(holder.foto)
     }
 
