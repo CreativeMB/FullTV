@@ -3,6 +3,7 @@ package com.creativem.fulltv.peliculas
 import android.annotation.SuppressLint
 import android.graphics.Color
 import android.os.CountDownTimer
+import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -26,13 +27,13 @@ class MoviesAdapter(
 
     private val timers = mutableMapOf<Int, CountDownTimer>()
 
-    // 1. Configuramos opciones globales para ahorrar memoria
+    // CONFIGURACIÓN DE CARGA MAESTRA
     private val glideOptions = RequestOptions()
-        .format(DecodeFormat.PREFER_RGB_565) // Consume 50% menos RAM
-        .diskCacheStrategy(DiskCacheStrategy.ALL) // Guarda imagen original y redimensionada
-        .override(240, 360) // Tamaño fijo de la tarjeta (ajusta según tu diseño)
+        .format(DecodeFormat.PREFER_RGB_565) // 50% menos de RAM que el formato estándar
+        .diskCacheStrategy(DiskCacheStrategy.ALL) // GUARDA TODO: original y redimensionada (Evita volver a descargar)
+        .override(180, 270) // Forzamos un tamaño pequeño. No necesitamos 4K para una miniatura.
         .centerCrop()
-        .placeholder(R.drawable.pelifondo)
+        .dontAnimate() // En listas largas, las animaciones de carga ralentizan el scroll
         .error(R.drawable.pelifondo)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MovieViewHolder {
@@ -40,86 +41,71 @@ class MoviesAdapter(
         return MovieViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: MovieViewHolder, @SuppressLint("RecyclerView") position: Int) {
+    override fun onBindViewHolder(holder: MovieViewHolder, position: Int) {
         val movie = movieList[position]
 
         holder.txtTitle.text = movie.title
-        holder.txtTitle.isSelected = true
+        holder.txtTitle.isSelected = false // Solo se activa en el foco
 
-        // 2. Carga optimizada de imagen
+        // CARGA SECUENCIAL E INTELIGENTE
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
             .apply(glideOptions)
-            .thumbnail(0.2f) // Carga una versión al 20% de calidad primero
-            .transition(DrawableTransitionOptions.withCrossFade()) // Aparece con un fundido suave
+            .thumbnail(0.1f) // Carga una versión borrosa súper rápido mientras llega la real
+            .placeholder(holder.imgMovie.drawable) // Mantiene lo que ya está para evitar parpadeos
             .into(holder.imgMovie)
 
-        // --- Lógica de Tiempos y Estados ---
-        val createdAtMillis = movie.createdAt
-        val countdownDurationMillis = TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
-        val currentTime = System.currentTimeMillis()
-        val timeElapsed = currentTime - createdAtMillis
+        // Lógica de tiempos (mantenla igual o muévela a una función externa)
+        configurarTiempos(holder, movie, position)
 
-        timers[position]?.cancel()
-
-        val esValida = movie.isValid
-
-        if (movie.countdownMinutes <= 0 || timeElapsed >= countdownDurationMillis) {
-            if (esValida) {
-                holder.txtStatus.text = "Abierta al público"
-                holder.txtBadge.text = "Gratis ✅"
-                holder.infoArea.setBackgroundColor(Color.parseColor("#006064"))
-                holder.txtBadge.setBackgroundColor(Color.parseColor("#006064"))
-            } else {
-                holder.txtStatus.text = "CasTV $${movie.castv}"
-                holder.txtBadge.text = "Alquilar 💳"
-                holder.infoArea.setBackgroundColor(Color.parseColor("#880E4F"))
-                holder.txtBadge.setBackgroundColor(Color.parseColor("#880E4F"))
-            }
-            holder.txtBadge.visibility = View.VISIBLE
-        } else {
-            val remainingTimeMillis = countdownDurationMillis - timeElapsed
-            val timer = object : CountDownTimer(remainingTimeMillis, 1000) {
-                override fun onTick(millisUntilFinished: Long) {
-                    val h = TimeUnit.MILLISECONDS.toHours(millisUntilFinished)
-                    val m = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished) % 60
-                    val s = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
-                    holder.txtStatus.text = "%02d:%02d:%02d".format(h, m, s)
-
-                    holder.infoArea.setBackgroundColor(Color.parseColor("#001f3f"))
-                    holder.txtBadge.text = "Alquilada 🎬"
-                    holder.txtBadge.setBackgroundColor(Color.parseColor("#001f3f"))
-                    holder.txtBadge.visibility = View.VISIBLE
-                }
-
-                override fun onFinish() {
-                    notifyItemChanged(position)
-                }
-            }.start()
-            timers[position] = timer
-        }
-
-        holder.itemView.setOnClickListener { onItemClick(movie) }
-
+        // FOCO Y ZOOM 1.2x
+        // Dentro de onBindViewHolder, modifica el bloque del Focus:
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             if (hasFocus) {
                 onFocusChange(movie)
-                view.animate().scaleX(1.08f).scaleY(1.08f).setDuration(150).start()
+
+                // 1. TRAER AL FRENTE (Esto evita que salga "debajo")
+                view.bringToFront()
+                view.parent.requestLayout()
+                (view.parent as View).invalidate()
+
+                // 2. ZOOM 1.2x + Elevación para sombra
+                view.animate()
+                    .scaleX(1.2f)
+                    .scaleY(1.2f)
+                    .translationZ(20f) // Eleva el ítem físicamente en el eje Z
+                    .setDuration(200)
+                    .start()
+
+                holder.txtTitle.isSelected = true
+                holder.txtTitle.setTextColor(Color.YELLOW)
             } else {
-                view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                // 1. VOLVER AL ESTADO NORMAL
+                view.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .translationZ(0f)
+                    .setDuration(200)
+                    .start()
+
+                holder.txtTitle.isSelected = false
+                holder.txtTitle.setTextColor(Color.WHITE)
             }
         }
+
+        holder.itemView.setOnClickListener { onItemClick(movie) }
     }
 
-    override fun getItemCount(): Int = movieList.size
-
-    // 3. Muy importante: Liberar recursos de Glide cuando la tarjeta no se ve
+    // LIBERACIÓN DE MEMORIA CRÍTICA
     override fun onViewRecycled(holder: MovieViewHolder) {
         super.onViewRecycled(holder)
+        // Esto le dice a Glide: "Este ítem ya no se ve, libera esa RAM para otro"
         Glide.with(holder.itemView.context).clear(holder.imgMovie)
         timers[holder.bindingAdapterPosition]?.cancel()
         timers.remove(holder.bindingAdapterPosition)
     }
+
+    override fun getItemCount(): Int = movieList.size
 
     class MovieViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val imgMovie: ImageView = view.findViewById(R.id.imgMovie)
@@ -127,5 +113,52 @@ class MoviesAdapter(
         val txtStatus: TextView = view.findViewById(R.id.txtStatus)
         val txtBadge: TextView = view.findViewById(R.id.txtBadge)
         val infoArea: View = view.findViewById(R.id.infoArea)
+    }
+    // Esta función va dentro de la clase MoviesAdapter, pero fuera de onBindViewHolder
+    private fun configurarTiempos(holder: MovieViewHolder, movie: Movie, position: Int) {
+        val createdAtMillis = movie.createdAt
+        val countdownDurationMillis = TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
+        val currentTime = System.currentTimeMillis()
+        val timeElapsed = currentTime - createdAtMillis
+
+        // Cancelamos cualquier timer viejo que esté usando esta tarjeta reciclada
+        timers[position]?.cancel()
+
+        // Si el tiempo ya se agotó
+        if (movie.countdownMinutes <= 0 || timeElapsed >= countdownDurationMillis) {
+            if (movie.isValid) {
+                holder.txtStatus.text = "Abierta al público"
+                holder.txtBadge.text = "Gratis ✅"
+                holder.infoArea.setBackgroundColor(Color.parseColor("#006064"))
+            } else {
+                holder.txtStatus.text = "CasTV $${movie.castv}"
+                holder.txtBadge.text = "Alquilar 💳"
+                holder.infoArea.setBackgroundColor(Color.parseColor("#880E4F"))
+            }
+            holder.txtBadge.visibility = View.VISIBLE
+        }
+        // Si aún hay tiempo de alquiler, arranca el contador
+        else {
+            val remainingTimeMillis = countdownDurationMillis - timeElapsed
+            val timer = object : CountDownTimer(remainingTimeMillis, 1000) {
+                override fun onTick(millisUntilFinished: Long) {
+                    val h = TimeUnit.MILLISECONDS.toHours(millisUntilFinished)
+                    val m = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished) % 60
+                    val s = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
+
+                    holder.txtStatus.text = "%02d:%02d:%02d".format(h, m, s)
+                    holder.infoArea.setBackgroundColor(Color.parseColor("#001f3f"))
+                    holder.txtBadge.text = "Alquilada 🎬"
+                }
+
+                override fun onFinish() {
+                    // Cuando termina el tiempo, refrescamos el ítem para que cambie a "Alquilar"
+                    notifyItemChanged(position)
+                }
+            }.start()
+
+            // Guardamos el timer para poder cancelarlo si el usuario hace scroll rápido
+            timers[position] = timer
+        }
     }
 }

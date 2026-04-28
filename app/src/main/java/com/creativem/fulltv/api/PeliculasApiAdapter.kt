@@ -31,28 +31,34 @@ class PeliculasApiAdapter(
             view.isFocusable = true
             view.isFocusableInTouchMode = true
 
+            // Dentro del init del ViewHolder
             view.setOnFocusChangeListener { v, hasFocus ->
-                // 1. Animación de Escala (Zoom) - Vital en TV
-                if (hasFocus) {
-                    v.animate().scaleX(1.15f).scaleY(1.15f).setDuration(200).start()
-                    v.elevation = 10f
-                    movieTitle.visibility = View.VISIBLE // Asegurar que se vea
-                    movieTitle.isSelected = true // Activar Marquee
-                    movieTitle.setTypeface(null, Typeface.BOLD)
-                    movieTitle.setTextColor(Color.YELLOW) // Color resaltado al enfocar
-                } else {
-                    v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(200).start()
-                    v.elevation = 0f
-                    movieTitle.isSelected = false // Apagar Marquee
-                    movieTitle.setTypeface(null, Typeface.NORMAL)
-                    movieTitle.setTextColor(Color.WHITE)
-                }
+                val card = v as androidx.cardview.widget.CardView
 
-                // 2. Color de fondo del borde/contenedor
-                v.background = if (hasFocus)
-                    ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
-                else
-                    null
+                if (hasFocus) {
+                    // 1. Zoom
+                    itemView.animate()
+                        .scaleX(1.2f)
+                        .scaleY(1.2f)
+                        .setDuration(200) // Un poco más de tiempo para que la animación sea elegante
+                        .start()
+
+                    // 2. Cambio de Color (Usa setCardBackgroundColor para no perder los bordes redondeados)
+                    card.setCardBackgroundColor(Color.parseColor("#FFD700")) // Color Oro/Amarillo para el borde
+                    card.cardElevation = 15f
+
+                    movieTitle.setTextColor(Color.YELLOW)
+                    movieTitle.isSelected = true
+                } else {
+                    card.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+
+                    // 3. Volver al color original
+                    card.setCardBackgroundColor(Color.parseColor("#1A1A1A"))
+                    card.cardElevation = 4f
+
+                    movieTitle.setTextColor(Color.WHITE)
+                    movieTitle.isSelected = false
+                }
             }
 
             view.setOnClickListener {
@@ -87,7 +93,6 @@ class PeliculasApiAdapter(
             ellipsize = TextUtils.TruncateAt.MARQUEE
             marqueeRepeatLimit = -1
             isSingleLine = true
-            isSelected = true
 
         }
 
