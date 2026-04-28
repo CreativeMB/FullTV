@@ -80,7 +80,6 @@ import androidx.recyclerview.widget.RecyclerView
 import java.util.concurrent.TimeUnit
 import com.android.volley.Request
 import com.creativem.fulltv.principal.CastvHelper
-import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Nosotros
 
 

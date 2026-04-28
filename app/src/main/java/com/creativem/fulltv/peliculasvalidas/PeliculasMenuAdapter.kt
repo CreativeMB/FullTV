@@ -13,7 +13,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
-import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.api.ApiPeliculaActivity // Asegúrate de importar esto si lo usas
 
 class PeliculasMenuAdapter(

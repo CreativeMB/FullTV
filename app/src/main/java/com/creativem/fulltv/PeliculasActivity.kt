@@ -40,7 +40,6 @@ import com.creativem.fulltv.databinding.ActivityPeliculasBinding
 import com.creativem.fulltv.enlinea.UsuarioEstadoManager
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
 import com.creativem.fulltv.menu.MenuPrincipalItem
-import com.creativem.fulltv.peliculas.PeliculasFragment
 import com.creativem.fulltv.peliculas.PeliculasValidasActivity
 import com.creativem.fulltv.peliculas.Validacioneslista
 import com.creativem.fulltv.principal.CastvHelper
@@ -483,37 +482,111 @@ class PeliculasActivity : AppCompatActivity() {
     // ==========================================
 
     private fun mostrarDialogoPedido() {
-        val input = EditText(this).apply { hint = "Ej: Moana 2 (2024)" }
+        val input = EditText(this).apply {
+            hint = "Ej: Moana 2 (2024)"
+            setPadding(50, 40, 50, 40)
+        }
+
         AlertDialog.Builder(this)
             .setTitle("Solicitar Película")
             .setView(input)
-            .setPositiveButton("Pedir (20 CasTV)") { _, _ ->
-                val p = input.text.toString().trim()
-                if (p.isNotEmpty()) procesarPedido(p)
-            }.show()
-    }
-
-    private fun procesarPedido(titulo: String) {
-        val uid = auth.currentUser?.uid ?: return
-        databaseRef.child("usuarios").child(uid).get().addOnSuccessListener { snap ->
-            val saldo = snap.child("castv").getValue(Int::class.java) ?: 0
-            if (saldo >= 20) {
-                val data = hashMapOf(
-                    "title" to titulo,
-                    "userId" to uid,
-                    "nombre" to (snap.child("nombre").value ?: "Usuario"),
-                    "email" to (snap.child("correo").value ?: ""),
-                    "createdAt" to ServerValue.TIMESTAMP
-                )
-                databaseRef.child("pedidosmovies").push().setValue(data).addOnSuccessListener {
-                    databaseRef.child("usuarios").child(uid).child("castv").setValue(saldo - 20)
-                    enviarCorreoNotificacion(titulo)
-                    Toast.makeText(this, "Pedido enviado!", Toast.LENGTH_SHORT).show()
+            .setPositiveButton("Siguiente") { _, _ ->
+                val nombrePeli = input.text.toString().trim()
+                if (nombrePeli.isNotEmpty()) {
+                    // AQUÍ ESTÁ EL TRUCO: En lugar de procesar, abre el resumen
+                    comprobantepago(nombrePeli)
+                } else {
+                    Toast.makeText(this, "Escribe el nombre de la película", Toast.LENGTH_SHORT).show()
                 }
-            } else Toast.makeText(this, "Saldo insuficiente", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+    private fun comprobantepago(pedido: String) {
+        val user = auth.currentUser
+        if (user != null && user.email != null) {
+            val correoKey = user.email!!.replace(".", "_").replace("@", "_")
+
+            // Buscamos los datos reales para mostrar en el resumen
+            databaseRef.child("usuarios").child(correoKey).get().addOnSuccessListener { snapshot ->
+                if (snapshot.exists()) {
+                    val nombreUsuario = snapshot.child("nombre").value?.toString() ?: "Usuario"
+                    val saldoActual = (snapshot.child("castv").value as? Number)?.toInt() ?: 0
+                    val costo = 20
+
+                    // Construimos el mensaje de resumen
+                    val mensaje = """
+                    🎬 Película: $pedido
+                    👤 Usuario: $nombreUsuario
+                    💰 Saldo Actual: $saldoActual CasTV
+                    📉 Costo: $costo CasTV
+                    ------------------------------
+                    Saldo final: ${saldoActual - costo} CasTV
+                """.trimIndent()
+
+                    // SEGUNDO ALERT DIALOG (Confirmación de envío)
+                    AlertDialog.Builder(this)
+                        .setTitle("Confirmar Pedido")
+                        .setMessage(mensaje)
+                        .setCancelable(false)
+                        .setPositiveButton("Confirmar y Enviar") { _, _ ->
+                            if (saldoActual >= costo) {
+                                ejecutarProcesoFinal(correoKey, pedido, costo, nombreUsuario, user.email!!)
+                            } else {
+                                Toast.makeText(this, "Saldo insuficiente", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                        .setNegativeButton("Corregir") { _, _ -> mostrarDialogoPedido() } // Regresa al anterior
+                        .show()
+                }
+            }
+        }
+    }
+    private fun ejecutarProcesoFinal(correoKey: String, titulo: String, costo: Int, nombre: String, email: String) {
+        val data = hashMapOf(
+            "title" to titulo,
+            "castv" to costo,
+            "nombre" to nombre,
+            "email" to email,
+            "timestamp" to ServerValue.TIMESTAMP
+        )
+
+        // 1. Guardamos el pedido
+        databaseRef.child("pedidosmovies").push().setValue(data).addOnSuccessListener {
+            // 2. Descontamos los puntos usando el método que ya tienes
+            descontarPuntos(correoKey, costo)
+
+
+            Toast.makeText(this, "¡Pedido registrado con éxito!", Toast.LENGTH_SHORT).show()
         }
     }
 
+    private fun descontarPuntos(correoKey: String, puntosADescontar: Int) {
+        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
+
+        userRef.child("castv").get().addOnSuccessListener { snapshot ->
+            val castvActual = (snapshot.value as? Number)?.toInt() ?: 0
+
+            if (castvActual >= puntosADescontar) {
+                val nuevoCastv = castvActual - puntosADescontar
+
+                userRef.child("castv").setValue(nuevoCastv)
+                    .addOnSuccessListener {
+                        Log.d("ALQUILER_LOG", "✅ Descuento aplicado. Nuevo saldo: $nuevoCastv")
+                        Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
+
+                        val intent = Intent(this, Nosotros::class.java)
+                        startActivity(intent)
+                        finish()
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("ALQUILER_LOG", "❌ Error al actualizar saldo: ${e.message}")
+                    }
+            }
+        }.addOnFailureListener { e ->
+            Log.e("ALQUILER_LOG", "Error de conexión: ${e.message}")
+        }
+    }
     private fun activarpaquete() {
         val input = EditText(this).apply { hint = "Nombre y Fecha del Pago" }
         AlertDialog.Builder(this)

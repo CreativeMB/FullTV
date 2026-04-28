@@ -173,7 +173,7 @@ class Login : AppCompatActivity() {
                 if (task.isSuccessful) {
                     Log.d(TAG, "signInAsDefaultUser:success")
                     Toast.makeText(this, "Ingresaste como invitado.", Toast.LENGTH_SHORT).show()
-                    startActivity(Intent(this, Main::class.java))
+                    startActivity(Intent(this, PeliculasActivity::class.java))
                     finish()
                 } else {
                     // Si falla el login, intentar crear la cuenta
@@ -197,7 +197,7 @@ class Login : AppCompatActivity() {
                                     )
                                 }
 
-                                startActivity(Intent(this, Main::class.java))
+                                startActivity(Intent(this, PeliculasActivity::class.java))
                                 finish()
                             } else {
                                 Log.w(TAG, "Error al crear usuario invitado.", createTask.exception)

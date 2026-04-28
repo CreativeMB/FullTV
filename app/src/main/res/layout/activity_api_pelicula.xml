@@ -149,7 +149,7 @@
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:gravity="center"
-                android:text="▶ Reproducir"
+                android:text="▶ Ver"
                 android:textColor="@color/rojo"
                 android:textSize="22sp"
                 android:textStyle="bold" />
