@@ -529,65 +529,93 @@ class PeliculasActivity : AppCompatActivity() {
         val searchResultsView = dialogView.findViewById<ListView>(R.id.list_view)
         val progressBar = dialogView.findViewById<ProgressBar>(R.id.progress_bar)
 
+        progressBar.visibility = View.GONE
+
         val filteredMovieList = mutableListOf<Movie>()
-        val adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_list_item_1,
-            mutableListOf<String>()
-        )
+        val allFirebaseMovies = mutableListOf<Movie>() // Cache local de Firebase
+
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, mutableListOf<String>())
         searchResultsView.adapter = adapter
 
-        val dialog = AlertDialog.Builder(this)
-            .setView(dialogView)
-            .create()
-
+        val dialog = AlertDialog.Builder(this).setView(dialogView).create()
         dialog.show()
 
-        progressBar.visibility = View.GONE
-        searchEditText.visibility = View.VISIBLE
-        searchResultsView.visibility = View.VISIBLE
+        // --- FUNCIÓN PARA QUITAR TILDES Y MAYÚSCULAS ---
+        fun String.normalizar(): String {
+            val diacritics = Regex("\\p{InCombiningDiacriticalMarks}+")
+            val temp = java.text.Normalizer.normalize(this, java.text.Normalizer.Form.NFD)
+            return diacritics.replace(temp, "").lowercase()
+        }
 
-        // Configura búsqueda en la API
+        // 1. CARGAMOS TODOS LOS DATOS DE FIREBASE UNA SOLA VEZ AL ABRIR EL DIÁLOGO
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val snapshot = FirebaseDatabase.getInstance().getReference("movies").get().await()
+                val loadedMovies = snapshot.children.mapNotNull { doc ->
+                    val m = doc.getValue(Movie::class.java)
+                    m?.copy(id = doc.key ?: "")
+                }
+                allFirebaseMovies.addAll(loadedMovies)
+            } catch (e: Exception) {
+                Log.e("FIREBASE", "Error cargando base de datos local: ${e.message}")
+            }
+        }
+
         searchEditText.addTextChangedListener(object : TextWatcher {
             private var searchJob: Job? = null
 
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val query = s.toString().trim()
+                val queryRaw = s.toString().trim()
+                val queryNormalizada = queryRaw.normalizar()
 
-                if (query.length < 2) return
+                if (queryRaw.length < 2) {
+                    adapter.clear()
+                    return
+                }
 
                 searchJob?.cancel()
                 searchJob = CoroutineScope(Dispatchers.IO).launch {
-                    val response = TMDbApiClient.service.searchMovies(
-                        apiKey = "678193d2c735c6f37840cee035f4d69a",
-                        language = "es-MX",
-                        query = query
-                    ).execute()
+                    // --- A. FILTRADO EN FIREBASE (LOCAL) ---
+                    // Buscamos cualquier coincidencia en el título (infalible)
+                    val firebaseMatches = allFirebaseMovies.filter {
+                        it.title.normalizar().contains(queryNormalizada)
+                    }.map { it.copy(title = "💿 ${it.title}") }
 
-                    if (response.isSuccessful) {
-                        val moviesApi = response.body()?.results ?: emptyList()
-                        val mapped = moviesApi.map {
-                            Movie(
-                                id = it.id.toString(),
-                                title = "${it.title} (${it.release_date ?: "N/A"})",
-                                originalTitle = it.original_title,
-                                imageUrl = "https://image.tmdb.org/t/p/w500${it.poster_path}",
-                                streamUrl = "https://tuservidor.com/stream/${it.id}",
-                                castv = 50,
-                                countdownMinutes = 60,
-                                createdAt = System.currentTimeMillis()
-                            )
-                        }
+                    // --- B. BÚSQUEDA EN API ---
+                    val apiResults = try {
+                        val response = TMDbApiClient.service.searchMovies(
+                            apiKey = "678193d2c735c6f37840cee035f4d69a",
+                            language = "es-MX",
+                            query = queryRaw
+                        ).execute()
 
-                        withContext(Dispatchers.Main) {
-                            filteredMovieList.clear()
-                            filteredMovieList.addAll(mapped)
-                            adapter.clear()
-                            adapter.addAll(filteredMovieList.map { it.title })
-                            adapter.notifyDataSetChanged()
-                        }
+                        if (response.isSuccessful) {
+                            response.body()?.results?.map {
+                                Movie(
+                                    id = it.id.toString(),
+                                    title = "🌐 ${it.title} (${it.release_date?.take(4) ?: "N/A"})",
+                                    originalTitle = it.original_title,
+                                    imageUrl = "https://image.tmdb.org/t/p/w500${it.poster_path}",
+                                    streamUrl = "https://tuservidor.com/stream/${it.id}",
+                                    castv = 50,
+                                    countdownMinutes = 60,
+                                    createdAt = System.currentTimeMillis()
+                                )
+                            } ?: emptyList()
+                        } else emptyList()
+                    } catch (e: Exception) { emptyList() }
+
+                    // --- C. COMBINAR ---
+                    val combined = firebaseMatches + apiResults
+
+                    withContext(Dispatchers.Main) {
+                        filteredMovieList.clear()
+                        filteredMovieList.addAll(combined)
+                        adapter.clear()
+                        adapter.addAll(filteredMovieList.map { it.title })
+                        adapter.notifyDataSetChanged()
                     }
                 }
             }
@@ -601,7 +629,6 @@ class PeliculasActivity : AppCompatActivity() {
             dialog.dismiss()
         }
     }
-
 
     // ==========================================
     // 6. PEDIDOS Y CasTV
