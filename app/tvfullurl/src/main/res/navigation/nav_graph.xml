@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+
+    app:startDestination="@id/nuevaPeliculaFragment">
+    <action
+        android:id="@+id/action_global_self"
+        app:destination="@id/nuevaPeliculaFragment" />
+
+    <fragment
+        android:id="@+id/nuevaPeliculaFragment"
+        android:name="com.creativem.tvfullurl.Fragment.NuevaPeliculaFragment"
+        android:label="fragment_nueva_pelicula"
+        tools:layout="@layout/fragment_nueva_editar" >
+        <action
+            android:id="@+id/action_nuevaPeliculaFragment_to_editarPeliculaFragment"
+            app:destination="@id/editarPeliculaFragment" />
+        <action
+            android:id="@+id/action_nuevaPeliculaFragment_to_soporteFragment"
+            app:destination="@id/soporteFragment" />
+        <action
+            android:id="@+id/action_nuevaPeliculaFragment_to_TvFragment"
+            app:destination="@id/TvFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/editarPeliculaFragment"
+        android:name="com.creativem.tvfullurl.Fragment.EditarPeliculaFragment"
+        android:label="fragment_editar_pelicula"
+        tools:layout="@layout/fragment_pedidos" >
+        <action
+            android:id="@+id/action_editarPeliculaFragment_to_nuevaPeliculaFragment"
+            app:destination="@id/nuevaPeliculaFragment" />
+        <action
+            android:id="@+id/action_editarPeliculaFragment_to_soporteFragment"
+            app:destination="@id/soporteFragment" />
+        <action
+            android:id="@+id/action_editarPeliculaFragment_to_TvFragment"
+            app:destination="@id/TvFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/soporteFragment"
+        android:name="com.creativem.tvfullurl.Fragment.PedidosFragment"
+        android:label="fragment_soporte"
+        tools:layout="@layout/fragment_pedidos" >
+        <action
+            android:id="@+id/action_soporteFragment_to_editarPeliculaFragment"
+            app:destination="@id/editarPeliculaFragment" />
+        <action
+            android:id="@+id/action_soporteFragment_to_nuevaPeliculaFragment"
+            app:destination="@id/nuevaPeliculaFragment" />
+        <action
+            android:id="@+id/action_soporteFragment_to_TvFragment"
+            app:destination="@id/TvFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/CastvFragment"
+        android:name="com.creativem.tvfullurl.Fragment.CastvFragment"
+        android:label="fragment_soporte"
+        tools:layout="@layout/fragment_pedidos" >
+        <action
+            android:id="@+id/action_soporteFragment_to_editarPeliculaFragment"
+            app:destination="@id/editarPeliculaFragment" />
+        <action
+            android:id="@+id/action_soporteFragment_to_nuevaPeliculaFragment"
+            app:destination="@id/nuevaPeliculaFragment" />
+        <action
+            android:id="@+id/action_CastvFragment_to_soporteFragment"
+            app:destination="@id/soporteFragment" />
+        <action
+            android:id="@+id/action_CastvFragment_to_TvFragment"
+            app:destination="@id/TvFragment" />
+
+    </fragment>
+    <fragment
+        android:id="@+id/TvFragment"
+        android:name="com.creativem.tvfullurl.Fragment.TvFragment"
+        android:label="Televicion"
+        tools:layout="@layout/fragment_tv" >
+        <action
+            android:id="@+id/action_soporteFragment_to_editarPeliculaFragment"
+            app:destination="@id/editarPeliculaFragment" />
+        <action
+            android:id="@+id/action_soporteFragment_to_nuevaPeliculaFragment"
+            app:destination="@id/nuevaPeliculaFragment" />
+        <action
+            android:id="@+id/action_CastvFragment_to_soporteFragment"
+            app:destination="@id/soporteFragment" />
+        <action
+            android:id="@+id/action_TvFragment_to_CastvFragment"
+            app:destination="@id/CastvFragment" />
+        <action
+            android:id="@+id/action_TvFragment_to_editarPeliculaFragment"
+            app:destination="@id/editarPeliculaFragment" />
+        <action
+            android:id="@+id/action_TvFragment_to_soporteFragment"
+            app:destination="@id/soporteFragment" />
+
+    </fragment>
+</navigation>
