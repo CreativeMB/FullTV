@@ -30,7 +30,6 @@ class PelisCarteleraAdapter(
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val poster: ImageView = view.findViewById(R.id.itemPoster)
         val title: TextView = view.findViewById(R.id.itemTitle)
-
         val badge: TextView = view.findViewById(R.id.txtBadge)
 
         init {
@@ -45,20 +44,32 @@ class PelisCarteleraAdapter(
             }
 
             view.setOnFocusChangeListener { v, hasFocus ->
-                // Color de fondo al enfocar (Paridad con el principal)
-                v.setBackgroundColor(
-                    if (hasFocus)
-                        ContextCompat.getColor(v.context, R.color.colorhover2)
-                    else
-                        Color.TRANSPARENT
-                )
+                // Casteamos a CardView para usar sus funciones especiales
+                val card = v as androidx.cardview.widget.CardView
 
-                // Animación de escala 1.08f (Paridad con el principal)
-                val scale = if (hasFocus) 1.08f else 1.0f
-                v.animate().scaleX(scale).scaleY(scale).setDuration(150).start()
+                if (hasFocus) {
+                    // --- AL ENFOCAR ---
+                    card.animate().scaleX(1.10f).scaleY(1.10f).setDuration(200).start()
 
-                title.isSelected = hasFocus // Activa Marquee
-                title.setTextColor(Color.YELLOW)
+                    // Usar la función específica de CardView
+                    card.setCardBackgroundColor(ContextCompat.getColor(v.context, R.color.colorhover2))
+                    card.cardElevation = 15f
+
+                    title.setTextColor(Color.YELLOW)
+                    title.isSelected = true
+                    v.z = 10f
+                } else {
+                    // --- AL PERDER FOCO (LIMPIEZA TOTAL) ---
+                    card.animate().scaleX(1.0f).scaleY(1.0f).setDuration(200).start()
+
+                    // Volver al color de fondo original del XML (#1A1A1A)
+                    card.setCardBackgroundColor(Color.parseColor("#1A1A1A"))
+                    card.cardElevation = 6f
+
+                    title.setTextColor(Color.WHITE)
+                    title.isSelected = false
+                    v.z = 0f
+                }
             }
         }
     }
