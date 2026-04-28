@@ -30,6 +30,7 @@ class PelisCarteleraAdapter(
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val poster: ImageView = view.findViewById(R.id.itemPoster)
         val title: TextView = view.findViewById(R.id.itemTitle)
+
         val badge: TextView = view.findViewById(R.id.txtBadge)
 
         init {
@@ -57,6 +58,7 @@ class PelisCarteleraAdapter(
                 v.animate().scaleX(scale).scaleY(scale).setDuration(150).start()
 
                 title.isSelected = hasFocus // Activa Marquee
+                title.setTextColor(Color.YELLOW)
             }
         }
     }
