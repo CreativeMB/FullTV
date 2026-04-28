@@ -277,10 +277,25 @@ class PeliculasActivity : AppCompatActivity() {
         userStatusListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (haProcesadoEliminacion) return
-                val estado = snapshot.child("estado").getValue(String::class.java)
-                if (!snapshot.exists() || estado == "eliminado") {
-                    haProcesadoEliminacion = true
-                    mostrarDialogoEliminado()
+
+                // 🟢 NUEVA LÓGICA:
+                if (snapshot.exists()) {
+                    val estado = snapshot.child("estado").getValue(String::class.java)
+
+                    // SOLO lo sacamos si el estado dice "eliminado"
+                    if (estado == "eliminado") {
+                        haProcesadoEliminacion = true
+                        mostrarDialogoEliminado()
+                    }
+                } else {
+                    // Si el snapshot NO EXISTE, significa que el administrador
+                    // borró los datos para un RESET. No lo sacamos de la app.
+                    Log.d("Seguridad", "Los datos no existen, el usuario puede seguir (Reset)")
+
+                    // OPCIONAL: Podrías llamar aquí a CastvHelper.nuevosusuarios(...)
+                    // para que le cree su perfil de nuevo automáticamente si no existe.
+                    val currentUser = auth.currentUser
+                    CastvHelper.nuevosusuarios(this@PeliculasActivity, currentUser?.displayName ?: "Usuario", email)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -411,6 +426,7 @@ class PeliculasActivity : AppCompatActivity() {
         // MONITOR DE PROGRESO (Hilo para actualizar la barra)
         val handler = Handler(Looper.getMainLooper())
         val monitor = object : Runnable {
+            @SuppressLint("Range")
             override fun run() {
                 val q = DownloadManager.Query().setFilterById(downloadId)
                 val cursor = dm.query(q)
@@ -712,12 +728,6 @@ class PeliculasActivity : AppCompatActivity() {
             }.show()
     }
 
-    private fun enviarCorreoNotificacion(pedido: String) {
-        val url = "https://server-csks8w.fly.dev/correo"
-        val body = JSONObject().put("titulo", pedido)
-        val request = object : JsonObjectRequest(Method.POST, url, body, null, null) {}
-        Volley.newRequestQueue(this).add(request)
-    }
 
     // ==========================================
     // 7. LISTA Y REPRODUCTOR
@@ -857,15 +867,34 @@ class PeliculasActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+
+        // 1. Limpiar el Receptor de Descargas (APK)
         try {
             unregisterReceiver(onDownloadComplete)
         } catch (e: Exception) {
-            // Ya estaba desregistrado
+            // Ya estaba desregistrado o nunca se activó
         }
-        publicidadDialog?.dismiss()
 
-        peliculasListener?.let { databaseRef.child("movies").removeEventListener(it) }
-        publicidadDialog?.dismiss()
+        // 2. Limpiar Listener de Películas (Realtime Database)
+        peliculasListener?.let {
+            databaseRef.child("movies").removeEventListener(it)
+        }
+
+        // 3. Limpiar Listener de Seguridad (Estado de cuenta)
+        // Es vital quitarlo de la ruta exacta del usuario
+        val email = auth.currentUser?.email
+        if (email != null && userStatusListener != null) {
+            val correoKey = email.replace(".", "_").replace("@", "_")
+            databaseRef.child("usuarios").child(correoKey).removeEventListener(userStatusListener!!)
+        }
+
+        // 4. Cerrar todos los diálogos abiertos para evitar error "WindowLeaked"
+        publicidadDialog?.let { if (it.isShowing) it.dismiss() }
+        progressDialog?.let { if (it.isShowing) it.dismiss() } // El de la descarga roja
+
+        // 5. Limpiar el Handler (Detiene el monitor de progreso de descarga)
         handler.removeCallbacksAndMessages(null)
+
+        Log.d("PeliculasActivity", "Limpieza de onDestroy completada")
     }
 }

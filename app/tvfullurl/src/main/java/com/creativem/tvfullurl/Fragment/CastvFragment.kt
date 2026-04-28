@@ -66,42 +66,57 @@ class CastvFragment : Fragment() {
 
         databaseRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
+                // 1. Limpiamos la lista local para no duplicar datos
                 userList.clear()
 
                 if (snapshot.exists()) {
                     for (userSnapshot in snapshot.children) {
                         val user = userSnapshot.getValue(User::class.java)
-                        user?.let {
-                            it.userId = userSnapshot.key ?: ""
 
-                            if (it.estado != "eliminado") {
-                                it.isOnline = it.estado == "activo" &&
-                                        (userSnapshot.child("enlinea").getValue(Boolean::class.java) ?: false)
+                        if (user != null) {
+                            // Asignamos el ID (la clave del nodo) al objeto usuario
+                            user.userId = userSnapshot.key ?: ""
 
-                                userList.add(it)
+                            // 2. FILTRO:
+                            // - Si usaste removeValue(), el usuario ya no sale aquí.
+                            // - Si el usuario aún existe pero tiene estado "eliminado", lo ocultamos.
+                            if (user.estado != "eliminado") {
+
+                                // 3. ESTADO ONLINE:
+                                // Obtenemos el valor de "enlinea" directamente del snapshot
+                                val enLineaDB = userSnapshot.child("enlinea").getValue(Boolean::class.java) ?: false
+                                user.isOnline = enLineaDB
+
+                                userList.add(user)
                             }
                         }
                     }
 
-                    // Ordenar por fechaCreacion y luego por email
+                    // 4. ORDENAR:
+                    // Primero por fecha de creación (más nuevos arriba)
+                    // Luego por correo (alfabético)
                     userList.sortWith(
                         compareByDescending<User> { it.fechaCreacion }
-                            .thenByDescending { it.correo } // ← esto debe devolver String
+                            .thenBy { it.correo }
                     )
 
-                    castvAdapter.filter("") // Actualizar la vista
                 } else {
-                    Log.d("Usuarios", "No se encontraron usuarios.")
+                    Log.d("Usuarios", "La base de datos de usuarios está vacía.")
                 }
+
+                // 5. ACTUALIZAR UI:
+                // Notificamos al adaptador para que refresque la lista en pantalla
+                castvAdapter.filter("")
             }
 
             override fun onCancelled(error: DatabaseError) {
                 Log.e("Usuarios", "Error en la base de datos: ${error.message}")
+                if (isAdded) {
+                    Toast.makeText(requireContext(), "Error al cargar usuarios", Toast.LENGTH_SHORT).show()
+                }
             }
         })
     }
-
-
 
     private fun verificarEstadosDeConexion() {
         val usuariosRef = FirebaseDatabase.getInstance().reference.child("usuarios")
@@ -187,59 +202,31 @@ class CastvFragment : Fragment() {
 
 
     private fun deleteUsers(userId: String) {
+        // userId es el correo codificado (ej: usuario_gmail_com)
         val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId)
 
-        userRef.child("estado").setValue("eliminado")
-            .addOnSuccessListener {
-                Toast.makeText(requireContext(), "Usuario marcado como eliminado", Toast.LENGTH_SHORT).show()
-                llamarEliminacionEnFly(userId)
+        // Es mejor pedir una confirmación antes de borrar todo
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Eliminar permanentemente")
+            .setMessage("¿Estás seguro de borrar a este usuario? Se perderán sus puntos y su historial por completo.")
+            .setPositiveButton("Borrar Todo") { _, _ ->
+
+                // .removeValue() elimina el nodo completo de ese usuario
+                userRef.removeValue()
+                    .addOnSuccessListener {
+                        Toast.makeText(requireContext(), "Datos eliminados por completo", Toast.LENGTH_SHORT).show()
+
+                        // Ya no llamamos a Fly.dev porque no funciona
+                        // cargarUsuarios() se activará solo por el ValueEventListener
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("Usuarios", "Error al borrar nodo", e)
+                        Toast.makeText(requireContext(), "Error al eliminar datos", Toast.LENGTH_SHORT).show()
+                    }
             }
-            .addOnFailureListener { e ->
-                Log.e("Usuarios", "Error al actualizar estado", e)
-                Toast.makeText(requireContext(), "Error al marcar como eliminado", Toast.LENGTH_SHORT).show()
-            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
-
-    private fun llamarEliminacionEnFly(email: String) {
-        val url = "https://server-csks8w.fly.dev/eliminar-usuario"
-        Log.d("FlyServer", "Preparando solicitud a $url con email: $email")
-
-        val json = JSONObject().apply {
-            put("email", email)
-        }
-
-        Log.d("FlyServer", "Cuerpo JSON a enviar: $json")
-
-        val request = object : JsonObjectRequest(
-            Request.Method.POST, url, json,
-            { response ->
-                Log.d("FlyServer", "Respuesta recibida del servidor: $response")
-                val mensaje = response.optString("mensaje", "Usuario eliminado desde servidor")
-                Toast.makeText(requireContext(), mensaje, Toast.LENGTH_LONG).show()
-            },
-            { error ->
-                Log.e("FlyServer", "❌ Error en la solicitud: ${error.message}")
-                error.networkResponse?.let { networkResponse ->
-                    val statusCode = networkResponse.statusCode
-                    val data = networkResponse.data?.decodeToString()
-                    Log.e("FlyServer", "Código HTTP: $statusCode, Respuesta: $data")
-                } ?: Log.e("FlyServer", "No hay respuesta del servidor (puede ser problema de red o TLS)")
-
-                Toast.makeText(requireContext(), "Error al comunicar con el servidor", Toast.LENGTH_LONG).show()
-            }
-        ) {
-            override fun getHeaders(): MutableMap<String, String> {
-                val headers = hashMapOf("Content-Type" to "application/json")
-                Log.d("FlyServer", "Encabezados de la solicitud: $headers")
-                return headers
-            }
-        }
-
-        Log.d("FlyServer", "Enviando solicitud POST a $url...")
-        Volley.newRequestQueue(requireContext()).add(request)
-    }
-
-
 
 
     override fun onDestroyView() {
