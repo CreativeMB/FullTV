@@ -69,6 +69,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
@@ -713,21 +714,112 @@ class PeliculasActivity : AppCompatActivity() {
         }
     }
     private fun activarpaquete() {
-        val input = EditText(this).apply { hint = "Nombre y Fecha del Pago" }
-        AlertDialog.Builder(this)
-            .setTitle("Activar Paquete")
-            .setView(input)
-            .setPositiveButton("Registrar") { _, _ ->
-                val p = input.text.toString().trim()
-                if (p.isNotEmpty()) {
-                    val uid = auth.currentUser?.uid ?: return@setPositiveButton
-                    val data = hashMapOf("title" to p, "userId" to uid, "createdAt" to ServerValue.TIMESTAMP)
-                    databaseRef.child("pedidosmovies").push().setValue(data)
-                    Toast.makeText(this, "Revisaremos tu pago pronto", Toast.LENGTH_LONG).show()
-                }
-            }.show()
-    }
+        val user = auth.currentUser ?: return
+        val email = user.email ?: return
+        val uid = user.uid
+        val correoKey = email.replace(".", "_").replace("@", "_")
 
+        // --- DISEÑO DEL DIÁLOGO ---
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(60, 40, 60, 20)
+        }
+
+        val descripcion = TextView(this).apply {
+            text = "Selecciona el paquete que pagaste:"
+            textSize = 16f
+            setPadding(0, 0, 0, 20)
+        }
+
+        // Grupo de selección
+        val radioGroup = android.widget.RadioGroup(this)
+
+        // Opción Plata
+        val rbPlata = android.widget.RadioButton(this).apply {
+            text = "Plata: \$5.000 (50 Castv)"
+            id = View.generateViewId()
+        }
+        // Opción Bronce
+        val rbBronce = android.widget.RadioButton(this).apply {
+            text = "Bronce: \$10.000 (120 Castv)"
+            id = View.generateViewId()
+        }
+        // Opción Oro
+        val rbOro = android.widget.RadioButton(this).apply {
+            text = "Oro: \$20.000 (250 Castv)"
+            id = View.generateViewId()
+        }
+
+        radioGroup.addView(rbPlata)
+        radioGroup.addView(rbBronce)
+        radioGroup.addView(rbOro)
+        rbPlata.isChecked = true // Seleccionado por defecto
+
+        val inputReferencia = EditText(this).apply {
+            hint = "Escribe Banco y Nombre completo "
+            setPadding(20, 30, 20, 30)
+        }
+
+        layout.addView(descripcion)
+        layout.addView(radioGroup)
+        layout.addView(TextView(this).apply { text = "\nDetalles adicionales:"; textSize = 14f })
+        layout.addView(inputReferencia)
+
+        // --- MOSTRAR EL DIÁLOGO ---
+        AlertDialog.Builder(this)
+            .setTitle("💎 Activar Paquete")
+            .setView(layout)
+            .setPositiveButton("Enviar Reporte") { _, _ ->
+
+                // Determinar qué plan eligió y cuántos puntos son
+                val planSeleccionado = when (radioGroup.checkedRadioButtonId) {
+                    rbPlata.id -> "PLATA"
+                    rbBronce.id -> "BRONCE"
+                    rbOro.id -> "ORO"
+                    else -> "DESCONOCIDO"
+                }
+
+                val puntosPlan = when (radioGroup.checkedRadioButtonId) {
+                    rbPlata.id -> 50
+                    rbBronce.id -> 120
+                    rbOro.id -> 250
+                    else -> 0
+                }
+
+                val detalle = inputReferencia.text.toString().trim()
+                val tituloFinal = "$planSeleccionado - $detalle"
+
+                // EJECUTAR EL GUARDADO
+                CoroutineScope(Dispatchers.Main).launch {
+                    try {
+                        val snapshot = withContext(Dispatchers.IO) {
+                            databaseRef.child("usuarios").child(correoKey).get().await()
+                        }
+                        val nombreReal = snapshot.child("nombre").value?.toString() ?: "Usuario"
+
+                        val data = hashMapOf(
+                            "title" to tituloFinal,
+                            "castv" to puntosPlan, // Aquí ya va el valor real según el plan
+                            "email" to email,
+                            "nombre" to nombreReal,
+                            "timestamp" to ServerValue.TIMESTAMP,
+                            "userId" to uid
+                        )
+
+                        withContext(Dispatchers.IO) {
+                            databaseRef.child("pedidosmovies").push().setValue(data).await()
+                        }
+
+                        Toast.makeText(this@PeliculasActivity, "✅ Reporte de $planSeleccionado enviado", Toast.LENGTH_LONG).show()
+
+                    } catch (e: Exception) {
+                        Toast.makeText(this@PeliculasActivity, "❌ Error al enviar reporte", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
 
     // ==========================================
     // 7. LISTA Y REPRODUCTOR
