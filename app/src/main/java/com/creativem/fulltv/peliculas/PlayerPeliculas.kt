@@ -716,17 +716,22 @@ class PlayerPeliculas : AppCompatActivity() {
         }
 
 
-    override fun onIsPlayingChanged(isPlaying: Boolean) {
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
             val playPauseButton = findViewById<ImageButton>(R.id.play_pause)
+
+            // Ponemos el foco primero
+            playPauseButton.requestFocus()
+
             if (isPlaying) {
                 handler.postDelayed(runnableOcultar, hideControlsDelay)
-                playPauseButton.setImageResource(R.drawable.ic_play)
+                // Cambias a icono de PAUSA si está reproduciendo
+                playPauseButton.setImageResource(R.drawable.ic_stop)
             } else {
                 handler.removeCallbacks(runnableOcultar)
-                playPauseButton.setImageResource(R.drawable.ic_stop)
+                // Cambias a icono de PLAY si está detenido
+                playPauseButton.setImageResource(R.drawable.ic_play)
             }
         }
-
 
         override fun onPlayerError(error: PlaybackException) {
 
@@ -1210,7 +1215,7 @@ class PlayerPeliculas : AppCompatActivity() {
 
     private fun showControlsAndResetTimer() {
         lastInteractionTime = System.currentTimeMillis()
-        binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis).requestFocus()
+        binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis)
         val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
         if (controles.visibility != View.VISIBLE) {
             controles.alpha = 0f

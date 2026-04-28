@@ -165,7 +165,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="🎬 Películas en cartelera casTV $50 para Alquilar"
+                    android:text="🎬 Películas gratis"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:textColor="@android:color/white" />
