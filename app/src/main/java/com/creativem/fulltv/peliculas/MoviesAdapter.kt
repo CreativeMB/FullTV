@@ -1,4 +1,4 @@
-package com.creativem.fulltv
+package com.creativem.fulltv.peliculas
 
 import android.annotation.SuppressLint
 import android.graphics.Color
@@ -14,6 +14,7 @@ import com.bumptech.glide.load.DecodeFormat
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions
+import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 import java.util.concurrent.TimeUnit
 

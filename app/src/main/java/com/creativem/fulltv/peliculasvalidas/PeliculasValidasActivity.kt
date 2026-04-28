@@ -1,4 +1,4 @@
-package com.creativem.fulltv.peliculas
+package com.creativem.fulltv.peliculasvalidas
 
 import android.content.Context
 import android.content.Intent
@@ -8,7 +8,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import com.bumptech.glide.Glide
-import com.creativem.fulltv.MoviesAdapter
+import com.creativem.fulltv.peliculas.MoviesAdapter
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.databinding.ActivityPeliculasValidasBinding
 import com.creativem.fulltv.principal.Movie

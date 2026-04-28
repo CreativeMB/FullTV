@@ -1,11 +1,13 @@
-package com.creativem.fulltv
+package com.creativem.fulltv.peliculas
 
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.Dialog
 import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Bundle
@@ -33,6 +35,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.bumptech.glide.Glide
+import com.creativem.fulltv.R
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.api.PeliculasApiActivity
 import com.creativem.fulltv.api.TMDbApiClient
@@ -40,8 +43,9 @@ import com.creativem.fulltv.databinding.ActivityPeliculasBinding
 import com.creativem.fulltv.enlinea.UsuarioEstadoManager
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
 import com.creativem.fulltv.menu.MenuPrincipalItem
-import com.creativem.fulltv.peliculas.PeliculasValidasActivity
-import com.creativem.fulltv.peliculas.Validacioneslista
+import com.creativem.fulltv.peliculasvalidas.PeliculasValidasActivity
+import com.creativem.fulltv.peliculasvalidas.Validaciones
+import com.creativem.fulltv.peliculasvalidas.Validacioneslista
 import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Login
 import com.creativem.fulltv.principal.Movie
@@ -82,7 +86,7 @@ class PeliculasActivity : AppCompatActivity() {
     private var publicidadDialog: Dialog? = null
     private var versionRemotaGlobal: String? = null
     private val handler = Handler(Looper.getMainLooper())
-    private val onDownloadComplete = object : android.content.BroadcastReceiver() {
+    private val onDownloadComplete = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
             if (id == downloadId) { // Verificamos que sea nuestra descarga
@@ -163,13 +167,15 @@ class PeliculasActivity : AppCompatActivity() {
                     val intent = Intent(this, Nosotros::class.java)
                     startActivity(intent)
                 }
+
                 "TV" -> navegarATv()
                 "Cerrar" -> cerrarSesion()
                 else -> Toast.makeText(this, "${item.name} seleccionado", Toast.LENGTH_SHORT).show()
             }
         }
 
-        binding.menuPrincipal.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        binding.menuPrincipal.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         binding.menuPrincipal.adapter = adapter
     }
     fun navegarInicio() {
@@ -341,11 +347,11 @@ class PeliculasActivity : AppCompatActivity() {
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationUri(Uri.fromFile(file))
 
-        val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val dm = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
         downloadId = dm.enqueue(request) // Guardamos el ID de la descarga
 
         // 🟢 REGISTRAMOS EL ESCUCHADOR PARA CUANDO TERMINE
-        registerReceiver(onDownloadComplete, android.content.IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+        registerReceiver(onDownloadComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
 
         Toast.makeText(this, "Descargando actualización...", Toast.LENGTH_LONG).show()
     }
@@ -382,7 +388,8 @@ class PeliculasActivity : AppCompatActivity() {
                     val img = dialogView.findViewById<ImageView>(R.id.imgPublicidad)
 
                     Glide.with(this).load(uri).into(img)
-                    publicidadDialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+                    publicidadDialog =
+                        Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
                     publicidadDialog?.setContentView(dialogView)
                     publicidadDialog?.show()
 
@@ -657,7 +664,7 @@ class PeliculasActivity : AppCompatActivity() {
     private fun validarYActualizarVistasEnVivo() {
         // No borramos nombres, usamos la lógica masiva local
         CoroutineScope(Dispatchers.Main).launch {
-            val validador = com.creativem.fulltv.peliculas.Validaciones()
+            val validador = Validaciones()
 
             // Hacemos una copia para no tener errores de concurrencia
             val listaActual = ArrayList(movieList)
@@ -738,7 +745,7 @@ class PeliculasActivity : AppCompatActivity() {
             sincronizarConCacheLocal()
         }
 
-        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val am = getSystemService(AUDIO_SERVICE) as AudioManager
         am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
     }
 

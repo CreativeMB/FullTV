@@ -9,7 +9,7 @@ import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import com.bumptech.glide.Glide
-import com.creativem.fulltv.MoviesAdapter
+import com.creativem.fulltv.peliculas.MoviesAdapter
 import com.creativem.fulltv.databinding.ActivityTvBinding
 import com.creativem.fulltv.peliculas.PlayerPeliculas
 import com.creativem.fulltv.principal.AudioFocusHelper

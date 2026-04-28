@@ -1,17 +1,19 @@
-package com.creativem.fulltv.peliculas
+package com.creativem.fulltv.peliculasvalidas
 
 import android.util.Log
 import com.creativem.fulltv.principal.Movie
 import com.google.firebase.database.FirebaseDatabase
-import kotlinx.coroutines.*
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.tasks.await
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.io.IOException
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.withContext
 import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class Validaciones {
     private val databaseRef = FirebaseDatabase.getInstance().reference
@@ -48,7 +50,8 @@ class Validaciones {
 
             val (validas, invalidas) = resultados.partition { it.isValid }
 
-            Pair(validas.sortedByDescending { it.createdAt },
+            Pair(
+                validas.sortedByDescending { it.createdAt },
                 invalidas.sortedByDescending { it.createdAt })
         } catch (e: Exception) {
             Log.e("Validaciones", "Error: ${e.message}")

@@ -1,4 +1,4 @@
-package com.creativem.fulltv.peliculas
+package com.creativem.fulltv.peliculasvalidas
 
 import com.creativem.fulltv.principal.Movie
 import kotlinx.coroutines.Dispatchers

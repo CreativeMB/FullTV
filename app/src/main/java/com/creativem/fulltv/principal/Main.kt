@@ -55,7 +55,7 @@
 //import com.bumptech.glide.load.resource.bitmap.CenterCrop
 //import com.bumptech.glide.request.RequestOptions
 //import com.creativem.fulltv.BuildConfig
-//import com.creativem.fulltv.PeliculasActivity
+//import com.creativem.fulltv.peliculas.PeliculasActivity
 //import com.creativem.fulltv.R
 //import com.creativem.fulltv.api.ApiPeliculaActivity
 //import com.creativem.fulltv.api.TMDbApiClient

@@ -1,5 +1,6 @@
-package com.creativem.fulltv.api
+package com.creativem.fulltv.peliculasvalidas
 
+import android.graphics.Color
 import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
@@ -10,6 +11,7 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
+import com.creativem.fulltv.api.TmdbMovie
 
 class PelisCarteleraAdapter(
     private val items: List<TmdbMovie>,
@@ -21,6 +23,8 @@ class PelisCarteleraAdapter(
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val poster: ImageView = view.findViewById(R.id.itemPoster)
         val title: TextView = view.findViewById(R.id.itemTitle)
+        // Referencia a la etiqueta
+        val badge: TextView = view.findViewById(R.id.txtBadge)
 
         init {
             view.setOnClickListener {
@@ -34,7 +38,6 @@ class PelisCarteleraAdapter(
             }
 
             view.setOnFocusChangeListener { v, hasFocus ->
-                // Foco visual
                 v.setBackgroundColor(
                     if (hasFocus)
                         ContextCompat.getColor(v.context, R.color.colorhover2)
@@ -42,11 +45,9 @@ class PelisCarteleraAdapter(
                         ContextCompat.getColor(v.context, R.color.colorNotSelected)
                 )
 
-                // Escala
                 v.scaleX = if (hasFocus) 1.05f else 1f
                 v.scaleY = if (hasFocus) 1.05f else 1f
 
-                // Activar marquee
                 title.isSelected = hasFocus
             }
         }
@@ -60,6 +61,17 @@ class PelisCarteleraAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val movie = items[position]
+
+        // --- CONFIGURACIÓN DE LA ETIQUETA GRATIS ---
+        holder.badge.apply {
+            visibility = View.VISIBLE
+            text = "Gratis ✅"
+            // Color verde oscuro (tipo cian) para diferenciar de Alquiler
+            setBackgroundColor(Color.parseColor("#006064"))
+            // Esto asegura que se dibuje por encima si hay problemas de capas
+            bringToFront()
+        }
+
         holder.title.apply {
             text = movie.title
             textSize = 16f

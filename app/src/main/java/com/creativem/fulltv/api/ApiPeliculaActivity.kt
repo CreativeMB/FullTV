@@ -14,7 +14,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.peliculas.PlayerPeliculas
-import com.creativem.fulltv.peliculas.Validacioneslista
+import com.creativem.fulltv.peliculasvalidas.Validacioneslista
+import com.creativem.fulltv.peliculasvalidas.PelisCarteleraAdapter
 import com.creativem.fulltv.principal.Movie
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.*

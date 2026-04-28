@@ -37,7 +37,7 @@
         android:usesCleartextTraffic="true"
         tools:ignore="UnusedAttribute">
         <activity
-            android:name=".PeliculasActivity"
+            android:name=".peliculas.PeliculasActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar">
 
         </activity>
@@ -69,7 +69,7 @@
             android:name=".tv.TvActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
         <activity
-            android:name=".peliculas.PeliculasValidasActivity"
+            android:name=".peliculasvalidas.PeliculasValidasActivity"
             android:exported="false"
             android:windowSoftInputMode="stateHidden|adjustPan"
             tools:ignore="Instantiatable"
