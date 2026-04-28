@@ -37,9 +37,9 @@
         android:usesCleartextTraffic="true"
         tools:ignore="UnusedAttribute">
         <activity
-            android:name="com.creativem.tvfullurl.PeliculasActivity"
-            android:screenOrientation="landscape"
+            android:name=".PeliculasActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar">
+
         </activity>
         <activity
             android:name=".api.ApiPeliculaActivity"
@@ -48,10 +48,9 @@
             android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".api.PeliculasApi"
+            android:name=".api.PeliculasApiActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="false"
-            android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".principal.Main"
@@ -62,30 +61,21 @@
             android:exported="false"
             android:screenOrientation="landscape" />
         <activity
-            android:name=".peliculasvalidas.PeliculasValidas"
-            android:exported="false"
-            android:screenOrientation="landscape" />
-        <activity
             android:name=".peliculas.PeliculasFragment"
             android:exported="false"
-            android:screenOrientation="landscape"
             android:windowSoftInputMode="stateHidden|adjustPan"
             tools:ignore="Instantiatable" />
         <activity
-            android:name=".tv.TvFragment"
-            android:exported="false"
-            android:screenOrientation="landscape"
-            android:windowSoftInputMode="stateHidden|adjustPan"
-            tools:ignore="Instantiatable" />
+            android:name=".tv.TvActivity"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
         <activity
-            android:name=".peliculasvalidas.PeliculasValidasFragment"
+            android:name=".peliculas.PeliculasValidasActivity"
             android:exported="false"
-            android:screenOrientation="landscape"
             android:windowSoftInputMode="stateHidden|adjustPan"
-            tools:ignore="Instantiatable" />
+            tools:ignore="Instantiatable"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".principal.Nosotros"
-            android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".peliculas.PlayerPeliculas"
@@ -95,16 +85,14 @@
         <activity
             android:name=".tv.PlayerTv"
             android:configChanges="orientation|screenSize|keyboardHidden"
-            android:screenOrientation="landscape"
+
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".principal.Login"
             android:exported="true"
-            android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>

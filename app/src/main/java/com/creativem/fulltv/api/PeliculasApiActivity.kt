@@ -1,19 +1,10 @@
 package com.creativem.fulltv.api
 
 import android.content.Intent
-import android.graphics.Matrix
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.TransitionDrawable
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
 import android.view.ViewTreeObserver
-import android.widget.ImageView
-import androidx.fragment.app.Fragment
+import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -21,9 +12,7 @@ import com.creativem.fulltv.R
 
 import com.creativem.fulltv.menu.MenuSuperiorAdapter
 import com.creativem.fulltv.peliculasvalidas.PeliculasMenuAdapter
-import com.creativem.fulltv.principal.Main
 import com.creativem.fulltv.principal.Movie
-import com.google.firebase.Timestamp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -32,21 +21,21 @@ import okhttp3.OkHttpClient
 import retrofit2.*
 import retrofit2.converter.gson.GsonConverterFactory
 
-class PeliculasApiFragment : Fragment() {
+
+class PeliculasApiActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: PeliculasMenuAdapter
     private lateinit var apiService: TMDbApiService
     private val apiKey = "678193d2c735c6f37840cee035f4d69a"
     private var layoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View = inflater.inflate(R.layout.fragment_peliculasapi, container, false)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
+        // 1. Cargamos el layout directamente
+        setContentView(R.layout.fragment_peliculasapi)
+
+        // --- TODA TU LÓGICA DE onViewCreated COMIENZA AQUÍ ---
 
         val menuOpciones = listOf(
             "Populares", "Mejor valoradas", "En cartelera", "Acción", "Aventura", "Animación",
@@ -55,9 +44,13 @@ class PeliculasApiFragment : Fragment() {
             "Película de TV", "Suspenso", "Bélica", "Western"
         )
 
-        val menuRecycler = view.findViewById<RecyclerView>(R.id.menu_horizontal)
+        // En Activity usamos findViewById directamente
+        val menuRecycler = findViewById<RecyclerView>(R.id.menu_horizontal)
+
+        // Cambiamos requireContext() por 'this'
         menuRecycler.layoutManager =
-            LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+
         menuRecycler.adapter = MenuSuperiorAdapter(menuOpciones) { seleccion ->
             when (seleccion) {
                 "Populares" -> cargarPeliculasPopulares()
@@ -67,14 +60,15 @@ class PeliculasApiFragment : Fragment() {
             }
         }
 
-        recyclerView = view.findViewById(R.id.recycler_populares)
+        recyclerView = findViewById(R.id.recycler_populares)
 
+        // Mantenemos tu layoutListener tal cual
         layoutListener = ViewTreeObserver.OnGlobalLayoutListener {
-            if (!isAdded) return@OnGlobalLayoutListener
+            // En Activity no hace falta 'isAdded', siempre está añadida si está abierta
             val spanCount = calcularElementosPorFila(recyclerView.width)
             val currentLayoutManager = recyclerView.layoutManager as? GridLayoutManager
             if (currentLayoutManager == null || currentLayoutManager.spanCount != spanCount) {
-                recyclerView.layoutManager = GridLayoutManager(requireContext(), spanCount)
+                recyclerView.layoutManager = GridLayoutManager(this, spanCount)
             }
         }
 
@@ -83,13 +77,13 @@ class PeliculasApiFragment : Fragment() {
             if (recyclerView.layoutManager !is GridLayoutManager ||
                 (recyclerView.layoutManager as GridLayoutManager).spanCount != spanCount
             ) {
-                recyclerView.layoutManager = GridLayoutManager(requireContext(), spanCount)
+                recyclerView.layoutManager = GridLayoutManager(this, spanCount)
             }
         }
 
+        // Mantenemos el Intent con todos tus Extras
         adapter = PeliculasMenuAdapter(mutableListOf()) { movie ->
-
-            val intent = Intent(requireContext(), ApiPeliculaActivity::class.java).apply {
+            val intent = Intent(this, ApiPeliculaActivity::class.java).apply {
                 putExtra("EXTRA_STREAM_URL", movie.streamUrl)
                 putExtra("EXTRA_MOVIE_TITLE", movie.title)
                 putExtra("EXTRA_MOVIE_CASTV", movie.castv)
@@ -101,11 +95,13 @@ class PeliculasApiFragment : Fragment() {
         }
 
         recyclerView.adapter = adapter
+
+        // Llamamos a tus funciones de API
         setupApiService()
         cargarPeliculasPopulares()
 
-        // 🔄 Restaurar fondo animado al iniciar
-        (activity as? Main)?.restaurarFondoAnimado()
+        // 🔄 Como ya no estás en Main, si quieres fondo animado aquí,
+        // deberías llamar a una función de animación propia de esta Activity.
     }
 
     private fun setupApiService() {
@@ -277,33 +273,49 @@ class PeliculasApiFragment : Fragment() {
 
     // Función para calcular cuántos elementos caben según el ancho real del RecyclerView
     private fun calcularElementosPorFila(anchoRecyclerPx: Int): Int {
-        if (!isAdded || anchoRecyclerPx <= 0) return 1
+        // 1. Quitamos 'isAdded'. Solo verificamos que el ancho sea mayor a 0 para evitar errores.
+        if (anchoRecyclerPx <= 0) return 2 // Retornamos 2 como mínimo por defecto
+
+        // 2. Definimos el ancho que queremos para cada póster en DP
         val anchoTarjetaDp = 120
+
+        // 3. Convertimos DP a Píxeles según la densidad de la pantalla actual
         val anchoTarjetaPx = (anchoTarjetaDp * resources.displayMetrics.density).toInt()
-        return (anchoRecyclerPx / anchoTarjetaPx).coerceAtLeast(1)
+
+        // 4. Calculamos cuántas tarjetas caben en el ancho total del RecyclerView
+        // Usamos .coerceAtLeast(1) para asegurar que al menos se vea 1 columna
+        val columnas = anchoRecyclerPx / anchoTarjetaPx
+
+        return columnas.coerceAtLeast(1)
     }
 
     override fun onResume() {
         super.onResume()
 
-        // Espera a que el recyclerView esté ya medido antes de calcular
+        // Usamos post para asegurar que el RecyclerView ya tenga dimensiones reales en pantalla
         recyclerView.post {
             val ancho = recyclerView.width
             if (ancho > 0) {
                 val spanCount = calcularElementosPorFila(ancho)
                 val currentLayoutManager = recyclerView.layoutManager as? GridLayoutManager
+
+                // Verificamos si necesitamos cambiar el número de columnas
                 if (currentLayoutManager == null || currentLayoutManager.spanCount != spanCount) {
-                    recyclerView.layoutManager = GridLayoutManager(requireContext(), spanCount)
+                    // CAMBIO: Usamos 'this' porque estamos en una Activity
+                    recyclerView.layoutManager = GridLayoutManager(this, spanCount)
                 }
             }
         }
     }
-    override fun onDestroyView() {
-        super.onDestroyView()
+    override fun onDestroy() {
+        super.onDestroy() // En Activity llamamos a super.onDestroy()
+
         // Es crucial eliminar el listener para evitar crashes y fugas de memoria.
         if (layoutListener != null) {
+            // Verificamos que el recyclerView no sea nulo antes de acceder a su observer
             recyclerView.viewTreeObserver.removeOnGlobalLayoutListener(layoutListener)
         }
+
         // También es bueno limpiar la referencia.
         layoutListener = null
     }

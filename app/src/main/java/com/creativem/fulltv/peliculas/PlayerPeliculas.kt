@@ -85,6 +85,8 @@ import com.creativem.fulltv.principal.Nosotros
 
 
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ServerValue
+import kotlinx.coroutines.isActive
 
 
 @Suppress("DEPRECATION")
@@ -364,26 +366,29 @@ class PlayerPeliculas : AppCompatActivity() {
 
 
     private fun loadMovies() {
-        databaseRef.child("movies").limitToLast(20).get().addOnSuccessListener { snapshot ->
-            val peliculas = mutableListOf<com.creativem.fulltv.principal.Movie>()
-            for (child in snapshot.children) {
-                val movie = child.getValue(com.creativem.fulltv.principal.Movie::class.java)
-                movie?.let {
-                    peliculas.add(it.copy(id = child.key ?: ""))
-                }
-            }
-            // Ordenar por las más recientes
-            adapter.updateMovies(peliculas.sortedByDescending { it.createdAt })
+        // 1. Intentamos cargar lo que ya hay en memoria (instantáneo)
+        val peliculasValidas = Validacioneslista.obtenerPeliculasValidas()
+
+        if (peliculasValidas.isNotEmpty()) {
+            adapter.updateMovies(peliculasValidas.sortedByDescending { it.createdAt })
         }
-    }
-    // Método que llama al repositorio de Firestore para validar la URL
-    private suspend fun isUrlValidInFirestore(url: String?): Boolean {
-        // Verifica si la URL está vacía o es nula
-        return if (url.isNullOrEmpty()) {
-            false
-        } else {
-            // Llama al método en tu Validaciones para validar la URL
-            Validaciones().isUrlValid(url) // Ajusta esto según tu implementación
+
+        // 2. Si el proceso de validación sigue corriendo en segundo plano,
+        // usamos una corrutina para ir actualizando el menú conforme aparezcan más
+        lifecycleScope.launch {
+            while (isActive) {
+                val listaActualizada = Validacioneslista.obtenerPeliculasValidas()
+
+                // Si el objeto Singleton encontró más películas válidas, actualizamos el menú
+                if (listaActualizada.size > peliculasValidas.size) {
+                    adapter.updateMovies(listaActualizada.sortedByDescending { it.createdAt })
+                }
+
+                // Si ya terminó de validar todo el servidor, dejamos de vigilar
+                if (Validacioneslista.yaCargado()) break
+
+                delay(2000) // Revisa cada 2 segundos para no saturar
+            }
         }
     }
 
@@ -407,10 +412,18 @@ class PlayerPeliculas : AppCompatActivity() {
         }
 
         CoroutineScope(Dispatchers.Main).launch {
+            // 1. Verificamos localmente contra el objeto Validacioneslista
             val isUrlValid = withContext(Dispatchers.IO) {
-                isUrlValidInFirestore(streamUrl)
+                // Si por alguna razón el objeto no ha cargado nada, le pedimos que lo haga
+                if (!Validacioneslista.yaCargado()) {
+                    Validacioneslista.cargarPeliculas()
+                }
+
+                // Comprobamos si la URL de esta película está entre las que pasaron el ping
+                Validacioneslista.obtenerPeliculasValidas().any { it.streamUrl == streamUrl }
             }
 
+            // 2. Si no es válida, mostramos el diálogo de error (pedido)
             if (!isUrlValid) {
                 showErrorDialog(movieTitle, movieCastv, userId)
                 return@launch
@@ -888,15 +901,15 @@ class PlayerPeliculas : AppCompatActivity() {
             startActivity(intent)
         }
 
+        // ... (todo tu código anterior de Spannable y CastvHelper)
+
         val alertDialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .setNegativeButton("Volver al contenido") { dialog, _ ->
                 dialog.dismiss()
                 finish()
             }
-            .setNeutralButton("Alquilar Película") { _, _ ->
-                verificarYProcesarPedido()
-            }
+            .setNeutralButton("Alquilar Película", null) // Se deja en null aquí
             .setPositiveButton("Cerrar") { dialog, _ ->
                 dialog.dismiss()
             }
@@ -908,6 +921,13 @@ class PlayerPeliculas : AppCompatActivity() {
             val btnAlquilar = alertDialog.getButton(AlertDialog.BUTTON_NEUTRAL)
             val btnVolver = alertDialog.getButton(AlertDialog.BUTTON_POSITIVE)
             val btnCerrar = alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+
+            // --- AQUÍ ES DONDE SE AGREGA LA LLAMADA ---
+            btnAlquilar.setOnClickListener {
+                Log.d("ALQUILER_LOG", "1. Botón Alquilar presionado")
+                verificarYProcesarPedido(alertDialog)
+            }
+            // ------------------------------------------
 
             val focusSelector = R.drawable.focus_selector
             btnAlquilar.setBackgroundResource(focusSelector)
@@ -928,88 +948,94 @@ class PlayerPeliculas : AppCompatActivity() {
         alertDialog.show()
     }
 
+    // Agregamos (dialog: AlertDialog) aquí
+    private fun verificarYProcesarPedido(dialog: AlertDialog) {
+        Log.d("ALQUILER_LOG", "2. Entrando a verificarYProcesarPedido para: $movieTitle")
 
-
-    private fun verificarYProcesarPedido() {
-        // Consultamos en Realtime Database ordenando por título
         val query = databaseRef.child("pedidosmovies")
             .orderByChild("title")
             .equalTo(movieTitle)
 
         query.get().addOnSuccessListener { snapshot ->
             if (!snapshot.exists()) {
-                // Si no existe ninguna entrada con ese título, procesamos el pedido
-                enviarPedido()
+                Log.d("ALQUILER_LOG", "3. La película no ha sido pedida aún. Procediendo...")
+                enviarPedido(dialog)
             } else {
-                // La película ya fue pedida
-                Log.i("RTDB", "La película '$movieTitle' ya existe en pedidos.")
-                Toast.makeText(this, "La película '$movieTitle' ya fue pedida por alguien.", Toast.LENGTH_LONG).show()
+                Log.d("ALQUILER_LOG", "3. La película YA existe en pedidos.")
+                Toast.makeText(this, "Esta película ya fue pedida.", Toast.LENGTH_LONG).show()
             }
         }.addOnFailureListener { e ->
-            Log.e("RTDB", "Error al consultar pedidos: ${e.message}")
+            Log.e("ALQUILER_LOG", "ERROR en consulta de pedidos: ${e.message}")
         }
     }
-    private fun enviarPedido() {
+    // Agregamos (dialog: AlertDialog) aquí
+    private fun enviarPedido(dialog: AlertDialog) {
         if (isProcessingOrder) return
         isProcessingOrder = true
 
         val user = auth.currentUser
-        if (user != null) {
-            val userId = user.uid
+        if (user != null && user.email != null) {
+            val correoKey = user.email!!.replace(".", "_").replace("@", "_")
 
-            // 1. Obtener datos del usuario desde RTDB
-            databaseRef.child("usuarios").child(userId).get().addOnSuccessListener { snapshot ->
-                val userName = snapshot.child("nombre").value?.toString() ?: "Sin nombre"
-                val userEmail = snapshot.child("correo").value?.toString() ?: "Sin correo"
-                val costoPedido = movieCastv
+            databaseRef.child("usuarios").child(correoKey).get().addOnSuccessListener { snapshot ->
+                if (snapshot.exists()) {
+                    val userName = snapshot.child("nombre").value?.toString() ?: "Sin nombre"
+                    val userEmail = snapshot.child("correo").value?.toString() ?: user.email!!
+                    val costoPedido = (movieCastv as? Number)?.toInt() ?: 0
 
-                // 2. Verificar puntos
-                verificarPuntos(userId, costoPedido) { tienePuntos ->
-                    if (tienePuntos) {
-                        val datos = hashMapOf(
-                            "title" to movieTitle,
-                            "castv" to movieCastv,
-                            "email" to userEmail,
-                            "nombre" to userName,
-                            "userId" to userId,
-                            "timestamp" to System.currentTimeMillis() // Fecha actual
-                        )
+                    // ✅ Ahora enviamos los dos parámetros correctamente
+                    verificarPuntos(correoKey, costoPedido) { tienePuntos ->
+                        if (tienePuntos) {
+                            val datos = hashMapOf(
+                                "title" to movieTitle,
+                                "castv" to costoPedido,
+                                "email" to userEmail,
+                                "nombre" to userName,
+                                "userId" to snapshot.child("userId").value?.toString(),
+                                "timestamp" to ServerValue.TIMESTAMP
+                            )
 
-                        // 3. Guardar el pedido en RTDB (usando push() para ID único)
-                        databaseRef.child("pedidosmovies").push().setValue(datos)
-                            .addOnSuccessListener {
-                                descontarPuntos(userId, costoPedido.toLong())
-                                enviarCorreoNuevoPedido(movieTitle)
-                                // Toast se muestra dentro de descontarPuntos
-                            }
-                            .addOnFailureListener { e ->
-                                Toast.makeText(this, "Error al enviar pedido: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                    } else {
-                        Toast.makeText(this, "Saldo CasTV insuficiente.", Toast.LENGTH_LONG).show()
-                        startActivity(Intent(this, Nosotros::class.java))
-                        finish()
+                            databaseRef.child("pedidosmovies").push().setValue(datos)
+                                .addOnSuccessListener {
+                                    dialog.dismiss()
+                                    descontarPuntos(correoKey, costoPedido)
+                                    enviarCorreoNuevoPedido(movieTitle)
+                                    isProcessingOrder = false
+                                }
+                                .addOnFailureListener { e ->
+                                    isProcessingOrder = false
+                                    Toast.makeText(this, "Error al enviar: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                        } else {
+                            isProcessingOrder = false
+                            Toast.makeText(this, "Saldo CasTV insuficiente.", Toast.LENGTH_SHORT).show()
+                        }
                     }
+                } else {
+                    isProcessingOrder = false
                 }
-            }
+            }.addOnFailureListener { isProcessingOrder = false }
         }
-        isProcessingOrder = false
     }
+    private fun verificarPuntos(correoKey: String, costo: Int, callback: (Boolean) -> Unit) {
+        Log.d("ALQUILER_LOG", "Buscando en la ruta correcta: usuarios/$correoKey")
 
-
-        private fun verificarPuntos(userId: String, costo: Int, callback: (Boolean) -> Unit) {
-        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(userId)
+        val userRef = databaseRef.child("usuarios").child(correoKey)
 
         userRef.child("castv").get().addOnSuccessListener { snapshot ->
-            val puntosActuales = snapshot.getValue(Int::class.java) ?: 0
-            callback(puntosActuales >= costo) // true si tiene saldo suficiente
+            if (snapshot.exists()) {
+                val puntosActuales = (snapshot.value as? Number)?.toInt() ?: 0
+                Log.d("ALQUILER_LOG", "✅ Puntos encontrados para $correoKey: $puntosActuales")
+                callback(puntosActuales >= costo)
+            } else {
+                Log.e("ALQUILER_LOG", "❌ No se encontró la carpeta: usuarios/$correoKey")
+                callback(false)
+            }
         }.addOnFailureListener { e ->
-            Log.e("RealtimeDB", "Error al verificar puntos: ${e.message}")
-            Toast.makeText(this, "Error al verificar puntos: ${e.message}", Toast.LENGTH_SHORT).show()
-            callback(false) // En caso de error, asumimos que no tiene puntos suficientes
+            Log.e("ALQUILER_LOG", "Error de Firebase: ${e.message}")
+            callback(false)
         }
     }
-
     private fun enviarCorreoNuevoPedido(movieTitle: String) {
         val url = "https://server-csks8w.fly.dev/correo"
 
@@ -1033,81 +1059,32 @@ class PlayerPeliculas : AppCompatActivity() {
         requestQueue.add(jsonRequest)
     }
 
+    private fun descontarPuntos(correoKey: String, puntosADescontar: Int) {
+        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
 
-//    private fun enviarCorreoNuevoPedido(movieTitle: String) {
-//        val tituloCodificado = URLEncoder.encode(movieTitle, "UTF-8")
-//        val url = "https://eo8uyhrlz1e6vs2.m.pipedream.net/send?titulo=$tituloCodificado"
-//
-//        val requestQueue = Volley.newRequestQueue(this)
-//
-//        val stringRequest = object : StringRequest(
-//            Request.Method.GET, url,
-//            Response.Listener { response ->
-//                Log.d("Email", "✅ Correo enviado exitosamente: $response")
-//            },
-//            Response.ErrorListener { error ->
-//                Log.e("Email", "❌ Error al enviar el correo: ${error.message}")
-//            }
-//        ) {}
-//
-//        requestQueue.add(stringRequest)
-//    }
-
-    private fun descontarPuntos(
-        userId: String,
-        puntosADescontar: Long
-    ) {
-        // Referencia a Realtime Database (Ruta: usuarios -> ID_USUARIO)
-        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(userId)
-
-        userRef.get().addOnSuccessListener { snapshot ->
-            // Obtenemos el saldo actual. Usamos Long para evitar errores de conversión.
-            val castvActual = snapshot.child("castv").getValue(Long::class.java) ?: 0L
+        userRef.child("castv").get().addOnSuccessListener { snapshot ->
+            val castvActual = (snapshot.value as? Number)?.toInt() ?: 0
 
             if (castvActual >= puntosADescontar) {
                 val nuevoCastv = castvActual - puntosADescontar
 
-                // Actualizamos solo el campo 'castv' en Realtime Database
                 userRef.child("castv").setValue(nuevoCastv)
                     .addOnSuccessListener {
-                        // --- MANTENIENDO TU LÓGICA ORIGINAL ---
+                        Log.d("ALQUILER_LOG", "✅ Descuento aplicado. Nuevo saldo: $nuevoCastv")
                         Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
-                        supportFragmentManager.beginTransaction()
+
                         val intent = Intent(this, Nosotros::class.java)
                         startActivity(intent)
-                        startActivity(intent) // Se mantiene el doble inicio según tu código
                         finish()
-                        // --------------------------------------
                     }
                     .addOnFailureListener { e ->
-                        Log.e("RealtimeDB", "Error al descontar puntos: ${e.message}")
-                        Toast.makeText(
-                            this,
-                            "Error al descontar CasTV: ${e.message}",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        Log.e("ALQUILER_LOG", "❌ Error al actualizar saldo: ${e.message}")
                     }
-            } else {
-                // --- MANTENIENDO TU LÓGICA DE SALDO INSUFICIENTE ---
-                Toast.makeText(
-                    this,
-                    "¡Ho! No tienes Saldo de CasTV para poder Alquilar",
-                    Toast.LENGTH_LONG
-                ).show()
-                supportFragmentManager.beginTransaction()
-                val intent = Intent(this, Nosotros::class.java)
-                startActivity(intent)
-                startActivity(intent)
-                finish()
-                // ---------------------------------------------------
             }
         }.addOnFailureListener { e ->
-            Log.e("RealtimeDB", "Error al obtener usuario: ${e.message}")
-            Toast.makeText(this, "Error al obtener usuario: ${e.message}", Toast.LENGTH_SHORT).show()
+            Log.e("ALQUILER_LOG", "Error de conexión: ${e.message}")
         }
     }
-
-
     override fun onResume() {
         super.onResume()
             // Verificar si el player está en reproducción para actualizar el UI

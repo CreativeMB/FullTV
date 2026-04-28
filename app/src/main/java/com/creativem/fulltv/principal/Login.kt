@@ -6,6 +6,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.creativem.fulltv.PeliculasActivity
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -56,12 +57,12 @@ class Login : AppCompatActivity() {
             // Si el usuario está autenticado, verificar si es el usuario invitado
             if (currentUser.email == "invitado@fulltv.com") {
                 // El usuario ya está autenticado como invitado
-                val intent = Intent(this, Main::class.java)
+                val intent = Intent(this, PeliculasActivity::class.java)
                 startActivity(intent)
                 finish()
             } else {
                 // El usuario está autenticado con Google u otro método
-                val intent = Intent(this, Main::class.java)
+                val intent = Intent(this, PeliculasActivity::class.java)
                 startActivity(intent)
                 finish()
             }
@@ -147,7 +148,7 @@ class Login : AppCompatActivity() {
                             )
 
                             // Continuar a la app
-                            startActivity(Intent(this, Main::class.java))
+                            startActivity(Intent(this, PeliculasActivity::class.java))
                             finish()
 
                         }.addOnFailureListener {

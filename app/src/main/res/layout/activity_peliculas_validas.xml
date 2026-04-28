@@ -14,30 +14,35 @@
         android:scaleType="centerCrop"
         android:alpha="0.3" />
 
-    <!-- MENU SUPERIOR HORIZONTAL -->
-    <!-- wrap_content en width y las constraints lo centran -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/menuPrincipal"
+    <!-- TÍTULO CENTRADO -->
+    <TextView
+        android:id="@+id/txtTituloSeccion"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:clipToPadding="false"
-        android:paddingHorizontal="20dp"
-        android:nextFocusDown="@id/rvPeliculas"
+        android:layout_marginTop="20dp"
+        android:text="PELÍCULAS GRATIS"
+        android:textColor="#00BCD4"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"
+        android:shadowColor="#000000"
+        android:shadowDx="2"
+        android:shadowDy="2"
+        android:shadowRadius="3"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
     <!-- LISTA DE PELÍCULAS -->
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvPeliculas"
+        android:id="@+id/rvPelisValidas"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="5dp"
+        android:layout_marginTop="10dp"
+        android:paddingHorizontal="10dp"
         android:clipToPadding="false"
-        android:padding="10dp"
         android:focusable="true"
-        android:nextFocusUp="@id/menuPrincipal"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/menuPrincipal" />
+        app:layout_constraintTop_toBottomOf="@id/txtTituloSeccion" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

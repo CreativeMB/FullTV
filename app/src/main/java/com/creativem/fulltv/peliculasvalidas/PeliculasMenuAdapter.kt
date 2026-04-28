@@ -1,4 +1,7 @@
 package com.creativem.fulltv.peliculasvalidas
+
+import android.graphics.Color
+import android.graphics.Typeface
 import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
@@ -10,8 +13,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
-import android.graphics.Color
 import com.creativem.fulltv.principal.Main
+import com.creativem.fulltv.api.ApiPeliculaActivity // Asegúrate de importar esto si lo usas
 
 class PeliculasMenuAdapter(
     private val movieList: MutableList<Movie>,
@@ -23,26 +26,35 @@ class PeliculasMenuAdapter(
     inner class SmallMovieViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val movieImage: ImageView = view.findViewById(R.id.movie_image_small)
         val movieTitle: TextView = view.findViewById(R.id.movie_title_small)
+        val cardContainer: View = view // El LinearLayout principal del item
 
         init {
-            view.setOnFocusChangeListener { v, hasFocus ->
-                movieTitle.isSelected = hasFocus
+            // Permitir que el item sea enfocable
+            view.isFocusable = true
+            view.isFocusableInTouchMode = true
 
+            view.setOnFocusChangeListener { v, hasFocus ->
+                // 1. Animación de Escala (Zoom) - Vital en TV
                 if (hasFocus) {
-                    val movie = movieList[bindingAdapterPosition]
-                    if (!movie.imageUrl.isNullOrEmpty()) {
-                        (v.context as? Main)?.setFondoDesdeUrl(movie.imageUrl)
-                    } else {
-                        (v.context as? Main)?.restaurarFondoAnimado()
-                    }
+                    v.animate().scaleX(1.15f).scaleY(1.15f).setDuration(200).start()
+                    v.elevation = 10f
+                    movieTitle.visibility = View.VISIBLE // Asegurar que se vea
+                    movieTitle.isSelected = true // Activar Marquee
+                    movieTitle.setTypeface(null, Typeface.BOLD)
+                    movieTitle.setTextColor(Color.YELLOW) // Color resaltado al enfocar
+                } else {
+                    v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(200).start()
+                    v.elevation = 0f
+                    movieTitle.isSelected = false // Apagar Marquee
+                    movieTitle.setTypeface(null, Typeface.NORMAL)
+                    movieTitle.setTextColor(Color.WHITE)
                 }
 
-                v.setBackgroundColor(
-                    if (hasFocus)
-                        ContextCompat.getColor(view.context, R.color.colorhover2)
-                    else
-                        ContextCompat.getColor(view.context, R.color.colorNotSelected)
-                )
+                // 2. Color de fondo del borde/contenedor
+                v.background = if (hasFocus)
+                    ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
+                else
+                    null
             }
 
             view.setOnClickListener {
@@ -50,20 +62,13 @@ class PeliculasMenuAdapter(
                 if (position != RecyclerView.NO_POSITION) {
                     val movie = movieList[position]
 
-                    // 🔄 Fondo dinámico
-                    if (!movie.imageUrl.isNullOrEmpty()) {
-                        (view.context as? Main)?.setFondoDesdeUrl(movie.imageUrl)
-                    } else {
-                        (view.context as? Main)?.restaurarFondoAnimado()
-                    }
-
-                    // 🔁 Ejecutar callback
-                    onMovieClick(movie)
-
-                    // 🔁 Marcar como seleccionado visualmente
-                    notifyItemChanged(selectedPosition)
+                    // Actualizar posición seleccionada visualmente
+                    val oldPos = selectedPosition
                     selectedPosition = position
+                    notifyItemChanged(oldPos)
                     notifyItemChanged(selectedPosition)
+
+                    onMovieClick(movie)
                 }
             }
         }
@@ -78,36 +83,36 @@ class PeliculasMenuAdapter(
     override fun onBindViewHolder(holder: SmallMovieViewHolder, position: Int) {
         val movie = movieList[position]
 
+        // Configuración de Títulos
         holder.movieTitle.apply {
             text = movie.title
-            textSize = 18f
-            setTextColor(Color.WHITE)
-            maxLines = 1
             ellipsize = TextUtils.TruncateAt.MARQUEE
             marqueeRepeatLimit = -1
             isSingleLine = true
-            isFocusable = true
-            isFocusableInTouchMode = true
-            setHorizontallyScrolling(true)
+            isSelected = true
+
         }
 
+        // Carga de Imagen Optimizada
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
+            .centerCrop() // Para que todas las miniaturas tengan el mismo aspecto
             .placeholder(R.drawable.pelifondo)
             .error(R.drawable.icono)
             .into(holder.movieImage)
+
+        // Resaltar si es la película que se está reproduciendo actualmente
+        if (position == selectedPosition) {
+            holder.cardContainer.background = ContextCompat.getDrawable(holder.itemView.context, R.drawable.card_focused_background)
+        }
     }
 
     override fun getItemCount(): Int = movieList.size
 
     fun updateMovies(newMovies: List<Movie>) {
         movieList.clear()
-        val validMovies = newMovies.filter { isUrlValid(it.streamUrl) }
-        movieList.addAll(validMovies)
+        // Ya no filtramos aquí por string, confiamos en que vienen validadas del objeto Validacioneslista
+        movieList.addAll(newMovies)
         notifyDataSetChanged()
-    }
-
-    private fun isUrlValid(url: String): Boolean {
-        return url.isNotEmpty() && (url.startsWith("http://") || url.startsWith("https://"))
     }
 }

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import android.widget.*
@@ -13,15 +14,17 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.peliculas.PlayerPeliculas
-import com.creativem.fulltv.principal.Main
+import com.creativem.fulltv.peliculas.Validacioneslista
 import com.creativem.fulltv.principal.Movie
+import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import retrofit2.*
 import retrofit2.converter.gson.GsonConverterFactory
 
 class ApiPeliculaActivity : AppCompatActivity() {
-
+    // Añade esto debajo de las otras variables
+    private val databaseRef by lazy { FirebaseDatabase.getInstance().reference }
     private lateinit var ivPoster: ImageView
     private lateinit var tvTitulo: TextView
     private lateinit var tvFecha: TextView
@@ -134,63 +137,88 @@ class ApiPeliculaActivity : AppCompatActivity() {
     }
 
     private fun cargarCartelera() {
-        CoroutineScope(Dispatchers.IO).launch {
-            val peliculasTotales = mutableListOf<TmdbMovie>()
-            val paginasACargar = 3
+        val pelisMostradas = mutableListOf<TmdbMovie>()
 
-            for (page in 1..paginasACargar) {
-                try {
-                    val response = apiService.getNowPlaying(apiKey, "es-MX", page).execute()
-                    if (response.isSuccessful) {
-                        val pelis = response.body()?.results?.map { peli ->
-                            peli.copy(
-                                streamUrl = "https://tuservidor.com/stream/${peli.id}",
-                                imageUrl = "https://image.tmdb.org/t/p/w500${peli.poster_path}",
-                                castv = 50 // Valor fijo para todos
-                            )
-                        } ?: emptyList()
-                        peliculasTotales.addAll(pelis)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
+        // 1. Configuramos el adaptador de una vez para que la lista no esté nula
+        carteleraAdapter = PelisCarteleraAdapter(pelisMostradas) { movieSeleccionado ->
+            actualizarPeliculaSeleccionada(movieSeleccionado)
+        }
+        recyclerCartelera.adapter = carteleraAdapter
 
-            withContext(Dispatchers.Main) {
-                if (peliculasTotales.isNotEmpty()) {
-                    carteleraAdapter = PelisCarteleraAdapter(peliculasTotales) { movieSeleccionado ->
+        // 2. Iniciamos un "observador" en tiempo real
+        CoroutineScope(Dispatchers.Main).launch {
+            // Ejecutamos mientras la actividad esté viva
+            while (isActive) {
+                val listaActualDelObjeto = Validacioneslista.obtenerPeliculasValidas()
 
-                        val releaseDate = movieSeleccionado.release_date ?: "N/A"
-                        val tituloConFecha = "${movieSeleccionado.title} (${releaseDate})"
+                // Si el objeto Singleton ha encontrado nuevas películas...
+                if (listaActualDelObjeto.size > pelisMostradas.size) {
 
-                        movieActual = Movie(
-                            title = tituloConFecha,
-                            originalTitle = movieSeleccionado.original_title ?: movieSeleccionado.title,
-                            imageUrl = movieSeleccionado.imageUrl,
-                            streamUrl = movieSeleccionado.streamUrl,
-                            castv = movieSeleccionado.castv ?: 50,
-                            countdownMinutes = 60
+                    // Mapeamos solo las que no tenemos
+                    val mapeoActualizado = listaActualDelObjeto.map { movie ->
+                        TmdbMovie(
+                            id = 0,
+                            title = movie.title,
+                            poster_path = movie.imageUrl.replace("https://image.tmdb.org/t/p/w500", ""),
+                            release_date = "Verificada ✅",
+                            vote_average = 10.0,
+                            overview = "Cargando datos...",
+                            original_title = movie.originalTitle ?: movie.title,
+                            streamUrl = movie.streamUrl,
+                            imageUrl = movie.imageUrl,
+                            castv = movie.castv
                         )
-
-                        // Asignaciones a variables globales
-                        streamUrlGuardado = movieSeleccionado.streamUrl
-                        movieTitle = movieSeleccionado.title
-                        movieCastv = movieSeleccionado.castv ?: 50
-                        movieImageUrl = movieSeleccionado.imageUrl
-                        movieCountdown = 60
-                        movieReleaseDate = releaseDate
-
-                        mostrarPelicula(movieSeleccionado)
                     }
 
-                    recyclerCartelera.adapter = carteleraAdapter
+                    // Actualizamos la lista del adaptador
+                    pelisMostradas.clear()
+                    pelisMostradas.addAll(mapeoActualizado)
+                    carteleraAdapter.notifyDataSetChanged()
                 }
-            }
 
+                // Si el proceso global ya terminó todas las pelis del servidor, dejamos de vigilar
+                if (Validacioneslista.yaCargado()) break
+
+                // Revisa cada medio segundo para que parezca instantáneo
+                delay(500)
+            }
         }
     }
+    private fun actualizarPeliculaSeleccionada(movieSeleccionado: TmdbMovie) {
+        // 🟢 PASO 1: CAMBIO VISUAL INMEDIATO
+        // No esperamos a la API, pintamos ya lo que tenemos en la mano
+        tvTitulo.text = movieSeleccionado.title
+        tvSinopsis.text = "Cargando información detallada..."
+        tvInfoAdicional.text = "Obteniendo géneros y duración..."
+        recyclerActores.adapter = null // Limpia actores de la peli anterior
 
+        // Carga las imágenes de inmediato (ya las tenemos en la lista local)
+        Glide.with(this).load(movieSeleccionado.imageUrl).placeholder(R.drawable.icono).into(ivPoster)
+        Glide.with(this).load(movieSeleccionado.imageUrl).centerCrop().into(backgroundImageView)
 
+        // 🟢 PASO 2: ACTUALIZAR DATOS PARA EL PLAYER
+        streamUrlGuardado = movieSeleccionado.streamUrl
+        movieTitle = movieSeleccionado.title
+        movieImageUrl = movieSeleccionado.imageUrl
+
+        movieActual = Movie(
+            id = movieSeleccionado.id.toString(),
+            title = movieSeleccionado.title,
+            originalTitle = movieSeleccionado.original_title ?: movieSeleccionado.title,
+            imageUrl = movieSeleccionado.imageUrl,
+            streamUrl = movieSeleccionado.streamUrl,
+            castv = 50,
+            countdownMinutes = 60
+        )
+
+        // 🟢 PASO 3: CONSULTA API EN SEGUNDO PLANO
+        // Esto rellenará la sinopsis, director y actores en unos milisegundos
+        val consulta = movieSeleccionado.original_title ?: movieSeleccionado.title
+        buscarPelicula(consulta)
+
+        // Foco para control remoto
+        tvReproducir.requestFocus()
+    }
     private fun buscarPelicula(query: String) {
         apiService.searchMovie(apiKey, "es-MX", query)
             .enqueue(object : Callback<MovieResponse> {

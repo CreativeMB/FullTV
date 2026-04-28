@@ -6,38 +6,41 @@
     android:layout_height="match_parent"
     android:background="#050505">
 
-    <!-- FONDO -->
+    <!-- Imagen de fondo que cambia al navegar -->
     <ImageView
-        android:id="@+id/imgFondo"
+        android:id="@+id/imgFondoTv"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop"
         android:alpha="0.3" />
 
-    <!-- MENU SUPERIOR HORIZONTAL -->
-    <!-- wrap_content en width y las constraints lo centran -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/menuPrincipal"
+    <!-- TÍTULO CENTRADO -->
+    <TextView
+        android:id="@+id/txtTituloTv"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:clipToPadding="false"
-        android:paddingHorizontal="20dp"
-        android:nextFocusDown="@id/rvPeliculas"
+        android:layout_marginTop="20dp"
+        android:text="CANALES DE TELEVISIÓN"
+        android:textColor="#FF9800"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:shadowColor="#000000"
+        android:shadowDx="2"
+        android:shadowDy="2"
+        android:shadowRadius="3"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- LISTA DE PELÍCULAS -->
+    <!-- LISTA DE CANALES -->
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvPeliculas"
+        android:id="@+id/rvCanales"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="5dp"
-        android:clipToPadding="false"
+        android:layout_marginTop="10dp"
         android:padding="10dp"
-        android:focusable="true"
-        android:nextFocusUp="@id/menuPrincipal"
+        android:clipToPadding="false"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/menuPrincipal" />
+        app:layout_constraintTop_toBottomOf="@id/txtTituloTv" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

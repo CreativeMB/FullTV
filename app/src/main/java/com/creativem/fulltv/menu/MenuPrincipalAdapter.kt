@@ -8,50 +8,49 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
+import android.graphics.Color
 
 class MenuPrincipalAdapter(
     private val items: List<MenuPrincipalItem>,
     private val onItemClick: (MenuPrincipalItem) -> Unit
 ) : RecyclerView.Adapter<MenuPrincipalAdapter.MenuViewHolder>() {
 
-    var lastFocusedPosition: Int = 0  // Se puede usar desde el Fragmento para restaurar foco
+    var lastFocusedPosition: Int = 0
 
     inner class MenuViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.iconoMenu)
         val text: TextView = view.findViewById(R.id.textoMenu)
 
         init {
+            // Aseguramos que el texto sea visible siempre
+            text.visibility = View.VISIBLE
+
             view.setOnClickListener {
                 val item = items[bindingAdapterPosition]
                 onItemClick(item)
             }
 
             view.setOnFocusChangeListener { v, hasFocus ->
-                // Fondo y escala
+                // Fondo de selección
                 v.background = if (hasFocus)
                     ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
                 else
                     null
 
-                val layoutParams = v.layoutParams
-                if (hasFocus) {
-                    layoutParams.width = ViewGroup.LayoutParams.WRAP_CONTENT // Expande al tamaño del contenido (título)
-                } else {
-                    layoutParams.width = v.context.resources.getDimensionPixelSize(R.dimen.menu_item_width_collapsed)
-                }
-                v.layoutParams = layoutParams
-
-                // Mostrar texto solo cuando tiene focus
-                text.visibility = if (hasFocus) View.VISIBLE else View.INVISIBLE
+                // Efectos visuales de foco
                 text.isSelected = hasFocus
-
                 if (hasFocus) {
+                    text.setTextColor(Color.YELLOW)
+                    v.scaleX = 1.1f
+                    v.scaleY = 1.1f
                     lastFocusedPosition = bindingAdapterPosition
+                } else {
+                    text.setTextColor(Color.WHITE)
+                    v.scaleX = 1.0f
+                    v.scaleY = 1.0f
                 }
             }
-
         }
-
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MenuViewHolder {
@@ -65,13 +64,23 @@ class MenuPrincipalAdapter(
         holder.icon.setImageResource(item.iconResId)
         holder.text.text = item.name
 
-        val hasFocus = position == lastFocusedPosition
-        holder.text.visibility = if (hasFocus) View.VISIBLE else View.INVISIBLE
-        holder.text.isSelected = hasFocus
+        // --- CORRECCIÓN AQUÍ ---
+        // Forzamos a que el texto sea VISIBLE siempre para todos
+        holder.text.visibility = View.VISIBLE
 
-        val scale = if (hasFocus) 1.1f else 1f
-        holder.itemView.scaleX = scale
-        holder.itemView.scaleY = scale
+        // Aplicamos el estado inicial (si es el último enfocado o no)
+        val isFocused = position == lastFocusedPosition
+        holder.text.isSelected = isFocused
+
+        if (isFocused) {
+            holder.text.setTextColor(Color.YELLOW)
+            holder.itemView.scaleX = 1.1f
+            holder.itemView.scaleY = 1.1f
+        } else {
+            holder.text.setTextColor(Color.WHITE)
+            holder.itemView.scaleX = 1.0f
+            holder.itemView.scaleY = 1.0f
+        }
     }
 
     override fun getItemCount(): Int = items.size

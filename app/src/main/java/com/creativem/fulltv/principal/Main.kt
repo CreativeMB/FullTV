@@ -55,18 +55,16 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.bitmap.CenterCrop
 import com.bumptech.glide.request.RequestOptions
 import com.creativem.fulltv.BuildConfig
+import com.creativem.fulltv.PeliculasActivity
 import com.creativem.fulltv.R
 import com.creativem.fulltv.api.ApiPeliculaActivity
-import com.creativem.fulltv.api.PeliculasApiFragment
 import com.creativem.fulltv.api.TMDbApiClient
 import com.creativem.fulltv.databinding.MainPrincipalfragmentBinding
 import com.creativem.fulltv.enlinea.UsuarioEstadoManager
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
 import com.creativem.fulltv.menu.MenuPrincipalItem
 import com.creativem.fulltv.peliculas.PeliculasFragment
-import com.creativem.fulltv.peliculasvalidas.PeliculasValidasFragment
-import com.creativem.fulltv.tv.TvFragment
-import com.creativem.tvfullurl.PeliculasActivity
+
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -253,10 +251,10 @@ class Main : FragmentActivity() {
     }
 
     fun navegarATv() {
-        navegarA(TvFragment())
+//        navegarA(TvFragment())
     }
      fun navegarAPeliculasApi() {
-        navegarA(PeliculasApiFragment())
+//        navegarA(PeliculasApiFragment())
      }
 
     private fun cargarMenuPrincipal() {
