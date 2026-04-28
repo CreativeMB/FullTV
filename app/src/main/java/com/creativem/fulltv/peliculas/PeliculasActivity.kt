@@ -8,6 +8,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Bundle
@@ -17,14 +19,17 @@ import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
@@ -52,7 +57,7 @@ import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.principal.Nosotros
 import com.creativem.fulltv.tv.TvActivity
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.BuildConfig
+import com.creativem.fulltv.BuildConfig
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
@@ -84,17 +89,32 @@ class PeliculasActivity : AppCompatActivity() {
     private var haProcesadoEliminacion = false
     private var yaMostroPublicidad = false
     private var publicidadDialog: Dialog? = null
+
     private var versionRemotaGlobal: String? = null
     private val handler = Handler(Looper.getMainLooper())
+
+    private var progressDialog: AlertDialog? = null
     private val onDownloadComplete = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
-            if (id == downloadId) { // Verificamos que sea nuestra descarga
-                val file = File(getExternalFilesDir(null), "FullTV_update.apk")
-                if (file.exists()) {
-                    // 🟢 AQUÍ ES DONDE POR FIN SE LLAMA AL MÉTODO
-                    instalarAPK(file)
+            if (id == downloadId) {
+                progressDialog?.dismiss()
+                val query = DownloadManager.Query().setFilterById(downloadId)
+                val dm = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
+                val cursor = dm.query(query)
+
+                if (cursor.moveToFirst()) {
+                    val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                    if (DownloadManager.STATUS_SUCCESSFUL == cursor.getInt(statusIndex)) {
+                        val file = File(getExternalFilesDir(null), "FullTV_update.apk")
+                        if (file.exists()) {
+                            instalarAPK(file)
+                        }
+                    } else {
+                        Toast.makeText(context, "Error en la descarga", Toast.LENGTH_SHORT).show()
+                    }
                 }
+                cursor.close()
             }
         }
     }
@@ -302,17 +322,24 @@ class PeliculasActivity : AppCompatActivity() {
     // ==========================================
 
     private fun obtenerNoticiaYActualizaciones() {
-        databaseRef.child("noticia").child("us4vaaf0VPezu9vuc4ns").get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                val versionLocal = BuildConfig.VERSION_NAME
-                val versionRemota = snapshot.child("versionapk").value?.toString() ?: ""
-                versionRemotaGlobal = versionRemota
+        val versionLocal = BuildConfig.VERSION_NAME
+        // Apuntamos al nodo noticia en Realtime Database
+        val ref = FirebaseDatabase.getInstance().getReference("noticia").child("us4vaaf0VPezu9vuc4ns")
 
-                if (esNuevaVersion(versionRemota, versionLocal)) {
-                    mostrarAlertaActualizacion(versionRemota)
+        ref.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    val versionRemota = snapshot.child("versionapk").getValue(String::class.java) ?: ""
+
+                    if (versionRemota.isNotEmpty() && esNuevaVersion(versionRemota, versionLocal)) {
+                        mostrarAlertaActualizacion(versionRemota)
+                    }
                 }
             }
-        }
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("Firebase", "Error: ${error.message}")
+            }
+        })
     }
 
     private fun esNuevaVersion(remota: String, local: String): Boolean {
@@ -338,38 +365,113 @@ class PeliculasActivity : AppCompatActivity() {
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private fun descargarAPK(version: String) {
-        val url = "https://github.com/CreativeMB/FullTV/releases/download/fulltv/FullTV_update.apk"
+        val url = "https://github.com/CreativeMB/center/releases/download/apk/FullTV.apk"
         val file = File(getExternalFilesDir(null), "FullTV_update.apk")
         if (file.exists()) file.delete()
 
+        // --- DISEÑO DEL DIÁLOGO ROJO (Como tu código viejo) ---
+        val progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            isIndeterminate = false
+            max = 100
+            progress = 0
+            progressTintList = ColorStateList.valueOf(Color.RED) // Rojo
+        }
+
+        val textoProgreso = TextView(this).apply {
+            text = "Iniciando descarga..."
+            setTextColor(Color.RED)
+            textSize = 16f
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, 20, 0, 0)
+        }
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 50, 50, 50)
+            addView(progressBar)
+            addView(textoProgreso)
+        }
+
+        progressDialog = AlertDialog.Builder(this)
+            .setTitle("📥 Descargando FullTV v$version")
+            .setView(layout)
+            .setCancelable(false)
+            .create()
+
+        progressDialog?.show()
+
         val request = DownloadManager.Request(Uri.parse(url))
-            .setTitle("FullTV Update v$version")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setTitle("FullTV v$version")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
             .setDestinationUri(Uri.fromFile(file))
 
         val dm = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
-        downloadId = dm.enqueue(request) // Guardamos el ID de la descarga
+        downloadId = dm.enqueue(request)
 
-        // 🟢 REGISTRAMOS EL ESCUCHADOR PARA CUANDO TERMINE
-        registerReceiver(onDownloadComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+        // MONITOR DE PROGRESO (Hilo para actualizar la barra)
+        val handler = Handler(Looper.getMainLooper())
+        val monitor = object : Runnable {
+            override fun run() {
+                val q = DownloadManager.Query().setFilterById(downloadId)
+                val cursor = dm.query(q)
+                if (cursor.moveToFirst()) {
+                    val status = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS))
+                    val downloaded = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                    val total = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
 
-        Toast.makeText(this, "Descargando actualización...", Toast.LENGTH_LONG).show()
+                    if (total > 0) {
+                        val progress = ((downloaded * 100) / total).toInt()
+                        progressBar.progress = progress
+                        textoProgreso.text = "Descargando... $progress%"
+                    }
+
+                    if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                        cursor.close()
+                        textoProgreso.text = "Descarga completada ✅"
+                        handler.postDelayed({
+                            progressDialog?.dismiss()
+                            instalarAPK(file)
+                        }, 500)
+                        return
+                    }
+                }
+                cursor.close()
+                handler.postDelayed(this, 500)
+            }
+        }
+        handler.post(monitor)
+
+        // Registro del Receiver compatible con Android 13+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(onDownloadComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(onDownloadComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+        }
     }
 
     private fun instalarAPK(file: File) {
-        // El authority debe ser EXACTAMENTE igual al que pusiste en el AndroidManifest.xml
-        val uri = FileProvider.getUriForFile(this, "${applicationContext.packageName}.provider", file)
+        val authority = "${packageName}.provider"
+        val uri = FileProvider.getUriForFile(this, authority, file)
 
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
-            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            if (!packageManager.canRequestPackageInstalls()) {
+                // No tiene permiso, lo enviamos a configuración
+                startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+                Toast.makeText(this, "Autoriza la instalación y vuelve a intentarlo", Toast.LENGTH_LONG).show()
+                return
+            }
         }
 
         try {
             startActivity(intent)
         } catch (e: Exception) {
-            Log.e("Instalador", "Error al abrir APK: ${e.message}")
-            Toast.makeText(this, "No se pudo abrir el instalador", Toast.LENGTH_LONG).show()
+            Log.e("Instalador", "Error al abrir: ${e.message}")
         }
     }
     // ==========================================

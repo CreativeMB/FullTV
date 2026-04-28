@@ -357,6 +357,7 @@ class PlayerPeliculas : AppCompatActivity() {
             this@PlayerPeliculas,
             LinearLayoutManager.HORIZONTAL,
             false
+
         )
 
         // 3. Asignamos el nuevo adaptador al RecyclerView del reproductor

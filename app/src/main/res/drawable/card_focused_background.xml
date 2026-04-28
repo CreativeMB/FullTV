@@ -5,7 +5,7 @@
 
     <!-- Aumentamos grosor del borde -->
     <stroke
-        android:width="6dp"
+        android:width="1dp"
         android:color="#C20091EA" />
 
 
