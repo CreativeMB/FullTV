@@ -728,9 +728,6 @@ class PlayerPeliculas : AppCompatActivity() {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             val playPauseButton = findViewById<ImageButton>(R.id.play_pause)
 
-            // Ponemos el foco primero
-            playPauseButton.requestFocus()
-
             if (isPlaying) {
                 handler.postDelayed(runnableOcultar, hideControlsDelay)
                 // Cambias a icono de PAUSA si está reproduciendo
@@ -1343,9 +1340,9 @@ class PlayerPeliculas : AppCompatActivity() {
                     val h = TimeUnit.MILLISECONDS.toHours(tiempoRestante)
                     val m = TimeUnit.MILLISECONDS.toMinutes(tiempoRestante) % 60
                     val s = TimeUnit.MILLISECONDS.toSeconds(tiempoRestante) % 60
-                    tiempototal.text = String.format("⏳ %02d:%02d:%02d", h, m, s)
+                    tiempototal.text = String.format("%02d:%02d:%02d", h, m, s)
                 } else {
-                    tiempototal.text = "⛔ Finalizado"
+                    tiempototal.text = "Finalizado"
                 }
 
                 // Avance del SeekBar
