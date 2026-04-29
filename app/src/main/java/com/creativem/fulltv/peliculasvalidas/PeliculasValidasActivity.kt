@@ -12,6 +12,7 @@ import com.creativem.fulltv.peliculas.MoviesAdapter
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.databinding.ActivityPeliculasValidasBinding
 import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.ViewUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,23 +38,30 @@ class PeliculasValidasActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
-        // Calculamos columnas dinámicas para que se adapte a cualquier TV
-        val columnas = calcularColumnas(this)
-        binding.rvPelisValidas.layoutManager = GridLayoutManager(this, columnas)
+        // Usamos la función centralizada
+        val columnas = ViewUtils.calcularColumnas(this)
 
-        movieAdapter = MoviesAdapter(
-            movieList,
-            onItemClick = { movie -> irAlDetalle(movie) },
-            onFocusChange = { movie -> actualizarFondo(movie.imageUrl) }
-        )
-        binding.rvPelisValidas.adapter = movieAdapter
+        binding.rvPelisValidas.apply {
+            layoutManager = GridLayoutManager(this@PeliculasValidasActivity, columnas)
+
+            // Evita que el RecyclerView haga una animación de "parpadeo" al cargar
+            itemAnimator = null
+
+            adapter = MoviesAdapter(
+                movieList,
+                onItemClick = { movie -> irAlDetalle(movie) },
+                onFocusChange = { movie -> actualizarFondo(movie.imageUrl) }
+            )
+        }
     }
 
     private fun loadValidatedMovies() {
-        CoroutineScope(Dispatchers.Main).launch {
+        CoroutineScope(Dispatchers.IO).launch { // Cambiamos a IO para no bloquear la UI en la espera
             // 1. Esperamos a que el proceso de validación global termine
             if (!Validacioneslista.yaCargado()) {
-                Toast.makeText(this@PeliculasValidasActivity, "Verificando enlaces...", Toast.LENGTH_SHORT).show()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@PeliculasValidasActivity, "Verificando enlaces...", Toast.LENGTH_SHORT).show()
+                }
                 Validacioneslista.esperarCarga()
             }
 
@@ -63,17 +71,25 @@ class PeliculasValidasActivity : AppCompatActivity() {
             withContext(Dispatchers.Main) {
                 if (validadas.isNotEmpty()) {
                     movieList.clear()
-                    // Aseguramos que todas tengan el flag isValid en true para que el adapter pinte el check
                     validadas.forEach { it.isValid = true }
                     movieList.addAll(validadas.sortedByDescending { it.createdAt })
-                    movieAdapter.notifyDataSetChanged()
+
+                    // 🟢 SOLUCIÓN AL CRASH:
+                    // Verificamos si el adapter ya fue creado antes de usarlo
+                    if (::movieAdapter.isInitialized) {
+                        movieAdapter.notifyDataSetChanged()
+                    } else {
+                        // Si por alguna razón la corrutina ganó y el adapter no existe, lo creamos
+                        setupRecyclerView()
+                    }
+
                 } else {
                     Toast.makeText(
                         this@PeliculasValidasActivity,
                         "No hay películas disponibles actualmente",
                         Toast.LENGTH_LONG
                     ).show()
-                    finish() // Cerramos si no hay nada que mostrar
+                    finish()
                 }
             }
         }

@@ -87,24 +87,35 @@ class PeliculasApiAdapter(
     override fun onBindViewHolder(holder: SmallMovieViewHolder, position: Int) {
         val movie = movieList[position]
 
-        // Configuración de Títulos
+        // 1. EXTRAER EL AÑO Y CONFIGURAR EL TÍTULO
+        // Suponiendo que el título viene de la API como "Nombre (2024-05-10)"
+        // o que quieres que se vea limpio: "Nombre (2024)"
+
+        val tituloLimpio = movie.title.replace(Regex("\\(\\d{4}-\\d{2}-\\d{2}\\)"), "").trim()
+
+        // Si tu objeto Movie tiene una propiedad para la fecha, úsala.
+        // Si no, podemos intentar extraerla del string que mandamos desde la Activity.
+        val yearMatch = Regex("(\\d{4})").find(movie.title)
+        val año = yearMatch?.value ?: ""
+
         holder.movieTitle.apply {
-            text = movie.title
+            text = if (año.isNotEmpty()) "$tituloLimpio ($año)" else tituloLimpio
             ellipsize = TextUtils.TruncateAt.MARQUEE
             marqueeRepeatLimit = -1
             isSingleLine = true
-
         }
 
-        // Carga de Imagen Optimizada
+        // 2. CARGA DE IMAGEN CON fitXY (Como tú lo quieres)
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
-            .centerCrop() // Para que todas las miniaturas tengan el mismo aspecto
+            // Quitamos centerCrop() porque tú quieres que se adapte al contenedor (fitXY)
+            // Usamos .dontAnimate() para evitar parpadeos al reciclar
+            .dontAnimate()
             .placeholder(R.drawable.pelifondo)
             .error(R.drawable.icono)
             .into(holder.movieImage)
 
-        // Resaltar si es la película que se está reproduciendo actualmente
+        // Resaltar si es la película seleccionada
         if (position == selectedPosition) {
             holder.cardContainer.background = ContextCompat.getDrawable(holder.itemView.context, R.drawable.card_focused_background)
         }

@@ -22,7 +22,7 @@
         android:layout_marginTop="20dp"
         android:text="PELÍCULAS GRATIS"
         android:textColor="#00BCD4"
-        android:textSize="26sp"
+        android:textSize="16sp"
         android:textStyle="bold"
         android:letterSpacing="0.1"
         android:shadowColor="#000000"
@@ -33,16 +33,21 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- LISTA DE PELÍCULAS -->
+    <!-- LISTA DE PELÍCULAS (UNIFICADA CON LAS OTRAS PANTALLAS) -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvPelisValidas"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="0dp"
+        android:paddingTop="20dp"
         android:paddingHorizontal="10dp"
+        android:paddingBottom="20dp"
         android:clipToPadding="false"
         android:focusable="true"
+        android:overScrollMode="never"
         app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/txtTituloSeccion" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

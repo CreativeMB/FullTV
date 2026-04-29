@@ -58,6 +58,7 @@ import com.creativem.fulltv.principal.Nosotros
 import com.creativem.fulltv.tv.TvActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.creativem.fulltv.BuildConfig
+import com.creativem.fulltv.principal.ViewUtils
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
@@ -91,7 +92,6 @@ class PeliculasActivity : AppCompatActivity() {
     private var yaMostroPublicidad = false
     private var publicidadDialog: Dialog? = null
 
-    private var versionRemotaGlobal: String? = null
     private val handler = Handler(Looper.getMainLooper())
 
     private var progressDialog: AlertDialog? = null
@@ -160,11 +160,10 @@ class PeliculasActivity : AppCompatActivity() {
     // ==========================================
     private fun setupMenuHorizontal() {
         val menuItems = listOf(
-            "Inicio", "TV", "Gratis", "Peliculas", "Buscar",
+            "TV", "Gratis", "Peliculas", "Buscar",
             "Pedir", "Paquete", "Pago", "Cerrar"
         )
         val menuIcons = listOf(
-            R.drawable.home,
             R.drawable.tv, R.drawable.cartelera,
             R.drawable.cine, R.drawable.buscar, R.drawable.pedido,
             R.drawable.activacion, R.drawable.pago, R.drawable.cerrrar
@@ -178,7 +177,6 @@ class PeliculasActivity : AppCompatActivity() {
 
         val adapter = MenuPrincipalAdapter(menuList) { item ->
             when (item.name) {
-                "Inicio" -> navegarInicio()
                 "Gratis" -> navegarGratis() // En esta pantalla, Inicio y Gratis suelen ser lo mismo
                 "Buscar" -> buscarPeliculaDialogo()
                 "Pedir" -> mostrarDialogoPedido()
@@ -199,12 +197,7 @@ class PeliculasActivity : AppCompatActivity() {
             LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         binding.menuPrincipal.adapter = adapter
     }
-    fun navegarInicio() {
-        // En lugar de abrir la actividad de nuevo, subimos al principio de la lista
-        binding.rvPeliculas.smoothScrollToPosition(0)
-        binding.rvPeliculas.requestFocus()
-    }
-    // 2. Funciones de Navegación corregidas para Actividades
+      // 2. Funciones de Navegación corregidas para Actividades
     fun navegarGratis() {
         // Aquí abres la actividad de peliculas validas/gratis
         val intent = Intent(this, PeliculasValidasActivity::class.java)
@@ -225,15 +218,17 @@ class PeliculasActivity : AppCompatActivity() {
 
     // 3. Configuración de la Grilla Adaptable
     private fun setupMovieGrid() {
-        val columnas = calcularColumnas(this)
+        // 1. Usamos el objeto central para obtener las columnas
+        val columnas = ViewUtils.calcularColumnas(this)
+
+        // 2. Aplicamos el número de columnas al Grid
         binding.rvPeliculas.layoutManager = GridLayoutManager(this, columnas)
 
         movieAdapter = MoviesAdapter(
             movieList,
             onItemClick = { movie -> irAlReproductor(movie) },
             onFocusChange = { movie ->
-                // 🟢 AQUÍ ESTABA EL ERROR (Estaba vacío).
-                // Llamamos a la función para pintar el fondo:
+                // Ahora sí, el fondo se actualiza dinámicamente al mover el foco
                 actualizarImagenDeFondo(movie.imageUrl)
             }
         )
@@ -250,18 +245,6 @@ class PeliculasActivity : AppCompatActivity() {
             // Opcional: ajustar la transparencia si se ve muy fuerte
             binding.imgFondo.alpha = 0.3f
         }
-    }
-    // Función para que se adapte a cualquier pantalla (TV, Tablet, Celular)
-    private fun calcularColumnas(context: Context): Int {
-        val displayMetrics = context.resources.displayMetrics
-        val anchoPantallaDp = displayMetrics.widthPixels / displayMetrics.density
-
-        // 160dp es un buen tamaño para posters en TV y móvil
-        val anchoMinimoItem = 160
-        val columnas = (anchoPantallaDp / anchoMinimoItem).toInt()
-
-        // Retornamos al menos 2 columnas para que no se vea una sola gigante
-        return if (columnas >= 2) columnas else 2
     }
 
     // ==========================================

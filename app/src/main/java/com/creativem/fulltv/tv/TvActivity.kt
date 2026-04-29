@@ -14,6 +14,7 @@ import com.creativem.fulltv.databinding.ActivityTvBinding
 import com.creativem.fulltv.peliculas.PlayerPeliculas
 import com.creativem.fulltv.principal.AudioFocusHelper
 import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.ViewUtils
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,15 +43,24 @@ class TvActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
-        val columnas = calcularColumnas(this)
+        // 1. Usamos el objeto global para obtener el número de columnas (basado en 160dp)
+        val columnas = ViewUtils.calcularColumnas(this)
+
+        // 2. Aplicamos el LayoutManager con ese valor global
         binding.rvCanales.layoutManager = GridLayoutManager(this, columnas)
 
         // Usamos el mismo MoviesAdapter para mantener la estética
         adapter = MoviesAdapter(
             channelList,
             onItemClick = { canal -> abrirReproductor(canal) },
-            onFocusChange = { canal -> actualizarFondo(canal.imageUrl) }
+            onFocusChange = { canal ->
+                // Esto asegura que al navegar por los canales también cambie el fondo
+                actualizarFondo(canal.imageUrl)
+            }
         )
+
+        // 3. Opcional: Quitar animaciones para que el foco se mueva más rápido en TV
+        binding.rvCanales.itemAnimator = null
         binding.rvCanales.adapter = adapter
     }
 

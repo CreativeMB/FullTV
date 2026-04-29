@@ -9,6 +9,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -17,6 +18,7 @@ import com.creativem.fulltv.peliculas.PlayerPeliculas
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
 import com.creativem.fulltv.peliculasvalidas.PelisCarteleraAdapter
 import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.ViewUtils
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
@@ -138,7 +140,6 @@ class ApiPeliculaActivity : AppCompatActivity() {
     }
 
     private fun cargarCartelera() {
-        // 1. Usamos directamente Movie para que coincida con el adaptador
         val pelisMostradas = mutableListOf<Movie>()
 
         carteleraAdapter = PelisCarteleraAdapter(pelisMostradas) { movieSeleccionado ->
@@ -151,10 +152,8 @@ class ApiPeliculaActivity : AppCompatActivity() {
                 val listaActualDelObjeto = Validacioneslista.obtenerPeliculasValidas()
 
                 if (listaActualDelObjeto.size > pelisMostradas.size) {
-                    // Ya no mapeamos a TmdbMovie, usamos la lista tal cual
                     pelisMostradas.clear()
                     pelisMostradas.addAll(listaActualDelObjeto)
-
                     carteleraAdapter.notifyDataSetChanged()
                 }
 

@@ -74,7 +74,5 @@ interface TMDbApiService {
         @Query("page") page: Int = 1
     ): Call<PeliculasResponse>
 
-
-
 }
 
