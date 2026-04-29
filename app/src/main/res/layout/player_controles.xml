@@ -1,11 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/controles_reproductor"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:clipChildren="false"
     android:clipToPadding="false"
     android:background="@android:color/transparent">
+
+
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="20dp"
+        android:background="@drawable/bg_clock_modern"
+        android:gravity="end"
+        android:orientation="vertical"
+        android:paddingHorizontal="15dp"
+        android:paddingVertical="8dp">
+
+        <!-- HORA (Grande y resaltada) -->
+        <TextView
+            android:id="@+id/textHora"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="14:30"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:shadowColor="#000000"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="3"/>
+
+        <!-- FECHA (Más pequeña y sutil) -->
+        <TextView
+            android:id="@+id/textfecha"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Viernes, 19 de Julio"
+            android:textColor="#CCCCCC"
+            android:textSize="14sp"
+            android:textStyle="normal"
+            android:textAllCaps="true"
+            android:visibility="visible" />
+
+    </LinearLayout>
 
 
     <androidx.recyclerview.widget.RecyclerView
@@ -20,7 +63,7 @@
 
     <!-- Contenedor inferior para imagen + controles -->
     <LinearLayout
-        android:id="@+id/controles_reproductor"
+
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
@@ -59,10 +102,10 @@
                 android:id="@+id/nombrePelicula"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:ellipsize="marquee"
-                android:focusable="true"
                 android:layout_marginStart="15dp"
-                android:focusableInTouchMode="true"
+                android:ellipsize="marquee"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
                 android:gravity="start"
                 android:marqueeRepeatLimit="marquee_forever"
                 android:scrollHorizontally="true"
@@ -80,9 +123,12 @@
                 android:layout_marginStart="5dp"
                 android:layout_marginTop="5dp"
                 android:max="100"
+                android:background="@drawable/button_selector"
                 android:progressDrawable="@android:drawable/progress_horizontal"
                 android:minHeight="15dp"
                 android:maxHeight="15dp"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
                 android:progressTint="@color/rojo"
                 android:thumbTint="@color/colorSeekBar1" />
 

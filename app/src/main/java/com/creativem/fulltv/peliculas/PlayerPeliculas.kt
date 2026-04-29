@@ -176,11 +176,6 @@ class PlayerPeliculas : AppCompatActivity() {
 
         }
 
-        val textHora = binding.textHora
-        val textfecha = binding.textfecha
-        val reloj = Reloj(textHora, textfecha)
-        reloj.startClock()
-
         firestore = Firebase.firestore
         // Inicializa el SeekBar desde el binding
         actualizarTiempo()
@@ -196,6 +191,14 @@ class PlayerPeliculas : AppCompatActivity() {
             loadMovies()
         }
 
+        // --- 1. LLAMAR AL RELOJ (Buscando dentro del reproductor) ---
+        val textHora = binding.reproductor.findViewById<TextView>(R.id.textHora)
+        val textfecha = binding.reproductor.findViewById<TextView>(R.id.textfecha)
+
+        if (textHora != null && textfecha != null) {
+            val reloj = Reloj(textHora, textfecha)
+            reloj.startClock()
+        }
         val menupelis = binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis)
         menupelis.setOnClickListener {
             mostarpelis()

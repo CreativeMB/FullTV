@@ -2,12 +2,7 @@ package com.creativem.fulltv.principal
 
 import android.annotation.SuppressLint
 import android.widget.TextView
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -19,20 +14,28 @@ class Reloj(private val textViewHora: TextView, private val textViewFecha: TextV
     @SuppressLint("SetTextI18n")
     fun startClock() {
         clockScope.launch {
-            while (true) {
-                // Formato de fecha con la primera letra en mayúscula
-                val fecha = SimpleDateFormat("EEEE dd MM yy", Locale.getDefault()).format(Date())
+            while (isActive) {
+                val ahora = Date()
+
+                // 1. FECHA: Mantenemos tu lógica original
+                val sdfFecha = SimpleDateFormat("EEEE dd MM yy", Locale.getDefault())
+                val fecha = sdfFecha.format(ahora)
                 val fechaConMayuscula = fecha.substring(0, 1).uppercase() + fecha.substring(1)
 
-                // Formato de hora con AM/PM en mayúsculas
-                val horaActual = SimpleDateFormat("hh:mm aa", Locale.getDefault()).format(Date())
-                val horaConMayuscula = horaActual.replace("am", "AM").replace("pm", "PM")
+                // 2. HORA: FORZAMOS Locale.US para asegurar que genere AM/PM
+                // 'hh' (minúscula) es 12h. 'HH' (mayúscula) es 24h.
+                val sdfHora = SimpleDateFormat("hh:mm a", Locale.US)
+                val horaActual = sdfHora.format(ahora)
 
-                // Asignar la hora y la fecha formateada a los TextViews
-                textViewHora.text = horaConMayuscula  // Ahora asignamos correctamente 'horaConMayuscula'
+                // Mantenemos tu reemplazo manual por si acaso
+                val horaConMayuscula = horaActual.replace("am", "AM")
+                    .replace("pm", "PM")
+                    .replace("AM", " AM") // Espacio extra para que no pegue al número
+                    .replace("PM", " PM")
+
+                textViewHora.text = horaConMayuscula
                 textViewFecha.text = fechaConMayuscula
 
-                // Retraso de 1 segundo (1000 milisegundos)
                 delay(1000)
             }
         }

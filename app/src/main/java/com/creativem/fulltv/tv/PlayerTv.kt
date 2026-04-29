@@ -108,10 +108,14 @@ class PlayerTv : AppCompatActivity() {
             Toast.makeText(this, "No se recibió la URL de streaming.", Toast.LENGTH_SHORT).show()
             return
         }
-        val textHora = binding.textHora
-        val textfecha = binding.textfecha
-        val reloj = Reloj(textHora, textfecha)
-        reloj.startClock()
+// --- 1. LLAMAR AL RELOJ (Buscando dentro del reproductor) ---
+        val textHora = binding.reproductor.findViewById<TextView>(R.id.textHora)
+        val textfecha = binding.reproductor.findViewById<TextView>(R.id.textfecha)
+
+        if (textHora != null && textfecha != null) {
+            val reloj = Reloj(textHora, textfecha)
+            reloj.startClock()
+        }
 
         actualizarTiempo()
         player = ExoPlayer.Builder(this).build()

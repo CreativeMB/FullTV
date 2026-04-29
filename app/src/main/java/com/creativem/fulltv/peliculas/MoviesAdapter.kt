@@ -193,8 +193,22 @@ class MoviesAdapter(
 
     override fun onViewRecycled(holder: MovieViewHolder) {
         super.onViewRecycled(holder)
-        // Liberar Glide pero NO cancelamos el timer aquí para que siga en segundo plano
-        Glide.with(holder.itemView.context).clear(holder.imgMovie)
+
+        val context = holder.itemView.context
+
+        // Verificamos que el contexto sea una actividad y que no esté destruida
+        if (context is android.app.Activity) {
+            if (context.isFinishing || context.isDestroyed) {
+                return // Si la actividad se está cerrando o ya no existe, no hacemos nada
+            }
+        }
+
+        try {
+            // Usamos el contexto de la aplicación para mayor seguridad en la limpieza
+            Glide.with(context.applicationContext).clear(holder.imgMovie)
+        } catch (e: Exception) {
+            // Evitamos que cualquier error aquí cierre la aplicación
+        }
     }
 
     class MovieViewHolder(view: View) : RecyclerView.ViewHolder(view) {

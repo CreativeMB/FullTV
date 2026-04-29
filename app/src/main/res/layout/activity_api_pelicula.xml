@@ -99,8 +99,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="110dp"
                         android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:layout_marginTop="8dp">
+                        android:gravity="center_vertical">
 
                         <!-- Actores (80% del ancho) -->
                         <androidx.recyclerview.widget.RecyclerView
@@ -110,6 +109,8 @@
                             android:layout_weight="7"
                             android:orientation="horizontal"
                             android:clipToPadding="false"
+                            android:clipChildren="false"
+                            android:overScrollMode="never"
                             android:paddingEnd="8dp" />
 
                         <!-- Fecha (20% del ancho) -->
@@ -129,7 +130,7 @@
                                 android:paddingStart="8dp"
                                 android:text="⭐ 8.5"
                                 android:textColor="@color/textColorPrimary"
-                                android:textSize="30sp" />
+                                android:textSize="25sp" />
 
                             <TextView
                                 android:id="@+id/tvFecha"
@@ -137,7 +138,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="📅"
                                 android:textColor="@color/textColorPrimary"
-                                android:textSize="26sp"
+                                android:textSize="25sp"
                                 android:gravity="center" />
 
                         </LinearLayout>
@@ -149,9 +150,8 @@
             <!-- Contenedor horizontal: Scroll de sinopsis + botón -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="80dp"
+                android:layout_height="50dp"
             android:orientation="horizontal"
-            android:layout_marginTop="8dp"
             android:paddingHorizontal="4dp">
 
             <!-- ScrollView con TextView de sinopsis -->
