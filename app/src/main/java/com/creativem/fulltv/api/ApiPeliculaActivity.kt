@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
@@ -13,6 +14,8 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.creativem.fulltv.R
 import com.creativem.fulltv.peliculas.PlayerPeliculas
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
@@ -99,11 +102,25 @@ class ApiPeliculaActivity : AppCompatActivity() {
         movieImageUrl = intent.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
         movieCountdown = intent.getIntExtra("EXTRA_COUNTDOWN", 0)
 
-
+        // 1. Creamos el LayoutManager una sola vez con optimizaciones
+        val layoutManagerCartelera = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        layoutManagerCartelera.isItemPrefetchEnabled = true // Mejora la fluidez
 
         recyclerCartelera = findViewById(R.id.peliscartelera)
-        recyclerCartelera.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        recyclerCartelera.setHasFixedSize(true)
 
+// 2. Asignamos el layoutManager que creamos arriba
+        recyclerCartelera.layoutManager = layoutManagerCartelera
+
+// 3. BLOQUEO DE FOCO (Para que no salte a otros lados de la actividad)
+        recyclerCartelera.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+
+// Esto obliga a que si no hay más items a la izquierda o derecha, se quede en el mismo sitio
+        recyclerCartelera.nextFocusLeftId = R.id.peliscartelera
+        recyclerCartelera.nextFocusRightId = R.id.peliscartelera
+
+// IMPORTANTE: Evita que el foco se pierda cuando la lista se actualiza
+        recyclerCartelera.preserveFocusAfterLayout = true
         tvReproducir.setOnClickListener {
             if (streamUrlGuardado.isBlank()) {
                 Toast.makeText(this, "URL de reproducción no disponible", Toast.LENGTH_SHORT).show()
@@ -229,23 +246,22 @@ class ApiPeliculaActivity : AppCompatActivity() {
         tvSinopsis.text = movie.overview ?: "Sin sinopsis disponible"
 
         val posterUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}"
+        val backdropUrl = "https://image.tmdb.org/t/p/w780${movie.poster_path}" // Imagen más grande para el fondo
         // 2. Carga del Póster (ivPoster)
+        // 1. Carga del Póster pequeño (ivPoster)
         Glide.with(this)
             .load(posterUrl)
-            // CLAVE: En lugar de R.drawable.icono, usamos el drawable actual
-            // Esto evita que la pantalla se ponga en blanco/icono entre cambios
             .placeholder(ivPoster.drawable)
-            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
             .into(ivPoster)
 
-        // 3. Carga del Fondo
+        // 2. Carga del Fondo (backgroundImageView)
         Glide.with(this)
-            .load(posterUrl)
+            .load(backdropUrl) // Usamos la URL de mejor calidad
             .centerCrop()
             .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
-            // Añadimos un pequeño fundido para que el cambio de fondo no sea brusco
-            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
+            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade(800))
             .into(backgroundImageView)
+
 
         tvInfoAdicional.text = ""
         recyclerActores.adapter = null

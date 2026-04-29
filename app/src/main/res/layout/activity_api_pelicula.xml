@@ -2,21 +2,38 @@
     android:id="@+id/rootContainer"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:clipToPadding="false"
     android:background="@color/colorPrimary">
 
-    <!-- Scroll padre para todo el contenido -->
+    <ImageView
+        android:id="@+id/backgroundImageView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.2"
+        android:scaleType="centerCrop"
+        android:visibility="visible" />
+
+
     <androidx.core.widget.NestedScrollView
         android:id="@+id/nestedScrollView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true"
-        android:background="@color/colorPrimary">
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:background="@android:color/transparent">
+
+
 
         <LinearLayout
             android:id="@+id/mainContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:clipChildren="false"
+            android:background="@android:color/transparent"
+            android:clipToPadding="false"
+            android:paddingBottom="50dp">
 
             <!-- Fila superior: imagen + datos -->
             <LinearLayout
@@ -159,25 +176,30 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:clipChildren="false"
+                android:clipToPadding="false">
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/peliscartelera"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@android:color/transparent"
                     android:orientation="horizontal"
-                    android:overScrollMode="never"
-                    android:padding="2dp"
-                    android:scrollbars="none" />
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:descendantFocusability="afterDescendants"
+                android:nextFocusLeft="@id/peliscartelera"
+                android:nextFocusRight="@id/peliscartelera"
+                 android:nextFocusUp="@id/tvReproducir"
+                android:overScrollMode="never"
+                android:padding="2dp"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:paddingTop="30dp"
+                    android:paddingBottom="30dp"
+                    android:paddingHorizontal="10dp"/>
 
-                <ImageView
-                    android:id="@+id/backgroundImageView"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:alpha="0.2"
-                    android:scaleType="centerCrop"
-                    android:visibility="visible" />
+
             </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>

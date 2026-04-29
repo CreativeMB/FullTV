@@ -22,6 +22,7 @@ import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.EditText
@@ -91,7 +92,7 @@ class PeliculasActivity : AppCompatActivity() {
     private var haProcesadoEliminacion = false
     private var yaMostroPublicidad = false
     private var publicidadDialog: Dialog? = null
-
+    private var lastFocusedMovie: View? = null
     private val handler = Handler(Looper.getMainLooper())
 
     private var progressDialog: AlertDialog? = null
@@ -130,6 +131,25 @@ class PeliculasActivity : AppCompatActivity() {
         binding = ActivityPeliculasBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // --- LÓGICA DE MEMORIA DE FOCO ---
+        // 1. Escuchamos cada cambio de foco en la pantalla
+        binding.root.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
+            // Si el nuevo foco pertenece a la lista de películas, lo guardamos
+            if (newFocus != null && isViewDescendantOf(newFocus, binding.rvPeliculas)) {
+                lastFocusedMovie = newFocus
+            }
+        }
+
+        // 2. Obligamos al menú a que al bajar, busque la última película
+        binding.menuPrincipal.setOnFocusChangeListener { _, hasFocus ->
+            // Si el foco SALE del menú, intentamos recuperar la última posición
+            if (!hasFocus && lastFocusedMovie != null) {
+                lastFocusedMovie?.requestFocus()
+            }
+        }
+
+
+
         // 🔄 Botón atrás personalizado
         onBackPressedDispatcher.addCallback(this) {
             mostrarConfirmacionSalida()
@@ -153,6 +173,16 @@ class PeliculasActivity : AppCompatActivity() {
         if (currentUser != null && !currentUser.email.isNullOrBlank()) {
             CastvHelper.nuevosusuarios(this, currentUser.displayName ?: "Usuario", currentUser.email!!)
         }
+    }
+
+    // Función auxiliar para saber si una vista está dentro del RecyclerView
+    private fun isViewDescendantOf(view: View, parent: ViewGroup): Boolean {
+        var current = view.parent
+        while (current != null) {
+            if (current == parent) return true
+            current = current.parent
+        }
+        return false
     }
 
     // ==========================================
@@ -196,6 +226,7 @@ class PeliculasActivity : AppCompatActivity() {
         binding.menuPrincipal.layoutManager =
             LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         binding.menuPrincipal.adapter = adapter
+        binding.menuPrincipal.isFocusable = true
     }
       // 2. Funciones de Navegación corregidas para Actividades
     fun navegarGratis() {
@@ -223,7 +254,10 @@ class PeliculasActivity : AppCompatActivity() {
 
         // 2. Aplicamos el número de columnas al Grid
         binding.rvPeliculas.layoutManager = GridLayoutManager(this, columnas)
-
+// ESTO REEMPLAZA AL XML Y NO DA ERROR
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            binding.rvPeliculas.preserveFocusAfterLayout = true
+        }
         movieAdapter = MoviesAdapter(
             movieList,
             onItemClick = { movie -> irAlReproductor(movie) },
@@ -233,6 +267,7 @@ class PeliculasActivity : AppCompatActivity() {
             }
         )
         binding.rvPeliculas.adapter = movieAdapter
+        binding.rvPeliculas.setHasFixedSize(true)
     }
     private fun actualizarImagenDeFondo(url: String?) {
         if (!url.isNullOrEmpty()) {

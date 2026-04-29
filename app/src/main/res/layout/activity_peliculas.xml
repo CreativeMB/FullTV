@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -11,39 +10,41 @@
         android:id="@+id/imgFondo"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="centerCrop"
-        android:alpha="0.3" />
+        android:alpha="0.3"
+        android:scaleType="centerCrop" />
 
-    <!-- MENU SUPERIOR HORIZONTAL -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/menuPrincipal"
         android:layout_width="wrap_content"
         android:layout_height="50dp"
         android:layout_marginTop="10dp"
         android:clipToPadding="false"
-        android:paddingHorizontal="20dp"
-        android:nextFocusDown="@id/rvPeliculas"
         android:elevation="10dp"
+        android:nextFocusDown="@id/rvPeliculas"
+        android:paddingHorizontal="20dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- LISTA DE PELÍCULAS (UNIFICADA) -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvPeliculas"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="0dp"
-        android:paddingTop="20dp"
-        android:paddingHorizontal="10dp"
-        android:paddingBottom="20dp"
         android:clipToPadding="false"
+        android:descendantFocusability="afterDescendants"
         android:focusable="true"
+        android:nextFocusLeft="@id/menuPrincipal"
+        android:nextFocusRight="@id/menuPrincipal"
         android:nextFocusUp="@id/menuPrincipal"
+        android:nextFocusDown="@id/rvPeliculas"
         android:overScrollMode="never"
+        android:paddingHorizontal="10dp"
+        android:paddingTop="20dp"
+        android:paddingBottom="20dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/menuPrincipal" />
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>

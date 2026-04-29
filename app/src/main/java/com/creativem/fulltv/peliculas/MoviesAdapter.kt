@@ -38,44 +38,79 @@ class MoviesAdapter(
         return MovieViewHolder(view)
     }
 
+    // ... (Mantén el resto de la clase igual hasta el onBindViewHolder)
+
     override fun onBindViewHolder(holder: MovieViewHolder, position: Int) {
         val movie = movieList[position]
 
-        // 1. Reset visual para evitar basura de reciclaje
+        // 1. Reset visual
         holder.txtStatus.text = ""
         holder.txtTitle.text = movie.title
         holder.txtTitle.isSelected = false
 
-        // 2. Carga de imagen optimizada
+        // 2. Carga de imagen ( Glide )
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
             .apply(glideOptions)
             .placeholder(holder.imgMovie.drawable)
             .into(holder.imgMovie)
 
-        // 3. Iniciar lógica de tiempos
+        // 3. Timers
         configurarTiempos(holder, movie)
 
-        // 4. Zoom 1.2x y gestión de Foco (Eje Z corregido)
+        // 4. GESTIÓN DE FOCO Y ZOOM (Versión Robusta)
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
-            if (hasFocus) {
+            // Usamos as? para evitar crashes si el root no fuera CardView
+            val card = view as? androidx.cardview.widget.CardView
+            val currentPos = holder.bindingAdapterPosition
+
+            if (hasFocus && currentPos != RecyclerView.NO_POSITION) {
                 onFocusChange(movie)
 
-                // Traer al frente para que el zoom no quede detrás de otros items
+                // --- 1. CENTRAR ITEM (Con comprobación de seguridad) ---
+                val parentView = view.parent
+                if (parentView is RecyclerView) {
+                    val smoothScroller = object : androidx.recyclerview.widget.LinearSmoothScroller(view.context) {
+                        override fun calculateDtToFit(viewStart: Int, viewEnd: Int, boxStart: Int, boxEnd: Int, snapPreference: Int): Int {
+                            return (boxStart + (boxEnd - boxStart) / 2) - (viewStart + (viewEnd - viewStart) / 2)
+                        }
+                        override fun calculateSpeedPerPixel(displayMetrics: android.util.DisplayMetrics): Float {
+                            return 100f / displayMetrics.densityDpi
+                        }
+                    }
+                    smoothScroller.targetPosition = currentPos
+                    parentView.layoutManager?.startSmoothScroll(smoothScroller)
+
+                    // BLOQUEO DE FOCO
+                    parentView.requestChildFocus(view, view)
+                }
+
+                // --- 2. GESTIÓN DE CAPAS SEGURA ---
                 view.bringToFront()
-                view.parent.requestLayout()
-                (view.parent as View).invalidate()
+                parentView?.requestLayout()
+                (parentView as? View)?.invalidate()
+
+                // --- 3. BRILLO Y ZOOM ---
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    view.foreground = null
+                }
+                view.alpha = 1.0f
 
                 view.animate()
                     .scaleX(1.2f)
                     .scaleY(1.2f)
-                    .translationZ(30f) // Elevación física
-                    .setDuration(200)
+                    .translationZ(35f)
+                    .setDuration(250)
                     .start()
 
+                // --- 4. COLORES ---
+                card?.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(view.context, R.color.colorhover2))
+                card?.cardElevation = 20f
                 holder.txtTitle.isSelected = true
                 holder.txtTitle.setTextColor(Color.YELLOW)
-            } else {
+
+            } else if (!hasFocus) {
+                // RESET AL PERDER FOCO
                 view.animate()
                     .scaleX(1.0f)
                     .scaleY(1.0f)
@@ -83,6 +118,8 @@ class MoviesAdapter(
                     .setDuration(200)
                     .start()
 
+                card?.setCardBackgroundColor(Color.parseColor("#1A1A1A"))
+                card?.cardElevation = 6f
                 holder.txtTitle.isSelected = false
                 holder.txtTitle.setTextColor(Color.WHITE)
             }
