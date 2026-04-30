@@ -18,7 +18,13 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
+// 1. Cambiamos el nombre global del proyecto
+rootProject.name = "CineParche"
 
-rootProject.name = "FullTV"
-include(":app")
-include(":app:tvfullurl")
+// 2. Definimos los nuevos nombres para tus módulos
+include(":CineParcheApp")
+include(":CineParcheUrl")
+
+// 3. Mapeamos estos nombres a las carpetas físicas actuales
+project(":CineParcheApp").projectDir = file("app")
+project(":CineParcheUrl").projectDir = file("app/tvfullurl")
