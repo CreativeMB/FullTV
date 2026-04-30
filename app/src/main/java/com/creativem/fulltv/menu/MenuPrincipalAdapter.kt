@@ -77,7 +77,7 @@ class MenuPrincipalAdapter(
             holder.itemView.scaleX = 1.1f
             holder.itemView.scaleY = 1.1f
         } else {
-            holder.text.setTextColor(Color.WHITE)
+            holder.text.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.texto))
             holder.itemView.scaleX = 1.0f
             holder.itemView.scaleY = 1.0f
         }

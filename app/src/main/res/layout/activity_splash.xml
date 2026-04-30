@@ -25,18 +25,20 @@
             android:padding="30dp"> <!-- Un poco de margen para que al hacer scroll no pegue a los bordes -->
 
             <androidx.cardview.widget.CardView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:cardCornerRadius="8dp"
-                app:cardElevation="0dp">
+                android:layout_width="200dp"
+                android:layout_height="200dp"
+                app:cardCornerRadius="30dp"
+                app:cardBackgroundColor="#0A0A0C"
+                app:cardElevation="0dp"
+                app:cardPreventCornerOverlap="false">
 
                 <!-- LOGO -->
                 <ImageView
                     android:id="@+id/imgLogoSplash"
-                    android:layout_width="160dp"
-                    android:layout_height="200dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
                     android:src="@drawable/icono"
-                    android:scaleType="fitXY"
+                    android:scaleType="centerCrop"
                     android:alpha="0" />
 
             </androidx.cardview.widget.CardView>
@@ -48,7 +50,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="0dp"
-                android:textColor="#F44336"
+                android:padding="15dp"
+                android:textColor="#C5A059"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"
@@ -77,7 +80,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="30dp"
                 android:text="BIENVENIDO"
-                android:textColor="#FFC107"
+                android:textColor="@color/texto"
                 android:textSize="32sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.15" />
@@ -90,7 +93,7 @@
                 android:layout_marginTop="12dp"
                 android:text="Organizando el contenido para\nuna experiencia inolvidable"
                 android:textAlignment="center"
-                android:textColor="#00BCD4"
+                android:textColor="@color/texto"
                 android:textSize="24sp"
                 android:fontFamily="sans-serif-medium" />
 

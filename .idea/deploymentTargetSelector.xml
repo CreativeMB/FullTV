@@ -13,7 +13,7 @@
         </DropdownSelection>
         <DialogSelection />
       </SelectionState>
-      <SelectionState runConfigName="FullTV">
+      <SelectionState runConfigName="CineParche">
         <option name="selectionMode" value="DROPDOWN" />
         <DropdownSelection timestamp="2025-07-19T20:14:25.232544700Z">
           <Target type="DEFAULT_BOOT">
