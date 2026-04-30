@@ -389,51 +389,110 @@ class PeliculasActivity : AppCompatActivity() {
     }
 
     private fun mostrarAlertaActualizacion(version: String) {
-        AlertDialog.Builder(this)
-            .setTitle("🚀 Nueva Versión $version")
-            .setMessage("Actualiza CineParche para obtener las mejoras.")
-            .setCancelable(false)
-            .setPositiveButton("Actualizar") { _, _ -> descargarAPK(version) }
-            .setNegativeButton("Luego", null)
-            .show()
+        // Colores de marca CineParche
+        val colorDorado = Color.parseColor("#C5A059")
+        val colorFondo = Color.parseColor("#0A122A")
+
+        // Título con estilo y color de marca
+        val title = SpannableString("🚀 Nueva Versión $version")
+        title.setSpan(ForegroundColorSpan(colorDorado), 0, title.length, 0)
+        title.setSpan(StyleSpan(Typeface.BOLD), 0, title.length, 0)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage("Hemos mejorado CineParche para ti. Actualiza ahora para disfrutar de la mejor experiencia.")
+            .setCancelable(false) // Obliga al usuario a decidir para mantener la estabilidad
+            .setPositiveButton("ACTUALIZAR") { _, _ -> descargarAPK(version) }
+            .setNegativeButton("LUEGO", null)
+            .create()
+
+        dialog.show()
+
+        // --- Personalización Estética ---
+
+        // Fondo inmersivo azul noche
+        dialog.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
+
+        // Estilo de los botones
+        val btnActualizar = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        val btnLuego = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+        val focusSelector = R.drawable.focus_selector
+
+        btnActualizar.apply {
+            setTextColor(Color.WHITE)
+            setTypeface(Typeface.DEFAULT_BOLD)
+            setBackgroundResource(focusSelector) // Soporte para TV
+            requestFocus() // Foco inmediato en la actualización
+        }
+
+        btnLuego.apply {
+            setTextColor(Color.LTGRAY)
+            setBackgroundResource(focusSelector)
+        }
+
+        // Color del mensaje explicativo
+        val messageView = dialog.findViewById<TextView>(android.R.id.message)
+        messageView?.setTextColor(Color.WHITE)
+        messageView?.textSize = 16f
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private fun descargarAPK(version: String) {
+        // Colores de identidad CineParche
+        val colorDorado = Color.parseColor("#C5A059")
+        val colorFondo = Color.parseColor("#0A122A")
+
         val url = "https://github.com/CreativeMB/center/releases/download/apk/CineParcheApp-debug.apk"
         val file = File(getExternalFilesDir(null), "CineParcheApp-debug.apk")
         if (file.exists()) file.delete()
 
-        // --- DISEÑO DEL DIÁLOGO ROJO (Como tu código viejo) ---
+        // --- DISEÑO PROFESIONAL CINEPARCHE ---
         val progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             isIndeterminate = false
             max = 100
             progress = 0
-            progressTintList = ColorStateList.valueOf(Color.RED) // Rojo
+            // Cambiamos el tinte de la barra de Rojo a Dorado
+            progressTintList = ColorStateList.valueOf(colorDorado)
+            progressBackgroundTintList = ColorStateList.valueOf(Color.GRAY)
         }
 
         val textoProgreso = TextView(this).apply {
-            text = "Iniciando descarga..."
-            setTextColor(Color.RED)
+            text = "Iniciando descarga segura..."
+            setTextColor(Color.WHITE) // Blanco para legibilidad sobre azul
             textSize = 16f
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, 20, 0, 0)
+            setPadding(0, 30, 0, 0)
         }
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(50, 50, 50, 50)
+            setPadding(60, 60, 60, 60)
+            setBackgroundColor(colorFondo) // Fondo azul noche
             addView(progressBar)
             addView(textoProgreso)
         }
 
+        // Título con estilo dorado
+        val title = SpannableString("📥 Actualizando CineParche v$version")
+        title.setSpan(ForegroundColorSpan(colorDorado), 0, title.length, 0)
+        title.setSpan(StyleSpan(Typeface.BOLD), 0, title.length, 0)
+
         progressDialog = AlertDialog.Builder(this)
-            .setTitle("📥 Descargando CineParche v$version")
+            .setCustomTitle(TextView(this).apply {
+                text = title
+                textSize = 20f
+                setPadding(60, 40, 60, 0)
+                setTextColor(colorDorado)
+                setBackgroundColor(colorFondo)
+            })
             .setView(layout)
             .setCancelable(false)
             .create()
 
         progressDialog?.show()
+
+        // Eliminamos bordes del sistema
+        progressDialog?.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
 
         val request = DownloadManager.Request(Uri.parse(url))
             .setTitle("CineParche v$version")
@@ -443,7 +502,6 @@ class PeliculasActivity : AppCompatActivity() {
         val dm = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
         downloadId = dm.enqueue(request)
 
-        // MONITOR DE PROGRESO (Hilo para actualizar la barra)
         val handler = Handler(Looper.getMainLooper())
         val monitor = object : Runnable {
             @SuppressLint("Range")
@@ -459,15 +517,18 @@ class PeliculasActivity : AppCompatActivity() {
                         val progress = ((downloaded * 100) / total).toInt()
                         progressBar.progress = progress
                         textoProgreso.text = "Descargando... $progress%"
+                        // El texto de porcentaje también puede resaltar en dorado
+                        if (progress > 0) textoProgreso.setTextColor(colorDorado)
                     }
 
                     if (status == DownloadManager.STATUS_SUCCESSFUL) {
                         cursor.close()
                         textoProgreso.text = "Descarga completada ✅"
+                        textoProgreso.setTextColor(Color.GREEN)
                         handler.postDelayed({
                             progressDialog?.dismiss()
                             instalarAPK(file)
-                        }, 500)
+                        }, 800)
                         return
                     }
                 }
@@ -477,7 +538,6 @@ class PeliculasActivity : AppCompatActivity() {
         }
         handler.post(monitor)
 
-        // Registro del Receiver compatible con Android 13+
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(onDownloadComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), RECEIVER_EXPORTED)
         } else {
