@@ -734,11 +734,11 @@ class PlayerPeliculas : AppCompatActivity() {
             if (isPlaying) {
                 handler.postDelayed(runnableOcultar, hideControlsDelay)
                 // Cambias a icono de PAUSA si está reproduciendo
-                playPauseButton.setImageResource(R.drawable.ic_stop)
+                playPauseButton.setImageResource(R.drawable.play)
             } else {
                 handler.removeCallbacks(runnableOcultar)
                 // Cambias a icono de PLAY si está detenido
-                playPauseButton.setImageResource(R.drawable.ic_play)
+                playPauseButton.setImageResource(R.drawable.stop)
             }
         }
 
@@ -1295,10 +1295,10 @@ class PlayerPeliculas : AppCompatActivity() {
         if (player != null) {
             if (player.isPlaying) {
                 player.pause()
-                playPauseButton.setImageResource(R.drawable.ic_stop)
+//                playPauseButton.setImageResource(R.drawable.stop)
             } else {
                 player.play()
-                playPauseButton.setImageResource(R.drawable.ic_play)
+//                playPauseButton.setImageResource(R.drawable.play)
 
                 // ✅ Reiniciar contador de tiempo manualmente
                 handler.removeCallbacks(runnableActualizar)

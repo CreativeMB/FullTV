@@ -38,8 +38,6 @@ import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.android.volley.toolbox.JsonObjectRequest
-import com.android.volley.toolbox.Volley
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.api.ApiPeliculaActivity
@@ -73,7 +71,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.File
 
 class PeliculasActivity : AppCompatActivity() {
@@ -196,7 +193,7 @@ class PeliculasActivity : AppCompatActivity() {
         val menuIcons = listOf(
             R.drawable.tv, R.drawable.cartelera,
             R.drawable.cine, R.drawable.buscar, R.drawable.pedido,
-            R.drawable.activacion, R.drawable.pago, R.drawable.cerrrar
+            R.drawable.activacion, R.drawable.pagos, R.drawable.cerrar
         )
 
 
@@ -976,7 +973,7 @@ class PeliculasActivity : AppCompatActivity() {
 
     private fun mostrarConfirmacionSalida() {
         AlertDialog.Builder(this)
-            .setTitle("¿Desea salir de FullTV?")
+            .setTitle("¿Desea cerrar de FullTV?")
             .setPositiveButton("Sí") { _, _ -> finish() }
             .setNegativeButton("No", null)
             .show()

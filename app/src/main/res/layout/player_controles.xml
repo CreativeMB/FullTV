@@ -160,36 +160,9 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1.8"
+                    android:gravity="center"
                     android:orientation="horizontal"
                     android:layout_marginHorizontal="5dp">
-
-
-
-                    <ImageButton
-                        android:id="@+id/render"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/button_selector"
-                        android:scaleType="fitCenter"
-                        android:layout_marginEnd="10dp"
-                        android:src="@drawable/ic_render"
-                        android:focusable="true"
-                        android:focusableInTouchMode="true"
-                        app:tint="@color/exo_button_color" />
-
-
-
-                    <ImageButton
-                        android:id="@+id/pedidos"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:layout_marginEnd="10dp"
-                        android:background="@drawable/button_selector"
-                        android:scaleType="fitCenter"
-                        android:src="@drawable/pago"
-                        android:focusable="true"
-                        android:focusableInTouchMode="true"
-                        app:tint="@color/exo_button_color" />
 
                     <ImageButton
                         android:id="@+id/home"
@@ -200,8 +173,33 @@
                         android:scaleType="fitCenter"
                         android:focusable="true"
                         android:focusableInTouchMode="true"
-                        android:src="@drawable/ic_cineflex"
-                        app:tint="@color/exo_button_color" />
+                        android:src="@drawable/cerrar" />
+
+
+                    <ImageButton
+                        android:id="@+id/render"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/button_selector"
+                        android:scaleType="fitCenter"
+                        android:layout_marginEnd="10dp"
+                        android:src="@drawable/zoom"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true" />
+
+
+
+                    <ImageButton
+                        android:id="@+id/pedidos"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="10dp"
+                        android:background="@drawable/button_selector"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/pagos"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true" />
+
 
                     <ImageButton
                         android:id="@+id/lista_pelis"
@@ -210,8 +208,7 @@
                         android:layout_marginEnd="10dp"
                         android:background="@drawable/button_selector"
                         android:scaleType="fitCenter"
-                        android:src="@drawable/pelis_menu"
-                        app:tint="@color/exo_button_color"
+                        android:src="@drawable/menu"
                         android:focusable="true"
                         android:focusableInTouchMode="true" />
                     <ImageButton
@@ -223,8 +220,7 @@
                         android:scaleType="fitCenter"
                         android:focusable="true"
                         android:focusableInTouchMode="true"
-                        android:src="@drawable/ic_play"
-                        app:tint="@color/exo_button_color" />
+                        android:src="@drawable/play" />
 
                 </LinearLayout>
 

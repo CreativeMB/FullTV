@@ -681,7 +681,7 @@
 //            return
 //        }
 //
-//        eliminarListener() // ✅ Detener escucha antes de salir
+//        eliminarListener() // ✅ Detener escucha antes de cerrar
 //
 //        var segundosRestantes = 10
 //        val mensajeInicial = "Tu cuenta ha sido eliminada del sistema.\nSerás redirigido en $segundosRestantes segundos..."
