@@ -1,17 +1,14 @@
 package com.creativem.tvfullurl.modelo
 
-import java.security.Timestamp
-
-
 data class User(
     var userId: String = "",
-    var fechaCreacion: String = "",
     var correo: String = "",
-    val nombre: String = "",  // Cambiado de 'name' a 'nombre'
-    var title: String = "", // Cambiado de 'points' a 'puntos'
-    val id: String = "",      // Para almacenar el ID del documento
-    var createdAt: Long = System.currentTimeMillis(),
+    var nombre: String = "",
     var estado: String = "activo",
-    val castv: Long = 0,
-    var isOnline: Boolean = false
+    var isOnline: Boolean = false,
+    // Usamos Any? para que Firebase no explote al convertir
+    var fechaCreacion: Any? = null,
+    var ultimaConexion: Any? = null,
+    var castv: Any? = null,
+    var createdAt: Any? = null
 )

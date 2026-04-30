@@ -53,18 +53,10 @@
             android:exported="false"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".principal.Main"
+            android:name=".principal.Login"
             android:exported="false"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name=".tv.Tv"
-            android:exported="false"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name=".peliculas.PeliculasFragment"
-            android:exported="false"
-            android:windowSoftInputMode="stateHidden|adjustPan"
-            tools:ignore="Instantiatable" />
+            android:theme="@style/Theme.AppCompat.NoActionBar"/>
+
         <activity
             android:name=".tv.TvActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
@@ -88,7 +80,7 @@
 
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".principal.Login"
+            android:name=".principal.SplashActivity"
             android:exported="true"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar">
             <intent-filter>

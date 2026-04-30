@@ -1,8 +1,15 @@
 package com.creativem.fulltv.principal
 
+import android.app.Dialog
 import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.util.Log
+import android.view.Gravity
+import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -17,6 +24,9 @@ import com.creativem.fulltv.R
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
 
+import android.graphics.Typeface
+
+import android.widget.TextView
 class Login : AppCompatActivity() {
 
     private lateinit var auth: FirebaseAuth
@@ -70,22 +80,124 @@ class Login : AppCompatActivity() {
 
     }
     /**
-     * Muestra un AlertDialog para que el usuario elija el método de inicio de sesión.
+     * Muestra un Dialog moderno programado 100% en Kotlin, adaptable a TV y Celular.
      */
     private fun showLoginOptionsDialog() {
-        val builder = AlertDialog.Builder(this)
-        builder.setTitle("Selecciona una opción")
-        builder.setMessage("¿Cómo deseas continuar?")
-        builder.setPositiveButton("Iniciar sesión con Google") { _, _ ->
+        val dialog = Dialog(this, android.R.style.Theme_Translucent_NoTitleBar_Fullscreen)
+        dialog.setCancelable(false)
+
+        val rootLayout = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#CC000000"))
+        }
+
+        val dialogBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+
+            val displayMetrics = resources.displayMetrics
+            val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+            // Ajuste de anchos para que no se vea mal en ninguna pantalla
+            val widthPercent = if (isLandscape) 0.45 else 0.85
+            val paddingVal = if (isLandscape) 60 else 40
+
+            setPadding(paddingVal, paddingVal, paddingVal, paddingVal)
+
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#141414"))
+                cornerRadius = 40f // Bordes un poco más curvos se ve más moderno
+                setStroke(2, Color.parseColor("#333333"))
+            }
+
+            layoutParams = FrameLayout.LayoutParams(
+                (displayMetrics.widthPixels * widthPercent).toInt(),
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.CENTER
+            }
+        }
+
+        // Título
+        val title = TextView(this).apply {
+            text = "INICIAR SESIÓN"
+            textSize = 24f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 10)
+        }
+
+        // Mensaje
+        val message = TextView(this).apply {
+            text = "¿Cómo deseas disfrutar de FullTV hoy?"
+            textSize = 16f
+            setTextColor(Color.parseColor("#99FFFFFF"))
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 40)
+        }
+
+        // Función de botones mejorada
+        fun createTvButton(textStr: String, bgColor: String, fColor: String, onClick: () -> Unit): TextView {
+            val btn = TextView(this)
+            btn.text = textStr // ASIGNACIÓN DIRECTA
+            btn.textSize = 18f
+            btn.setTextColor(Color.WHITE)
+            btn.typeface = Typeface.DEFAULT_BOLD
+            btn.gravity = Gravity.CENTER
+            btn.isFocusable = true
+            btn.isClickable = true
+
+            // Padding interno del botón (ajustado para que no sea tan alto en celular)
+            btn.setPadding(0, 30, 0, 30)
+
+            val bg = GradientDrawable().apply {
+                setColor(Color.parseColor(bgColor))
+                cornerRadius = 20f
+            }
+            btn.background = bg
+
+            btn.layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 10, 0, 10)
+            }
+
+            btn.setOnFocusChangeListener { v, hasFocus ->
+                if (hasFocus) {
+                    bg.setColor(Color.parseColor(fColor))
+                    v.animate().scaleX(1.05f).scaleY(1.05f).setDuration(200).start()
+                } else {
+                    bg.setColor(Color.parseColor(bgColor))
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(200).start()
+                }
+            }
+
+            btn.setOnClickListener {
+                dialog.dismiss()
+                onClick()
+            }
+            return btn
+        }
+
+        val btnGoogle = createTvButton("Continuar con Google", "#E50914", "#FF3344") {
             signInWithGoogle()
         }
-        builder.setNegativeButton("Continuar como invitado") { _, _ ->
+
+        val btnInvitado = createTvButton("Entrar como Invitado", "#2B2B2B", "#444444") {
             signInAsDefaultUser()
         }
-        builder.setCancelable(false)
-        builder.create().show()
-    }
 
+        dialogBox.addView(title)
+        dialogBox.addView(message)
+        dialogBox.addView(btnGoogle)
+        dialogBox.addView(btnInvitado)
+        rootLayout.addView(dialogBox)
+
+        dialog.setContentView(rootLayout)
+        dialog.show()
+        btnGoogle.requestFocus()
+    }
     private fun signInWithGoogle() {
         // Limpiar la sesión anterior de Google
         googleSignInClient.signOut()

@@ -66,54 +66,58 @@ class CastvFragment : Fragment() {
 
         databaseRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                // 1. Limpiamos la lista local para no duplicar datos
                 userList.clear()
 
                 if (snapshot.exists()) {
                     for (userSnapshot in snapshot.children) {
-                        val user = userSnapshot.getValue(User::class.java)
+                        try {
+                            // 1. Cargamos el usuario (con la nueva data class ya no explota)
+                            val user = userSnapshot.getValue(User::class.java)
 
-                        if (user != null) {
-                            // Asignamos el ID (la clave del nodo) al objeto usuario
-                            user.userId = userSnapshot.key ?: ""
+                            if (user != null) {
+                                user.userId = userSnapshot.key ?: ""
 
-                            // 2. FILTRO:
-                            // - Si usaste removeValue(), el usuario ya no sale aquí.
-                            // - Si el usuario aún existe pero tiene estado "eliminado", lo ocultamos.
-                            if (user.estado != "eliminado") {
+                                if (user.estado != "eliminado") {
+                                    // 2. Leer estado online de forma segura
+                                    val enLineaValue = userSnapshot.child("enlinea").value
+                                    user.isOnline = when (enLineaValue) {
+                                        is Boolean -> enLineaValue
+                                        is Long -> enLineaValue == 1L
+                                        is String -> enLineaValue.lowercase() == "true"
+                                        else -> false
+                                    }
 
-                                // 3. ESTADO ONLINE:
-                                // Obtenemos el valor de "enlinea" directamente del snapshot
-                                val enLineaDB = userSnapshot.child("enlinea").getValue(Boolean::class.java) ?: false
-                                user.isOnline = enLineaDB
-
-                                userList.add(user)
+                                    userList.add(user)
+                                }
                             }
+                        } catch (e: Exception) {
+                            Log.e("Usuarios", "Error en usuario ${userSnapshot.key}: ${e.message}")
                         }
                     }
 
-                    // 4. ORDENAR:
-                    // Primero por fecha de creación (más nuevos arriba)
-                    // Luego por correo (alfabético)
+                    // 3. 🔄 ORDENAR (Convertimos a Long para comparar)
                     userList.sortWith(
-                        compareByDescending<User> { it.fechaCreacion }
-                            .thenBy { it.correo }
+                        compareByDescending<User> { user ->
+                            // Convertimos ultimaConexion a Long de forma segura para ordenar
+                            when (val fecha = user.ultimaConexion) {
+                                is Long -> fecha
+                                is String -> fecha.toLongOrNull() ?: 0L
+                                else -> 0L
+                            }
+                        }.thenBy { it.nombre }
                     )
 
                 } else {
-                    Log.d("Usuarios", "La base de datos de usuarios está vacía.")
+                    Log.d("Usuarios", "La base de datos está vacía.")
                 }
 
-                // 5. ACTUALIZAR UI:
-                // Notificamos al adaptador para que refresque la lista en pantalla
+                // 4. Refrescar UI
                 castvAdapter.filter("")
+                Log.d("Usuarios", "✅ Usuarios cargados con éxito: ${userList.size}")
             }
 
             override fun onCancelled(error: DatabaseError) {
-                Log.e("Usuarios", "Error en la base de datos: ${error.message}")
-                if (isAdded) {
-                    Toast.makeText(requireContext(), "Error al cargar usuarios", Toast.LENGTH_SHORT).show()
-                }
+                Log.e("Usuarios", "Error: ${error.message}")
             }
         })
     }
@@ -153,7 +157,7 @@ class CastvFragment : Fragment() {
                     // Actualizar `isOnline` para cada usuario en `userList`
                     for (user in userList) {
                         user.isOnline = estadosDeConexion[user.userId] ?: false
-                        Log.d("Conexion", "Actualizado ${user.nombre} (${user.id}): ${user.isOnline}")
+                        Log.d("Conexion", "Actualizado ${user.nombre} (${user.userId}): ${user.isOnline}")
                     }
 
                     castvAdapter.notifyDataSetChanged()

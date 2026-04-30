@@ -3,6 +3,7 @@ package com.creativem.fulltv.principal
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.graphics.Color
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -21,7 +22,7 @@ import java.util.Date
 import java.util.Locale
 
 class HeaderPresenter : Presenter() {
-
+    private var noticiaListener: ValueEventListener? = null
     private var usuariosListener: ValueEventListener? = null
     // Referencia global a Realtime Database
     private val databaseRef = FirebaseDatabase.getInstance().reference
@@ -43,6 +44,7 @@ class HeaderPresenter : Presenter() {
         val textCastv = viewHolder.view.findViewById<TextView>(R.id.textCastv)
         val txtActualizacion = viewHolder.view.findViewById<TextView>(R.id.txtActualizacion)
         val imagenUser = viewHolder.view.findViewById<ImageView>(R.id.imagenuser)
+        val txtBanner = viewHolder.view.findViewById<TextView>(R.id.txtBanner)
 
         val auth = FirebaseAuth.getInstance()
         val usuario = auth.currentUser
@@ -51,6 +53,28 @@ class HeaderPresenter : Presenter() {
         textFecha.text = obtenerFechaActual()
         textHora.text = obtenerHoraActual()
 
+
+        // 1. --- LÓGICA DE LA NOTICIA (BANNER) ---
+        noticiaListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    // USAMOS "banner" PORQUE ASÍ ESTÁ EN TU FIREBASE
+                    val mensaje = snapshot.child("banner").getValue(String::class.java) ?: ""
+                    val version = snapshot.child("versionapk").getValue(String::class.java) ?: ""
+
+                    txtBanner?.apply {
+                        // Aquí ya saldrá el texto largo que tienes en la DB
+                        text = " 📢 $mensaje | Versión: $version "
+                        visibility = View.VISIBLE
+                        isSelected = true // Para que empiece a rodar
+                    }
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("FIREBASE", "Error al cargar noticia: ${error.message}")
+            }
+        }
+        databaseRef.child("noticia").child("us4vaaf0VPezu9vuc4ns").addValueEventListener(noticiaListener!!)
         if (usuarioId == null) {
             textUsuario.text = "Invitado"
             textCastv.text = "🎬 Películas: 0 | ⭐ Castv: 0"

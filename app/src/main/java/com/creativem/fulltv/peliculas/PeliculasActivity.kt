@@ -748,7 +748,6 @@ class PeliculasActivity : AppCompatActivity() {
 
                         val intent = Intent(this, Nosotros::class.java)
                         startActivity(intent)
-                        finish()
                     }
                     .addOnFailureListener { e ->
                         Log.e("ALQUILER_LOG", "❌ Error al actualizar saldo: ${e.message}")

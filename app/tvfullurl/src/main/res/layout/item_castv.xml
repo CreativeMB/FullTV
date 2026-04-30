@@ -1,105 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
 <androidx.cardview.widget.CardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="5dp"
-    app:cardElevation="6dp"
-    app:cardCornerRadius="6dp">
+    android:layout_marginHorizontal="8dp"
+    android:layout_marginVertical="4dp"
+    app:cardBackgroundColor="#E2E2E2"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="4dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="4dp"
         android:gravity="center_vertical">
 
-        <!-- Contenedor de texto (70%) -->
+        <!-- INDICADOR ONLINE (Más delgado) -->
+        <View
+            android:id="@+id/indicatorOnline"
+            android:layout_width="4dp"
+            android:layout_height="match_parent"
+            android:minHeight="80dp"
+            android:background="#4CAF50" />
+
+        <!-- INFO PRINCIPAL -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:orientation="vertical"
-            android:layout_weight="7"
-            android:paddingEnd="8dp">
+            android:paddingVertical="8dp"
+            android:paddingHorizontal="12dp">
 
-            <!-- Nombre -->
             <TextView
                 android:id="@+id/userName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textSize="18sp"
+                android:text="Nombre"
+                android:textColor="#FFFFFF"
+                android:textSize="17sp"
                 android:textStyle="bold"
-                android:text="Nombre del usuario"
-                android:layout_marginBottom="4dp" />
+                android:maxLines="1"
+                android:ellipsize="end" />
 
-            <!-- Email -->
             <TextView
                 android:id="@+id/userEmail"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:text="Email" />
+                android:text="correo@ejemplo.com"
+                android:textColor="#000000"
+                android:textSize="13sp"
+                android:maxLines="1" />
 
-            <!-- Castv + Fecha en misma fila -->
+            <!-- FILA DE EDICIÓN Y FECHA -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginTop="2dp">
+                android:layout_marginTop="4dp">
 
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/castv" />
+
+                <!-- EDIT TEXT PARA PUNTOS (Limpio y directo) -->
                 <EditText
                     android:id="@+id/userCastv"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textSize="16sp"
-                    android:inputType="number"
-                    android:textStyle="bold"
-                    android:hint="Puntos"
+                    android:layout_width="60dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="4dp"
                     android:background="@null"
-                    android:padding="0dp"
-                    android:layout_marginEnd="8dp" />
+                    android:imeOptions="actionDone"
+                    android:inputType="number"
+                    android:singleLine="true"
+                    android:text="500"
+                    android:textColor="#000000"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/fechaCreacion"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
+                    android:text="• 12/04"
+                    android:textColor="#000000"
                     android:textSize="12sp"
-                    android:textStyle="italic"
-                    android:text="fechaCreacion" />
+                    android:layout_marginStart="8dp" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Iconos (sin cambios) (30%) -->
+        <!-- ACCIONES (Botones más pequeños) -->
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="3"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_marginStart="4dp">
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingEnd="8dp"
+            android:orientation="horizontal">
 
             <ImageView
                 android:id="@+id/editImage"
-                android:layout_width="0dp"
-                android:layout_height="60dp"
-                android:layout_weight="1"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:padding="10dp"
                 android:src="@drawable/castv"
-                android:scaleType="fitXY"
-                android:layout_marginEnd="10dp"
-                android:contentDescription="Editar usuario" />
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:layout_marginEnd="4dp" />
 
             <ImageView
                 android:id="@+id/deleteImage"
-                android:layout_width="0dp"
-                android:layout_height="30dp"
-                android:layout_weight="1"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:padding="10dp"
                 android:src="@drawable/delete"
-                android:scaleType="fitXY"
-                android:contentDescription="Eliminar usuario" />
+                android:background="?android:attr/selectableItemBackgroundBorderless" />
+
         </LinearLayout>
     </LinearLayout>
 </androidx.cardview.widget.CardView>
