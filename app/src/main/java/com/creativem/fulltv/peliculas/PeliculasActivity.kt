@@ -10,6 +10,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Bundle
@@ -17,7 +19,10 @@ import android.os.CountDownTimer
 import android.os.Handler
 import android.os.Looper
 import android.text.Editable
+import android.text.SpannableString
 import android.text.TextWatcher
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -105,7 +110,7 @@ class PeliculasActivity : AppCompatActivity() {
                 if (cursor.moveToFirst()) {
                     val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
                     if (DownloadManager.STATUS_SUCCESSFUL == cursor.getInt(statusIndex)) {
-                        val file = File(getExternalFilesDir(null), "FullTV_update.apk")
+                        val file = File(getExternalFilesDir(null), "CineParcheApp-debug.apk")
                         if (file.exists()) {
                             instalarAPK(file)
                         }
@@ -163,7 +168,6 @@ class PeliculasActivity : AppCompatActivity() {
         // 🛡️ Seguridad, Actualizaciones y Publicidad
         iniciarVerificacionDeEstadoDeCuenta()
         obtenerNoticiaYActualizaciones()
-        mostrarPublicidad()
 
         // 📊 Registro de Usuario
         val currentUser = auth.currentUser
@@ -387,7 +391,7 @@ class PeliculasActivity : AppCompatActivity() {
     private fun mostrarAlertaActualizacion(version: String) {
         AlertDialog.Builder(this)
             .setTitle("🚀 Nueva Versión $version")
-            .setMessage("Actualiza FullTV para obtener las mejoras.")
+            .setMessage("Actualiza CineParche para obtener las mejoras.")
             .setCancelable(false)
             .setPositiveButton("Actualizar") { _, _ -> descargarAPK(version) }
             .setNegativeButton("Luego", null)
@@ -396,8 +400,8 @@ class PeliculasActivity : AppCompatActivity() {
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private fun descargarAPK(version: String) {
-        val url = "https://github.com/CreativeMB/center/releases/download/apk/FullTV.apk"
-        val file = File(getExternalFilesDir(null), "FullTV_update.apk")
+        val url = "https://github.com/CreativeMB/center/releases/download/apk/CineParcheApp-debug.apk"
+        val file = File(getExternalFilesDir(null), "CineParcheApp-debug.apk")
         if (file.exists()) file.delete()
 
         // --- DISEÑO DEL DIÁLOGO ROJO (Como tu código viejo) ---
@@ -424,7 +428,7 @@ class PeliculasActivity : AppCompatActivity() {
         }
 
         progressDialog = AlertDialog.Builder(this)
-            .setTitle("📥 Descargando FullTV v$version")
+            .setTitle("📥 Descargando CineParche v$version")
             .setView(layout)
             .setCancelable(false)
             .create()
@@ -432,7 +436,7 @@ class PeliculasActivity : AppCompatActivity() {
         progressDialog?.show()
 
         val request = DownloadManager.Request(Uri.parse(url))
-            .setTitle("FullTV v$version")
+            .setTitle("CineParche v$version")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
             .setDestinationUri(Uri.fromFile(file))
 
@@ -510,30 +514,30 @@ class PeliculasActivity : AppCompatActivity() {
     // 4. PUBLICIDAD
     // ==========================================
 
-    private fun mostrarPublicidad() {
-        if (yaMostroPublicidad) return
-        yaMostroPublicidad = true
-
-        val storageRef = FirebaseStorage.getInstance().reference.child("FulltvPublicidad")
-        storageRef.listAll().addOnSuccessListener { list ->
-            if (list.items.isNotEmpty()) {
-                list.items.random().downloadUrl.addOnSuccessListener { uri ->
-                    val dialogView = layoutInflater.inflate(R.layout.dialog_publicidad, null)
-                    val img = dialogView.findViewById<ImageView>(R.id.imgPublicidad)
-
-                    Glide.with(this).load(uri).into(img)
-                    publicidadDialog =
-                        Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-                    publicidadDialog?.setContentView(dialogView)
-                    publicidadDialog?.show()
-
-                    dialogView.findViewById<View>(R.id.btnCerrarPublicidad).setOnClickListener {
-                        publicidadDialog?.dismiss()
-                    }
-                }
-            }
-        }
-    }
+//    private fun mostrarPublicidad() {
+//        if (yaMostroPublicidad) return
+//        yaMostroPublicidad = true
+//
+//        val storageRef = FirebaseStorage.getInstance().reference.child("FulltvPublicidad")
+//        storageRef.listAll().addOnSuccessListener { list ->
+//            if (list.items.isNotEmpty()) {
+//                list.items.random().downloadUrl.addOnSuccessListener { uri ->
+//                    val dialogView = layoutInflater.inflate(R.layout.dialog_publicidad, null)
+//                    val img = dialogView.findViewById<ImageView>(R.id.imgPublicidad)
+//
+//                    Glide.with(this).load(uri).into(img)
+//                    publicidadDialog =
+//                        Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+//                    publicidadDialog?.setContentView(dialogView)
+//                    publicidadDialog?.show()
+//
+//                    dialogView.findViewById<View>(R.id.btnCerrarPublicidad).setOnClickListener {
+//                        publicidadDialog?.dismiss()
+//                    }
+//                }
+//            }
+//        }
+//    }
 
     // ==========================================
     // 5. BUSCADOR TMDB
@@ -972,11 +976,50 @@ class PeliculasActivity : AppCompatActivity() {
     }
 
     private fun mostrarConfirmacionSalida() {
-        AlertDialog.Builder(this)
-            .setTitle("¿Desea cerrar de FullTV?")
-            .setPositiveButton("Sí") { _, _ -> finish() }
-            .setNegativeButton("No", null)
-            .show()
+        val colorDorado = Color.parseColor("#C5A059")
+        val colorFondo = Color.parseColor("#0A122A")
+
+        val title = SpannableString("¿Desea cerrar CineParche?")
+        title.setSpan(ForegroundColorSpan(colorDorado), 0, title.length, 0)
+        title.setSpan(StyleSpan(Typeface.BOLD), 0, title.length, 0)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage("Si sales ahora, te perderás lo mejor del parche.")
+            .setPositiveButton("SÍ, SALIR") { _, _ -> finish() }
+            .setNegativeButton("VOLVER (5s)", null) // Texto inicial
+            .create()
+
+        dialog.show()
+
+        // Estética del fondo y mensaje
+        dialog.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
+        dialog.findViewById<TextView>(android.R.id.message)?.setTextColor(Color.WHITE)
+
+        val btnNegativo = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+        val btnPositivo = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+
+        btnNegativo.setTextColor(colorDorado)
+        btnPositivo.setTextColor(Color.WHITE)
+
+        // --- Lógica del Contador ---
+        val timer = object : CountDownTimer(5000, 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                val segundosRestantes = millisUntilFinished / 1000
+                btnNegativo.text = "VOLVER (${segundosRestantes}s)"
+            }
+
+            override fun onFinish() {
+                if (dialog.isShowing) {
+                    dialog.dismiss() // Se cierra sin hacer nada
+                }
+            }
+        }
+
+        timer.start()
+
+        // Si el usuario presiona un botón manualmente, detenemos el timer
+        dialog.setOnDismissListener { timer.cancel() }
     }
 
     override fun onStart() {

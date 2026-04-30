@@ -59,6 +59,7 @@ import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -452,92 +453,106 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
     private fun mostrarDialogoContinuar(progresoGuardado: Long) {
+        // Colores de identidad CineParche
+        val colorDorado = Color.parseColor("#C5A059")
+        val colorFondo = Color.parseColor("#0A122A")
+
         val horas = progresoGuardado / 3600000
         val minutos = (progresoGuardado % 3600000) / 60000
         val segundos = (progresoGuardado % 60000) / 1000
         val tiempoFormateado = String.format("%02d:%02d:%02d", horas, minutos, segundos)
 
-        val contadorTextView = TextView(this@PlayerPeliculas).apply {
-            textSize = 22f
-            setTextColor(Color.GREEN)
-            setPadding(30, 10, 20, 10)
-        }
-
-        val customTitle = TextView(this@PlayerPeliculas).apply {
+        // Título elegante
+        val customTitle = TextView(this).apply {
             text = "¿Deseas continuar?"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 25f)
-            setTextColor(Color.GREEN)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
+            setTextColor(colorDorado)
             typeface = Typeface.DEFAULT_BOLD
-            setPadding(30, 20, 20, 20)
+            setPadding(40, 30, 40, 10)
         }
 
-        val customMessage = LinearLayout(this@PlayerPeliculas).apply {
+        // Mensaje centralizado
+        val customMessage = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(30, 20, 20, 20)
+            setPadding(40, 20, 40, 30)
+            gravity = Gravity.CENTER_HORIZONTAL
 
-            val texto = TextView(this@PlayerPeliculas).apply {
-                text = "Te Quedaste en $tiempoFormateado"
-                setTextSize(30f)
-                setTextColor(Color.RED)
+            val textoInfo = TextView(this@PlayerPeliculas).apply {
+                text = "Te quedaste en:"
+                textSize = 18f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
             }
 
-            addView(texto)
-            addView(contadorTextView)
+            val textoTiempo = TextView(this@PlayerPeliculas).apply {
+                text = tiempoFormateado
+                textSize = 32f
+                setTextColor(Color.WHITE)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, 10, 0, 10)
+                gravity = Gravity.CENTER
+            }
+
+            addView(textoInfo)
+            addView(textoTiempo)
         }
 
-        val dialog = AlertDialog.Builder(this@PlayerPeliculas)
+        val dialog = AlertDialog.Builder(this)
             .setCustomTitle(customTitle)
             .setView(customMessage)
-            .setNegativeButton("Reanudar", null)
-            .setPositiveButton("Reiniciar", null) // se configura luego para evitar cierre automático
+            .setNegativeButton("Reanudar (10s)", null)
+            .setPositiveButton("Reiniciar", null)
             .setCancelable(false)
             .create()
 
-        var contador: CountDownTimer? = null
+        var contadorTimer: CountDownTimer? = null
 
         dialog.setOnShowListener {
-            dialog.window?.setBackgroundDrawable(
-                ColorDrawable(ContextCompat.getColor(this@PlayerPeliculas, R.color.colorPrimary))
-            )
+            // Fondo inmersivo azul noche
+            dialog.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
 
-            val focusSelector = R.drawable.focus_selector
             val btnReiniciar = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             val btnReanudar = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+            val focusSelector = R.drawable.focus_selector
 
-            listOf(btnReiniciar, btnReanudar).forEach {
-                it.setTextColor(Color.LTGRAY)
-                it.textSize = 16f
-                it.setBackgroundResource(focusSelector)
-                it.isFocusable = true
-                it.isFocusableInTouchMode = true
+            listOf(btnReiniciar, btnReanudar).forEach { button ->
+                button.setTextColor(Color.WHITE)
+                button.textSize = 18f
+                button.setBackgroundResource(focusSelector)
+                button.isFocusable = true
+                button.isFocusableInTouchMode = true
+                button.setPadding(30, 15, 30, 15)
             }
 
-            // Botón por defecto con foco
-            btnReiniciar?.requestFocus()
+            // Foco inicial en Reanudar para mayor comodidad
+            btnReanudar?.requestFocus()
 
-            // Acciones de los botones
             btnReiniciar.setOnClickListener {
-                contador?.cancel()
+                contadorTimer?.cancel()
                 prepararReproductor(0L)
                 dialog.dismiss()
             }
 
             btnReanudar.setOnClickListener {
-                contador?.cancel()
+                contadorTimer?.cancel()
                 prepararReproductor(progresoGuardado)
                 dialog.dismiss()
             }
 
-            // Iniciar contador regresivo
-            contador = object : CountDownTimer(10000, 1000) {
+            // Lógica del contador integrada en el botón
+            contadorTimer = object : CountDownTimer(10000, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
-                    val segundosRestantes = millisUntilFinished / 1000
-                    contadorTextView.text = "Reanudar en $segundosRestantes"
+                    val seg = millisUntilFinished / 1000
+                    btnReanudar.text = "Reanudar (${seg}s)"
+                    // Efecto visual: el botón con el contador resalta en dorado
+                    btnReanudar.setTextColor(colorDorado)
                 }
 
                 override fun onFinish() {
-                    prepararReproductor(progresoGuardado)
-                    dialog.dismiss()
+                    if (dialog.isShowing) {
+                        prepararReproductor(progresoGuardado)
+                        dialog.dismiss()
+                    }
                 }
             }.start()
         }
@@ -914,7 +929,9 @@ class PlayerPeliculas : AppCompatActivity() {
             startActivity(intent)
         }
 
-        // ... (todo tu código anterior de Spannable y CastvHelper)
+// Colores de identidad CineParche
+        val colorDorado = Color.parseColor("#C5A059")
+        val colorFondo = Color.parseColor("#0A122A")
 
         val alertDialog = AlertDialog.Builder(this)
             .setView(dialogView)
@@ -922,43 +939,54 @@ class PlayerPeliculas : AppCompatActivity() {
                 dialog.dismiss()
                 finish()
             }
-            .setNeutralButton("Alquilar Película", null) // Se deja en null aquí
+            .setNeutralButton("Alquilar Película", null)
             .setPositiveButton("Cerrar") { dialog, _ ->
                 dialog.dismiss()
             }
             .create()
 
-        dialogView.setBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary))
+// Aplicamos el fondo azul oscuro al View personalizado
+        dialogView.setBackgroundColor(colorFondo)
 
         alertDialog.setOnShowListener {
             val btnAlquilar = alertDialog.getButton(AlertDialog.BUTTON_NEUTRAL)
-            val btnVolver = alertDialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            val btnCerrar = alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+            val btnVolver = alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+            val btnCerrar = alertDialog.getButton(AlertDialog.BUTTON_POSITIVE)
 
-            // --- AQUÍ ES DONDE SE AGREGA LA LLAMADA ---
+            // --- ESTILO DE TEXTO ---
+            btnAlquilar.setTextColor(colorDorado)
+            btnAlquilar.setTypeface(Typeface.DEFAULT_BOLD)
+
+            btnVolver.setTextColor(colorDorado)
+            btnCerrar.setTextColor(colorDorado)
+
+            // --- CONFIGURACIÓN DE ENFOQUE Y SELECTOR ---
+            val focusSelector = R.drawable.focus_selector
+            listOf(btnAlquilar, btnVolver, btnCerrar).forEach { button ->
+                button.setBackgroundResource(focusSelector)
+                button.isFocusable = true
+                button.isFocusableInTouchMode = true
+                // Ajuste de padding para que el selector se vea bien en TV
+                button.setPadding(24, 12, 24, 12)
+            }
+
+            // Asegurar que el contenedor de los botones no tenga bordes de otro color
+            (btnAlquilar.parent as? View)?.setBackgroundColor(colorFondo)
+
+            // --- LÓGICA DE ALQUILER ---
             btnAlquilar.setOnClickListener {
                 Log.d("ALQUILER_LOG", "1. Botón Alquilar presionado")
                 verificarYProcesarPedido(alertDialog)
             }
-            // ------------------------------------------
 
-            val focusSelector = R.drawable.focus_selector
-            btnAlquilar.setBackgroundResource(focusSelector)
-            btnVolver.setBackgroundResource(focusSelector)
-            btnCerrar.setBackgroundResource(focusSelector)
-
-            val buttonParent = btnAlquilar.parent as View
-            buttonParent.setBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary))
-
-            listOf(btnAlquilar, btnVolver, btnCerrar).forEach {
-                it.isFocusable = true
-                it.isFocusableInTouchMode = true
-            }
-
+            // El foco inicia en Alquilar para facilitar la compra
             btnAlquilar.requestFocus()
         }
 
         alertDialog.show()
+
+// Hacemos que la ventana del diálogo sea totalmente inmersiva (sin bordes blancos)
+        alertDialog.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
     }
 
     // Agregamos (dialog: AlertDialog) aquí
