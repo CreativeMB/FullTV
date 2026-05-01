@@ -10,8 +10,10 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.PorterDuff
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Bundle
@@ -19,6 +21,7 @@ import android.os.CountDownTimer
 import android.os.Handler
 import android.os.Looper
 import android.text.Editable
+import android.text.InputType
 import android.text.SpannableString
 import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
@@ -28,6 +31,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.EditText
@@ -41,8 +45,11 @@ import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.api.ApiPeliculaActivity
@@ -62,6 +69,7 @@ import com.creativem.fulltv.principal.Nosotros
 import com.creativem.fulltv.tv.TvActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.creativem.fulltv.BuildConfig
+import com.creativem.fulltv.principal.SplashActivity
 import com.creativem.fulltv.principal.ViewUtils
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -73,6 +81,7 @@ import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -123,6 +132,8 @@ class PeliculasActivity : AppCompatActivity() {
         }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 0. CERO TRANSICIONES: Crucial para que no haya salto negro
+        overridePendingTransition(0, 0)
         super.onCreate(savedInstanceState)
 
         // 🔧 Configuración Visual TV (Pantalla Completa)
@@ -133,49 +144,58 @@ class PeliculasActivity : AppCompatActivity() {
         binding = ActivityPeliculasBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // --- LÓGICA DE MEMORIA DE FOCO ---
-        // 1. Escuchamos cada cambio de foco en la pantalla
+        // --- 🚀 PASO 1: LLENADO INMEDIATO ---
+        // Tomamos los datos que el Splash ya dejó en la RAM
+        val peliculasYaCargadas = Validacioneslista.obtenerPeliculasValidas()
+        if (peliculasYaCargadas.isNotEmpty()) {
+            movieList.clear()
+            movieList.addAll(peliculasYaCargadas)
+        }
+
+        // --- 🚀 PASO 2: INICIAR COMPONENTES (Antes del listener de dibujo) ---
+        setupMenuHorizontal()
+        setupMovieGrid() // 👈 Aquí es donde configuramos el Pre-fetching que mencionamos antes
+
+        // --- 🚀 PASO 3: SINCRONIZACIÓN MILIMÉTRICA CON EL SPLASH ---
+
+        binding.rvPeliculas.post {
+            lifecycleScope.launch {
+                delay(100) // Un último respiro de 100ms para que el renderizado se asiente
+                SplashActivity.instance?.finish()
+                SplashActivity.instance = null
+            }
+        }
+
+        // --- LÓGICA DE FOCO ---
         binding.root.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
-            // Si el nuevo foco pertenece a la lista de películas, lo guardamos
             if (newFocus != null && isViewDescendantOf(newFocus, binding.rvPeliculas)) {
                 lastFocusedMovie = newFocus
             }
         }
 
-        // 2. Obligamos al menú a que al bajar, busque la última película
         binding.menuPrincipal.setOnFocusChangeListener { _, hasFocus ->
-            // Si el foco SALE del menú, intentamos recuperar la última posición
             if (!hasFocus && lastFocusedMovie != null) {
                 lastFocusedMovie?.requestFocus()
             }
         }
 
-
-
-        // 🔄 Botón atrás personalizado
+        // 🔄 Botón atrás
         onBackPressedDispatcher.addCallback(this) {
             mostrarConfirmacionSalida()
         }
-        CoroutineScope(Dispatchers.IO).launch {
-            Validacioneslista.cargarPeliculas()
-        }
 
+        // 📡 Listener Firebase (En segundo plano para no trabar el UI)
+        escucharCambiosEnPeliculas()
 
-        // 🚀 Iniciar Componentes
-        setupMenuHorizontal()
-        setupMovieGrid()
-
-        // 🛡️ Seguridad, Actualizaciones y Publicidad
+        // 🛡️ Seguridad, Publicidad y Registro
         iniciarVerificacionDeEstadoDeCuenta()
         obtenerNoticiaYActualizaciones()
 
-        // 📊 Registro de Usuario
         val currentUser = auth.currentUser
         if (currentUser != null && !currentUser.email.isNullOrBlank()) {
             CastvHelper.nuevosusuarios(this, currentUser.displayName ?: "Usuario", currentUser.email!!)
         }
     }
-
     // Función auxiliar para saber si una vista está dentro del RecyclerView
     private fun isViewDescendantOf(view: View, parent: ViewGroup): Boolean {
         var current = view.parent
@@ -237,38 +257,43 @@ class PeliculasActivity : AppCompatActivity() {
     }
 
     fun navegarATv() {
-        // Aquí abres la actividad de peliculas validas/gratis
+
         val intent = Intent(this, TvActivity::class.java)
         startActivity(intent)
     }
 
     fun navegarAPeliculasApi() {
-        // Aquí abres la actividad de peliculas validas/gratis
+
         val intent = Intent(this, PeliculasApiActivity::class.java)
         startActivity(intent)
     }
 
     // 3. Configuración de la Grilla Adaptable
     private fun setupMovieGrid() {
-        // 1. Usamos el objeto central para obtener las columnas
         val columnas = ViewUtils.calcularColumnas(this)
 
-        // 2. Aplicamos el número de columnas al Grid
-        binding.rvPeliculas.layoutManager = GridLayoutManager(this, columnas)
-// ESTO REEMPLAZA AL XML Y NO DA ERROR
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            binding.rvPeliculas.preserveFocusAfterLayout = true
+        // 1. Forzamos el LayoutManager a ser estático
+        val layoutManager = object : GridLayoutManager(this, columnas) {
+            // Esto evita que el RV pida medidas al sistema una y otra vez
+            override fun isAutoMeasureEnabled(): Boolean = false
         }
+        layoutManager.initialPrefetchItemCount = 25
+
+        binding.rvPeliculas.layoutManager = layoutManager
+
+        // 3. ESTO ES VITAL: Le dice al RV que el tamaño no va a cambiar nunca
+        binding.rvPeliculas.setHasFixedSize(true)
+
+        // 4. Evita que las tarjetas se re-dibujen al entrar
+        binding.rvPeliculas.itemAnimator = null
+
         movieAdapter = MoviesAdapter(
             movieList,
             onItemClick = { movie -> irAlReproductor(movie) },
-            onFocusChange = { movie ->
-                // Ahora sí, el fondo se actualiza dinámicamente al mover el foco
-                actualizarImagenDeFondo(movie.imageUrl)
-            }
+            onFocusChange = { movie -> actualizarImagenDeFondo(movie.imageUrl) }
         )
+
         binding.rvPeliculas.adapter = movieAdapter
-        binding.rvPeliculas.setHasFixedSize(true)
     }
     private fun actualizarImagenDeFondo(url: String?) {
         if (!url.isNullOrEmpty()) {
@@ -299,58 +324,58 @@ class PeliculasActivity : AppCompatActivity() {
                 if (haProcesadoEliminacion) return
 
                 // 🟢 NUEVA LÓGICA:
-                if (snapshot.exists()) {
-                    val estado = snapshot.child("estado").getValue(String::class.java)
-
-                    // SOLO lo sacamos si el estado dice "eliminado"
-                    if (estado == "eliminado") {
-                        haProcesadoEliminacion = true
-                        mostrarDialogoEliminado()
-                    }
-                } else {
-                    // Si el snapshot NO EXISTE, significa que el administrador
-                    // borró los datos para un RESET. No lo sacamos de la app.
-                    Log.d("Seguridad", "Los datos no existen, el usuario puede seguir (Reset)")
-
-                    // OPCIONAL: Podrías llamar aquí a CastvHelper.nuevosusuarios(...)
-                    // para que le cree su perfil de nuevo automáticamente si no existe.
-                    val currentUser = auth.currentUser
-                    CastvHelper.nuevosusuarios(this@PeliculasActivity, currentUser?.displayName ?: "Usuario", email)
-                }
+//                if (snapshot.exists()) {
+//                    val estado = snapshot.child("estado").getValue(String::class.java)
+//
+//                    // SOLO lo sacamos si el estado dice "eliminado"
+//                    if (estado == "eliminado") {
+//                        haProcesadoEliminacion = true
+//                        mostrarDialogoEliminado()
+//                    }
+//                } else {
+//                    // Si el snapshot NO EXISTE, significa que el administrador
+//                    // borró los datos para un RESET. No lo sacamos de la app.
+//                    Log.d("Seguridad", "Los datos no existen, el usuario puede seguir (Reset)")
+//
+//                    // OPCIONAL: Podrías llamar aquí a CastvHelper.nuevosusuarios(...)
+//                    // para que le cree su perfil de nuevo automáticamente si no existe.
+//                    val currentUser = auth.currentUser
+//                    CastvHelper.nuevosusuarios(this@PeliculasActivity, currentUser?.displayName ?: "Usuario", email)
+//                }
             }
             override fun onCancelled(error: DatabaseError) {}
         }
         userRef.addValueEventListener(userStatusListener!!)
     }
 
-    private fun mostrarDialogoEliminado() {
-        var segundos = 10
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Cuenta Eliminada")
-            .setMessage("Tu cuenta ha sido eliminada. Serás redirigido en $segundos s...")
-            .setCancelable(false)
-            .create()
-        dialog.show()
-
-        object : CountDownTimer(10000, 1000) {
-            override fun onTick(ms: Long) {
-                segundos--
-                dialog.setMessage("Tu cuenta ha sido eliminada. Serás redirigido en $segundos s...")
-            }
-            override fun onFinish() {
-                redirigirALogin()
-            }
-        }.start()
-    }
-
-    private fun redirigirALogin() {
-        UsuarioEstadoManager.cerrarSesion()
-        auth.signOut()
-        val intent = Intent(this, Login::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
-    }
+//    private fun mostrarDialogoEliminado() {
+//        var segundos = 10
+//        val dialog = AlertDialog.Builder(this)
+//            .setTitle("Cuenta Eliminada")
+//            .setMessage("Tu cuenta ha sido eliminada. Serás redirigido en $segundos s...")
+//            .setCancelable(false)
+//            .create()
+//        dialog.show()
+//
+//        object : CountDownTimer(10000, 1000) {
+//            override fun onTick(ms: Long) {
+//                segundos--
+//                dialog.setMessage("Tu cuenta ha sido eliminada. Serás redirigido en $segundos s...")
+//            }
+//            override fun onFinish() {
+//                redirigirALogin()
+//            }
+//        }.start()
+//    }
+//
+//    private fun redirigirALogin() {
+//        UsuarioEstadoManager.cerrarSesion()
+//        auth.signOut()
+//        val intent = Intent(this, Login::class.java)
+//        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+//        startActivity(intent)
+//        finish()
+//    }
 
     // ==========================================
     // 3. ACTUALIZACIONES
@@ -714,62 +739,185 @@ class PeliculasActivity : AppCompatActivity() {
     // ==========================================
 
     private fun mostrarDialogoPedido() {
-        val input = EditText(this).apply {
-            hint = "Ej: Moana 2 (2024)"
-            setPadding(50, 40, 50, 40)
+        // 🎨 Tus colores exactos
+        val colorTextoLogo = Color.parseColor("#C5A059") // El dorado
+        val colorFondoPrincipal = Color.parseColor("#2A2A2A") // El azul con transparencia
+
+        // 1. Contenedor Principal
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(60, 50, 60, 50)
+            // Aplicamos tu color de fondo principal
+            setBackgroundColor(colorFondoPrincipal)
         }
 
-        AlertDialog.Builder(this)
-            .setTitle("Solicitar Película")
-            .setView(input)
-            .setPositiveButton("Siguiente") { _, _ ->
+        // 2. Título con el dorado del logo
+        val titulo = TextView(this).apply {
+            text = "SOLICITAR PELÍCULA"
+            textSize = 22f
+            setTextColor(colorTextoLogo)
+            gravity = Gravity.CENTER
+            setTypeface(null, Typeface.BOLD)
+            setPadding(0, 0, 0, 40)
+        }
+
+        // 3. Campo de entrada (EditText)
+        val input = EditText(this).apply {
+            hint = "Ej: Moana 2 (2024)"
+            setHintTextColor(Color.parseColor("#BDBDBD")) // Gris claro para que sea legible
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            // La línea inferior del EditText en dorado
+            background.setColorFilter(colorTextoLogo, PorterDuff.Mode.SRC_ATOP)
+            setPadding(10, 25, 10, 25)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+        }
+
+        layout.addView(titulo)
+        layout.addView(input)
+
+        // 4. Crear el diálogo
+        val dialog = AlertDialog.Builder(this)
+            .setView(layout)
+            .setPositiveButton("SIGUIENTE", null)
+            .setNegativeButton("CANCELAR", null)
+            .create()
+
+        dialog.show()
+
+        // 5. Estilizar los botones
+
+        // Botón SIGUIENTE en Dorado
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
+            setTextColor(colorTextoLogo)
+            textSize = 17f
+            setTypeface(null, Typeface.BOLD)
+
+            setOnClickListener {
                 val nombrePeli = input.text.toString().trim()
                 if (nombrePeli.isNotEmpty()) {
-                    // AQUÍ ESTÁ EL TRUCO: En lugar de procesar, abre el resumen
                     comprobantepago(nombrePeli)
+                    dialog.dismiss()
                 } else {
-                    Toast.makeText(this, "Escribe el nombre de la película", Toast.LENGTH_SHORT).show()
+                    input.error = "Escribe el nombre"
                 }
             }
-            .setNegativeButton("Cancelar", null)
-            .show()
+        }
+
+        // Botón CANCELAR en Blanco
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).apply {
+            setTextColor(Color.WHITE)
+            textSize = 15f
+        }
     }
     private fun comprobantepago(pedido: String) {
-        val user = auth.currentUser
-        if (user != null && user.email != null) {
-            val correoKey = user.email!!.replace(".", "_").replace("@", "_")
+        val user = auth.currentUser ?: return
+        val email = user.email ?: return
+        val correoKey = email.replace(".", "_").replace("@", "_")
 
-            // Buscamos los datos reales para mostrar en el resumen
-            databaseRef.child("usuarios").child(correoKey).get().addOnSuccessListener { snapshot ->
-                if (snapshot.exists()) {
-                    val nombreUsuario = snapshot.child("nombre").value?.toString() ?: "Usuario"
-                    val saldoActual = (snapshot.child("castv").value as? Number)?.toInt() ?: 0
-                    val costo = 20
+        // Colores de tu identidad
+        val colorTextoLogo = Color.parseColor("#C5A059") // Dorado
+        val colorFondoPrincipal = Color.parseColor("#2A2A2A") // Tu fondo oscuro
 
-                    // Construimos el mensaje de resumen
-                    val mensaje = """
-                    🎬 Película: $pedido
-                    👤 Usuario: $nombreUsuario
-                    💰 Saldo Actual: $saldoActual CasTV
-                    📉 Costo: $costo CasTV
-                    ------------------------------
-                    Saldo final: ${saldoActual - costo} CasTV
-                """.trimIndent()
+        databaseRef.child("usuarios").child(correoKey).get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                val nombreUsuario = snapshot.child("nombre").value?.toString() ?: "Usuario"
+                val saldoActual = (snapshot.child("castv").value as? Number)?.toInt() ?: 0
+                val costo = 20
+                val saldoFinal = saldoActual - costo
 
-                    // SEGUNDO ALERT DIALOG (Confirmación de envío)
-                    AlertDialog.Builder(this)
-                        .setTitle("Confirmar Pedido")
-                        .setMessage(mensaje)
-                        .setCancelable(false)
-                        .setPositiveButton("Confirmar y Enviar") { _, _ ->
-                            if (saldoActual >= costo) {
-                                ejecutarProcesoFinal(correoKey, pedido, costo, nombreUsuario, user.email!!)
-                            } else {
-                                Toast.makeText(this, "Saldo insuficiente", Toast.LENGTH_LONG).show()
-                            }
+                // 1. Contenedor Principal
+                val layout = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(60, 50, 60, 50)
+                    setBackgroundColor(colorFondoPrincipal)
+                }
+
+                // 2. Título "Resumen de Pedido"
+                val titulo = TextView(this).apply {
+                    text = "CONFIRMAR PEDIDO"
+                    textSize = 20f
+                    setTextColor(colorTextoLogo)
+                    gravity = Gravity.CENTER
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(0, 0, 0, 40)
+                }
+
+                // 3. Bloque de Datos (Información del pedido)
+                val infoLayout = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(30, 30, 30, 30)
+                    // Le damos un borde sutil para que parezca una ficha
+                    val shape = GradientDrawable().apply {
+                        cornerRadius = 10f
+                        setStroke(2, Color.parseColor("#444444"))
+                    }
+                    background = shape
+                }
+
+                val crearFila = { label: String, valor: String, resaltado: Boolean ->
+                    TextView(this).apply {
+                        text = "$label $valor"
+                        textSize = if (resaltado) 17f else 15f
+                        setTextColor(if (resaltado) colorTextoLogo else Color.WHITE)
+                        setPadding(0, 8, 0, 8)
+                    }
+                }
+
+                infoLayout.addView(crearFila("🎬 Película:", pedido, true))
+                infoLayout.addView(crearFila("👤 Usuario:", nombreUsuario, false))
+                infoLayout.addView(crearFila("💰 Saldo:", "$saldoActual CasTV", false))
+                infoLayout.addView(crearFila("📉 Costo:", "$costo CasTV", false))
+
+                // Separador sutil
+                val linea = View(this).apply {
+                    // Usamos ViewGroup.LayoutParams para acceder a MATCH_PARENT
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        2
+                    ).apply {
+                        setMargins(0, 20, 0, 20)
+                    }
+                    setBackgroundColor(Color.parseColor("#444444"))
+                }
+                infoLayout.addView(linea)
+                infoLayout.addView(crearFila("✅ Saldo Final:", "$saldoFinal CasTV", true))
+
+                layout.addView(titulo)
+                layout.addView(infoLayout)
+
+                // 4. Crear el Alert Dialog
+                val dialog = AlertDialog.Builder(this)
+                    .setView(layout)
+                    .setCancelable(false)
+                    .setPositiveButton("CONFIRMAR Y ENVIAR", null)
+                    .setNegativeButton("CORREGIR", null)
+                    .create()
+
+                dialog.show()
+
+                // 5. Estilo de Botones
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
+                    setTextColor(colorTextoLogo)
+                    textSize = 16f
+                    setTypeface(null, Typeface.BOLD)
+                    setOnClickListener {
+                        if (saldoActual >= costo) {
+                            ejecutarProcesoFinal(correoKey, pedido, costo, nombreUsuario, email)
+                            dialog.dismiss()
+                        } else {
+                            Toast.makeText(context, "Saldo insuficiente ❌", Toast.LENGTH_LONG).show()
                         }
-                        .setNegativeButton("Corregir") { _, _ -> mostrarDialogoPedido() } // Regresa al anterior
-                        .show()
+                    }
+                }
+
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).apply {
+                    setTextColor(Color.WHITE)
+                    textSize = 14f
+                    setOnClickListener {
+                        dialog.dismiss()
+                        mostrarDialogoPedido() // Regresa al anterior
+                    }
                 }
             }
         }
@@ -824,59 +972,91 @@ class PeliculasActivity : AppCompatActivity() {
         val uid = user.uid
         val correoKey = email.replace(".", "_").replace("@", "_")
 
+        // 🎨 Tus colores de identidad
+        val colorTextoLogo = Color.parseColor("#C5A059") // Dorado
+        val colorFondoPrincipal = Color.parseColor("#2A2A2A") // Tu fondo oscuro
+
         // --- DISEÑO DEL DIÁLOGO ---
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(60, 40, 60, 20)
+            setPadding(60, 50, 60, 40)
+            setBackgroundColor(colorFondoPrincipal)
+        }
+
+        val titulo = TextView(this).apply {
+            text = "💎 ACTIVAR PAQUETE"
+            textSize = 20f
+            setTextColor(colorTextoLogo)
+            gravity = Gravity.CENTER
+            setTypeface(null, Typeface.BOLD)
+            setPadding(0, 0, 0, 30)
         }
 
         val descripcion = TextView(this).apply {
             text = "Selecciona el paquete que pagaste:"
-            textSize = 16f
+            textSize = 15f
+            setTextColor(Color.WHITE)
             setPadding(0, 0, 0, 20)
         }
 
-        // Grupo de selección
-        val radioGroup = android.widget.RadioGroup(this)
+        // Grupo de selección estilizado
+        val radioGroup = android.widget.RadioGroup(this).apply {
+            setPadding(10, 10, 10, 20)
+        }
 
-        // Opción Plata
-        val rbPlata = android.widget.RadioButton(this).apply {
-            text = "Plata: \$5.000 (50 Castv)"
-            id = View.generateViewId()
+        // Función para crear RadioButtons con tu estilo
+        fun crearRadioButton(texto: String): android.widget.RadioButton {
+            return android.widget.RadioButton(this).apply {
+                text = texto
+                setTextColor(Color.WHITE)
+                textSize = 16f
+                // Cambia el color del círculo del RadioButton a dorado
+                buttonTintList = ColorStateList.valueOf(colorTextoLogo)
+                id = View.generateViewId()
+                setPadding(20, 20, 20, 20)
+            }
         }
-        // Opción Bronce
-        val rbBronce = android.widget.RadioButton(this).apply {
-            text = "Bronce: \$10.000 (120 Castv)"
-            id = View.generateViewId()
-        }
-        // Opción Oro
-        val rbOro = android.widget.RadioButton(this).apply {
-            text = "Oro: \$20.000 (250 Castv)"
-            id = View.generateViewId()
-        }
+
+        val rbPlata = crearRadioButton("Plata: $5.000 (50 Castv)")
+        val rbBronce = crearRadioButton("Bronce: $10.000 (120 Castv)")
+        val rbOro = crearRadioButton("Oro: $20.000 (250 Castv)")
 
         radioGroup.addView(rbPlata)
         radioGroup.addView(rbBronce)
         radioGroup.addView(rbOro)
-        rbPlata.isChecked = true // Seleccionado por defecto
+        rbPlata.isChecked = true
 
         val inputReferencia = EditText(this).apply {
-            hint = "Escribe Banco y Nombre completo "
-            setPadding(20, 30, 20, 30)
+            hint = "Banco y Nombre completo de quien envía"
+            setHintTextColor(Color.parseColor("#80FFFFFF"))
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            background.setColorFilter(colorTextoLogo, PorterDuff.Mode.SRC_ATOP)
+            setPadding(10, 30, 10, 30)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
         }
 
+        layout.addView(titulo)
         layout.addView(descripcion)
         layout.addView(radioGroup)
-        layout.addView(TextView(this).apply { text = "\nDetalles adicionales:"; textSize = 14f })
         layout.addView(inputReferencia)
 
         // --- MOSTRAR EL DIÁLOGO ---
-        AlertDialog.Builder(this)
-            .setTitle("💎 Activar Paquete")
+        val dialog = AlertDialog.Builder(this)
             .setView(layout)
-            .setPositiveButton("Enviar Reporte") { _, _ ->
+            .setPositiveButton("ENVIAR REPORTE", null)
+            .setNegativeButton("CANCELAR", null)
+            .create()
 
-                // Determinar qué plan eligió y cuántos puntos son
+        dialog.show()
+
+        // --- PERSONALIZAR BOTONES ---
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
+            setTextColor(colorTextoLogo)
+            textSize = 16f
+            setTypeface(null, Typeface.BOLD)
+
+            setOnClickListener {
                 val planSeleccionado = when (radioGroup.checkedRadioButtonId) {
                     rbPlata.id -> "PLATA"
                     rbBronce.id -> "BRONCE"
@@ -892,10 +1072,14 @@ class PeliculasActivity : AppCompatActivity() {
                 }
 
                 val detalle = inputReferencia.text.toString().trim()
+                if (detalle.isEmpty()) {
+                    inputReferencia.error = "Escribe los detalles del pago"
+                    return@setOnClickListener
+                }
+
                 val tituloFinal = "$planSeleccionado - $detalle"
 
-                // EJECUTAR EL GUARDADO
-                CoroutineScope(Dispatchers.Main).launch {
+                lifecycleScope.launch {
                     try {
                         val snapshot = withContext(Dispatchers.IO) {
                             databaseRef.child("usuarios").child(correoKey).get().await()
@@ -904,7 +1088,7 @@ class PeliculasActivity : AppCompatActivity() {
 
                         val data = hashMapOf(
                             "title" to tituloFinal,
-                            "castv" to puntosPlan, // Aquí ya va el valor real según el plan
+                            "castv" to puntosPlan,
                             "email" to email,
                             "nombre" to nombreReal,
                             "timestamp" to ServerValue.TIMESTAMP,
@@ -916,14 +1100,19 @@ class PeliculasActivity : AppCompatActivity() {
                         }
 
                         Toast.makeText(this@PeliculasActivity, "✅ Reporte de $planSeleccionado enviado", Toast.LENGTH_LONG).show()
+                        dialog.dismiss()
 
                     } catch (e: Exception) {
                         Toast.makeText(this@PeliculasActivity, "❌ Error al enviar reporte", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
-            .setNegativeButton("Cancelar", null)
-            .show()
+        }
+
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).apply {
+            setTextColor(Color.WHITE)
+            textSize = 14f
+        }
     }
 
     // ==========================================
@@ -931,42 +1120,80 @@ class PeliculasActivity : AppCompatActivity() {
     // ==========================================
 
     private fun escucharCambiosEnPeliculas() {
-        if (yaTieneListener) return // No agregar doble listener
+        if (yaTieneListener) return // Evitamos duplicar el listener
 
         val moviesRef = databaseRef.child("movies")
         peliculasListener = moviesRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
-                    val nuevasPeliculas = mutableListOf<Movie>()
+                    val nuevasPeliculasRaw = mutableListOf<Movie>()
+
+                    // 1. Mapeamos los IDs de las películas ya validadas para compararlas rápido
                     val yaValidadas = Validacioneslista.obtenerPeliculasValidas().map { it.id }.toSet()
 
+                    // 2. Extraemos los datos de Firebase
                     for (child in snapshot.children) {
                         val movie = child.getValue(Movie::class.java)
                         if (movie != null) {
+                            // Copiamos el objeto incluyendo el ID del nodo de Firebase
                             val movieConId = movie.copy(id = child.key ?: "")
+
+                            // Si ya está validada, marcamos el flag para que el adapter lo sepa
                             if (yaValidadas.contains(movieConId.id)) {
                                 movieConId.isValid = true
                             }
-                            nuevasPeliculas.add(movieConId)
+                            nuevasPeliculasRaw.add(movieConId)
                         }
                     }
 
-                    // 🟢 MEJORA: No hacemos clear() inmediato.
-                    // Ordenamos y comparamos antes de asignar para evitar parpadeos.
-                    val listaOrdenada = nuevasPeliculas.sortedByDescending { it.createdAt }
+                    // 3. Ordenamos por fecha de creación (de más nueva a más vieja)
+                    val listaNuevaOrdenada = nuevasPeliculasRaw.sortedByDescending { it.createdAt }
 
-                    movieList.clear()
-                    movieList.addAll(listaOrdenada)
-                    movieAdapter.notifyDataSetChanged()
+                    // 4. Lógica de actualización Inteligente (Premium)
+                    if (movieList.isEmpty()) {
+                        // Primera carga: Llenamos y notificamos todo de golpe para rapidez
+                        movieList.addAll(listaNuevaOrdenada)
+                        movieAdapter.notifyDataSetChanged()
+                    } else {
+                        // Cargas posteriores o cambios en vivo: Usamos DiffUtil para evitar parpadeos
+                        val listaVieja = ArrayList(movieList) // Copia de seguridad de la lista actual
 
+                        val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                            override fun getOldListSize(): Int = listaVieja.size
+                            override fun getNewListSize(): Int = listaNuevaOrdenada.size
+
+                            override fun areItemsTheSame(oldPos: Int, newPos: Int): Boolean {
+                                return listaVieja[oldPos].id == listaNuevaOrdenada[newPos].id
+                            }
+
+                            override fun areContentsTheSame(oldPos: Int, newPos: Int): Boolean {
+                                // Esto compara todos los campos de la data class Movie
+                                return listaVieja[oldPos] == listaNuevaOrdenada[newPos]
+                            }
+                        })
+
+                        // Actualizamos la lista principal y aplicamos los cambios quirúrgicos
+                        movieList.clear()
+                        movieList.addAll(listaNuevaOrdenada)
+                        diffResult.dispatchUpdatesTo(movieAdapter)
+                    }
+
+                    // 5. Verificamos si hay que validar contenido nuevo
                     if (!Validacioneslista.yaCargado()) {
                         validarYActualizarVistasEnVivo()
                     }
+
                     yaTieneListener = true
+                } else {
+                    // Si el nodo "movies" está vacío
+                    movieList.clear()
+                    movieAdapter.notifyDataSetChanged()
                 }
             }
+
             override fun onCancelled(error: DatabaseError) {
                 yaTieneListener = false
+                // Aquí podrías agregar un Log para debuggear fallos de conexión
             }
         })
     }

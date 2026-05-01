@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Color de fondo (ajusta a tu color principal) -->
+    <item android:drawable="@color/colorPrimary" />
+
+    <!-- Tu logo centrado -->
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/icono" />
+    </item>
+</layer-list>

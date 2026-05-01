@@ -18,18 +18,31 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
+// 🖼️ IMPORTANTE: Para la precarga optimizada de imágenes (Glide)
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 1. Configurar flags ANTES de que se cree la vista para evitar parpadeos de reajuste
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+        )
         super.onCreate(savedInstanceState)
-
+        instance = this
         // 🔧 Configuración Visual TV (Pantalla Completa)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
-
+// 2. Forzar pantalla completa total
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_splash)
 
         val logo = findViewById<ImageView>(R.id.imgLogoSplash)
@@ -58,28 +71,35 @@ class SplashActivity : AppCompatActivity() {
 
     private fun iniciarCargaDeDatos() {
         lifecycleScope.launch {
-            // 1. Cargamos las validaciones en un hilo secundario para no trabar la pantalla
+            // 1. Carga de datos e imágenes en segundo plano
             val cargaTrabajo = launch(Dispatchers.IO) {
                 Validacioneslista.cargarPeliculas()
+                val lasPrimeras = Validacioneslista.obtenerPeliculasValidas().take(15)
+                lasPrimeras.forEach { movie ->
+                    try {
+                        Glide.with(applicationContext).asBitmap().load(movie.imageUrl)
+                            .diskCacheStrategy(DiskCacheStrategy.ALL).submit().get()
+                    } catch (e: Exception) {}
+                }
             }
 
-            // 2. Tiempo mínimo en pantalla para que se lea el mensaje y se vea la animación (3 Segundos)
-            delay(3000)
-
-            // 3. Garantizamos que la base de datos ya está cacheada antes de avanzar
+            // 2. Esperamos a que los datos estén listos
             cargaTrabajo.join()
 
-            // 4. Verificamos a dónde debe ir el usuario
-            val currentUser = FirebaseAuth.getInstance().currentUser
-            if (currentUser != null) {
-                startActivity(Intent(this@SplashActivity, PeliculasActivity::class.java))
-            } else {
-                startActivity(Intent(this@SplashActivity, Login::class.java))
-            }
+            // 3. Abrimos la actividad pero NO llamamos a finish() todavía
+            val intent = Intent(this@SplashActivity, PeliculasActivity::class.java)
+            startActivity(intent)
 
-            // 5. Transición suave de fundido cruzado (Fade in / Fade out)
-            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
-            finish()
+            // Quitamos animaciones para que parezca la misma pantalla
+            overridePendingTransition(0, 0)
+
+            // El Splash se queda vivo en el fondo hasta que la lista se dibuje
         }
     }
+
+    // 4. Creamos un método estático para cerrar el splash desde la otra actividad
+    companion object {
+        var instance: SplashActivity? = null
+    }
+
 }
