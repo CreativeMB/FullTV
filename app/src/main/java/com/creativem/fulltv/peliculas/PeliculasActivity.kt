@@ -33,6 +33,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageView
@@ -1028,12 +1029,20 @@ class PeliculasActivity : AppCompatActivity() {
 
         val inputReferencia = EditText(this).apply {
             hint = "Banco y Nombre completo de quien envía"
-            setHintTextColor(Color.parseColor("#80FFFFFF"))
-            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#A0A0A0")) // Gris claro para que sea visible
+            setTextColor(Color.WHITE) // 👈 Forzamos que lo que se escribe sea BLANCO
             textSize = 16f
+
+            // Esto asegura que la línea de abajo sea dorada
             background.setColorFilter(colorTextoLogo, PorterDuff.Mode.SRC_ATOP)
-            setPadding(10, 30, 10, 30)
+
+            // Ajustamos el padding para que el texto no toque los bordes
+            setPadding(20, 40, 20, 40)
+
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+
+            // IMPORTANTE: Asegura que el teclado no tape el diálogo en TV
+            imeOptions = EditorInfo.IME_ACTION_DONE
         }
 
         layout.addView(titulo)
