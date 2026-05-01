@@ -40,6 +40,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
@@ -973,48 +974,46 @@ class PeliculasActivity : AppCompatActivity() {
         val uid = user.uid
         val correoKey = email.replace(".", "_").replace("@", "_")
 
-        // 🎨 Tus colores de identidad
-        val colorTextoLogo = Color.parseColor("#C5A059") // Dorado
-        val colorFondoPrincipal = Color.parseColor("#2A2A2A") // Tu fondo oscuro
+        val colorTextoLogo = Color.parseColor("#C5A059")
+        val colorFondoPrincipal = Color.parseColor("#2A2A2A")
 
-        // --- DISEÑO DEL DIÁLOGO ---
+        // 1. Contenedor principal sin ScrollView para forzar el ajuste
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(60, 50, 60, 40)
+            setPadding(40, 30, 40, 20) // Reducido de 60/50 a 40/30
             setBackgroundColor(colorFondoPrincipal)
         }
 
+        // 2. Título y Descripción más compactos
         val titulo = TextView(this).apply {
             text = "💎 ACTIVAR PAQUETE"
-            textSize = 20f
+            textSize = 18f // Reducido de 22f a 18f
             setTextColor(colorTextoLogo)
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
-            setPadding(0, 0, 0, 30)
+            setPadding(0, 0, 0, 15) // Espacio inferior reducido a la mitad
         }
 
         val descripcion = TextView(this).apply {
             text = "Selecciona el paquete que pagaste:"
-            textSize = 15f
+            textSize = 14f // Reducido de 16f a 14f
             setTextColor(Color.WHITE)
-            setPadding(0, 0, 0, 20)
+            setPadding(0, 0, 0, 10)
         }
 
-        // Grupo de selección estilizado
+        // 3. RadioGroup con menos padding
         val radioGroup = android.widget.RadioGroup(this).apply {
-            setPadding(10, 10, 10, 20)
+            setPadding(10, 0, 10, 10)
         }
 
-        // Función para crear RadioButtons con tu estilo
         fun crearRadioButton(texto: String): android.widget.RadioButton {
             return android.widget.RadioButton(this).apply {
                 text = texto
                 setTextColor(Color.WHITE)
-                textSize = 16f
-                // Cambia el color del círculo del RadioButton a dorado
+                textSize = 14f // Reducido de 16f a 14f
                 buttonTintList = ColorStateList.valueOf(colorTextoLogo)
                 id = View.generateViewId()
-                setPadding(20, 20, 20, 20)
+                setPadding(15, 10, 15, 10) // Padding interno mucho más pequeño
             }
         }
 
@@ -1027,21 +1026,33 @@ class PeliculasActivity : AppCompatActivity() {
         radioGroup.addView(rbOro)
         rbPlata.isChecked = true
 
+        // 4. EL CUADRO DE TEXTO ajustado
         val inputReferencia = EditText(this).apply {
-            hint = "Banco y Nombre completo de quien envía"
-            setHintTextColor(Color.parseColor("#A0A0A0")) // Gris claro para que sea visible
-            setTextColor(Color.WHITE) // 👈 Forzamos que lo que se escribe sea BLANCO
-            textSize = 16f
+            id = View.generateViewId()
+            hint = "Banco y Nombre de quien envía"
+            setHintTextColor(Color.parseColor("#80FFFFFF"))
+            setTextColor(Color.WHITE)
+            textSize = 15f
+            isFocusable = true
+            isFocusableInTouchMode = true
 
-            // Esto asegura que la línea de abajo sea dorada
-            background.setColorFilter(colorTextoLogo, PorterDuff.Mode.SRC_ATOP)
+            val gd = GradientDrawable().apply {
+                setColor(Color.parseColor("#33FFFFFF"))
+                cornerRadius = 8f // Bordes más discretos
+                setStroke(2, colorTextoLogo) // Borde más delgado
+            }
+            background = gd
 
-            // Ajustamos el padding para que el texto no toque los bordes
-            setPadding(20, 40, 20, 40)
+            setPadding(25, 25, 25, 25) // Altura del cuadro reducida
+
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 10, 0, 10) // Márgenes externos reducidos
+            }
 
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
-
-            // IMPORTANTE: Asegura que el teclado no tape el diálogo en TV
             imeOptions = EditorInfo.IME_ACTION_DONE
         }
 
@@ -1050,29 +1061,33 @@ class PeliculasActivity : AppCompatActivity() {
         layout.addView(radioGroup)
         layout.addView(inputReferencia)
 
-        // --- MOSTRAR EL DIÁLOGO ---
+        // 5. Mostrar Diálogo
         val dialog = AlertDialog.Builder(this)
-            .setView(layout)
+            .setView(layout) // Usamos el layout directamente
             .setPositiveButton("ENVIAR REPORTE", null)
             .setNegativeButton("CANCELAR", null)
             .create()
 
         dialog.show()
 
-        // --- PERSONALIZAR BOTONES ---
+        // Lógica de botones (Sin cambios en funcionalidad)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
             setTextColor(colorTextoLogo)
-            textSize = 16f
+            textSize = 15f
             setTypeface(null, Typeface.BOLD)
-
             setOnClickListener {
+                val detalle = inputReferencia.text.toString().trim()
+                if (detalle.isEmpty()) {
+                    inputReferencia.error = "Faltan detalles"
+                    return@setOnClickListener
+                }
+
                 val planSeleccionado = when (radioGroup.checkedRadioButtonId) {
                     rbPlata.id -> "PLATA"
                     rbBronce.id -> "BRONCE"
                     rbOro.id -> "ORO"
                     else -> "DESCONOCIDO"
                 }
-
                 val puntosPlan = when (radioGroup.checkedRadioButtonId) {
                     rbPlata.id -> 50
                     rbBronce.id -> 120
@@ -1080,39 +1095,27 @@ class PeliculasActivity : AppCompatActivity() {
                     else -> 0
                 }
 
-                val detalle = inputReferencia.text.toString().trim()
-                if (detalle.isEmpty()) {
-                    inputReferencia.error = "Escribe los detalles del pago"
-                    return@setOnClickListener
-                }
-
-                val tituloFinal = "$planSeleccionado - $detalle"
-
                 lifecycleScope.launch {
                     try {
                         val snapshot = withContext(Dispatchers.IO) {
                             databaseRef.child("usuarios").child(correoKey).get().await()
                         }
                         val nombreReal = snapshot.child("nombre").value?.toString() ?: "Usuario"
-
                         val data = hashMapOf(
-                            "title" to tituloFinal,
+                            "title" to "$planSeleccionado - $detalle",
                             "castv" to puntosPlan,
                             "email" to email,
                             "nombre" to nombreReal,
                             "timestamp" to ServerValue.TIMESTAMP,
                             "userId" to uid
                         )
-
                         withContext(Dispatchers.IO) {
                             databaseRef.child("pedidosmovies").push().setValue(data).await()
                         }
-
-                        Toast.makeText(this@PeliculasActivity, "✅ Reporte de $planSeleccionado enviado", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@PeliculasActivity, "✅ Enviado", Toast.LENGTH_SHORT).show()
                         dialog.dismiss()
-
                     } catch (e: Exception) {
-                        Toast.makeText(this@PeliculasActivity, "❌ Error al enviar reporte", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@PeliculasActivity, "❌ Error", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -1123,7 +1126,6 @@ class PeliculasActivity : AppCompatActivity() {
             textSize = 14f
         }
     }
-
     // ==========================================
     // 7. LISTA Y REPRODUCTOR
     // ==========================================
