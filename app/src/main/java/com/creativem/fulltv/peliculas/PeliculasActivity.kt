@@ -73,6 +73,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.creativem.fulltv.BuildConfig
 import com.creativem.fulltv.principal.SplashActivity
 import com.creativem.fulltv.principal.ViewUtils
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
@@ -134,68 +136,62 @@ class PeliculasActivity : AppCompatActivity() {
         }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 0. CERO TRANSICIONES: Crucial para que no haya salto negro
+        // 1. CERO TRANSICIONES: Evita saltos negros entre actividades
         overridePendingTransition(0, 0)
         super.onCreate(savedInstanceState)
 
-        // 🔧 Configuración Visual TV (Pantalla Completa)
+        // 2. CONFIGURACIÓN VISUAL PARA TV (Pantalla Completa e Inmersiva)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_FULLSCREEN,
+            WindowManager.LayoutParams.FLAG_FULLSCREEN
+        )
 
         binding = ActivityPeliculasBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // --- 🚀 PASO 1: LLENADO INMEDIATO ---
-        // Tomamos los datos que el Splash ya dejó en la RAM
+        // 3. CARGA DE DATOS DESDE LA RAM (Rápido y Seguro)
         val peliculasYaCargadas = Validacioneslista.obtenerPeliculasValidas()
         if (peliculasYaCargadas.isNotEmpty()) {
             movieList.clear()
             movieList.addAll(peliculasYaCargadas)
         }
 
-        // --- 🚀 PASO 2: INICIAR COMPONENTES (Antes del listener de dibujo) ---
+        // 4. INICIALIZACIÓN DE COMPONENTES UI
         setupMenuHorizontal()
-        setupMovieGrid() // 👈 Aquí es donde configuramos el Pre-fetching que mencionamos antes
+        setupMovieGrid()
 
-        // --- 🚀 PASO 3: SINCRONIZACIÓN MILIMÉTRICA CON EL SPLASH ---
+        // --- NOTA: HEMOS ELIMINADO EL BLOQUE SplashActivity.instance?.finish() ---
+        // Al usar las FLAGS en el Login, esto ya no es necesario y evita el CRASH.
 
-        binding.rvPeliculas.post {
-            lifecycleScope.launch {
-                delay(100) // Un último respiro de 100ms para que el renderizado se asiente
-                SplashActivity.instance?.finish()
-                SplashActivity.instance = null
-            }
-        }
-
-        // --- LÓGICA DE FOCO ---
+        // 5. GESTIÓN DE FOCO (Crucial para el control remoto de TV)
         binding.root.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
             if (newFocus != null && isViewDescendantOf(newFocus, binding.rvPeliculas)) {
                 lastFocusedMovie = newFocus
             }
         }
 
-        binding.menuPrincipal.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus && lastFocusedMovie != null) {
-                lastFocusedMovie?.requestFocus()
-            }
-        }
-
-        // 🔄 Botón atrás
+        // 6. LISTENERS Y SEGURIDAD (En segundo plano)
         onBackPressedDispatcher.addCallback(this) {
             mostrarConfirmacionSalida()
         }
 
-        // 📡 Listener Firebase (En segundo plano para no trabar el UI)
         escucharCambiosEnPeliculas()
-
-        // 🛡️ Seguridad, Publicidad y Registro
         iniciarVerificacionDeEstadoDeCuenta()
         obtenerNoticiaYActualizaciones()
 
+        // 7. REGISTRO DE USUARIO (Si aplica)
         val currentUser = auth.currentUser
         if (currentUser != null && !currentUser.email.isNullOrBlank()) {
-            CastvHelper.nuevosusuarios(this, currentUser.displayName ?: "Usuario", currentUser.email!!)
+            // Verificamos si es el invitado para poner el nombre manual
+            val nombreAMostrar = if (currentUser.email == "invitado@fulltv.com") {
+                "Estas En Invitado"
+            } else {
+                currentUser.displayName ?: "Usuario"
+            }
+
+            CastvHelper.nuevosusuarios(this, nombreAMostrar, currentUser.email!!)
         }
     }
     // Función auxiliar para saber si una vista está dentro del RecyclerView
@@ -1266,12 +1262,33 @@ class PeliculasActivity : AppCompatActivity() {
         startActivity(intent) // Inicia la actividad del reproductor
     }
 
+    // --- En PeliculasActivity.kt ---
+
     private fun cerrarSesion() {
-        UsuarioEstadoManager.cerrarSesion()
+        Toast.makeText(this, "Cerrando sesión...", Toast.LENGTH_SHORT).show()
+
+        // 1. Cerrar sesión en Firebase (Fundamental)
         auth.signOut()
-        startActivity(Intent(this, Login::class.java))
-        finish()
+
+        // 2. Configurar y cerrar Google
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(getString(R.string.default_web_client_id))
+            .build()
+        val googleSignInClient = GoogleSignIn.getClient(this, gso)
+
+        googleSignInClient.signOut().addOnCompleteListener {
+            // Opcional: Revocar acceso limpia el rastro de la cuenta de Google en el selector
+            googleSignInClient.revokeAccess().addOnCompleteListener {
+                // 3. Navegar al Login limpiando el historial de actividades
+                val intent = Intent(this, Login::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                }
+                startActivity(intent)
+                finish()
+            }
+        }
     }
+
 
     private fun mostrarConfirmacionSalida() {
         val colorDorado = Color.parseColor("#C5A059")

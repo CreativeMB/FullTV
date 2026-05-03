@@ -28,7 +28,7 @@
                 android:layout_width="100dp"
                 android:layout_height="150dp"
                 android:adjustViewBounds="true"
-                android:scaleType="centerCrop"
+                android:scaleType="fitXY"
                 android:src="@drawable/icono"
                 android:contentDescription="Imagen previa"
                 android:layout_marginEnd="8dp" />

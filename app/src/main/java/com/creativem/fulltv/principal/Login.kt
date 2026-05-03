@@ -40,44 +40,48 @@ class Login : AppCompatActivity() {
         private const val TAG = "Login"
     }
 
+    // --- En Login.kt ---
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.login)
 
-        // Configurar Firebase Auth
         auth = FirebaseAuth.getInstance()
         firestore = FirebaseFirestore.getInstance()
         database = FirebaseDatabase.getInstance()
 
-        // Configurar Google Sign-In
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(getString(R.string.default_web_client_id)) // ID desde Firebase Console
+            .requestIdToken(getString(R.string.default_web_client_id))
             .requestEmail()
             .build()
-
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
-        // Verificar si el usuario ya está autenticado
         val currentUser = auth.currentUser
 
-        if (currentUser == null) {
-            // Si no hay usuario autenticado, mostrar el diálogo de opciones de inicio de sesión
-            showLoginOptionsDialog()
-        } else {
-            // Si el usuario está autenticado, verificar si es el usuario invitado
+        // LÓGICA CORREGIDA:
+        if (currentUser != null) {
+            // Si el usuario es el invitado, cerramos sesión de inmediato y mostramos opciones
             if (currentUser.email == "invitado@fulltv.com") {
-                // El usuario ya está autenticado como invitado
-                val intent = Intent(this, PeliculasActivity::class.java)
-                startActivity(intent)
-                finish()
+                auth.signOut()
+                showLoginOptionsDialog()
             } else {
-                // El usuario está autenticado con Google u otro método
-                val intent = Intent(this, PeliculasActivity::class.java)
-                startActivity(intent)
-                finish()
+                // Si es un usuario real de Google, entra directo
+                irAPeliculas()
             }
+        } else {
+            // No hay nadie logueado, mostrar opciones
+            showLoginOptionsDialog()
         }
+    }
 
+    // Mantenemos tu función de navegación limpia
+    private fun irAPeliculas() {
+        val intent = Intent(this, PeliculasActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        startActivity(intent)
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        finish()
     }
     /**
      * Muestra un Dialog moderno programado 100% en Kotlin, adaptable a TV y Celular.
@@ -93,19 +97,15 @@ class Login : AppCompatActivity() {
         val dialogBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-
             val displayMetrics = resources.displayMetrics
             val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-            // Ajuste de anchos para que no se vea mal en ninguna pantalla
             val widthPercent = if (isLandscape) 0.45 else 0.85
             val paddingVal = if (isLandscape) 60 else 40
-
             setPadding(paddingVal, paddingVal, paddingVal, paddingVal)
 
             background = GradientDrawable().apply {
                 setColor(Color.parseColor("#141414"))
-                cornerRadius = 40f // Bordes un poco más curvos se ve más moderno
+                cornerRadius = 40f
                 setStroke(2, Color.parseColor("#333333"))
             }
 
@@ -117,7 +117,6 @@ class Login : AppCompatActivity() {
             }
         }
 
-        // Título
         val title = TextView(this).apply {
             text = "INICIAR SESIÓN"
             textSize = 24f
@@ -127,27 +126,23 @@ class Login : AppCompatActivity() {
             setPadding(0, 0, 0, 10)
         }
 
-        // Mensaje
         val message = TextView(this).apply {
-            text = "¿Cómo deseas disfrutar de FullTV hoy?"
+            text = "¿Cómo deseas ingresar hoy?"
             textSize = 16f
             setTextColor(Color.parseColor("#99FFFFFF"))
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 40)
         }
 
-        // Función de botones mejorada
         fun createTvButton(textStr: String, bgColor: String, fColor: String, onClick: () -> Unit): TextView {
             val btn = TextView(this)
-            btn.text = textStr // ASIGNACIÓN DIRECTA
+            btn.text = textStr
             btn.textSize = 18f
             btn.setTextColor(Color.WHITE)
             btn.typeface = Typeface.DEFAULT_BOLD
             btn.gravity = Gravity.CENTER
             btn.isFocusable = true
             btn.isClickable = true
-
-            // Padding interno del botón (ajustado para que no sea tan alto en celular)
             btn.setPadding(0, 30, 0, 30)
 
             val bg = GradientDrawable().apply {
@@ -174,6 +169,8 @@ class Login : AppCompatActivity() {
             }
 
             btn.setOnClickListener {
+                // AJUSTE 1: Evitamos doble clic accidental
+                btn.isClickable = false
                 dialog.dismiss()
                 onClick()
             }
@@ -195,8 +192,13 @@ class Login : AppCompatActivity() {
         rootLayout.addView(dialogBox)
 
         dialog.setContentView(rootLayout)
+
+        // AJUSTE 2: Solo damos foco a Google después de que el diálogo esté visible
+        dialog.setOnShowListener {
+            btnGoogle.requestFocus()
+        }
+
         dialog.show()
-        btnGoogle.requestFocus()
     }
     private fun signInWithGoogle() {
         // Limpiar la sesión anterior de Google
@@ -255,12 +257,18 @@ class Login : AppCompatActivity() {
                             // Crear el usuario si no existe
                             CastvHelper.nuevosusuarios(
                                 context = this,
-                                nombre = user.displayName ?: "Usuario",
+                                nombre = user.displayName ?: "Estas En Invitado",
                                 email = email
                             )
 
                             // Continuar a la app
-                            startActivity(Intent(this, PeliculasActivity::class.java))
+                            val intent = Intent(this, PeliculasActivity::class.java).apply {
+                                // Limpia todas las actividades anteriores de la memoria del TV
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            }
+                            startActivity(intent)
+// Transición suave para evitar el pantallazo negro en Android TV
+                            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
                             finish()
 
                         }.addOnFailureListener {
@@ -274,56 +282,44 @@ class Login : AppCompatActivity() {
                 }
             }
     }
-
-
     private fun signInAsDefaultUser() {
         val defaultEmail = "invitado@fulltv.com"
         val defaultPassword = "nuevouser"
+        val nombreInvitado = "Estas En Invitado" // Definimos el nombre aquí
 
         auth.signInWithEmailAndPassword(defaultEmail, defaultPassword)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
                     Log.d(TAG, "signInAsDefaultUser:success")
+
+                    // ✅ CORRECCIÓN: Llamamos a nuevosusuarios aunque ya exista la cuenta
+                    // para asegurar que el nombre sea el correcto en la base de datos.
+                    CastvHelper.nuevosusuarios(
+                        context = this,
+                        nombre = nombreInvitado,
+                        email = defaultEmail
+                    )
+
                     Toast.makeText(this, "Ingresaste como invitado.", Toast.LENGTH_SHORT).show()
-                    startActivity(Intent(this, PeliculasActivity::class.java))
-                    finish()
+                    irAPeliculas()
                 } else {
-                    // Si falla el login, intentar crear la cuenta
                     auth.createUserWithEmailAndPassword(defaultEmail, defaultPassword)
                         .addOnCompleteListener { createTask ->
                             if (createTask.isSuccessful) {
-                                Log.d(TAG, "Usuario invitado creado y autenticado con éxito.")
-                                Toast.makeText(
-                                    this,
-                                    "Usuario invitado creado con éxito.",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-
-                                // ✅ Agregar a Realtime Database como invitado
-                                val user = auth.currentUser
-                                if (user != null) {
-                                    CastvHelper.nuevosusuarios(
-                                        context = this,
-                                        nombre = "Estas En Invitado",
-                                        email = defaultEmail
-                                    )
-                                }
-
-                                startActivity(Intent(this, PeliculasActivity::class.java))
-                                finish()
+                                // ✅ CORRECCIÓN: Al crear la cuenta por primera vez
+                                CastvHelper.nuevosusuarios(
+                                    context = this,
+                                    nombre = nombreInvitado,
+                                    email = defaultEmail
+                                )
+                                irAPeliculas()
                             } else {
-                                Log.w(TAG, "Error al crear usuario invitado.", createTask.exception)
-                                Toast.makeText(
-                                    this,
-                                    "Error al crear usuario invitado.",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                Toast.makeText(this, "Error al acceder como invitado", Toast.LENGTH_SHORT).show()
                             }
                         }
                 }
             }
     }
-
 
 
 }

@@ -26,52 +26,48 @@ import kotlinx.coroutines.withTimeoutOrNull
 // 🖼️ IMPORTANTE: Para la precarga optimizada de imágenes (Glide)
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
+// ... tus imports ...
+
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 1. Configurar flags ANTES de que se cree la vista para evitar parpadeos de reajuste
         window.setFlags(
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
         )
         super.onCreate(savedInstanceState)
         instance = this
-        // 🔧 Configuración Visual TV (Pantalla Completa)
+
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
-// 2. Forzar pantalla completa total
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+
         setContentView(R.layout.activity_splash)
 
         val logo = findViewById<ImageView>(R.id.imgLogoSplash)
         val txtVersion = findViewById<TextView>(R.id.txtVersion)
 
-        // 📌 Poner la versión instalada automáticamente
         txtVersion.text = "Versión ${BuildConfig.VERSION_NAME}"
 
-        // 🎬 Animación elegante (El logo crece ligeramente y aparece)
         logo.scaleX = 0.8f
         logo.scaleY = 0.8f
         logo.animate()
             .alpha(1f)
             .scaleX(1f)
             .scaleY(1f)
-            .setDuration(1500) // 1.5 segundos de animación
+            .setDuration(1500)
             .setInterpolator(DecelerateInterpolator())
             .start()
 
-        // 🎬 El texto de la versión aparece un poquito después para darle estilo
         txtVersion.animate().alpha(1f).setDuration(1500).setStartDelay(500).start()
 
-        // 🚀 Iniciar Carga de datos de fondo
         iniciarCargaDeDatos()
     }
 
     private fun iniciarCargaDeDatos() {
         lifecycleScope.launch {
-            // 1. Carga de datos e imágenes en segundo plano
+            // 1. Carga de datos de fondo
             val cargaTrabajo = launch(Dispatchers.IO) {
                 Validacioneslista.cargarPeliculas()
                 val lasPrimeras = Validacioneslista.obtenerPeliculasValidas().take(15)
@@ -83,23 +79,30 @@ class SplashActivity : AppCompatActivity() {
                 }
             }
 
-            // 2. Esperamos a que los datos estén listos
             cargaTrabajo.join()
 
-            // 3. Abrimos la actividad pero NO llamamos a finish() todavía
-            val intent = Intent(this@SplashActivity, PeliculasActivity::class.java)
-            startActivity(intent)
+            // --- 🛡️ LOGICA DE REDIRECCIÓN (AQUÍ ESTÁ EL CAMBIO) ---
+            val auth = FirebaseAuth.getInstance()
+            val currentUser = auth.currentUser
 
-            // Quitamos animaciones para que parezca la misma pantalla
+            val intentDestino: Intent
+            if (currentUser == null || currentUser.email == "invitado@fulltv.com") {
+                // Si no hay nadie o es el invitado, lo deslogueamos por seguridad
+                // y lo mandamos al LOGIN para que elija.
+                auth.signOut()
+                intentDestino = Intent(this@SplashActivity, Login::class.java)
+            } else {
+                // Si es un usuario real (Google), va directo a las Películas.
+                intentDestino = Intent(this@SplashActivity, PeliculasActivity::class.java)
+            }
+
+            startActivity(intentDestino)
             overridePendingTransition(0, 0)
-
-            // El Splash se queda vivo en el fondo hasta que la lista se dibuje
+            // No hacemos finish() aquí para mantener el instance vivo si PeliculasActivity lo necesita
         }
     }
 
-    // 4. Creamos un método estático para cerrar el splash desde la otra actividad
     companion object {
         var instance: SplashActivity? = null
     }
-
 }
