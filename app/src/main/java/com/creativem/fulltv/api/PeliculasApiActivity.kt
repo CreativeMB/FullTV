@@ -110,7 +110,7 @@ class PeliculasApiActivity : AppCompatActivity() {
                                 originalTitle = movie.original_title,
                                 imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}",
                                 streamUrl = "https://tuservidor.com/stream/${movie.id}",
-                                castv = 50,
+                                castv = 30,
                                 countdownMinutes = 60,
                                 createdAt = System.currentTimeMillis()
                             )

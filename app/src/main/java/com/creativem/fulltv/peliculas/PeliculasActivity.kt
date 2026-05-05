@@ -1013,9 +1013,9 @@ class PeliculasActivity : AppCompatActivity() {
             }
         }
 
-        val rbPlata = crearRadioButton("Plata: $5.000 (50 Castv)")
-        val rbBronce = crearRadioButton("Bronce: $10.000 (120 Castv)")
-        val rbOro = crearRadioButton("Oro: $20.000 (250 Castv)")
+        val rbPlata = crearRadioButton("Bronce: $10.000 (50 Castv)")
+        val rbBronce = crearRadioButton("Plata: $22.000 (120 Castv)")
+        val rbOro = crearRadioButton("Oro: $45.000 (250 Castv)")
 
         radioGroup.addView(rbPlata)
         radioGroup.addView(rbBronce)

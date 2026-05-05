@@ -10,6 +10,11 @@
     <color name="redpersonalisado">#FC3D4C</color>
     <color name="texto">#C5A059</color>
 
+    <color name="cine_azul_oscuro">#0A0E14</color> <!-- Fondo principal de la web -->
+    <color name="cine_dorado">#C5A059</color>      <!-- Detalles y acentos -->
+    <color name="cine_card_bg">#141A24</color>     <!-- Fondo de las tarjetas -->
+    <color name="cine_blanco_suave">#E0E0E0</color>
+
     <color name="tu_color_fondo">#580091EA</color>
     <color name="tu_color_barra">#FF0000</color>
     <color name="tu_color_navegacion">#0000FF</color>

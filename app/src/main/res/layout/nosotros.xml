@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/colorPrimary"
+    android:background="#0A0E14"
     android:fillViewport="true">
 
     <LinearLayout
@@ -12,7 +12,7 @@
         android:orientation="vertical">
 
         <!-- ========================================== -->
-        <!-- HEADER (Ahora dentro del scroll)           -->
+        <!-- HEADER (Fondo Azul Muy Oscuro)             -->
         <!-- ========================================== -->
         <LinearLayout
             android:id="@+id/headerContainer"
@@ -20,7 +20,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="20dp"
-            android:background="#15000000">
+            android:background="#05080A">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -76,10 +76,9 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Usuario: Invitado"
-                            android:textColor="#CCC"
+                            android:textColor="#B0BEC5"
                             android:textSize="14sp"
                             android:layout_marginEnd="12dp" />
-
                     </LinearLayout>
 
                     <LinearLayout
@@ -128,13 +127,13 @@
                 android:textSize="16sp"
                 android:textStyle="italic" />
 
-            <!-- NOTICIA ELEGANTE (Multilínea) -->
+            <!-- NOTICIA ELEGANTE (Fondo Dorado con texto blanco) -->
             <TextView
                 android:id="@+id/txtBanner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
-                android:background="#26FFFFFF"
+                android:background="#141A24"
                 android:padding="20dp"
                 android:text="Cargando noticia..."
                 android:textColor="#FFFFFF"
@@ -148,10 +147,10 @@
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:layout_marginHorizontal="20dp"
-            android:background="#33FFFFFF"/>
+            android:background="#1AFFFFFF"/>
 
         <!-- ========================================== -->
-        <!-- CONTENIDO DE TARJETAS                      -->
+        <!-- CONTENIDO DE TARJETAS (Azul Oscuro Web)    -->
         <!-- ========================================== -->
         <LinearLayout
             android:id="@+id/containerLayout"
@@ -160,7 +159,7 @@
             android:orientation="vertical"
             android:padding="12dp">
 
-            <!-- Card Soporte -->
+            <!-- Card 1: SOPORTE Y PAGOS -->
             <androidx.cardview.widget.CardView
                 android:id="@+id/cardSoporte"
                 android:layout_width="match_parent"
@@ -168,32 +167,49 @@
                 android:layout_margin="10dp"
                 android:focusable="true"
                 android:clickable="true"
-                app:cardBackgroundColor="#E91E63"
+                app:cardBackgroundColor="#141A24"
                 app:cardCornerRadius="15dp"
                 app:cardElevation="8dp">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:gravity="center"
+                    android:gravity="start"
                     android:orientation="vertical"
                     android:padding="25dp">
+
                     <TextView
                         android:id="@+id/col1"
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="SOPORTE"
-                        android:textColor="#FFFFFF"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
+                        android:text="@string/columna_1"
+                        android:textColor="#E0E0E0"
+                        android:textSize="16sp"
+                        android:lineSpacingMultiplier="1.3" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="REPORTAR PAGO"
+                        android:textColor="#C5A059"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:layout_marginTop="15dp" />
+
                     <ImageView
-                        android:layout_width="160dp"
-                        android:layout_height="160dp"
-                        android:src="@drawable/qrtelegram"
-                        android:layout_marginTop="10dp"/>
+                        android:layout_width="220dp"
+                        android:layout_height="220dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/soporte"
+                        android:adjustViewBounds="true"
+                        android:scaleType="fitCenter"
+                        android:layout_marginTop="10dp"
+                        android:background="#FFFFFF"
+                        android:padding="12dp"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- Card Estadísticas -->
+            <!-- Card 2: CANAL Y ACTUALIZACIONES -->
             <androidx.cardview.widget.CardView
                 android:id="@+id/cardColumna2"
                 android:layout_width="match_parent"
@@ -201,27 +217,49 @@
                 android:layout_margin="10dp"
                 android:focusable="true"
                 android:clickable="true"
-                app:cardBackgroundColor="#00BCD4"
+                app:cardBackgroundColor="#141A24"
                 app:cardCornerRadius="15dp"
                 app:cardElevation="8dp">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:gravity="center"
+                    android:gravity="start"
                     android:orientation="vertical"
                     android:padding="25dp">
+
                     <TextView
                         android:id="@+id/col2"
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="ESTADÍSTICAS"
-                        android:textColor="#FFFFFF"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
+                        android:text="@string/columna_2"
+                        android:textColor="#E0E0E0"
+                        android:textSize="16sp"
+                        android:lineSpacingMultiplier="1.3" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="CANAL OFICIAL"
+                        android:textColor="#C5A059"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:layout_marginTop="15dp" />
+
+                    <ImageView
+                        android:layout_width="220dp"
+                        android:layout_height="220dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/canal"
+                        android:adjustViewBounds="true"
+                        android:scaleType="fitCenter"
+                        android:layout_marginTop="10dp"
+                        android:background="#FFFFFF"
+                        android:padding="12dp"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- Card Notificación -->
+            <!-- Card 3: COMUNIDAD Y GRUPO -->
             <androidx.cardview.widget.CardView
                 android:id="@+id/cardNotificacion"
                 android:layout_width="match_parent"
@@ -229,28 +267,46 @@
                 android:layout_margin="10dp"
                 android:focusable="true"
                 android:clickable="true"
-                app:cardBackgroundColor="#FF9800"
+                app:cardBackgroundColor="#141A24"
                 app:cardCornerRadius="15dp"
                 app:cardElevation="8dp">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:gravity="center"
+                    android:gravity="start"
                     android:orientation="vertical"
                     android:padding="25dp">
+
                     <TextView
                         android:id="@+id/col3"
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="NOTIFICACIÓN"
-                        android:textColor="#FFFFFF"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
+                        android:text="@string/columna_3"
+                        android:textColor="#E0E0E0"
+                        android:textSize="16sp"
+                        android:lineSpacingMultiplier="1.3" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="GRUPO DEL PARCHE"
+                        android:textColor="#C5A059"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:layout_marginTop="15dp" />
+
                     <ImageView
-                        android:layout_width="160dp"
-                        android:layout_height="160dp"
-                        android:src="@drawable/qrcontenido"
-                        android:layout_marginTop="10dp"/>
+                        android:id="@+id/qr_grupo"
+                        android:layout_width="220dp"
+                        android:layout_height="220dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/grupo"
+                        android:adjustViewBounds="true"
+                        android:scaleType="fitCenter"
+                        android:layout_marginTop="10dp"
+                        android:background="#FFFFFF"
+                        android:padding="12dp"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 

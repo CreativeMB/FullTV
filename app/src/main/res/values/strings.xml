@@ -17,41 +17,40 @@
     <!-- Otros posibles strings -->
     <string name="exo_ffwd">Avanzar</string>
     <string name="exo_download_removing">Eliminando Descarga</string>
+
     <string name="columna_1">
     <![CDATA[
-    🎬 Disfruta las mejores películas en casa con amigos y familia. Comparte la app y ve el mismo contenido alquilado juntos, sin importar la distancia.<br>
-    📦 <b>Paquetes (COP):</b><br>
-   <b> Plata: $5.000</b> (Castv: 50) <br>
-   <b> Bronce: $10.000</b> (Castv: 120) <br>
-    <b>Oro: $20.000</b> (Castv: 250)
+    🎬 <b>¡El parche se armó!</b> Disfruta las mejores películas en casa con amigos y familia. Comparte la app y disfruten juntos, sin importar la distancia.<br><br>
+    📦 <b>Paquetes Disponibles (COP):</b><br>
+    🥉 <b>Bronce: $10.000</b> (50 Castv)<br>
+    🥈 <b>Plata: $22.000</b> (120 Castv)<br>
+    🥇 <b>Oro: $45.000</b> (250 Castv)<br><br>
+    💳 <b>Paga Fácil:</b> En tu app bancaria usa "Pagar con Bre-Be" e ingresa el código <b>@TMB833</b>.
     ]]>
 </string>
 
     <string name="columna_2">
     <![CDATA[
-    💳 <b>Paga fácil:</b> Busca en tu app bancaria la opción Pagar con Llave, ingresa <b>@TMB833</b> y sigue las instrucciones.<br>
     ✅ <b>Activación de Paquetes:</b><br>
-    Enviar <b>Fecha y Nombre</b> del titular de la cuenta <br>
-    por el botón <b>Activar Paquete</b>.<br>
-    📺 <b>Beneficios:</b><br>
-    ✔ Etiqueta Alquilada<br>
-    ✔ Multi dispositivos<br>
-    ✔ Temporizador: <b>24 Horas</b><br>
-    ✔ Notificación <b>Telegram</b><br>
-    🎬 Como parte de nuestra comunidad, el contenido alquilado está disponible para todos, sin límites de cantidad ni distancia. ¡Disfrútalo y compártelo sin restricciones!
- 🌟 <b>Únete a nuestra comunidad y invita asus amigos</b><br>
-    📢 <b>Canal de Telegram</b><br>
-    Para recibir notificaciones del contenido alquilado y disponible en linea
-]]>
+    1. Registra tu paquete en el televisor usando el botón <b>"Activar Paquete"</b> del menú.<br>
+    2. Envía el comprobante al <b>Soporte de Telegram</b> para realizar la carga de tu saldo.<br><br>
+    📺 <b>Beneficios del Parche:</b><br>
+    ✔ Acceso a Etiqueta Alquilada<br>
+    ✔ Uso en Multi-dispositivos<br>
+    ✔ Temporizador de <b>24 Horas</b><br>
+    ✔ Notificaciones en tiempo real
+    ]]>
 </string>
 
     <string name="columna_3">
     <![CDATA[
-    🎥 <b>Cómo alquilar:</b><br>
-    Desde <b>pantalla principal Con etiqueta Alquilar</b><br>
-    o botón <b>Pedidos La que pelicula que aquiera</b>.<br>
-      📢 <b>Estara disponible encuaestion de minutos trabajamos las 24/7 para garantisar nuestro servicio</b><br>
-        ]]>
+    🎥 <b>Cómo Alquilar Contenido:</b><br>
+    1. Busca la etiqueta <b>"Alquilar"</b> en la pantalla principal de la aplicación.<br>
+    2. O usa el botón <b>"Pedidos"</b> para solicitar la película que tú quieras.<br><br>
+    📢 <b>Servicio Garantizado 24/7:</b><br>
+    Tu pedido estará disponible en cuestión de minutos para garantizar la mejor experiencia.<br><br>
+    🌟 <b>¡Invita a tus amigos al parche!</b>
+    ]]>
 </string>
 
 
