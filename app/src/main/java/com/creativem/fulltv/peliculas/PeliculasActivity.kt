@@ -321,59 +321,13 @@ class PeliculasActivity : AppCompatActivity() {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (haProcesadoEliminacion) return
 
-                // 🟢 NUEVA LÓGICA:
-//                if (snapshot.exists()) {
-//                    val estado = snapshot.child("estado").getValue(String::class.java)
-//
-//                    // SOLO lo sacamos si el estado dice "eliminado"
-//                    if (estado == "eliminado") {
-//                        haProcesadoEliminacion = true
-//                        mostrarDialogoEliminado()
-//                    }
-//                } else {
-//                    // Si el snapshot NO EXISTE, significa que el administrador
-//                    // borró los datos para un RESET. No lo sacamos de la app.
-//                    Log.d("Seguridad", "Los datos no existen, el usuario puede seguir (Reset)")
-//
-//                    // OPCIONAL: Podrías llamar aquí a CastvHelper.nuevosusuarios(...)
-//                    // para que le cree su perfil de nuevo automáticamente si no existe.
-//                    val currentUser = auth.currentUser
-//                    CastvHelper.nuevosusuarios(this@PeliculasActivity, currentUser?.displayName ?: "Usuario", email)
-//                }
+
             }
             override fun onCancelled(error: DatabaseError) {}
         }
         userRef.addValueEventListener(userStatusListener!!)
     }
 
-//    private fun mostrarDialogoEliminado() {
-//        var segundos = 10
-//        val dialog = AlertDialog.Builder(this)
-//            .setTitle("Cuenta Eliminada")
-//            .setMessage("Tu cuenta ha sido eliminada. Serás redirigido en $segundos s...")
-//            .setCancelable(false)
-//            .create()
-//        dialog.show()
-//
-//        object : CountDownTimer(10000, 1000) {
-//            override fun onTick(ms: Long) {
-//                segundos--
-//                dialog.setMessage("Tu cuenta ha sido eliminada. Serás redirigido en $segundos s...")
-//            }
-//            override fun onFinish() {
-//                redirigirALogin()
-//            }
-//        }.start()
-//    }
-//
-//    private fun redirigirALogin() {
-//        UsuarioEstadoManager.cerrarSesion()
-//        auth.signOut()
-//        val intent = Intent(this, Login::class.java)
-//        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-//        startActivity(intent)
-//        finish()
-//    }
 
     // ==========================================
     // 3. ACTUALIZACIONES
@@ -593,34 +547,6 @@ class PeliculasActivity : AppCompatActivity() {
             Log.e("Instalador", "Error al abrir: ${e.message}")
         }
     }
-    // ==========================================
-    // 4. PUBLICIDAD
-    // ==========================================
-
-//    private fun mostrarPublicidad() {
-//        if (yaMostroPublicidad) return
-//        yaMostroPublicidad = true
-//
-//        val storageRef = FirebaseStorage.getInstance().reference.child("FulltvPublicidad")
-//        storageRef.listAll().addOnSuccessListener { list ->
-//            if (list.items.isNotEmpty()) {
-//                list.items.random().downloadUrl.addOnSuccessListener { uri ->
-//                    val dialogView = layoutInflater.inflate(R.layout.dialog_publicidad, null)
-//                    val img = dialogView.findViewById<ImageView>(R.id.imgPublicidad)
-//
-//                    Glide.with(this).load(uri).into(img)
-//                    publicidadDialog =
-//                        Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-//                    publicidadDialog?.setContentView(dialogView)
-//                    publicidadDialog?.show()
-//
-//                    dialogView.findViewById<View>(R.id.btnCerrarPublicidad).setOnClickListener {
-//                        publicidadDialog?.dismiss()
-//                    }
-//                }
-//            }
-//        }
-//    }
 
     // ==========================================
     // 5. BUSCADOR TMDB
@@ -1249,17 +1175,35 @@ class PeliculasActivity : AppCompatActivity() {
         }
     }
     private fun irAlReproductor(movie: Movie) {
+        // 1. Verificación de seguridad: No iniciar si el link es nulo
+        if (movie.streamUrl.isNullOrBlank()) {
+            Toast.makeText(this, "El enlace de reproducción no es válido", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val intent = Intent(this, ApiPeliculaActivity::class.java).apply {
+            // 2. Flags de optimización:
+            // CLEAR_TOP: Si la actividad ya existe, cierra las que están encima y la trae al frente.
+            // SINGLE_TOP: Evita crear una copia nueva si ya estás en ella (usa onNewIntent).
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+
+            // 3. Empaquetado limpio de datos
             putExtra("EXTRA_STREAM_URL", movie.streamUrl)
             putExtra("EXTRA_MOVIE_TITLE", movie.title)
             putExtra("EXTRA_MOVIE_CASTV", movie.castv)
             putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
             putExtra("EXTRA_ORIGINAL_TITLE", movie.originalTitle)
             putExtra("EXTRA_COUNTDOWN", movie.countdownMinutes)
-            putExtra("EXTRA_CREATED_AT", movie.createdAt / 1000)
 
+            // Evitamos errores de precisión enviando el Long directamente si es necesario
+            putExtra("EXTRA_CREATED_AT", movie.createdAt / 1000)
         }
-        startActivity(intent) // Inicia la actividad del reproductor
+
+        // 4. Ejecución
+        startActivity(intent)
+
+        // Opcional: Quitar animación para que el cambio de link sea instantáneo
+        overridePendingTransition(0, 0)
     }
 
     // --- En PeliculasActivity.kt ---

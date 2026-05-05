@@ -140,9 +140,10 @@ class ApiPeliculaActivity : AppCompatActivity() {
                 putExtra("EXTRA_MOVIE_CASTV", movieActual?.castv ?: movieCastv)
                 putExtra("EXTRA_MOVIE_IMAGE_URL", movieActual?.imageUrl ?: movieImageUrl)
                 putExtra("EXTRA_COUNTDOWN", movieActual?.countdownMinutes ?: movieCountdown)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
             startActivity(intent)
-
+            finish()
         }
 
         tvReproducir.isFocusableInTouchMode = true
