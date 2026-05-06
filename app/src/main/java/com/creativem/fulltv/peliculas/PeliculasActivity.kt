@@ -32,6 +32,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
+import android.view.Window
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
@@ -366,53 +367,145 @@ class PeliculasActivity : AppCompatActivity() {
     }
 
     private fun mostrarAlertaActualizacion(version: String) {
-        // Colores de marca CineParche
+
         val colorDorado = Color.parseColor("#C5A059")
         val colorFondo = Color.parseColor("#0A122A")
+        val fondoBoton = Color.parseColor("#1A1A1A")
 
-        // Título con estilo y color de marca
-        val title = SpannableString("🚀 Nueva Versión $version")
-        title.setSpan(ForegroundColorSpan(colorDorado), 0, title.length, 0)
-        title.setSpan(StyleSpan(Typeface.BOLD), 0, title.length, 0)
+        // Crear diálogo base
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setCancelable(false)
 
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(title)
-            .setMessage("Hemos mejorado CineParche para ti. Actualiza ahora para disfrutar de la mejor experiencia.")
-            .setCancelable(false) // Obliga al usuario a decidir para mantener la estabilidad
-            .setPositiveButton("ACTUALIZAR") { _, _ -> descargarAPK(version) }
-            .setNegativeButton("LUEGO", null)
-            .create()
+        // Contenedor principal
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 40, 50, 40)
+            background = GradientDrawable().apply {
+                setColor(colorFondo)
+                cornerRadius = 20f
+            }
+        }
+
+        // TÍTULO
+        val titulo = TextView(this).apply {
+            text = "🚀 Nueva Versión $version"
+            setTextColor(colorDorado)
+            textSize = 20f
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+        }
+
+        // MENSAJE
+        val mensaje = TextView(this).apply {
+            text = "Hemos mejorado CineParche para ti. Actualiza ahora para disfrutar de la mejor experiencia."
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            setPadding(0, 20, 0, 30)
+            gravity = Gravity.CENTER
+        }
+
+        // Contenedor de botones
+        val botones = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+
+        // Función para crear fondo
+        fun fondo(color: Int): GradientDrawable {
+            return GradientDrawable().apply {
+                setColor(color)
+                cornerRadius = 12f
+            }
+        }
+
+        // BOTÓN ACTUALIZAR
+        val btnActualizar = TextView(this).apply {
+            text = "ACTUALIZAR"
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(40, 20, 40, 20)
+            background = fondo(fondoBoton)
+
+            isFocusable = true
+            isFocusableInTouchMode = true
+
+            setOnClickListener {
+                dialog.dismiss()
+                descargarAPK(version)
+            }
+        }
+
+        // BOTÓN LUEGO
+        val btnLuego = TextView(this).apply {
+            text = "LUEGO"
+            setTextColor(Color.LTGRAY)
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setPadding(40, 20, 40, 20)
+            background = fondo(fondoBoton)
+
+            isFocusable = true
+            isFocusableInTouchMode = true
+
+            setOnClickListener {
+                dialog.dismiss()
+            }
+        }
+
+        // Layout params para separar botones
+        val params = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            setMargins(20, 0, 20, 0)
+        }
+
+        btnActualizar.layoutParams = params
+        btnLuego.layoutParams = params
+
+        // --- EFECTO FOCO (clave para TV) ---
+        fun aplicarFoco(view: TextView, colorTextoNormal: Int) {
+            view.setOnFocusChangeListener { v, hasFocus ->
+                if (hasFocus) {
+                    v.background = fondo(colorDorado)
+                    v.scaleX = 1.1f
+                    v.scaleY = 1.1f
+                    v.elevation = 20f
+                    (v as TextView).setTextColor(Color.BLACK)
+                } else {
+                    v.background = fondo(fondoBoton)
+                    v.scaleX = 1f
+                    v.scaleY = 1f
+                    v.elevation = 4f
+                    (v as TextView).setTextColor(colorTextoNormal)
+                }
+            }
+        }
+
+        aplicarFoco(btnActualizar, Color.WHITE)
+        aplicarFoco(btnLuego, Color.LTGRAY)
+
+        // Agregar vistas
+        botones.addView(btnActualizar)
+        botones.addView(btnLuego)
+
+        container.addView(titulo)
+        container.addView(mensaje)
+        container.addView(botones)
+
+        dialog.setContentView(container)
+
+        // Fondo transparente del diálogo (para bordes redondeados)
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
         dialog.show()
 
-        // --- Personalización Estética ---
-
-        // Fondo inmersivo azul noche
-        dialog.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
-
-        // Estilo de los botones
-        val btnActualizar = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-        val btnLuego = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
-        val focusSelector = R.drawable.focus_selector
-
-        btnActualizar.apply {
-            setTextColor(Color.WHITE)
-            setTypeface(Typeface.DEFAULT_BOLD)
-            setBackgroundResource(focusSelector) // Soporte para TV
-            requestFocus() // Foco inmediato en la actualización
-        }
-
-        btnLuego.apply {
-            setTextColor(Color.LTGRAY)
-            setBackgroundResource(focusSelector)
-        }
-
-        // Color del mensaje explicativo
-        val messageView = dialog.findViewById<TextView>(android.R.id.message)
-        messageView?.setTextColor(Color.WHITE)
-        messageView?.textSize = 16f
+        // Foco inicial (muy importante en TV)
+        btnActualizar.requestFocus()
     }
-
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private fun descargarAPK(version: String) {
         // Colores de identidad CineParche
@@ -1245,7 +1338,10 @@ class PeliculasActivity : AppCompatActivity() {
         val dialog = AlertDialog.Builder(this)
             .setTitle(title)
             .setMessage("Si sales ahora, te perderás lo mejor del parche.")
-            .setPositiveButton("SÍ, SALIR") { _, _ -> finish() }
+            .setPositiveButton("SÍ, SALIR") { _, _ ->
+                finishAffinity()
+                System.exit(0)
+            }
             .setNegativeButton("VOLVER (5s)", null) // Texto inicial
             .create()
 
