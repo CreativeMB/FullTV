@@ -229,7 +229,13 @@ class PlayerPeliculas : AppCompatActivity() {
         // Botón pedidos
         val pedidosButton: ImageButton = findViewById(R.id.pedidos)
         pedidosButton.setOnClickListener {
-            showErrorDialog(movieTitle, movieCastv, userId)
+            // Creamos el Intent para ir a la Activity "Nosotros"
+            val intent = Intent(this, Nosotros::class.java)
+
+            // Si necesitas pasarle datos a esa nueva pantalla (como el userId), puedes hacerlo así:
+            // intent.putExtra("USER_ID", userId)
+
+            startActivity(intent)
         }
         // Botón Pantalla Completa
         val renderButton: ImageButton = findViewById(R.id.render)
@@ -846,7 +852,7 @@ class PlayerPeliculas : AppCompatActivity() {
         val messageText = dialogView.findViewById<TextView>(R.id.messageText)
         val linkNosotros = dialogView.findViewById<TextView>(R.id.linkNosotros)
         val imageView = dialogView.findViewById<ImageView>(R.id.dialogImage)
-        imageView.setImageResource(R.drawable.qrcontenido)
+        imageView.setImageResource(R.drawable.canal)
 
         val spannable = SpannableStringBuilder()
 
@@ -935,15 +941,18 @@ class PlayerPeliculas : AppCompatActivity() {
 
         val alertDialog = AlertDialog.Builder(this)
             .setView(dialogView)
+            // 1. Evita que se cierre con el botón atrás o tocando fuera
+            .setCancelable(false)
             .setNegativeButton("Volver al contenido") { dialog, _ ->
                 dialog.dismiss()
                 finish()
             }
             .setNeutralButton("Alquilar Película", null)
-            .setPositiveButton("Cerrar") { dialog, _ ->
-                dialog.dismiss()
-            }
+            // Se eliminó el setPositiveButton ("Cerrar")
             .create()
+
+// 2. Refuerzo para que no se cierre al tocar fuera (opcional pero recomendado)
+        alertDialog.setCanceledOnTouchOutside(false)
 
 // Aplicamos el fondo azul oscuro al View personalizado
         dialogView.setBackgroundColor(colorFondo)
@@ -951,22 +960,19 @@ class PlayerPeliculas : AppCompatActivity() {
         alertDialog.setOnShowListener {
             val btnAlquilar = alertDialog.getButton(AlertDialog.BUTTON_NEUTRAL)
             val btnVolver = alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
-            val btnCerrar = alertDialog.getButton(AlertDialog.BUTTON_POSITIVE)
 
             // --- ESTILO DE TEXTO ---
             btnAlquilar.setTextColor(colorDorado)
             btnAlquilar.setTypeface(Typeface.DEFAULT_BOLD)
-
             btnVolver.setTextColor(colorDorado)
-            btnCerrar.setTextColor(colorDorado)
 
             // --- CONFIGURACIÓN DE ENFOQUE Y SELECTOR ---
             val focusSelector = R.drawable.focus_selector
-            listOf(btnAlquilar, btnVolver, btnCerrar).forEach { button ->
+            // Solo aplicamos a los dos botones existentes
+            listOf(btnAlquilar, btnVolver).forEach { button ->
                 button.setBackgroundResource(focusSelector)
                 button.isFocusable = true
                 button.isFocusableInTouchMode = true
-                // Ajuste de padding para que el selector se vea bien en TV
                 button.setPadding(24, 12, 24, 12)
             }
 
@@ -985,7 +991,7 @@ class PlayerPeliculas : AppCompatActivity() {
 
         alertDialog.show()
 
-// Hacemos que la ventana del diálogo sea totalmente inmersiva (sin bordes blancos)
+// Ventana totalmente inmersiva
         alertDialog.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
     }
 
