@@ -1,5 +1,7 @@
 package com.creativem.tvfullurl.Fragment
 
+import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -10,35 +12,50 @@ import android.view.ViewGroup
 import android.webkit.URLUtil
 import android.widget.EditText
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.creativem.cineflexurl.modelo.Movie
+import com.creativem.tvfullurl.BrowserActivity
+import com.creativem.tvfullurl.MovieResponse
 import com.creativem.tvfullurl.R
+import com.creativem.tvfullurl.SugerenciaAdapter
+import com.creativem.tvfullurl.TMDbApiService
+import com.creativem.tvfullurl.TmdbMovie
 import com.creativem.tvfullurl.databinding.FragmentNuevaEditarBinding
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
+import kotlinx.coroutines.*
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 class NuevaPeliculaFragment : Fragment() {
-
+    private val apiKey = "678193d2c735c6f37840cee035f4d69a"
+    private var isAutoFilling = false
     private lateinit var binding: FragmentNuevaEditarBinding
-
-    // NUEVA RUTA: Referencia a Realtime Database
     private val databaseRef = FirebaseDatabase.getInstance().reference.child("movies")
 
-    private lateinit var editTexts: List<EditText>
+    private lateinit var sugerenciaAdapter: SugerenciaAdapter
+    private var searchJob: Job? = null
     private var movieId: String? = null
 
-    private var title: String = ""
-    private var castv: Int = 0
-    private var imageUrl: String = ""
-    private var streamUrl: String = ""
-    private var trailerUrl: String = ""
-    private var originalTitle: String = ""
+    private val apiService: TMDbApiService by lazy {
+        Retrofit.Builder().baseUrl("https://api.themoviedb.org/3/")
+            .addConverterFactory(GsonConverterFactory.create()).build().create(TMDbApiService::class.java)
+    }
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
+    private val startBrowserForResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val url = result.data?.getStringExtra("URL_CAPTURADA")
+            binding.streamUrlEditText.setText(url)
+        }
+    }
+
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         binding = FragmentNuevaEditarBinding.inflate(inflater, container, false)
         movieId = arguments?.getString("movieId")
         return binding.root
@@ -46,149 +63,105 @@ class NuevaPeliculaFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        editTexts = listOf(
-            binding.titleEditText,
-            binding.originalTitleEditText,
-            binding.castvEditText,
-            binding.imageUrlEditText,
-            binding.streamUrlEditText,
-            binding.validEditText,
-            binding.trailerUrlEditText
-        )
-
-        movieId?.let {
-            loadMovieData(it)
-        }
-        listenerimagen()
-
-        binding.uploadText.setOnClickListener {
-            if (movieId == null) {
-                saveNewMovie()
-            } else {
-                editarMovie(movieId!!)
-            }
-        }
+        setupRecyclerView()
+        setupListeners()
+        movieId?.let { loadMovieData(it) }
     }
 
-    // --- CARGAR DATOS (Nueva Ruta) ---
-    private fun loadMovieData(movieId: String) {
-        databaseRef.child(movieId).get()
-            .addOnSuccessListener { snapshot ->
-                if (snapshot.exists()) {
-                    val movie = snapshot.getValue(Movie::class.java)
-                    movie?.let {
-                        binding.titleEditText.setText(it.title)
-                        binding.originalTitleEditText.setText(it.originalTitle)
-                        binding.castvEditText.setText(it.castv.toString())
-                        binding.imageUrlEditText.setText(it.imageUrl)
-                        binding.streamUrlEditText.setText(it.streamUrl)
-                        binding.trailerUrlEditText.setText(it.trailerUrl)
-                        binding.validEditText.setText(it.countdownMinutes.toString())
-                    }
-                }
-            }
-            .addOnFailureListener {
-                Toast.makeText(requireContext(), "Error al cargar los datos", Toast.LENGTH_SHORT).show()
-            }
+    private fun setupRecyclerView() {
+        sugerenciaAdapter = SugerenciaAdapter(emptyList()) { peli -> rellenarCampos(peli) }
+        binding.rvSugerencias.layoutManager = LinearLayoutManager(requireContext())
+        binding.rvSugerencias.adapter = sugerenciaAdapter
     }
 
-    // --- GUARDAR NUEVA PELÍCULA (Nueva Ruta) ---
-    private fun saveNewMovie() {
-        if (!validarCampos()) return
+    private fun setupListeners() {
+        binding.uploadText.setOnClickListener { saveOrUpdateMovie() }
 
-        // Generar ID automático en Realtime Database usando push()
-        val movieKey = databaseRef.push().key ?: return
-
-        // ✅ USAMOS .apply PARA RELLENAR LOS DATOS
-        // Esto funciona con la nueva clase Movie y evita errores de constructor
-        val newMovie = Movie().apply {
-            id = movieKey
-            title = binding.titleEditText.text.toString()
-            originalTitle = binding.originalTitleEditText.text.toString()
-            castv = binding.castvEditText.text.toString().toIntOrNull() ?: 0
-            imageUrl = binding.imageUrlEditText.text.toString()
-            streamUrl = binding.streamUrlEditText.text.toString()
-            trailerUrl = binding.trailerUrlEditText.text.toString()
-            createdAt = System.currentTimeMillis() // Long (milisegundos)
-            countdownMinutes = binding.validEditText.text.toString().toIntOrNull() ?: 0
+        binding.browser.setOnClickListener {
+            val intent = Intent(requireContext(), BrowserActivity::class.java)
+            startBrowserForResult.launch(intent)
         }
 
-        databaseRef.child(movieKey).setValue(newMovie)
-            .addOnSuccessListener {
-                Toast.makeText(requireContext(), "Película guardada en la nueva ruta", Toast.LENGTH_SHORT).show()
-                clearFields()
-            }
-            .addOnFailureListener {
-                Toast.makeText(requireContext(), "Error al guardar la película", Toast.LENGTH_SHORT).show()
-            }
-    }
-
-    // --- EDITAR PELÍCULA (Nueva Ruta) ---
-    private fun editarMovie(movieId: String) {
-        if (!validarCampos()) return
-
-        // Creamos un mapa con los campos específicos que queremos actualizar
-        // Esto asegura que los campos que NO están aquí se conserven en la base de datos
-        val updates = hashMapOf<String, Any>(
-            "id" to movieId,
-            "title" to title,
-            "originalTitle" to originalTitle,
-            "castv" to castv,
-            "imageUrl" to imageUrl,
-            "streamUrl" to streamUrl,
-            "trailerUrl" to trailerUrl,
-            "createdAt" to System.currentTimeMillis(),
-            "countdownMinutes" to (binding.validEditText.text.toString().toIntOrNull() ?: 0)
-        )
-
-        // CAMBIO CLAVE: Usamos updateChildren en lugar de setValue
-        databaseRef.child(movieId).updateChildren(updates)
-            .addOnSuccessListener {
-                Toast.makeText(requireContext(), "Película actualizada correctamente", Toast.LENGTH_LONG).show()
-                clearFields()
-                findNavController().navigateUp()
-            }
-            .addOnFailureListener { e ->
-                Toast.makeText(requireContext(), "Error al actualizar: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-    }
-    // --- LÓGICA DE VALIDACIÓN E IMAGEN (Se mantiene idéntica) ---
-    private fun listenerimagen() {
-        binding.imageUrlEditText.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+        binding.originalTitleEditText.addTextChangedListener(object : TextWatcher {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val imageUrl = s.toString().trim()
-                if (URLUtil.isValidUrl(imageUrl)) {
-                    Glide.with(this@NuevaPeliculaFragment).load(imageUrl).into(binding.previewImageView)
-                }
+                if (isAutoFilling) { isAutoFilling = false; return }
+                val texto = s.toString().trim()
+                if (texto.length > 2) iniciarBusqueda(texto) else binding.rvSugerencias.visibility = View.GONE
             }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun afterTextChanged(s: Editable?) {}
         })
     }
 
-    private fun validarCampos(): Boolean {
-        title = binding.titleEditText.text.toString().trim()
-        castv = binding.castvEditText.text.toString().toIntOrNull() ?: 0
-        imageUrl = binding.imageUrlEditText.text.toString().trim()
-        streamUrl = binding.streamUrlEditText.text.toString().trim()
-        trailerUrl = binding.trailerUrlEditText.text.toString().trim()
-        originalTitle = binding.originalTitleEditText.text.toString().trim()
-
-        if (title.isEmpty() || castv <= 0 || imageUrl.isEmpty()) {
-            Toast.makeText(requireContext(), "Todos los campos son obligatorios", Toast.LENGTH_LONG).show()
-            return false
+    private fun iniciarBusqueda(query: String) {
+        searchJob?.cancel()
+        searchJob = CoroutineScope(Dispatchers.Main).launch {
+            delay(600)
+            apiService.searchMovie(apiKey, "es-MX", query).enqueue(object : Callback<MovieResponse> {
+                override fun onResponse(call: Call<MovieResponse>, response: Response<MovieResponse>) {
+                    val lista = response.body()?.results ?: emptyList()
+                    sugerenciaAdapter.updateData(lista.take(5))
+                    binding.rvSugerencias.visibility = if (lista.isNotEmpty()) View.VISIBLE else View.GONE
+                }
+                override fun onFailure(call: Call<MovieResponse>, t: Throwable) {}
+            })
         }
-        return true
+    }
+
+    private fun rellenarCampos(movie: TmdbMovie) {
+        isAutoFilling = true
+        binding.originalTitleEditText.setText(movie.original_title)
+        binding.titleEditText.setText(movie.title)
+        val url = "https://image.tmdb.org/t/p/w500${movie.poster_path}"
+        binding.imageUrlEditText.setText(url)
+        binding.rvSugerencias.visibility = View.GONE
+        Glide.with(this).load(url).into(binding.previewImageView)
+    }
+
+    private fun loadMovieData(id: String) {
+        databaseRef.child(id).get().addOnSuccessListener { snapshot ->
+            val m = snapshot.getValue(Movie::class.java)
+            m?.let {
+                binding.titleEditText.setText(it.title)
+                binding.originalTitleEditText.setText(it.originalTitle)
+                binding.castvEditText.setText(it.castv.toString())
+                binding.imageUrlEditText.setText(it.imageUrl)
+                binding.streamUrlEditText.setText(it.streamUrl)
+                binding.trailerUrlEditText.setText(it.trailerUrl)
+                binding.validEditText.setText(it.countdownMinutes.toString())
+                Glide.with(this).load(it.imageUrl).into(binding.previewImageView)
+            }
+        }
+    }
+
+    private fun saveOrUpdateMovie() {
+        val title = binding.titleEditText.text.toString().trim()
+        if (title.isEmpty()) return
+
+        val id = movieId ?: databaseRef.push().key ?: return
+        val movie = Movie().apply {
+            this.id = id
+            this.title = title
+            this.originalTitle = binding.originalTitleEditText.text.toString().trim()
+            this.castv = binding.castvEditText.text.toString().toIntOrNull() ?: 0
+            this.imageUrl = binding.imageUrlEditText.text.toString().trim()
+            this.streamUrl = binding.streamUrlEditText.text.toString().trim()
+            this.trailerUrl = binding.trailerUrlEditText.text.toString().trim()
+            this.countdownMinutes = binding.validEditText.text.toString().toIntOrNull() ?: 0
+            this.createdAt = System.currentTimeMillis()
+        }
+
+        databaseRef.child(id).setValue(movie).addOnSuccessListener {
+            Toast.makeText(requireContext(), "Éxito", Toast.LENGTH_SHORT).show()
+            if (movieId != null) findNavController().navigateUp() else clearFields()
+        }
     }
 
     private fun clearFields() {
         binding.titleEditText.text.clear()
         binding.originalTitleEditText.text.clear()
-        binding.castvEditText.text.clear()
         binding.imageUrlEditText.text.clear()
         binding.streamUrlEditText.text.clear()
-        binding.trailerUrlEditText.text.clear()
         binding.previewImageView.setImageResource(R.drawable.icono)
-        binding.validEditText.text.clear()
     }
 }

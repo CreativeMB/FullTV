@@ -568,17 +568,24 @@ class PlayerPeliculas : AppCompatActivity() {
 
     @OptIn(UnstableApi::class)
     private fun prepararReproductor(posicionInicial: Long) {
-        val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setDefaultRequestProperties(mapOf("User-Agent" to "Mozilla/5.0"))
-            .setConnectTimeoutMs(30_000)
-            .setReadTimeoutMs(30_000)
+            // MODIFICACIÓN AQUÍ: Agregamos el header de ngrok para saltar la advertencia
+            val dataSourceFactory = DefaultHttpDataSource.Factory()
+                .setDefaultRequestProperties(
+                    mapOf(
+                        "User-Agent" to "Mozilla/5.0",
+                        "ngrok-skip-browser-warning" to "true" // <--- ESTA ES LA LÍNEA MÁGICA
+                    )
+                )
+                .setConnectTimeoutMs(30_000)
+                .setReadTimeoutMs(30_000)
 
-        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
-        val loadControl = DefaultLoadControl.Builder()
-            .setTargetBufferBytes(8 * 1024 * 1024)
-            .setPrioritizeTimeOverSizeThresholds(false)
-            .build()
+            // ... el resto de tu código sigue igual ...
+            val loadControl = DefaultLoadControl.Builder()
+                .setTargetBufferBytes(8 * 1024 * 1024)
+                .setPrioritizeTimeOverSizeThresholds(false)
+                .build()
 
         player = ExoPlayer.Builder(this@PlayerPeliculas)
             .setLoadControl(loadControl)

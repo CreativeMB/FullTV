@@ -49,6 +49,7 @@
                     android:inputType="text"
                     android:textSize="16sp"
                     android:layout_marginBottom="4dp" />
+
                 <EditText
                     android:id="@+id/originalTitleEditText"
                     android:layout_width="match_parent"
@@ -58,7 +59,14 @@
                     android:inputType="text"
                     android:textSize="16sp"
                     android:layout_marginBottom="4dp"/>
-
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvSugerencias"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxHeight="200dp"
+                    android:visibility="gone"
+                    android:background="@android:color/white"
+                    android:elevation="8dp" />
 
                 <EditText
                     android:id="@+id/validEditText"
@@ -131,8 +139,26 @@
             android:text="Enviar"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:background="@color/backgroundColor"
+            android:textColor="@color/black"
+            android:background="@color/primaryDarkColor"
             app:layout_constraintTop_toBottomOf="@id/trailerUrlEditText"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- Botón Browser (Debajo de Enviar) -->
+        <TextView
+            android:id="@+id/browser"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:padding="16dp"
+            android:text="Browser"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="@color/black"
+            android:background="@color/primaryDarkColor"
+            app:layout_constraintTop_toBottomOf="@id/uploadText"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
