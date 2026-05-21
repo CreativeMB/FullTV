@@ -169,7 +169,7 @@ class PlayerPeliculas : AppCompatActivity() {
                 .into(imagenPeliculaImageView)
 
             if (streamUrl.isEmpty()) {
-                showErrorDialog(movieTitle, movieCastv, userId)
+//                showErrorDialog(movieTitle, movieCastv, userId)
 
 
                 return@let
@@ -425,7 +425,7 @@ class PlayerPeliculas : AppCompatActivity() {
     @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
         if (streamUrl.isEmpty()) {
-            showErrorDialog(movieTitle, movieCastv, userId)
+//            showErrorDialog(movieTitle, movieCastv, userId)
             return
         }
 
@@ -443,7 +443,7 @@ class PlayerPeliculas : AppCompatActivity() {
 
             // 2. Si no es válida, mostramos el diálogo de error (pedido)
             if (!isUrlValid) {
-                showErrorDialog(movieTitle, movieCastv, userId)
+//                showErrorDialog(movieTitle, movieCastv, userId)
                 return@launch
             }
 
@@ -750,7 +750,7 @@ class PlayerPeliculas : AppCompatActivity() {
                 Player.STATE_ENDED -> {
                     borrarProgresoGuardado()
                     isPlaybackActive = false
-                    showErrorDialog(movieTitle, movieCastv, userId)
+//                    showErrorDialog(movieTitle, movieCastv, userId)
 
                     if (isLiveStream) {
                         intentarReconexion()
@@ -799,7 +799,7 @@ class PlayerPeliculas : AppCompatActivity() {
             if (isRecoverableError(error) && isPlaybackActive) {
                 intentarReconexion() // Llama al método de reconexión
             } else if (!isPlaybackActive && reconnectionAttempts >= maxReconnectionAttempts) {
-                showErrorDialog(movieTitle, movieCastv, userId) // Muestra un diálogo de error
+//                showErrorDialog(movieTitle, movieCastv, userId) // Muestra un diálogo de error
             }
         }
     }
@@ -835,13 +835,13 @@ class PlayerPeliculas : AppCompatActivity() {
             isReconnecting = false // Indica que no se está reconectando
 
             // Muestra un diálogo de error si no hay reproducción activa
-            if (!isPlaybackActive) {
-                showErrorDialog(
-                    movieTitle,
-                    movieCastv,
-                    userId
-                )
-            }
+//            if (!isPlaybackActive) {
+//                showErrorDialog(
+//                    movieTitle,
+//                    movieCastv,
+//                    userId
+//                )
+//            }
             return
         }
 
@@ -874,293 +874,293 @@ class PlayerPeliculas : AppCompatActivity() {
         val networkInfo = connectivityManager.activeNetworkInfo
         return networkInfo?.isConnected == true // Devuelve true si hay conexión
     }
-
-    @SuppressLint("SetTextI18n")
-    private fun showErrorDialog(movieTitle: String, movieCastv: Int, correoUsuario: String) {
-        val dialogView = layoutInflater.inflate(R.layout.player_alerdialogo, null)
-        val messageText = dialogView.findViewById<TextView>(R.id.messageText)
-        val linkNosotros = dialogView.findViewById<TextView>(R.id.linkNosotros)
-        val imageView = dialogView.findViewById<ImageView>(R.id.dialogImage)
-        imageView.setImageResource(R.drawable.canal)
-
-        val spannable = SpannableStringBuilder()
-
-        // --- Título película
-        val movieInfo = "Película: $movieTitle\n"
-        spannable.append(movieInfo)
-        val peliculaTexto = "Película:"
-        val peliculaIndex = spannable.indexOf(peliculaTexto)
-        spannable.setSpan(ForegroundColorSpan(Color.RED), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-        spannable.setSpan(RelativeSizeSpan(1.3f), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-        val tituloIndex = peliculaIndex + peliculaTexto.length + 1
-        spannable.setSpan(ForegroundColorSpan(Color.GREEN), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-        spannable.setSpan(RelativeSizeSpan(1.4f), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-
-        // --- Precio CasTV
-        val precioInfo = "Precio CasTV: $$movieCastv\n"
-        spannable.append(precioInfo)
-        val precioTexto = "Precio CasTV:"
-        val precioIndex = spannable.indexOf(precioTexto)
-        spannable.setSpan(ForegroundColorSpan(Color.RED), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-        spannable.setSpan(RelativeSizeSpan(1.3f), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-        val precioValorIndex = precioIndex + precioTexto.length + 2
-        spannable.setSpan(ForegroundColorSpan(Color.GREEN), precioValorIndex, precioValorIndex + movieCastv.toString().length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-        spannable.setSpan(RelativeSizeSpan(1.4f), precioValorIndex, precioValorIndex + movieCastv.toString().length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-
-        // Línea temporal mientras se obtiene usuario y saldo
-        spannable.append("\nUsuario: Consultando...\n")
-        spannable.append("Saldo actual: Consultando...\n")
-
-        // Texto final
-        spannable.append("\n¡Gracias por tu pedido!")
-        spannable.append("\nLa película estará disponible pronto. Estamos disponibles 24/7.")
-        spannable.append("\nSi la película se estrenó hace menos de 1 mes, no será puesta en línea.")
-        spannable.append("\nEn ese caso, el valor será reembolsado como crédito (CasTV).")
-        spannable.append("\nRecuerda tener saldo en CasTV para futuros Alquileres.")
-
-        messageText.text = spannable
-
-        val correoUsuario = FirebaseAuth.getInstance().currentUser?.email ?: ""
-
-        if (correoUsuario.isNotEmpty()) {
-            CastvHelper.obtenerDatosUsuario(
-                correoUsuario,
-                onSuccess = { nombre, correo, castv, _ ->
-                    val usuarioIndex = spannable.indexOf("Usuario: Consultando...")
-                    if (usuarioIndex != -1) {
-                        spannable.replace(
-                            usuarioIndex,
-                            usuarioIndex + "Usuario: Consultando...".length,
-                            "Usuario: $nombre"
-                        )
-                    }
-
-                    val saldoIndex = spannable.indexOf("Saldo actual: Consultando...")
-                    if (saldoIndex != -1) {
-                        spannable.replace(
-                            saldoIndex,
-                            saldoIndex + "Saldo actual: Consultando...".length,
-                            "Saldo actual: $castv CasTV"
-                        )
-                    }
-
-                    messageText.text = spannable
-                },
-                onFailure = { e ->
-                    Log.e("CastvHelper", "❌ Error obteniendo datos del usuario: ${e.message}")
-                }
-            )
-        } else {
-            Log.e("CastvHelper", "⚠️ Correo del usuario es nulo o vacío")
-        }
-
-
-        // Botones
-        linkNosotros.text = "Más información aquí"
-        linkNosotros.setTextColor(Color.RED)
-        linkNosotros.paintFlags = linkNosotros.paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
-        linkNosotros.setOnClickListener {
-            val intent = Intent(this, Nosotros::class.java)
-            startActivity(intent)
-        }
-
-// Colores de identidad CineParche
-        val colorDorado = Color.parseColor("#C5A059")
-        val colorFondo = Color.parseColor("#0A122A")
-
-        val alertDialog = AlertDialog.Builder(this)
-            .setView(dialogView)
-            // 1. Evita que se cierre con el botón atrás o tocando fuera
-            .setCancelable(false)
-            .setNegativeButton("Volver al contenido") { dialog, _ ->
-                dialog.dismiss()
-                finish()
-            }
-            .setNeutralButton("Alquilar Película", null)
-            // Se eliminó el setPositiveButton ("Cerrar")
-            .create()
-
-// 2. Refuerzo para que no se cierre al tocar fuera (opcional pero recomendado)
-        alertDialog.setCanceledOnTouchOutside(false)
-
-// Aplicamos el fondo azul oscuro al View personalizado
-        dialogView.setBackgroundColor(colorFondo)
-
-        alertDialog.setOnShowListener {
-            val btnAlquilar = alertDialog.getButton(AlertDialog.BUTTON_NEUTRAL)
-            val btnVolver = alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
-
-            // --- ESTILO DE TEXTO ---
-            btnAlquilar.setTextColor(colorDorado)
-            btnAlquilar.setTypeface(Typeface.DEFAULT_BOLD)
-            btnVolver.setTextColor(colorDorado)
-
-            // --- CONFIGURACIÓN DE ENFOQUE Y SELECTOR ---
-            val focusSelector = R.drawable.focus_selector
-            // Solo aplicamos a los dos botones existentes
-            listOf(btnAlquilar, btnVolver).forEach { button ->
-                button.setBackgroundResource(focusSelector)
-                button.isFocusable = true
-                button.isFocusableInTouchMode = true
-                button.setPadding(24, 12, 24, 12)
-            }
-
-            // Asegurar que el contenedor de los botones no tenga bordes de otro color
-            (btnAlquilar.parent as? View)?.setBackgroundColor(colorFondo)
-
-            // --- LÓGICA DE ALQUILER ---
-            btnAlquilar.setOnClickListener {
-                Log.d("ALQUILER_LOG", "1. Botón Alquilar presionado")
-                verificarYProcesarPedido(alertDialog)
-            }
-
-            // El foco inicia en Alquilar para facilitar la compra
-            btnAlquilar.requestFocus()
-        }
-
-        alertDialog.show()
-
-// Ventana totalmente inmersiva
-        alertDialog.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
-    }
-
+//
+//    @SuppressLint("SetTextI18n")
+//    private fun showErrorDialog(movieTitle: String, movieCastv: Int, correoUsuario: String) {
+//        val dialogView = layoutInflater.inflate(R.layout.player_alerdialogo, null)
+//        val messageText = dialogView.findViewById<TextView>(R.id.messageText)
+//        val linkNosotros = dialogView.findViewById<TextView>(R.id.linkNosotros)
+//        val imageView = dialogView.findViewById<ImageView>(R.id.dialogImage)
+//        imageView.setImageResource(R.drawable.canal)
+//
+//        val spannable = SpannableStringBuilder()
+//
+//        // --- Título película
+//        val movieInfo = "Película: $movieTitle\n"
+//        spannable.append(movieInfo)
+//        val peliculaTexto = "Película:"
+//        val peliculaIndex = spannable.indexOf(peliculaTexto)
+//        spannable.setSpan(ForegroundColorSpan(Color.RED), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+//        spannable.setSpan(RelativeSizeSpan(1.3f), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+//        val tituloIndex = peliculaIndex + peliculaTexto.length + 1
+//        spannable.setSpan(ForegroundColorSpan(Color.GREEN), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+//        spannable.setSpan(RelativeSizeSpan(1.4f), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+//
+//        // --- Precio CasTV
+//        val precioInfo = "Precio CasTV: $$movieCastv\n"
+//        spannable.append(precioInfo)
+//        val precioTexto = "Precio CasTV:"
+//        val precioIndex = spannable.indexOf(precioTexto)
+//        spannable.setSpan(ForegroundColorSpan(Color.RED), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+//        spannable.setSpan(RelativeSizeSpan(1.3f), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+//        val precioValorIndex = precioIndex + precioTexto.length + 2
+//        spannable.setSpan(ForegroundColorSpan(Color.GREEN), precioValorIndex, precioValorIndex + movieCastv.toString().length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+//        spannable.setSpan(RelativeSizeSpan(1.4f), precioValorIndex, precioValorIndex + movieCastv.toString().length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+//
+//        // Línea temporal mientras se obtiene usuario y saldo
+//        spannable.append("\nUsuario: Consultando...\n")
+//        spannable.append("Saldo actual: Consultando...\n")
+//
+//        // Texto final
+//        spannable.append("\n¡Gracias por tu pedido!")
+//        spannable.append("\nLa película estará disponible pronto. Estamos disponibles 24/7.")
+//        spannable.append("\nSi la película se estrenó hace menos de 1 mes, no será puesta en línea.")
+//        spannable.append("\nEn ese caso, el valor será reembolsado como crédito (CasTV).")
+//        spannable.append("\nRecuerda tener saldo en CasTV para futuros Alquileres.")
+//
+//        messageText.text = spannable
+//
+//        val correoUsuario = FirebaseAuth.getInstance().currentUser?.email ?: ""
+//
+//        if (correoUsuario.isNotEmpty()) {
+//            CastvHelper.obtenerDatosUsuario(
+//                correoUsuario,
+//                onSuccess = { nombre, correo, castv, _ ->
+//                    val usuarioIndex = spannable.indexOf("Usuario: Consultando...")
+//                    if (usuarioIndex != -1) {
+//                        spannable.replace(
+//                            usuarioIndex,
+//                            usuarioIndex + "Usuario: Consultando...".length,
+//                            "Usuario: $nombre"
+//                        )
+//                    }
+//
+//                    val saldoIndex = spannable.indexOf("Saldo actual: Consultando...")
+//                    if (saldoIndex != -1) {
+//                        spannable.replace(
+//                            saldoIndex,
+//                            saldoIndex + "Saldo actual: Consultando...".length,
+//                            "Saldo actual: $castv CasTV"
+//                        )
+//                    }
+//
+//                    messageText.text = spannable
+//                },
+//                onFailure = { e ->
+//                    Log.e("CastvHelper", "❌ Error obteniendo datos del usuario: ${e.message}")
+//                }
+//            )
+//        } else {
+//            Log.e("CastvHelper", "⚠️ Correo del usuario es nulo o vacío")
+//        }
+//
+//
+//        // Botones
+//        linkNosotros.text = "Más información aquí"
+//        linkNosotros.setTextColor(Color.RED)
+//        linkNosotros.paintFlags = linkNosotros.paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
+//        linkNosotros.setOnClickListener {
+//            val intent = Intent(this, Nosotros::class.java)
+//            startActivity(intent)
+//        }
+//
+//// Colores de identidad CineParche
+//        val colorDorado = Color.parseColor("#C5A059")
+//        val colorFondo = Color.parseColor("#0A122A")
+//
+//        val alertDialog = AlertDialog.Builder(this)
+//            .setView(dialogView)
+//            // 1. Evita que se cierre con el botón atrás o tocando fuera
+//            .setCancelable(false)
+//            .setNegativeButton("Volver al contenido") { dialog, _ ->
+//                dialog.dismiss()
+//                finish()
+//            }
+//            .setNeutralButton("Alquilar Película", null)
+//            // Se eliminó el setPositiveButton ("Cerrar")
+//            .create()
+//
+//// 2. Refuerzo para que no se cierre al tocar fuera (opcional pero recomendado)
+//        alertDialog.setCanceledOnTouchOutside(false)
+//
+//// Aplicamos el fondo azul oscuro al View personalizado
+//        dialogView.setBackgroundColor(colorFondo)
+//
+//        alertDialog.setOnShowListener {
+//            val btnAlquilar = alertDialog.getButton(AlertDialog.BUTTON_NEUTRAL)
+//            val btnVolver = alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+//
+//            // --- ESTILO DE TEXTO ---
+//            btnAlquilar.setTextColor(colorDorado)
+//            btnAlquilar.setTypeface(Typeface.DEFAULT_BOLD)
+//            btnVolver.setTextColor(colorDorado)
+//
+//            // --- CONFIGURACIÓN DE ENFOQUE Y SELECTOR ---
+//            val focusSelector = R.drawable.focus_selector
+//            // Solo aplicamos a los dos botones existentes
+//            listOf(btnAlquilar, btnVolver).forEach { button ->
+//                button.setBackgroundResource(focusSelector)
+//                button.isFocusable = true
+//                button.isFocusableInTouchMode = true
+//                button.setPadding(24, 12, 24, 12)
+//            }
+//
+//            // Asegurar que el contenedor de los botones no tenga bordes de otro color
+//            (btnAlquilar.parent as? View)?.setBackgroundColor(colorFondo)
+//
+//            // --- LÓGICA DE ALQUILER ---
+//            btnAlquilar.setOnClickListener {
+//                Log.d("ALQUILER_LOG", "1. Botón Alquilar presionado")
+//                verificarYProcesarPedido(alertDialog)
+//            }
+//
+//            // El foco inicia en Alquilar para facilitar la compra
+//            btnAlquilar.requestFocus()
+//        }
+//
+//        alertDialog.show()
+//
+//// Ventana totalmente inmersiva
+//        alertDialog.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
+//    }
+//
+//    // Agregamos (dialog: AlertDialog) aquí
+//    private fun verificarYProcesarPedido(dialog: AlertDialog) {
+//        Log.d("ALQUILER_LOG", "2. Entrando a verificarYProcesarPedido para: $movieTitle")
+//
+//        val query = databaseRef.child("pedidosmovies")
+//            .orderByChild("title")
+//            .equalTo(movieTitle)
+//
+//        query.get().addOnSuccessListener { snapshot ->
+//            if (!snapshot.exists()) {
+//                Log.d("ALQUILER_LOG", "3. La película no ha sido pedida aún. Procediendo...")
+//                enviarPedido(dialog)
+//            } else {
+//                Log.d("ALQUILER_LOG", "3. La película YA existe en pedidos.")
+//                Toast.makeText(this, "Esta película ya fue pedida.", Toast.LENGTH_LONG).show()
+//            }
+//        }.addOnFailureListener { e ->
+//            Log.e("ALQUILER_LOG", "ERROR en consulta de pedidos: ${e.message}")
+//        }
+//    }
     // Agregamos (dialog: AlertDialog) aquí
-    private fun verificarYProcesarPedido(dialog: AlertDialog) {
-        Log.d("ALQUILER_LOG", "2. Entrando a verificarYProcesarPedido para: $movieTitle")
-
-        val query = databaseRef.child("pedidosmovies")
-            .orderByChild("title")
-            .equalTo(movieTitle)
-
-        query.get().addOnSuccessListener { snapshot ->
-            if (!snapshot.exists()) {
-                Log.d("ALQUILER_LOG", "3. La película no ha sido pedida aún. Procediendo...")
-                enviarPedido(dialog)
-            } else {
-                Log.d("ALQUILER_LOG", "3. La película YA existe en pedidos.")
-                Toast.makeText(this, "Esta película ya fue pedida.", Toast.LENGTH_LONG).show()
-            }
-        }.addOnFailureListener { e ->
-            Log.e("ALQUILER_LOG", "ERROR en consulta de pedidos: ${e.message}")
-        }
-    }
-    // Agregamos (dialog: AlertDialog) aquí
-    private fun enviarPedido(dialog: AlertDialog) {
-        if (isProcessingOrder) return
-        isProcessingOrder = true
-
-        val user = auth.currentUser
-        if (user != null && user.email != null) {
-            val correoKey = user.email!!.replace(".", "_").replace("@", "_")
-
-            databaseRef.child("usuarios").child(correoKey).get().addOnSuccessListener { snapshot ->
-                if (snapshot.exists()) {
-                    val userName = snapshot.child("nombre").value?.toString() ?: "Sin nombre"
-                    val userEmail = snapshot.child("correo").value?.toString() ?: user.email!!
-                    val costoPedido = (movieCastv as? Number)?.toInt() ?: 0
-
-                    // ✅ Ahora enviamos los dos parámetros correctamente
-                    verificarPuntos(correoKey, costoPedido) { tienePuntos ->
-                        if (tienePuntos) {
-                            val datos = hashMapOf(
-                                "title" to movieTitle,
-                                "castv" to costoPedido,
-                                "email" to userEmail,
-                                "nombre" to userName,
-                                "userId" to snapshot.child("userId").value?.toString(),
-                                "timestamp" to ServerValue.TIMESTAMP
-                            )
-
-                            databaseRef.child("pedidosmovies").push().setValue(datos)
-                                .addOnSuccessListener {
-                                    dialog.dismiss()
-                                    descontarPuntos(correoKey, costoPedido)
-                                    enviarCorreoNuevoPedido(movieTitle)
-                                    isProcessingOrder = false
-                                }
-                                .addOnFailureListener { e ->
-                                    isProcessingOrder = false
-                                    Toast.makeText(this, "Error al enviar: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                        } else {
-                            isProcessingOrder = false
-                            Toast.makeText(this, "Saldo CasTV insuficiente.", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                } else {
-                    isProcessingOrder = false
-                }
-            }.addOnFailureListener { isProcessingOrder = false }
-        }
-    }
-    private fun verificarPuntos(correoKey: String, costo: Int, callback: (Boolean) -> Unit) {
-        Log.d("ALQUILER_LOG", "Buscando en la ruta correcta: usuarios/$correoKey")
-
-        val userRef = databaseRef.child("usuarios").child(correoKey)
-
-        userRef.child("castv").get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                val puntosActuales = (snapshot.value as? Number)?.toInt() ?: 0
-                Log.d("ALQUILER_LOG", "✅ Puntos encontrados para $correoKey: $puntosActuales")
-                callback(puntosActuales >= costo)
-            } else {
-                Log.e("ALQUILER_LOG", "❌ No se encontró la carpeta: usuarios/$correoKey")
-                callback(false)
-            }
-        }.addOnFailureListener { e ->
-            Log.e("ALQUILER_LOG", "Error de Firebase: ${e.message}")
-            callback(false)
-        }
-    }
-    private fun enviarCorreoNuevoPedido(movieTitle: String) {
-        val url = "https://server-csks8w.fly.dev/correo"
-
-        // No codificamos el título, lo enviamos tal cual
-        val jsonBody = JSONObject()
-        jsonBody.put("titulo", movieTitle)
-
-        val requestQueue = Volley.newRequestQueue(this)
-        val jsonRequest = object : JsonObjectRequest(
-            Request.Method.POST, url, jsonBody,
-            Response.Listener { response ->
-                Log.d("Email", "✅ Correo enviado exitosamente: $response")
-            },
-            Response.ErrorListener { error ->
-                Log.e("Email", "❌ Error al enviar el correo: ${error.message}")
-            }
-        ) {
-            override fun getBodyContentType(): String = "application/json; charset=utf-8"
-        }
-
-        requestQueue.add(jsonRequest)
-    }
-
-    private fun descontarPuntos(correoKey: String, puntosADescontar: Int) {
-        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
-
-        userRef.child("castv").get().addOnSuccessListener { snapshot ->
-            val castvActual = (snapshot.value as? Number)?.toInt() ?: 0
-
-            if (castvActual >= puntosADescontar) {
-                val nuevoCastv = castvActual - puntosADescontar
-
-                userRef.child("castv").setValue(nuevoCastv)
-                    .addOnSuccessListener {
-                        Log.d("ALQUILER_LOG", "✅ Descuento aplicado. Nuevo saldo: $nuevoCastv")
-                        Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
-
-                        val intent = Intent(this, Nosotros::class.java)
-                        startActivity(intent)
-                        finish()
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("ALQUILER_LOG", "❌ Error al actualizar saldo: ${e.message}")
-                    }
-            }
-        }.addOnFailureListener { e ->
-            Log.e("ALQUILER_LOG", "Error de conexión: ${e.message}")
-        }
-    }
+//    private fun enviarPedido(dialog: AlertDialog) {
+//        if (isProcessingOrder) return
+//        isProcessingOrder = true
+//
+//        val user = auth.currentUser
+//        if (user != null && user.email != null) {
+//            val correoKey = user.email!!.replace(".", "_").replace("@", "_")
+//
+//            databaseRef.child("usuarios").child(correoKey).get().addOnSuccessListener { snapshot ->
+//                if (snapshot.exists()) {
+//                    val userName = snapshot.child("nombre").value?.toString() ?: "Sin nombre"
+//                    val userEmail = snapshot.child("correo").value?.toString() ?: user.email!!
+//                    val costoPedido = (movieCastv as? Number)?.toInt() ?: 0
+//
+//                    // ✅ Ahora enviamos los dos parámetros correctamente
+//                    verificarPuntos(correoKey, costoPedido) { tienePuntos ->
+//                        if (tienePuntos) {
+//                            val datos = hashMapOf(
+//                                "title" to movieTitle,
+//                                "castv" to costoPedido,
+//                                "email" to userEmail,
+//                                "nombre" to userName,
+//                                "userId" to snapshot.child("userId").value?.toString(),
+//                                "timestamp" to ServerValue.TIMESTAMP
+//                            )
+//
+//                            databaseRef.child("pedidosmovies").push().setValue(datos)
+//                                .addOnSuccessListener {
+//                                    dialog.dismiss()
+//                                    descontarPuntos(correoKey, costoPedido)
+//                                    enviarCorreoNuevoPedido(movieTitle)
+//                                    isProcessingOrder = false
+//                                }
+//                                .addOnFailureListener { e ->
+//                                    isProcessingOrder = false
+//                                    Toast.makeText(this, "Error al enviar: ${e.message}", Toast.LENGTH_SHORT).show()
+//                                }
+//                        } else {
+//                            isProcessingOrder = false
+//                            Toast.makeText(this, "Saldo CasTV insuficiente.", Toast.LENGTH_SHORT).show()
+//                        }
+//                    }
+//                } else {
+//                    isProcessingOrder = false
+//                }
+//            }.addOnFailureListener { isProcessingOrder = false }
+//        }
+//    }
+//    private fun verificarPuntos(correoKey: String, costo: Int, callback: (Boolean) -> Unit) {
+//        Log.d("ALQUILER_LOG", "Buscando en la ruta correcta: usuarios/$correoKey")
+//
+//        val userRef = databaseRef.child("usuarios").child(correoKey)
+//
+//        userRef.child("castv").get().addOnSuccessListener { snapshot ->
+//            if (snapshot.exists()) {
+//                val puntosActuales = (snapshot.value as? Number)?.toInt() ?: 0
+//                Log.d("ALQUILER_LOG", "✅ Puntos encontrados para $correoKey: $puntosActuales")
+//                callback(puntosActuales >= costo)
+//            } else {
+//                Log.e("ALQUILER_LOG", "❌ No se encontró la carpeta: usuarios/$correoKey")
+//                callback(false)
+//            }
+//        }.addOnFailureListener { e ->
+//            Log.e("ALQUILER_LOG", "Error de Firebase: ${e.message}")
+//            callback(false)
+//        }
+//    }
+//    private fun enviarCorreoNuevoPedido(movieTitle: String) {
+//        val url = "https://server-csks8w.fly.dev/correo"
+//
+//        // No codificamos el título, lo enviamos tal cual
+//        val jsonBody = JSONObject()
+//        jsonBody.put("titulo", movieTitle)
+//
+//        val requestQueue = Volley.newRequestQueue(this)
+//        val jsonRequest = object : JsonObjectRequest(
+//            Request.Method.POST, url, jsonBody,
+//            Response.Listener { response ->
+//                Log.d("Email", "✅ Correo enviado exitosamente: $response")
+//            },
+//            Response.ErrorListener { error ->
+//                Log.e("Email", "❌ Error al enviar el correo: ${error.message}")
+//            }
+//        ) {
+//            override fun getBodyContentType(): String = "application/json; charset=utf-8"
+//        }
+//
+//        requestQueue.add(jsonRequest)
+//    }
+//
+//    private fun descontarPuntos(correoKey: String, puntosADescontar: Int) {
+//        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
+//
+//        userRef.child("castv").get().addOnSuccessListener { snapshot ->
+//            val castvActual = (snapshot.value as? Number)?.toInt() ?: 0
+//
+//            if (castvActual >= puntosADescontar) {
+//                val nuevoCastv = castvActual - puntosADescontar
+//
+//                userRef.child("castv").setValue(nuevoCastv)
+//                    .addOnSuccessListener {
+//                        Log.d("ALQUILER_LOG", "✅ Descuento aplicado. Nuevo saldo: $nuevoCastv")
+//                        Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
+//
+//                        val intent = Intent(this, Nosotros::class.java)
+//                        startActivity(intent)
+//                        finish()
+//                    }
+//                    .addOnFailureListener { e ->
+//                        Log.e("ALQUILER_LOG", "❌ Error al actualizar saldo: ${e.message}")
+//                    }
+//            }
+//        }.addOnFailureListener { e ->
+//            Log.e("ALQUILER_LOG", "Error de conexión: ${e.message}")
+//        }
+//    }
     override fun onResume() {
         super.onResume()
             // Verificar si el player está en reproducción para actualizar el UI

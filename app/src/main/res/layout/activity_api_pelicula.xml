@@ -198,7 +198,7 @@
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:gravity="center"
-                android:text="▶ Ver"
+                android:text="SIGUIENTE"
                 android:textColor="@color/rojo"
                 android:textSize="22sp"
                 android:textStyle="bold" />

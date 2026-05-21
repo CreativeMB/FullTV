@@ -142,7 +142,7 @@ class MoviesAdapter(
                         val s = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
 
                         holder.txtStatus.text = String.format("%02d:%02d:%02d", h, m, s)
-                        holder.txtBadge.text = "Alquilada 🎬"
+                        holder.txtBadge.text = "ONLINE 🎬"
                         holder.infoArea.setBackgroundColor(Color.parseColor("#001f3f"))
                         holder.txtBadge.setBackgroundColor(Color.parseColor("#001f3f"))
                         holder.txtBadge.visibility = View.VISIBLE
@@ -164,14 +164,14 @@ class MoviesAdapter(
     private fun actualizarInterfazFinal(holder: MovieViewHolder, movie: Movie) {
         holder.txtBadge.visibility = View.VISIBLE
         if (movie.isValid) {
-            holder.txtStatus.text = "Abierta al público"
-            holder.txtBadge.text = "Gratis ✅"
+            holder.txtStatus.text = "CasTV $${movie.castv}"
+            holder.txtBadge.text = "ACTIVAR 💳"
             val color = Color.parseColor("#006064")
             holder.infoArea.setBackgroundColor(color)
             holder.txtBadge.setBackgroundColor(color)
         } else {
             holder.txtStatus.text = "CasTV $${movie.castv}"
-            holder.txtBadge.text = "Alquilar 💳"
+            holder.txtBadge.text = "ALQUILA 💳"
             val color = Color.parseColor("#880E4F")
             holder.infoArea.setBackgroundColor(color)
             holder.txtBadge.setBackgroundColor(color)
