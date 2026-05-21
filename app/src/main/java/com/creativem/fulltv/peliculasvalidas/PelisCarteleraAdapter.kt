@@ -16,7 +16,7 @@ import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Movie
 
 class PelisCarteleraAdapter(
-    private var items: MutableList<Movie>,
+    private val items: MutableList<Movie> = mutableListOf(),
     private val onClick: (Movie) -> Unit
 ) : RecyclerView.Adapter<PelisCarteleraAdapter.ViewHolder>() {
 

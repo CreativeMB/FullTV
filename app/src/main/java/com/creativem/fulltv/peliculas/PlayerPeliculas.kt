@@ -83,6 +83,7 @@ import com.android.volley.Request
 import com.creativem.fulltv.peliculasvalidas.PelisCarteleraAdapter
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
 import com.creativem.fulltv.principal.CastvHelper
+import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.principal.Nosotros
 
 
@@ -200,6 +201,7 @@ class PlayerPeliculas : AppCompatActivity() {
             val reloj = Reloj(textHora, textfecha)
             reloj.startClock()
         }
+
         val menupelis = binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis)
         menupelis.setOnClickListener {
             mostarpelis()
@@ -378,34 +380,52 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
     private fun loadMovies() {
-        // 1. Obtenemos la lista inicial
-        val peliculasValidas = Validacioneslista.obtenerPeliculasValidas()
+        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
 
-        if (peliculasValidas.isNotEmpty()) {
-            // Ordenamos y enviamos al adaptador de cartelera
-            val listaOrdenada = peliculasValidas.sortedByDescending { it.createdAt }
+        // Función interna para filtrar las películas activas
+        fun filtrarActivas(lista: List<Movie>): List<Movie> {
+            return lista.filter { movie ->
+                val countdownDurationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
+                val timeElapsed = System.currentTimeMillis() - movie.createdAt
+                val remainingTimeMillis = countdownDurationMillis - timeElapsed
 
-            // Si el adaptador espera TmdbMovie y recibes Movie, asegúrate de que sea la misma clase
-            carteleraAdapter.updateMovies(listaOrdenada)
+                // Filtro: Debe tener contador mayor a 0 y aún no haber finalizado
+                movie.countdownMinutes > 0 && remainingTimeMillis > 0
+            }.sortedByDescending { it.createdAt }
         }
 
-        // 2. Vigilamos actualizaciones en segundo plano
         lifecycleScope.launch {
-            var ultimaCantidad = peliculasValidas.size
-
             while (isActive) {
                 val listaActualizada = Validacioneslista.obtenerPeliculasValidas()
+                val nuevasActivas = filtrarActivas(listaActualizada)
 
-                // Si hay pelis nuevas, actualizamos el adaptador
-                if (listaActualizada.size > ultimaCantidad) {
-                    ultimaCantidad = listaActualizada.size
-                    carteleraAdapter.updateMovies(listaActualizada.sortedByDescending { it.createdAt })
+                withContext(Dispatchers.Main) {
+                    if (nuevasActivas.isNotEmpty()) {
+                        // Si hay películas, actualizamos
+                        carteleraAdapter.updateMovies(nuevasActivas)
+
+                        // Si el menú estaba oculto por estar vacío, puedes decidir mostrarlo
+                        // menuPelis.visibility = View.VISIBLE
+                    } else {
+                        // 🟢 SI NO HAY PELÍCULAS, OCULTAMOS EL MENÚ CON ANIMACIÓN
+                        if (menuPelis.visibility == View.VISIBLE) {
+                            menuPelis.animate()
+                                .alpha(0f)
+                                .setDuration(300)
+                                .withEndAction {
+                                    menuPelis.visibility = View.GONE
+                                    menuPelis.alpha = 1f // Restauramos alpha para la próxima vez
+                                }
+                                .start()
+                            menuAbierto = false
+                        }
+                    }
                 }
 
-                // Si el Singleton dice que ya no hay más por cargar, salimos del bucle
+                // Si ya se cargó todo de la BD, terminamos el bucle
                 if (Validacioneslista.yaCargado()) break
 
-                delay(2000) // Espera 2 segundos antes de la siguiente revisión
+                delay(3000) // Revisión cada 3 segundos
             }
         }
     }
