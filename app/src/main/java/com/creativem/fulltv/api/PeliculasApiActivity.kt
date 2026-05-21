@@ -111,8 +111,8 @@ class PeliculasApiActivity : AppCompatActivity() {
                                 imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}",
                                 streamUrl = "https://tuservidor.com/stream/${movie.id}",
                                 castv = 30,
-                                countdownMinutes = 60,
-                                createdAt = System.currentTimeMillis()
+                                countdownMinutes = 0,
+                                createdAt = 0L
                             )
                         } ?: emptyList()
                         allMovies.addAll(mapped)

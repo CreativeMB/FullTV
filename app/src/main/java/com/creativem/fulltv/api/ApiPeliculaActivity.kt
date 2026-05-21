@@ -132,15 +132,21 @@ class ApiPeliculaActivity : AppCompatActivity() {
         recyclerCartelera.preserveFocusAfterLayout = true
 
         // --- BOTÓN REPRODUCIR ---
-        // --- BOTÓN REPRODUCIR ---
         tvReproducir.setOnClickListener {
             val urlActual = streamUrlGuardado
             val countdownActual = movieActual?.countdownMinutes ?: movieCountdown
             val createdAtOriginal = movieActual?.createdAt ?: movieCreatedAt
             val costoActual = movieActual?.castv ?: movieCastv
 
+            // 🟢 ESCENARIO 4 (NUEVO): VIENE DEL CATÁLOGO API
+            // Si el enlace es el de "tuservidor.com" o está en blanco, es una película
+            // que aún no existe en tu base de datos. Pasa directo a Pedir (Alquilar).
+            if (urlActual.contains("tuservidor.com") || urlActual.isBlank()) {
+                manejarEnlaceRoto(costoActual)
+                return@setOnClickListener // Corta aquí, no hace nada más.
+            }
+
             // 🟢 SOLUCIÓN: Ajuste de Fechas (Milisegundos vs Segundos)
-            // Si la fecha tiene menos de 13 dígitos, está en segundos. La multiplicamos por 1000.
             val createdAtMillis = if (createdAtOriginal > 0 && createdAtOriginal < 1000000000000L) {
                 createdAtOriginal * 1000
             } else {
@@ -151,17 +157,13 @@ class ApiPeliculaActivity : AppCompatActivity() {
             var isCountdownActive = false
 
             if (countdownActual > 0) {
-                // Si por alguna razón Firebase o el Intent no mandó fecha (0L), pero el contador existe,
-                // asumimos que es una película de acceso libre/estreno y la dejamos pasar.
                 if (createdAtMillis == 0L) {
                     isCountdownActive = true
                 } else {
-                    // Calculamos matemáticamente si aún le queda tiempo
                     val countdownDurationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownActual.toLong())
                     val timeElapsed = System.currentTimeMillis() - createdAtMillis
                     val remainingTimeMillis = countdownDurationMillis - timeElapsed
 
-                    // Si sobra tiempo (es mayor a 0), el contador sigue vivo
                     if (remainingTimeMillis > 0) {
                         isCountdownActive = true
                     }
@@ -171,7 +173,6 @@ class ApiPeliculaActivity : AppCompatActivity() {
             // ESCENARIO 3: Viene de un contador ACTIVO -> Reproduce directo sin cobrar
             if (isCountdownActive) {
                 if (urlActual.isNotBlank()) {
-                    // Quitamos el Toast para que sea inmediato y limpio
                     irAlReproductorDirecto()
                 } else {
                     Toast.makeText(this, "Enlace de cuenta regresiva no disponible", Toast.LENGTH_SHORT).show()
@@ -179,7 +180,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // ESCENARIO 1 y 2: Preparar UI para cobrar/validar (Evitar doble clic)
+            // ESCENARIO 1 y 2: Preparar UI para cobrar/validar
             tvReproducir.isEnabled = false
             val textoOriginal = tvReproducir.text
             tvReproducir.text = "Procesando Datos..."
@@ -190,14 +191,13 @@ class ApiPeliculaActivity : AppCompatActivity() {
                 }
 
                 if (enlaceValido) {
-                    // ESCENARIO 1: El enlace sirve -> Mostrar AlertDialog de Confirmación (Ver Ahora)
+                    // ESCENARIO 1: El enlace sirve -> Mostrar AlertDialog de Confirmación
                     procesarEnlaceBueno(costoActual)
                 } else {
-                    // ESCENARIO 2: El enlace está roto -> Mostrar AlertDialog para pedir la película (Alquilar)
+                    // ESCENARIO 2: El enlace está roto -> Mostrar AlertDialog para pedir la película
                     manejarEnlaceRoto(costoActual)
                 }
 
-                // Restaurar el botón a su estado normal por si el usuario canceló la alerta
                 tvReproducir.isEnabled = true
                 tvReproducir.text = textoOriginal
             }
