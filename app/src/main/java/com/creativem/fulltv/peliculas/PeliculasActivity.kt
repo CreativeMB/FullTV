@@ -210,7 +210,7 @@ class PeliculasActivity : AppCompatActivity() {
     // ==========================================
     private fun setupMenuHorizontal() {
         val menuItems = listOf(
-            "TV", "Gratis", "Peliculas", "Buscar",
+            "TV", "Activar", "Alquila", "Buscar",
             "Pedir", "Paquete", "Pago", "Cerrar"
         )
         val menuIcons = listOf(
@@ -227,11 +227,11 @@ class PeliculasActivity : AppCompatActivity() {
 
         val adapter = MenuPrincipalAdapter(menuList) { item ->
             when (item.name) {
-                "Gratis" -> navegarGratis() // En esta pantalla, Inicio y Gratis suelen ser lo mismo
+                "Activar" -> navegarGratis() // En esta pantalla, Inicio y Gratis suelen ser lo mismo
                 "Buscar" -> buscarPeliculaDialogo()
                 "Pedir" -> mostrarDialogoPedido()
                 "Paquete" -> activarpaquete()
-                "Peliculas" -> navegarAPeliculasApi()
+                "Alquila" -> navegarAPeliculasApi()
                 "Pago" -> {
                     val intent = Intent(this, Nosotros::class.java)
                     startActivity(intent)
