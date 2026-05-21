@@ -582,11 +582,20 @@ class PlayerPeliculas : AppCompatActivity() {
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
             // ... el resto de tu código sigue igual ...
-            val loadControl = DefaultLoadControl.Builder()
-                .setTargetBufferBytes(8 * 1024 * 1024)
-                .setPrioritizeTimeOverSizeThresholds(false)
-                .build()
-
+//            val loadControl = DefaultLoadControl.Builder()
+//                .setTargetBufferBytes(8 * 1024 * 1024)
+//                .setPrioritizeTimeOverSizeThresholds(false)
+//                .build()
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                2_500,   // Mínimo de buffer para empezar (bajamos de 15s a 2.5s)
+                30_000,  // Máximo de buffer
+                1_000,   // Buffer necesario para reanudar si se pausa
+                1_500    // Buffer necesario para el primer arranque
+            )
+            .setTargetBufferBytes(32 * 1024 * 1024) // Bajamos a 32MB para que no intente llenar tanto al inicio
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
         player = ExoPlayer.Builder(this@PlayerPeliculas)
             .setLoadControl(loadControl)
             .setRenderersFactory(
@@ -598,7 +607,20 @@ class PlayerPeliculas : AppCompatActivity() {
 
                 binding.reproductor.player = exoPlayer
 
-                val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+//                val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+// --- POR ESTO ---
+                val mediaUri = Uri.parse(streamUrl)
+                val mimeType = if (streamUrl.contains(".mkv")) {
+                    androidx.media3.common.MimeTypes.VIDEO_MATROSKA
+                } else {
+                    androidx.media3.common.MimeTypes.VIDEO_MP4
+                }
+
+                val mediaItem = MediaItem.Builder()
+                    .setUri(mediaUri)
+                    .setMimeType(mimeType) // <--- ESTO LE DICE AL CELULAR QUÉ CÓDEC USAR
+                    .build()
+
                 exoPlayer.setMediaItem(mediaItem)
                 exoPlayer.prepare()
 

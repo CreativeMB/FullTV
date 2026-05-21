@@ -9,6 +9,7 @@
         <domain includeSubdomains="true">filmaffinity.com</domain>
         <domain includeSubdomains="true">teleclub.xyz</domain>
         <domain includeSubdomains="true">coninfo.net</domain>
+        <domain includeSubdomains="true">cineparche.duckdns.org</domain>
     </domain-config>
         <base-config>
             <trust-anchors>
