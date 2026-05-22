@@ -23,6 +23,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
+import com.creativem.fulltv.peliculas.PeliculasActivity
 import com.creativem.fulltv.peliculas.PlayerPeliculas
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
 import com.creativem.fulltv.peliculasvalidas.PelisCarteleraAdapter
@@ -234,7 +235,6 @@ class ApiPeliculaActivity : AppCompatActivity() {
             Log.e("ALQUILER", "Error activando contador: ${it.message}")
         }
     }
-    // --- ESCENARIO 1: ENLACE BUENO ---
     // --- ESCENARIO 1: ENLACE BUENO (AHORA CON CONFIRMACIÓN) ---
     private fun procesarEnlaceBueno(costo: Int) {
         val user = auth.currentUser
@@ -249,7 +249,6 @@ class ApiPeliculaActivity : AppCompatActivity() {
         showConfirmPurchaseDialog(costo, correoKey)
     }
 
-    // --- DIALOGO DE CONFIRMACIÓN DE ALQUILER (ENLACE BUENO) ---
     // --- DIALOGO DE CONFIRMACIÓN DE ALQUILER (ENLACE BUENO) ---
     private fun showConfirmPurchaseDialog(costo: Int, correoKey: String) {
         val tituloUsado = movieActual?.title ?: movieTitle
@@ -285,7 +284,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
         spannable.setSpan(android.text.style.StyleSpan(Typeface.BOLD), startCosto, spannable.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         spannable.setSpan(RelativeSizeSpan(1.3f), startCosto, spannable.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
 
-        spannable.append("El enlace está disponible en alta calidad.\n¿Deseas alquilar y ver la película ahora?")
+        spannable.append("Contenido disponible.\n¿Deseas alquilar y ver la película ahora?")
 
         builder.setMessage(spannable)
         builder.setCancelable(true)
@@ -307,7 +306,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
             // Colores de los botones
             btnVerAhora.setTextColor(colorDorado)
             btnVerAhora.setTypeface(Typeface.DEFAULT_BOLD)
-            btnCancelar.setTextColor(Color.WHITE)
+            btnCancelar.setTextColor(Color.RED)
 
             // Selector para Android TV y Padding extra para que se vean más como botones
             val focusSelector = R.drawable.focus_selector
@@ -428,10 +427,10 @@ class ApiPeliculaActivity : AppCompatActivity() {
         spannable.append("Saldo actual: Consultando...\n")
         spannable.append("\nℹ️ INFORMACIÓN IMPORTANTE") // Añadir un ícono ayuda visualmente
         spannable.append("\nAl enviar su solicitud, el contenido será procesado por nuestro equipo de moderación.")
-        spannable.append("\nEl tiempo estimado de gestión es de algunas horas; le notificaremos a través de la plataforma en cuanto esté disponible.")
-        spannable.append("\n\n⚠️ RESTRICCIONES")
-        spannable.append("\nSi la película tiene menos de un mes de estreno, no podrá ser puesta en línea. En ese caso, el valor será reembolsado automáticamente como crédito en CasTV.")
-        spannable.append("\n\nRecuerda mantener saldo en tu cuenta CasTV para disfrutar de tus próximos alquileres.")
+        spannable.append("\nEl tiempo estimado de gestión es lo mas pronto posible; Notificacion por canal oficial de telegram.")
+        spannable.append("\n⚠️ RESTRICCIONES")
+        spannable.append("\nSi la película tiene menos de un mes de estreno, No será procesada. El valor será reembolsado automáticamente como crédito en CasTV.")
+        spannable.append("\nRecuerda mantener saldo en tu cuenta CasTV para disfrutar de tus próximos alquileres.")
 
         messageText.text = spannable
 
@@ -469,11 +468,19 @@ class ApiPeliculaActivity : AppCompatActivity() {
         val alertDialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .setCancelable(false)
+
             .setNegativeButton("Volver al contenido") { dialog, _ ->
                 dialog.dismiss()
-                // No llamamos a finish() si queremos que siga en la película,
-                // o si prefieres sacarlo, déjalo como finish()
+                val intent = Intent(this@ApiPeliculaActivity, PeliculasActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+
+                // 🟢 ESTA LÍNEA ELIMINA EL PANTALLAZO BRUSCO
+                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+
+                finish()
             }
+
             .setNeutralButton("Alquilar Película", null)
             .create()
 
@@ -585,12 +592,25 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
     private fun descontarPuntos(correoKey: String, costo: Int, onComplete: ((Boolean) -> Unit)? = null) {
         val userRef = databaseRef.child("usuarios").child(correoKey)
+
         userRef.child("castv").get().addOnSuccessListener { snapshot ->
             val puntosActuales = (snapshot.value as? Number)?.toInt() ?: 0
+
             if (puntosActuales >= costo) {
                 val nuevosPuntos = puntosActuales - costo
+
+                // Realizamos el descuento
                 userRef.child("castv").setValue(nuevosPuntos)
-                    .addOnSuccessListener { onComplete?.invoke(true) }
+                    .addOnSuccessListener {
+                        // 🟢 AHORA: Registramos el consumo en el historial
+                        // Necesitamos obtener el email original para el historial
+                        val emailOriginal = correoKey.replace("_", ".")
+                        val tituloPelicula = movieActual?.title ?: movieTitle
+
+                        CastvHelper.registrarConsumo(emailOriginal, tituloPelicula, costo)
+
+                        onComplete?.invoke(true)
+                    }
                     .addOnFailureListener { onComplete?.invoke(false) }
             } else {
                 onComplete?.invoke(false)
@@ -629,20 +649,49 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.Main).launch {
             while (isActive) {
-                val listaActualDelObjeto = Validacioneslista.obtenerPeliculasValidas()
+                val listaCompleta = Validacioneslista.obtenerPeliculasValidas()
 
-                if (listaActualDelObjeto.size > pelisMostradas.size) {
+                // Filtramos:
+                // 1. Que la URL sea válida (no vacía o no "tuservidor.com")
+                // 2. Que el contador ya haya expirado o no exista (isCountdownActive = false)
+                val listaFiltrada = listaCompleta.filter { movie ->
+                    val esUrlValida = movie.streamUrl.isNotBlank() && !movie.streamUrl.contains("tuservidor.com")
+
+                    // Calculamos si el contador está activo para esta película
+                    val isCountdownActive = calcularSiContadorEstaActivo(movie)
+
+                    esUrlValida && !isCountdownActive
+                }
+
+                if (listaFiltrada.size != pelisMostradas.size) {
                     pelisMostradas.clear()
-                    pelisMostradas.addAll(listaActualDelObjeto)
+                    pelisMostradas.addAll(listaFiltrada)
                     carteleraAdapter.notifyDataSetChanged()
                 }
 
                 if (Validacioneslista.yaCargado()) break
-                delay(500)
+                delay(1000) // Aumentamos un poco el delay para no saturar
             }
         }
     }
+    private fun calcularSiContadorEstaActivo(movie: Movie): Boolean {
+        if (movie.countdownMinutes <= 0) return false
 
+        val createdAtMillis = if (movie.createdAt > 0 && movie.createdAt < 1000000000000L) {
+            movie.createdAt * 1000
+        } else {
+            movie.createdAt
+        }
+
+        if (createdAtMillis == 0L) return false
+
+        val countdownDurationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
+        val timeElapsed = System.currentTimeMillis() - createdAtMillis
+        val remainingTimeMillis = countdownDurationMillis - timeElapsed
+
+        // Si remainingTimeMillis > 0, significa que el contador está corriendo
+        return remainingTimeMillis > 0
+    }
     private fun actualizarPeliculaSeleccionada(movieSeleccionado: Movie) {
         tvTitulo.text = movieSeleccionado.title
         tvSinopsis.text = "Cargando información detallada..."

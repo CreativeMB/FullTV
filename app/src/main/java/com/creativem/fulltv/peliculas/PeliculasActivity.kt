@@ -210,13 +210,13 @@ class PeliculasActivity : AppCompatActivity() {
     // ==========================================
     private fun setupMenuHorizontal() {
         val menuItems = listOf(
-            "TV", "Activar", "Alquila", "Buscar",
-            "Pedir", "Paquete", "Pago", "Cerrar"
+            "Activar", "Alquila", "Buscar",
+            "Pedir", "Paquete", "Perfil", "TV", "Cerrar"
         )
         val menuIcons = listOf(
-            R.drawable.tv, R.drawable.cartelera,
+            R.drawable.cartelera,
             R.drawable.cine, R.drawable.buscar, R.drawable.pedido,
-            R.drawable.activacion, R.drawable.pagos, R.drawable.cerrar
+            R.drawable.activacion, R.drawable.home, R.drawable.tv, R.drawable.cerrrarp
         )
 
 
@@ -232,7 +232,7 @@ class PeliculasActivity : AppCompatActivity() {
                 "Pedir" -> mostrarDialogoPedido()
                 "Paquete" -> activarpaquete()
                 "Alquila" -> navegarAPeliculasApi()
-                "Pago" -> {
+                "Perfil" -> {
                     val intent = Intent(this, Nosotros::class.java)
                     startActivity(intent)
                 }
@@ -720,9 +720,9 @@ class PeliculasActivity : AppCompatActivity() {
                                     originalTitle = it.original_title,
                                     imageUrl = "https://image.tmdb.org/t/p/w500${it.poster_path}",
                                     streamUrl = "https://tuservidor.com/stream/${it.id}",
-                                    castv = 50,
-                                    countdownMinutes = 60,
-                                    createdAt = System.currentTimeMillis()
+                                    castv = 10,
+                                    countdownMinutes = 0,
+                                    createdAt = 0L
                                 )
                             } ?: emptyList()
                         } else emptyList()
@@ -920,7 +920,7 @@ class PeliculasActivity : AppCompatActivity() {
                     setTypeface(null, Typeface.BOLD)
                     setOnClickListener {
                         if (saldoActual >= costo) {
-                            ejecutarProcesoFinal(correoKey, pedido, costo, nombreUsuario, email)
+                            ejecutarProcesoFinal(correoKey, pedido, costo, nombreUsuario, email, dialog)
                             dialog.dismiss()
                         } else {
                             Toast.makeText(context, "Saldo insuficiente ❌", Toast.LENGTH_LONG).show()
@@ -939,7 +939,7 @@ class PeliculasActivity : AppCompatActivity() {
             }
         }
     }
-    private fun ejecutarProcesoFinal(correoKey: String, titulo: String, costo: Int, nombre: String, email: String) {
+    private fun ejecutarProcesoFinal(correoKey: String, titulo: String, costo: Int, nombre: String, email: String, dialog: AlertDialog) {
         val data = hashMapOf(
             "title" to titulo,
             "castv" to costo,
@@ -950,15 +950,16 @@ class PeliculasActivity : AppCompatActivity() {
 
         // 1. Guardamos el pedido
         databaseRef.child("pedidosmovies").push().setValue(data).addOnSuccessListener {
-            // 2. Descontamos los puntos usando el método que ya tienes
-            descontarPuntos(correoKey, costo)
-
+            // 2. Descontamos los puntos y pasamos el dialog para que se cierre después
+            descontarPuntos(correoKey, costo, titulo, dialog)
 
             Toast.makeText(this, "¡Pedido registrado con éxito!", Toast.LENGTH_SHORT).show()
+        }.addOnFailureListener {
+            Toast.makeText(this, "Error al registrar pedido", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun descontarPuntos(correoKey: String, puntosADescontar: Int) {
+    private fun descontarPuntos(correoKey: String, puntosADescontar: Int, tituloPelicula: String, dialog: AlertDialog) {
         val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
 
         userRef.child("castv").get().addOnSuccessListener { snapshot ->
@@ -970,14 +971,22 @@ class PeliculasActivity : AppCompatActivity() {
                 userRef.child("castv").setValue(nuevoCastv)
                     .addOnSuccessListener {
                         Log.d("ALQUILER_LOG", "✅ Descuento aplicado. Nuevo saldo: $nuevoCastv")
+
+                        // 🟢 REGISTRAMOS EL CONSUMO EN EL HISTORIAL
+                        val email = correoKey.replace("_", ".")
+                        // Usamos el título que viene por parámetro, no "title" de la actividad
+                        CastvHelper.registrarConsumo(email, "PEDIDO: $tituloPelicula", puntosADescontar)
+
                         Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
 
-                        val intent = Intent(this, Nosotros::class.java)
-                        startActivity(intent)
+                        dialog.dismiss()  // Ahora esto cerrará el diálogo correctamente
                     }
                     .addOnFailureListener { e ->
                         Log.e("ALQUILER_LOG", "❌ Error al actualizar saldo: ${e.message}")
+                        Toast.makeText(this, "Error al actualizar saldo", Toast.LENGTH_SHORT).show()
                     }
+            } else {
+                Toast.makeText(this, "Saldo insuficiente", Toast.LENGTH_SHORT).show()
             }
         }.addOnFailureListener { e ->
             Log.e("ALQUILER_LOG", "Error de conexión: ${e.message}")

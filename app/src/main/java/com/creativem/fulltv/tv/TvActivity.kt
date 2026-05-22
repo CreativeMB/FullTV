@@ -25,7 +25,7 @@ import kotlinx.coroutines.withContext
 class TvActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityTvBinding
-    private lateinit var adapter: MoviesAdapter
+    private lateinit var adapter: ChannelsAdapter
     private val channelList = mutableListOf<Movie>()
     private val databaseRef = FirebaseDatabase.getInstance().getReference("tv")
 
@@ -43,23 +43,16 @@ class TvActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
-        // 1. Usamos el objeto global para obtener el número de columnas (basado en 160dp)
         val columnas = ViewUtils.calcularColumnas(this)
-
-        // 2. Aplicamos el LayoutManager con ese valor global
         binding.rvCanales.layoutManager = GridLayoutManager(this, columnas)
 
-        // Usamos el mismo MoviesAdapter para mantener la estética
-        adapter = MoviesAdapter(
+        // QUITA el "val" antes de adapter. Así usas la variable de clase.
+        adapter = ChannelsAdapter(
             channelList,
             onItemClick = { canal -> abrirReproductor(canal) },
-            onFocusChange = { canal ->
-                // Esto asegura que al navegar por los canales también cambie el fondo
-                actualizarFondo(canal.imageUrl)
-            }
+            onFocusChange = { canal -> actualizarFondo(canal.imageUrl) }
         )
 
-        // 3. Opcional: Quitar animaciones para que el foco se mueva más rápido en TV
         binding.rvCanales.itemAnimator = null
         binding.rvCanales.adapter = adapter
     }
@@ -68,27 +61,40 @@ class TvActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val snapshot = databaseRef.get().await()
-                val canales = mutableListOf<Movie>()
+                Log.d("TV_DEBUG", "Hijos encontrados en Firebase: ${snapshot.childrenCount}")
 
+                val canales = mutableListOf<Movie>()
                 for (child in snapshot.children) {
+                    // Firebase a veces necesita que la clase tenga constructor vacío
                     val canal = child.getValue(Movie::class.java)
                     canal?.let {
-                        // 🟢 FORZAMOS LA ETIQUETA GRATIS AQUÍ
-                        // Al ser canales de TV, marcamos que siempre son válidos/gratis
                         it.isValid = true
-
-                        canales.add(it.copy(id = child.key ?: ""))
+                        // Asignamos el ID directamente
+                        val canalConId = it.copy(id = child.key ?: "")
+                        canales.add(canalConId)
                     }
                 }
 
                 withContext(Dispatchers.Main) {
-                    channelList.clear()
-                    // Ordenar por nombre o fecha si lo prefieres
-                    channelList.addAll(canales.sortedBy { it.title })
-                    adapter.notifyDataSetChanged()
+                    if (canales.isEmpty()) {
+                        Log.d("TV_DEBUG", "La lista de canales está vacía en Firebase.")
+                    } else {
+                        // Limpiamos y recargamos la lista ORIGINAL que le pasamos al adaptador
+                        channelList.clear()
+                        channelList.addAll(canales.sortedBy { it.title })
+
+                        // Si el adaptador ya fue creado, avisarle que los datos cambiaron
+                        if (::adapter.isInitialized) {
+                            adapter.notifyDataSetChanged()
+                        } else {
+                            // Si por alguna razón setupRecyclerView no se llamó aún, llamarlo aquí
+                            setupRecyclerView()
+                        }
+                        Log.d("TV_DEBUG", "Canales cargados: ${channelList.size}")
+                    }
                 }
             } catch (e: Exception) {
-                Log.e("TV_ACTIVITY", "Error cargando canales: ${e.message}")
+                Log.e("TV_ACTIVITY", "Error crítico al cargar Firebase: ${e.message}")
             }
         }
     }

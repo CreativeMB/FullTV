@@ -43,10 +43,10 @@ class PelisCarteleraAdapter(
 
         // 1. LÓGICA DE ETIQUETAS
         if (movie.isValid) {
-            holder.badge.text = "Gratis ✅"
+            holder.badge.text = "ACTIVAR 💳"
             holder.badge.setBackgroundColor(Color.parseColor("#006064"))
         } else {
-            holder.badge.text = "Alquilar 💳"
+            holder.badge.text = "ALQUILA 💳"
             holder.badge.setBackgroundColor(Color.parseColor("#880E4F"))
         }
         holder.badge.visibility = View.VISIBLE

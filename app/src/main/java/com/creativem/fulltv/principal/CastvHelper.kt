@@ -71,7 +71,7 @@ object CastvHelper {
         val user = mapOf(
             "nombre" to nombre,
             "correo" to email,
-            "castv" to 10, // Créditos iniciales
+            "castv" to 250, // Créditos iniciales gratis
             "userId" to userId,
             "estado" to "activo",
             "enlinea" to true,
@@ -87,7 +87,41 @@ object CastvHelper {
                 Log.e(TAG, "❌ Error al crear nodo de usuario", e)
             }
     }
+    /**
+     * 💰 Registra el consumo de créditos de un usuario en Firebase
+     */
+    fun registrarConsumo(email: String, nombrePelicula: String, costo: Int) {
+        val correoKey = codificarCorreo(email)
+        val database = FirebaseDatabase.getInstance()
 
+        // 1. Creamos una entrada única en la rama "historial_consumos"
+        val consumoRef = database.reference.child("historial_consumos").push()
+
+        val datosConsumo = mapOf(
+            "usuarioCorreo" to email,
+            "pelicula" to nombrePelicula,
+            "creditosGastados" to costo,
+            "timestamp" to ServerValue.TIMESTAMP
+        )
+
+        consumoRef.setValue(datosConsumo).addOnSuccessListener {
+            Log.d(TAG, "Consumo registrado: $costo créditos en $nombrePelicula")
+        }
+
+        // 2. Opcional: Actualizamos también un total acumulado en el nodo del usuario
+        // Esto facilita ver en la otra app cuánto ha gastado un usuario en total
+        val userRef = database.reference.child("usuarios").child(correoKey)
+        userRef.child("totalGastado").runTransaction(object : Transaction.Handler {
+            override fun doTransaction(mutableData: MutableData): Transaction.Result {
+                val actual = mutableData.getValue(Int::class.java) ?: 0
+                mutableData.value = actual + costo
+                return Transaction.success(mutableData)
+            }
+            override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
+                if (error != null) Log.e(TAG, "Error actualizando totalGastado", error.toException())
+            }
+        })
+    }
     /**
      * 🟢 Configura el sistema de presencia (Online/Offline) usando onDisconnect.
      */
