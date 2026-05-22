@@ -627,19 +627,24 @@ class PlayerPeliculas : AppCompatActivity() {
 
                 binding.reproductor.player = exoPlayer
 
-//                val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
-// --- POR ESTO ---
                 val mediaUri = Uri.parse(streamUrl)
-                val mimeType = if (streamUrl.contains(".mkv")) {
-                    androidx.media3.common.MimeTypes.VIDEO_MATROSKA
+
+                val mediaItemBuilder = MediaItem.Builder().setUri(mediaUri)
+
+
+                if (streamUrl.contains(".m3u8")) {
+                    mediaItemBuilder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
                 } else {
-                    androidx.media3.common.MimeTypes.VIDEO_MP4
+
+                    val mimeType = if (streamUrl.contains(".mkv")) {
+                        androidx.media3.common.MimeTypes.VIDEO_MATROSKA
+                    } else {
+                        androidx.media3.common.MimeTypes.VIDEO_MP4
+                    }
+                    mediaItemBuilder.setMimeType(mimeType)
                 }
 
-                val mediaItem = MediaItem.Builder()
-                    .setUri(mediaUri)
-                    .setMimeType(mimeType) // <--- ESTO LE DICE AL CELULAR QUÉ CÓDEC USAR
-                    .build()
+                val mediaItem = mediaItemBuilder.build()
 
                 exoPlayer.setMediaItem(mediaItem)
                 exoPlayer.prepare()
