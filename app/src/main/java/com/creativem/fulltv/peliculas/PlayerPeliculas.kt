@@ -444,10 +444,16 @@ class PlayerPeliculas : AppCompatActivity() {
 
     @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
-        if (streamUrl.isEmpty()) {
-//            showErrorDialog(movieTitle, movieCastv, userId)
+        Log.d("Player", "Intentando preparar URL: $streamUrl")
+        if (streamUrl.isEmpty())
             return
-        }
+        lifecycleScope.launch {
+            // Asegurar que la validación ocurra antes de preparar
+            withContext(Dispatchers.IO) {
+                if (!Validacioneslista.yaCargado()) {
+                    Validacioneslista.cargarPeliculas()
+                }
+            }
 
         CoroutineScope(Dispatchers.Main).launch {
             // 1. Verificamos localmente contra el objeto Validacioneslista
@@ -476,6 +482,7 @@ class PlayerPeliculas : AppCompatActivity() {
 
             }
         }
+    }
     }
 
     private fun mostrarDialogoContinuar(progresoGuardado: Long) {
@@ -644,9 +651,11 @@ class PlayerPeliculas : AppCompatActivity() {
                     mediaItemBuilder.setMimeType(mimeType)
                 }
 
-                val mediaItem = mediaItemBuilder.build()
-
-                exoPlayer.setMediaItem(mediaItem)
+                val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+// Asegúrate de que esto esté justo antes de preparar
+                player?.stop()
+                player?.clearMediaItems()
+                exoPlayer.setMediaItem(mediaItem, true) // El 'true' reinicia la posición
                 exoPlayer.prepare()
 
                 exoPlayer.addListener(object : Player.Listener {
