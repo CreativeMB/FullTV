@@ -18,13 +18,11 @@ class MoviesAdapter(
     // La lista filtrada ahora se inicializa con la lista completa
     private var movieListFiltered: List<Movie> = movieList
 
-    // Método para actualizar la lista de películas
     fun updateMovieList(newMovieList: List<Movie>) {
         movieList = newMovieList
-        movieListFiltered = newMovieList // Asegúrate de que la lista filtrada esté actualizada
+        movieListFiltered = newMovieList
         notifyDataSetChanged()
     }
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MovieViewHolder {
         val view: View =
             LayoutInflater.from(parent.context).inflate(R.layout.item_movies_pedidos, parent, false)

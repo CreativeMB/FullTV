@@ -44,15 +44,22 @@ class EditarPeliculaFragment : Fragment() {
     private fun escucharPeliculasEnTiempoReal() {
         databaseRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
             override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                movieList.clear()
+                val listaTemporal = mutableListOf<Movie>()
+
                 for (child in snapshot.children) {
                     val movie = child.getValue(Movie::class.java)
                     movie?.let {
-                        it.id = child.key ?: "" // Aseguramos el ID
-                        movieList.add(it)
+                        it.id = child.key ?: ""
+                        listaTemporal.add(it)
                     }
                 }
-                moviesAdapter.notifyDataSetChanged()
+
+                // ORDENAR POR FECHA DE CREACIÓN (O ID)
+                // Asumiendo que 'createdAt' es Long
+                val listaOrdenada = listaTemporal.sortedByDescending { it.createdAt }
+
+                // Actualizamos el adaptador con la lista ordenada
+                moviesAdapter.updateMovieList(listaOrdenada)
             }
 
             override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
