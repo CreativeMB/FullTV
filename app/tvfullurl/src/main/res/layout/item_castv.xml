@@ -10,112 +10,137 @@
     app:cardCornerRadius="8dp"
     app:cardElevation="4dp">
 
+    <!-- CONTENEDOR VERTICAL PRINCIPAL -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:orientation="vertical">
 
-        <!-- INDICADOR ONLINE (Más delgado) -->
-        <View
-            android:id="@+id/indicatorOnline"
-            android:layout_width="4dp"
-            android:layout_height="match_parent"
-            android:minHeight="80dp"
-            android:background="#4CAF50" />
-
-        <!-- INFO PRINCIPAL -->
+        <!-- FILA SUPERIOR: Indicador, Info y Botones -->
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:paddingVertical="8dp"
-            android:paddingHorizontal="12dp">
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-            <TextView
-                android:id="@+id/userName"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Nombre"
-                android:textColor="#FFFFFF"
-                android:textSize="17sp"
-                android:textStyle="bold"
-                android:maxLines="1"
-                android:ellipsize="end" />
+            <View
+                android:id="@+id/indicatorOnline"
+                android:layout_width="4dp"
+                android:layout_height="70dp"
+                android:background="#4CAF50" />
 
-            <TextView
-                android:id="@+id/userEmail"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="correo@ejemplo.com"
-                android:textColor="#000000"
-                android:textSize="13sp"
-                android:maxLines="1" />
-
-            <!-- FILA DE EDICIÓN Y FECHA -->
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="4dp">
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:padding="12dp">
 
-                <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:src="@drawable/castv" />
-
-                <!-- EDIT TEXT PARA PUNTOS (Limpio y directo) -->
-                <EditText
-                    android:id="@+id/userCastv"
-                    android:layout_width="60dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="4dp"
-                    android:background="@null"
-                    android:imeOptions="actionDone"
-                    android:inputType="number"
-                    android:singleLine="true"
-                    android:text="500"
-                    android:textColor="#000000"
-                    android:textSize="14sp"
+                <TextView
+                    android:id="@+id/userName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Nombre Usuario"
+                    android:textColor="#333333"
+                    android:textSize="17sp"
                     android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/fechaCreacion"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/userEmail"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="• 12/04"
-                    android:textColor="#000000"
-                    android:textSize="12sp"
-                    android:layout_marginStart="8dp" />
+                    android:text="correo@ejemplo.com"
+                    android:textColor="#666666"
+                    android:textSize="15sp" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingEnd="8dp"
+                android:orientation="horizontal"
+                android:gravity="center">
+
+                <!-- BOTÓN EDITAR -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="45dp"
+                    android:layout_height="45dp"
+                    android:layout_margin="4dp"
+                    app:cardCornerRadius="22.5dp"
+                    app:cardElevation="2dp"
+                    app:cardBackgroundColor="#C5A059"> <!-- Color Dorado para el fondo -->
+
+                    <ImageView
+                        android:id="@+id/editImage"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:padding="10dp"
+                        android:src="@drawable/castv"
+                        android:background="?android:attr/selectableItemBackgroundBorderless" />
+                </androidx.cardview.widget.CardView>
+
+                <!-- BOTÓN ELIMINAR -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="45dp"
+                    android:layout_height="45dp"
+                    android:layout_margin="4dp"
+                    app:cardCornerRadius="22.5dp"
+                    app:cardElevation="2dp"
+                    app:cardBackgroundColor="#FF5252"> <!-- Color Rojo para el fondo -->
+
+                    <ImageView
+                        android:id="@+id/deleteImage"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:padding="10dp"
+                        android:src="@drawable/delete"
+                        android:background="?android:attr/selectableItemBackgroundBorderless" />
+                </androidx.cardview.widget.CardView>
+
             </LinearLayout>
         </LinearLayout>
 
-        <!-- ACCIONES (Botones más pequeños) -->
+        <!-- FILA INFERIOR: Va de orilla a orilla (debajo de todo) -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingEnd="8dp"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="10dp"
+            android:background="#D0D0D0"> <!-- Un color sutil para diferenciar la franja -->
 
-            <ImageView
-                android:id="@+id/editImage"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:padding="10dp"
-                android:src="@drawable/castv"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:layout_marginEnd="4dp" />
+            <TextView
+                android:id="@+id/userCastv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Castv: 500"
+                android:textColor="#D32F2F"
+                android:textStyle="bold"
+                android:textSize="14sp" />
 
-            <ImageView
-                android:id="@+id/deleteImage"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:padding="10dp"
-                android:src="@drawable/delete"
-                android:background="?android:attr/selectableItemBackgroundBorderless" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" | Gasto: "
+                android:textColor="#555555"
+                android:textSize="12sp" />
 
+            <TextView
+                android:id="@+id/userCastvGasto"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="0"
+                android:textColor="#000000"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/fechaCreacion"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="• 12/04"
+                android:textColor="#555555"
+                android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>
 </androidx.cardview.widget.CardView>

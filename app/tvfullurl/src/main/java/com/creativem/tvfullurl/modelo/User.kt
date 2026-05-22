@@ -10,5 +10,6 @@ data class User(
     var fechaCreacion: Any? = null,
     var ultimaConexion: Any? = null,
     var castv: Any? = null,
+    var totalGastado: Any? = null,
     var createdAt: Any? = null
 )

@@ -15,7 +15,7 @@
     <color name="textColor">#212121</color> <!-- Color del texto -->
     <color name="errorColor">#B00020</color> <!-- Color para errores -->
 
-    <color name="online_color">#00FF00</color> <!-- Verde para en línea -->
-    <color name="offline_color">#FF0000</color> <!-- Rojo para fuera de línea -->
+    <color name="online_color">#283593</color> <!-- Verde para en línea -->
+    <color name="offline_color">#6A0707</color> <!-- Rojo para fuera de línea -->
 
 </resources>

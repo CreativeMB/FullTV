@@ -19,6 +19,8 @@ import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.MutableData
+import com.google.firebase.database.Transaction
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FieldValue
 
@@ -190,18 +192,34 @@ class CastvFragment : Fragment() {
     }
 
     // Actualizar solo el campo de puntos de un usuario
-    private fun updateCastv(userId: String, newPoints: Int) {
-        val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId)
+    private fun updateCastv(userId: String, puntosASumar: Int) {
+        val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId).child("castv")
 
-        userRef.child("castv").setValue(newPoints)
-            .addOnSuccessListener {
-                Toast.makeText(requireContext(), "CasTV actualizado", Toast.LENGTH_SHORT).show()
-                cargarUsuarios() // Recargar usuarios si lo necesitas en pantalla
+        userRef.runTransaction(object : ValueEventListener, Transaction.Handler {
+            override fun doTransaction(mutableData: MutableData): Transaction.Result {
+                // 1. Obtener los puntos actuales de forma segura
+                val puntosActuales = mutableData.getValue(Int::class.java) ?: 0
+
+                // 2. Sumar el nuevo paquete a lo que ya tenía
+                mutableData.value = puntosActuales + puntosASumar
+
+                return Transaction.success(mutableData)
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(requireContext(), "Error al actualizar CasTV", Toast.LENGTH_SHORT).show()
-                Log.e("Usuarios", "Error actualizando castv", e)
+
+            override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
+                if (committed) {
+                    Toast.makeText(requireContext(), "¡Paquete sumado con éxito!", Toast.LENGTH_SHORT).show()
+                    // cargarUsuarios() no hace falta llamarlo aquí,
+                    // el addValueEventListener de cargarUsuarios() se refrescará solo.
+                } else {
+                    Toast.makeText(requireContext(), "Error al sumar puntos", Toast.LENGTH_SHORT).show()
+                }
             }
+
+            // Métodos requeridos por ValueEventListener (pueden ir vacíos)
+            override fun onDataChange(snapshot: DataSnapshot) {}
+            override fun onCancelled(error: DatabaseError) {}
+        })
     }
 
 

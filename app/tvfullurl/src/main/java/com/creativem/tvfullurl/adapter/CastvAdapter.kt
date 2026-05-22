@@ -29,9 +29,10 @@ class CastvAdapter(
         val userName: TextView = itemView.findViewById(R.id.userName)
         val userEmail: TextView = itemView.findViewById(R.id.userEmail)
         val userFecha: TextView = itemView.findViewById(R.id.fechaCreacion)
-        val userCastv: EditText = itemView.findViewById(R.id.userCastv)
+        val userCastv: TextView = itemView.findViewById(R.id.userCastv)
         val editImage: ImageView = itemView.findViewById(R.id.editImage)
         val deleteImage: ImageView = itemView.findViewById(R.id.deleteImage)
+        val userCastvGasto: TextView = itemView.findViewById(R.id.userCastvGasto)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserViewHolder {
@@ -60,10 +61,12 @@ class CastvAdapter(
         } else {
             holder.userName.setTextColor(holder.itemView.context.getColor(R.color.offline_color))
         }
+        holder.userCastvGasto.setText(user.totalGastado.toString())
 
         holder.userEmail.text = user.correo
         holder.userFecha.text = "${parsearFecha(user.ultimaConexion)}"
-        holder.userCastv.setText(user.castv.toString())
+        // Esto es más limpio porque no necesitas llamar a .toString() explícitamente
+        holder.userCastv.text = "Castv: ${user.castv}"
 
 
         // Copiar email al portapapeles
@@ -80,11 +83,13 @@ class CastvAdapter(
         }
 
         // Editar puntos
+        // En tu CastvAdapter, busca la parte donde configuras el editImage (el botón de editar)
         holder.editImage.setOnClickListener {
-            val newPoints = holder.userCastv.text.toString().toIntOrNull() ?: 0
-            onEditClick(user.userId, newPoints)
+            // En lugar de hacer nada o editar un campo, lanzamos el nuevo Dialog
+            mostrarSelectorDePlanes(holder.itemView.context, user.userId) { nuevosPuntos ->
+                onEditClick(user.userId, nuevosPuntos)
+            }
         }
-
         // Eliminar usuario
         holder.deleteImage.setOnClickListener {
             val context = holder.itemView.context
@@ -99,7 +104,23 @@ class CastvAdapter(
         }
 
     }
+    private fun mostrarSelectorDePlanes(context: android.content.Context, userId: String, onUpdate: (Int) -> Unit) {
+        val planes = arrayOf("Bronce: 50 Castv", "Plata: 120 Castv", "Oro: 250 Castv")
+        val valores = intArrayOf(50, 120, 250)
+        var seleccionado = 0
 
+        androidx.appcompat.app.AlertDialog.Builder(context)
+            .setTitle("Seleccionar Paquete")
+            .setSingleChoiceItems(planes, 0) { _, which ->
+                seleccionado = which
+            }
+            .setPositiveButton("Aplicar") { _, _ ->
+                // Llamamos a la función de actualización con el valor seleccionado
+                onUpdate(valores[seleccionado])
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
     override fun getItemCount(): Int = filteredList.size
 
     private fun parsearFecha(fecha: Any?): String {
