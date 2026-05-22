@@ -77,6 +77,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.recyclerview.widget.RecyclerView
 import java.util.concurrent.TimeUnit
 import com.android.volley.Request
@@ -595,112 +596,43 @@ class PlayerPeliculas : AppCompatActivity() {
 
     @OptIn(UnstableApi::class)
     private fun prepararReproductor(posicionInicial: Long) {
-            // MODIFICACIÓN AQUÍ: Agregamos el header de ngrok para saltar la advertencia
-            val dataSourceFactory = DefaultHttpDataSource.Factory()
-                .setDefaultRequestProperties(
-                    mapOf(
-                        "User-Agent" to "Mozilla/5.0",
-                        "ngrok-skip-browser-warning" to "true" // <--- ESTA ES LA LÍNEA MÁGICA
-                    )
-                )
-                .setConnectTimeoutMs(30_000)
-                .setReadTimeoutMs(30_000)
+        // 1. Limpieza
+        player?.let {
+            it.stop()
+            it.clearMediaItems()
+            it.release()
+        }
+        player = null
 
-            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+        // 2. Factory de red estándar
+        val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(15_000)
+            .setAllowCrossProtocolRedirects(true)
 
-            // ... el resto de tu código sigue igual ...
-//            val loadControl = DefaultLoadControl.Builder()
-//                .setTargetBufferBytes(8 * 1024 * 1024)
-//                .setPrioritizeTimeOverSizeThresholds(false)
-//                .build()
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                2_500,   // Mínimo de buffer para empezar (bajamos de 15s a 2.5s)
-                30_000,  // Máximo de buffer
-                1_000,   // Buffer necesario para reanudar si se pausa
-                1_500    // Buffer necesario para el primer arranque
-            )
-            .setTargetBufferBytes(32 * 1024 * 1024) // Bajamos a 32MB para que no intente llenar tanto al inicio
-            .setPrioritizeTimeOverSizeThresholds(true)
-            .build()
+        // 3. FACTORÍA AUTOMÁTICA: Esta detecta si es MP4 o M3U8 sola
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
+        // 4. Instancia del reproductor
         player = ExoPlayer.Builder(this@PlayerPeliculas)
-            .setLoadControl(loadControl)
-            .setRenderersFactory(
-                DefaultRenderersFactory(this@PlayerPeliculas)
-                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-            )
             .setMediaSourceFactory(mediaSourceFactory)
-            .build().also { exoPlayer ->
+            .build()
 
-                binding.reproductor.player = exoPlayer
+        binding.reproductor.player = player
 
-                val mediaUri = Uri.parse(streamUrl)
+        // 5. MEDIA ITEM: Sin "Cache Buster" forzado por ahora,
+        // algunos servidores bloquean peticiones con parámetros extra que no esperan.
+        val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
 
-                val mediaItemBuilder = MediaItem.Builder().setUri(mediaUri)
+        // 6. Preparar
+        player?.setMediaItem(mediaItem)
+        player?.prepare()
+        player?.addListener(playerListener)
 
-
-                if (streamUrl.contains(".m3u8")) {
-                    mediaItemBuilder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
-                } else {
-
-                    val mimeType = if (streamUrl.contains(".mkv")) {
-                        androidx.media3.common.MimeTypes.VIDEO_MATROSKA
-                    } else {
-                        androidx.media3.common.MimeTypes.VIDEO_MP4
-                    }
-                    mediaItemBuilder.setMimeType(mimeType)
-                }
-
-                val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
-// Asegúrate de que esto esté justo antes de preparar
-                player?.stop()
-                player?.clearMediaItems()
-                exoPlayer.setMediaItem(mediaItem, true) // El 'true' reinicia la posición
-                exoPlayer.prepare()
-
-                exoPlayer.addListener(object : Player.Listener {
-                    override fun onTimelineChanged(timeline: Timeline, reason: Int) {
-                        if (timeline.windowCount > 0) {
-                            val window = Timeline.Window()
-                            timeline.getWindow(0, window)
-                            if (!window.isLive) {
-                                // No es stream en vivo
-                            }
-                        }
-                    }
-                })
-
-                exoPlayer.addListener(playerListener)
-
-                if (posicionInicial > 0) {
-                    exoPlayer.seekTo(posicionInicial)
-                }
-
-                exoPlayer.playWhenReady = true
-
-                // 🔁 Handler para actualizar la última posición válida mientras se reproduce
-                val handlerPosicion = Handler(Looper.getMainLooper())
-                val actualizarPosicionRunnable = object : Runnable {
-                    override fun run() {
-                        val position = player?.contentPosition ?: 0L
-                        if (position > 10_000) {
-                            ultimaPosicionValida = position
-
-                        }
-                        handlerPosicion.postDelayed(this, 5000)
-                    }
-                }
-                handlerPosicion.postDelayed(actualizarPosicionRunnable, 5000)
-
-                // Limpia el handler cuando se destruya la actividad
-                lifecycle.addObserver(object : DefaultLifecycleObserver {
-                    override fun onDestroy(owner: LifecycleOwner) {
-                        handlerPosicion.removeCallbacks(actualizarPosicionRunnable)
-                    }
-                })
-            }
+        if (posicionInicial > 0) player?.seekTo(posicionInicial)
+        player?.playWhenReady = true
     }
-
     private fun obtenerProgresoGuardado(): Long {
         val clave = generarClaveProgreso()
         val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
