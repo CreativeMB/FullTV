@@ -78,6 +78,7 @@ import androidx.lifecycle.lifecycleScope
 
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.recyclerview.widget.RecyclerView
 import java.util.concurrent.TimeUnit
 import com.android.volley.Request
@@ -593,7 +594,6 @@ class PlayerPeliculas : AppCompatActivity() {
 
         dialog.show()
     }
-
     @OptIn(UnstableApi::class)
     private fun prepararReproductor(posicionInicial: Long) {
         // 1. Limpieza
@@ -604,29 +604,45 @@ class PlayerPeliculas : AppCompatActivity() {
         }
         player = null
 
-        // 2. Factory de red estándar
+        // 2. Factory de red: Añadimos "Connection: close" para evitar el bloqueo del CDN
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .setDefaultRequestProperties(mapOf("Connection" to "close")) // Obliga a refrescar el socket
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(15_000)
             .setAllowCrossProtocolRedirects(true)
 
-        // 3. FACTORÍA AUTOMÁTICA: Esta detecta si es MP4 o M3U8 sola
-        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+        // 3. Load Control para arranque rápido
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(1_000, 30_000, 500, 1_000)
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
 
         // 4. Instancia del reproductor
         player = ExoPlayer.Builder(this@PlayerPeliculas)
-            .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(loadControl)
             .build()
 
         binding.reproductor.player = player
 
-        // 5. MEDIA ITEM: Sin "Cache Buster" forzado por ahora,
-        // algunos servidores bloquean peticiones con parámetros extra que no esperan.
+        // 5. Configuración específica por tipo de archivo
         val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
 
+        if (streamUrl.contains(".m3u8")) {
+            // Para HLS: Usamos la factoría explícita y desactivamos el Chunkless
+            // si falla (a veces es más estable sin ello)
+            val hlsSource = HlsMediaSource.Factory(dataSourceFactory)
+                .setAllowChunklessPreparation(false) // <--- Cambiado a FALSE para mayor compatibilidad
+                .createMediaSource(mediaItem)
+            player?.setMediaSource(hlsSource)
+        } else {
+            // Para MP4: Usamos ProgressiveMediaSource
+            val progressiveSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(mediaItem)
+            player?.setMediaSource(progressiveSource)
+        }
+
         // 6. Preparar
-        player?.setMediaItem(mediaItem)
         player?.prepare()
         player?.addListener(playerListener)
 
