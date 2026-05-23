@@ -489,52 +489,74 @@ class PlayerPeliculas : AppCompatActivity() {
     }
     @OptIn(UnstableApi::class)
     private fun prepararReproductor(posicionInicial: Long) {
-        // 1. LIMPIEZA TOTAL: Matamos cualquier hilo de red anterior
-        player?.let {
-            it.stop()
-            it.clearMediaItems()
-            it.release()
-        }
+        // 1. LIMPIEZA DE HARDWARE (Crucial en TV Real)
+        binding.reproductor.player = null // Desvincular la vista primero
+        player?.stop()
+        player?.clearMediaItems()
+        player?.release()
         player = null
 
-        // 2. CONFIGURACIÓN DE RED: Forzamos el cierre de sockets viejos ("Connection" to "close")
-        // Esto es lo que permite que funcione sin tener que reiniciar la app.
+        // 2. CONFIGURACIÓN DE RED PARA TV
+        // Las TV reales manejan una tabla de conexiones más pequeña. Forzamos cierre.
         val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .setUserAgent("Mozilla/5.0 (Linux; Android 10; BRAVIA 4K Build/QTG3.200305.006.A1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .setDefaultRequestProperties(mapOf(
                 "Connection" to "close",
                 "ngrok-skip-browser-warning" to "true"
             ))
-            .setConnectTimeoutMs(20_000)
-            .setReadTimeoutMs(20_000)
+            .setConnectTimeoutMs(30_000)
+            .setReadTimeoutMs(30_000)
             .setAllowCrossProtocolRedirects(true)
 
-        // 3. LOAD CONTROL: Aceleración de arranque (1 segundo de buffer)
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(1_000, 30_000, 500, 1_000)
-            .setPrioritizeTimeOverSizeThresholds(true)
-            .build()
+        // 3. RENDERIZADORES PARA TV (Esto es lo que le falta a la TV real)
+        // Forzamos el modo EXTENSION_RENDERER para que si el hardware falla, use software.
+        val renderersFactory = DefaultRenderersFactory(this@PlayerPeliculas)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            .setEnableDecoderFallback(true) // Si el codec de la TV no puede, usa uno genérico
 
-        // 4. FACTORÍA MAESTRA: Ella detecta si es HLS, MP4, DASH, etc.
-        // Usamos el extractor por defecto para que analice el flujo si no hay extensión.
+        // 4. FACTORÍA DE MEDIA CON SOPORTE HLS MEJORADO
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
-        // 5. INSTANCIA DEL REPRODUCTOR
-        player = ExoPlayer.Builder(this@PlayerPeliculas)
+        // 5. LOAD CONTROL (Un poco más de buffer para TV real por la estabilidad del WiFi)
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                2_500,  // Mínimo para empezar (aumentamos a 2.5s para hardware real)
+                40_000, // Máximo
+                1_500,  // Para reanudar
+                2_000   // Buffer inicial
+            )
+            .setTargetBufferBytes(64 * 1024 * 1024) // Aumentamos a 64MB para 4K/HD
+            .build()
+
+        // 6. CREAR EL PLAYER CON RENDERIZADORES DE TV
+        player = ExoPlayer.Builder(this@PlayerPeliculas, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .build()
 
         binding.reproductor.player = player
 
-        // 6. MEDIA ITEM: Creamos el item sin forzar MimeType (dejamos que el Factory lo detecte)
+        // 7. MEDIA ITEM LIMPIO
+        val uriLimpia = streamUrl.trim()
         val mediaItem = MediaItem.Builder()
-            .setUri(Uri.parse(streamUrl))
+            .setUri(Uri.parse(uriLimpia))
             .build()
 
-        // 7. PREPARAR
+        // 8. PREPARAR Y ESCUCHAR ERRORES
         player?.setMediaItem(mediaItem)
         player?.prepare()
+
+        // Listener adicional para detectar por qué falla en la TV
+        player?.addListener(object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                Log.e("TV_ERROR", "Error en hardware: ${error.errorCodeName}")
+                // Si hay error de hardware, intentamos re-conectar una vez
+                if (error.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED) {
+                    prepararReproductor(player?.currentPosition ?: 0L)
+                }
+            }
+        })
+
         player?.addListener(playerListener)
 
         if (posicionInicial > 0) {

@@ -1,8 +1,11 @@
 package com.creativem.fulltv.principal // Ajusta a tu paquete real
 
+import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
+import android.view.View
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
 import android.widget.ImageView
@@ -30,8 +33,19 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {
+    private val frasesCine = listOf(
+        "Reuniendo al parche para la gran función",
+        "Sincronizando lo mejor del cine en nuestro idioma",
+        "Preparando la sala para compartir en comunidad",
+        "Alistando los estrenos en español latino",
+        "Haciendo posible el cine para todos",
+        "Tu parche, tu cine, tu comunidad",
+        "Conectando con la mejor señal latina",
+        "Organizando la cartelera para el grupo"
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 1. Configuración de Pantalla Completa Inmersiva para TV
         window.setFlags(
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
@@ -45,26 +59,65 @@ class SplashActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_splash)
 
+        // 2. Referencias de las Vistas
         val logo = findViewById<ImageView>(R.id.imgLogoSplash)
+        val txtBienvenido = findViewById<TextView>(R.id.txtBienvenido) // Título CINE PARCHE
+        val txtCargando = findViewById<TextView>(R.id.txtCargandoAnim) // Frases de comunidad
         val txtVersion = findViewById<TextView>(R.id.txtVersion)
+        val viewGlow = findViewById<View>(R.id.viewGlow)
 
-        txtVersion.text = "Versión ${BuildConfig.VERSION_NAME}"
+        // 3. EFECTO ORO METÁLICO (Gradiente) al Título Principal
+        // Usamos .post para que el gradiente se aplique una vez el texto ya tenga dimensiones
+        txtBienvenido.post {
+            val paint = txtBienvenido.paint
+            val width = paint.measureText(txtBienvenido.text.toString())
+            val shader = android.graphics.LinearGradient(
+                0f, 0f, width, txtBienvenido.textSize,
+                intArrayOf(
+                    Color.parseColor("#F5E6AD"), // Oro Brillante
+                    Color.parseColor("#C5A059"), // Dorado Medio
+                    Color.parseColor("#8A6E2F"), // Bronce Oscuro
+                    Color.parseColor("#C5A059")  // Dorado Medio
+                ),
+                null, android.graphics.Shader.TileMode.CLAMP
+            )
+            txtBienvenido.paint.shader = shader
+            txtBienvenido.invalidate() // Forzar redibujado con el nuevo color
+        }
 
-        logo.scaleX = 0.8f
-        logo.scaleY = 0.8f
-        logo.animate()
-            .alpha(1f)
-            .scaleX(1f)
-            .scaleY(1f)
-            .setDuration(1500)
-            .setInterpolator(DecelerateInterpolator())
-            .start()
+        // 4. Mostrar Versión actualizada de la App
+        txtVersion.text = "VERSIÓN ${BuildConfig.VERSION_NAME}"
 
-        txtVersion.animate().alpha(1f).setDuration(1500).setStartDelay(500).start()
+        // 5. Animación de "Glow" (Efecto palpitante de luz de cine)
+        val animGlow = android.animation.ObjectAnimator.ofFloat(viewGlow, "alpha", 0.4f, 0.9f)
+        animGlow.duration = 1500
+        animGlow.repeatMode = android.animation.ObjectAnimator.REVERSE
+        animGlow.repeatCount = android.animation.ObjectAnimator.INFINITE
+        animGlow.start()
 
+        // 6. Animación de Entrada (Logo y Título aparecen con suavidad)
+        logo.alpha = 0f
+        txtBienvenido.alpha = 0f
+        logo.animate().alpha(1f).setDuration(1000).start()
+        txtBienvenido.animate().alpha(1f).setDuration(1200).setStartDelay(300).start()
+
+        // 7. Iniciar Ciclo de Frases Cinematográficas y Carga de Datos
+        iniciarCicloFrases(txtCargando)
         iniciarCargaDeDatos()
     }
-
+    private fun iniciarCicloFrases(textView: TextView) {
+        lifecycleScope.launch {
+            var index = 0
+            while (true) {
+                textView.text = frasesCine[index]
+                textView.animate().alpha(1f).setDuration(400).start()
+                delay(2000)
+                textView.animate().alpha(0f).setDuration(400).start()
+                delay(450)
+                index = (index + 1) % frasesCine.size
+            }
+        }
+    }
     private fun iniciarCargaDeDatos() {
         lifecycleScope.launch {
             // 1. Carga de datos de fondo

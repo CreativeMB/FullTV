@@ -4,100 +4,100 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0A0A0C">
+    android:background="#050505">
 
-    <!-- SCROLLVIEW: Permite deslizar si el contenido no cabe -->
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fillViewport="true"
-        app:layout_constraintTop_toTopOf="parent"
+    <!-- LUZ DE FONDO (PROYECTOR) -->
+    <View
+        android:id="@+id/viewGlow"
+        android:layout_width="600dp"
+        android:layout_height="600dp"
+        android:background="@drawable/splash_glow"
         app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- CONTENEDOR CENTRAL -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:padding="30dp"> <!-- Un poco de margen para que al hacer scroll no pegue a los bordes -->
+    <!-- LOGO -->
+    <ImageView
+        android:id="@+id/imgLogoSplash"
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:src="@drawable/icono"
+        app:layout_constraintBottom_toTopOf="@+id/txtBienvenido"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_chainStyle="packed" />
 
-            <androidx.cardview.widget.CardView
-                android:layout_width="200dp"
-                android:layout_height="200dp"
-                app:cardCornerRadius="30dp"
-                app:cardBackgroundColor="#0A0A0C"
-                app:cardElevation="0dp"
-                app:cardPreventCornerOverlap="false">
+    <!-- TÍTULO: CINE PARCHE (Grande e impactante) -->
+    <TextView
+        android:id="@+id/txtBienvenido"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="EL CINE QUE NOS UNE"
+        android:textColor="#C5A059"
+        android:textSize="40sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"
+        android:shadowColor="#000000"
+        android:gravity="center"
+        android:shadowDx="5"
+        android:shadowDy="5"
+        android:shadowRadius="10"
+        app:layout_constraintBottom_toTopOf="@+id/txtCargandoAnim"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/imgLogoSplash" />
 
-                <!-- LOGO -->
-                <ImageView
-                    android:id="@+id/imgLogoSplash"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:src="@drawable/icono"
-                    android:scaleType="centerCrop"
-                    android:alpha="0" />
+    <!-- FRASES DE COMUNIDAD (Blancas con brillo dorado) -->
+    <TextView
+        android:id="@+id/txtCargandoAnim"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_marginStart="100dp"
+        android:layout_marginEnd="100dp"
+        android:textAlignment="center"
+        android:fontFamily="sans-serif-black"
+        android:text="Uniendo al parche para la gran función"
+        android:textColor="#FFFFFF"
+        android:textSize="32sp"
+        android:lineSpacingExtra="8dp"
+        android:shadowColor="#C5A059"
+        android:shadowRadius="15"
+        app:layout_constraintBottom_toTopOf="@+id/progressBarSplash"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/txtBienvenido" />
 
-            </androidx.cardview.widget.CardView>
+    <!-- BARRA DE CARGA -->
+    <ProgressBar
+        android:id="@+id/progressBarSplash"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="350dp"
+        android:layout_height="6dp"
+        android:layout_marginTop="40dp"
+        android:indeterminate="true"
+        android:indeterminateTint="#C5A059"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/txtCargandoAnim" />
 
-
-            <!-- VERSIÓN -->
-            <TextView
-                android:id="@+id/txtVersion"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="0dp"
-                android:padding="15dp"
-                android:textColor="#C5A059"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.1"
-                android:fontFamily="sans-serif-light"
-                android:alpha="0" />
-
-            <!-- ESPACIO VISUAL -->
-            <Space
-                android:layout_width="match_parent"
-                android:layout_height="40dp" />
-
-            <!-- BARRA DE CARGA MODERNA -->
-            <!-- Nota: cambié el ancho a 350dp para que sea un poco más adaptable a pantallas chicas sin romper el diseño -->
-            <ProgressBar
-                android:id="@+id/progressBarSplash"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="350dp"
-                android:layout_height="wrap_content"
-                android:indeterminate="true"
-                android:indeterminateTint="#E50914" />
-
-            <!-- TÍTULO DE BIENVENIDA -->
-            <TextView
-                android:id="@+id/txtBienvenido"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="30dp"
-                android:text="BIENVENIDO"
-                android:textColor="@color/texto"
-                android:textSize="32sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.15" />
-
-            <!-- FRASE MODERNA -->
-            <TextView
-                android:id="@+id/txtCargando"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="Organizando el contenido para\nuna experiencia inolvidable"
-                android:textAlignment="center"
-                android:textColor="@color/texto"
-                android:textSize="24sp"
-                android:fontFamily="sans-serif-medium" />
-
-        </LinearLayout>
-    </ScrollView>
+    <!-- VERSIÓN (Más visible pero elegante) -->
+    <TextView
+        android:id="@+id/txtVersion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="40dp"
+        android:text="VERSIÓN 1.0.0"
+        android:textColor="#C5A059"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:alpha="0.8"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

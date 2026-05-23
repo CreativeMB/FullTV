@@ -512,13 +512,15 @@ class ApiPeliculaActivity : AppCompatActivity() {
     // 🟢 ESTA FUNCIÓN ES LA QUE HACE EL REGRESO LIMPIO
     private fun volverAlContenido() {
         val intent = Intent(this@ApiPeliculaActivity, PeliculasActivity::class.java).apply {
-            // Esto limpia el historial para que no pueda volver al reproductor vacío
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            // Trae la cartelera al frente sin recargarla
+            flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
         }
         startActivity(intent)
 
-        // Animación suave para evitar el pantallazo negro
-        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        // 🟢 USAMOS TUS ANIMACIONES PERSONALIZADAS
+        // R.anim.fade_in_slow -> Hace aparecer la cartelera suavemente (500ms)
+        // R.anim.stay -> Mantiene la pantalla de detalles quieta mientras se desvanece
+        overridePendingTransition(R.animator.fade_in_slow, R.animator.stay)
 
         finish()
     }
