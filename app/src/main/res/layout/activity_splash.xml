@@ -100,4 +100,77 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
+
+
+    <!-- CONTENEDOR DE ERROR DE CONEXIÓN (Inicia GONE) -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/layoutNoInternet"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#F2050505"
+        android:visibility="gone"
+        android:elevation="50dp">
+
+        <ImageView
+            android:id="@+id/imgError"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:src="@android:drawable/ic_dialog_alert"
+            app:tint="#C5A059"
+            app:layout_constraintBottom_toTopOf="@+id/tvErrorTitulo"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_chainStyle="packed" />
+
+        <TextView
+            android:id="@+id/tvErrorTitulo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="SIN CONEXIÓN AL PARCHE"
+            android:textColor="#C5A059"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toTopOf="@+id/tvErrorMensaje"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/imgError" />
+
+        <TextView
+            android:id="@+id/tvErrorMensaje"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="100dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginEnd="100dp"
+            android:text="Necesitamos internet para encender los proyectores.\nRevisa tu red y vuelve a intentarlo."
+            android:textAlignment="center"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            app:layout_constraintBottom_toTopOf="@+id/btnReintentar"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/tvErrorTitulo" />
+
+        <Button
+            android:id="@+id/btnReintentar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="40dp"
+            android:backgroundTint="#C5A059"
+            android:padding="20dp"
+            android:text="REINTENTAR CONEXIÓN"
+            android:textColor="#050505"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:focusable="true"
+            android:nextFocusUp="@id/btnReintentar"
+            android:nextFocusDown="@id/btnReintentar"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/tvErrorMensaje" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

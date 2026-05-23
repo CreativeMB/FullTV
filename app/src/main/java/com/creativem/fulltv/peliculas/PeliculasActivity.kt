@@ -22,7 +22,9 @@ import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.InputType
+import android.text.Spannable
 import android.text.SpannableString
+import android.text.SpannableStringBuilder
 import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
@@ -195,6 +197,66 @@ class PeliculasActivity : AppCompatActivity() {
 
             CastvHelper.nuevosusuarios(this, nombreAMostrar, currentUser.email!!)
         }
+        escucharSaldoUsuario()
+    }
+
+    private fun escucharSaldoUsuario() {
+        val email = auth.currentUser?.email ?: return
+        val correoKey = email.replace(".", "_").replace("@", "_")
+        val userRef = databaseRef.child("usuarios").child(correoKey)
+
+        userRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    // 1. Obtenemos el valor del saldo
+                    val saldo = snapshot.child("castv").value?.toString() ?: "0"
+
+                    // 2. CONSTRUIR TEXTO: 🪙 CasTV: [VALOR]
+                    // Usamos el emoji directamente en el string
+                    val emoji = "🪙 "
+                    val etiqueta = "CasTV: "
+                    val textoCompleto = "$emoji$etiqueta$saldo"
+
+                    val spannable = SpannableStringBuilder(textoCompleto)
+
+                    // Color Blanco para la palabra "CasTV: "
+                    spannable.setSpan(
+                        ForegroundColorSpan(Color.WHITE),
+                        emoji.length,
+                        emoji.length + etiqueta.length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+
+                    // Color Dorado (#C5A059) para el número del saldo
+                    spannable.setSpan(
+                        ForegroundColorSpan(Color.parseColor("#C5A059")),
+                        emoji.length + etiqueta.length,
+                        textoCompleto.length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+
+                    // Aplicamos todo al TextView
+                    binding.tvSaldoValue.text = spannable
+
+                    // 3. ANIMACIÓN DE "LATIDO" (Feedback visual al cambiar saldo)
+                    binding.layoutSaldo.animate()
+                        .scaleX(1.1f)
+                        .scaleY(1.1f)
+                        .setDuration(200)
+                        .withEndAction {
+                            binding.layoutSaldo.animate()
+                                .scaleX(1f)
+                                .scaleY(1f)
+                                .setDuration(200)
+                                .start()
+                        }.start()
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("Firebase", "Error al obtener saldo: ${error.message}")
+            }
+        })
     }
     // Función auxiliar para saber si una vista está dentro del RecyclerView
     private fun isViewDescendantOf(view: View, parent: ViewGroup): Boolean {

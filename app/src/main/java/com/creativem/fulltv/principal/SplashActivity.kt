@@ -29,7 +29,13 @@ import kotlinx.coroutines.withTimeoutOrNull
 // 🖼️ IMPORTANTE: Para la precarga optimizada de imágenes (Glide)
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
-// ... tus imports ...
+
+
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.content.Context
+import android.util.Log
+import android.widget.Button
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {
@@ -43,6 +49,7 @@ class SplashActivity : AppCompatActivity() {
         "Conectando con la mejor señal latina",
         "Organizando la cartelera para el grupo"
     )
+    private var frasesJob: kotlinx.coroutines.Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // 1. Configuración de Pantalla Completa Inmersiva para TV
@@ -85,6 +92,11 @@ class SplashActivity : AppCompatActivity() {
             txtBienvenido.invalidate() // Forzar redibujado con el nuevo color
         }
 
+        // Configurar el botón de reintentar
+        findViewById<Button>(R.id.btnReintentar).setOnClickListener {
+            checkConexionYProcesar()
+        }
+
         // 4. Mostrar Versión actualizada de la App
         txtVersion.text = "VERSIÓN ${BuildConfig.VERSION_NAME}"
 
@@ -105,6 +117,42 @@ class SplashActivity : AppCompatActivity() {
         iniciarCicloFrases(txtCargando)
         iniciarCargaDeDatos()
     }
+
+    private fun checkConexionYProcesar() {
+        if (isNetworkAvailable()) {
+            // Ocultar error si estaba visible
+            findViewById<View>(R.id.layoutNoInternet).visibility = View.GONE
+            // Reiniciar animaciones y carga
+            iniciarCargaDeDatos()
+        } else {
+            mostrarErrorConexion()
+        }
+    }
+
+    private fun isNetworkAvailable(): Boolean {
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val activeNetwork = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return when {
+            activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> true
+            activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
+            activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> true // Importante para TV Box
+            else -> false
+        }
+    }
+
+    private fun mostrarErrorConexion() {
+        val layoutError = findViewById<View>(R.id.layoutNoInternet)
+        val btnReintentar = findViewById<Button>(R.id.btnReintentar)
+
+        layoutError.visibility = View.VISIBLE
+        layoutError.alpha = 0f
+        layoutError.animate().alpha(1f).setDuration(500).start()
+
+        // Dar foco al botón para que el control remoto pueda usarlo inmediatamente
+        btnReintentar.requestFocus()
+    }
+
     private fun iniciarCicloFrases(textView: TextView) {
         lifecycleScope.launch {
             var index = 0
@@ -120,40 +168,51 @@ class SplashActivity : AppCompatActivity() {
     }
     private fun iniciarCargaDeDatos() {
         lifecycleScope.launch {
-            // 1. Carga de datos de fondo
-            val cargaTrabajo = launch(Dispatchers.IO) {
-                Validacioneslista.cargarPeliculas()
-                val lasPrimeras = Validacioneslista.obtenerPeliculasValidas().take(15)
-                lasPrimeras.forEach { movie ->
+            // 1. Carga de datos de fondo con Timeout para que no se quede pegado si el server falla
+            val cargaExitosa = withTimeoutOrNull(15000) { // 15 segundos max de espera
+                val cargaTrabajo = launch(Dispatchers.IO) {
                     try {
-                        Glide.with(applicationContext).asBitmap().load(movie.imageUrl)
-                            .diskCacheStrategy(DiskCacheStrategy.ALL).submit().get()
-                    } catch (e: Exception) {}
+                        Validacioneslista.cargarPeliculas()
+                        val lasPrimeras = Validacioneslista.obtenerPeliculasValidas().take(15)
+                        lasPrimeras.forEach { movie ->
+                            Glide.with(applicationContext).asBitmap().load(movie.imageUrl)
+                                .diskCacheStrategy(DiskCacheStrategy.ALL).submit().get()
+                        }
+                    } catch (e: Exception) {
+                        Log.e("SPLASH", "Error en carga: ${e.message}")
+                    }
                 }
+                cargaTrabajo.join()
+                true
             }
 
-            cargaTrabajo.join()
-
-            // --- 🛡️ LOGICA DE REDIRECCIÓN (AQUÍ ESTÁ EL CAMBIO) ---
-            val auth = FirebaseAuth.getInstance()
-            val currentUser = auth.currentUser
-
-            val intentDestino: Intent
-            if (currentUser == null || currentUser.email == "invitado@fulltv.com") {
-                // Si no hay nadie o es el invitado, lo deslogueamos por seguridad
-                // y lo mandamos al LOGIN para que elija.
-                auth.signOut()
-                intentDestino = Intent(this@SplashActivity, Login::class.java)
-            } else {
-                // Si es un usuario real (Google), va directo a las Películas.
-                intentDestino = Intent(this@SplashActivity, PeliculasActivity::class.java)
+            if (cargaExitosa == null) {
+                // Si el tiempo se agotó y no cargó nada, mostrar error de red
+                mostrarErrorConexion()
+                return@launch
             }
 
-            startActivity(intentDestino)
-            overridePendingTransition(0, 0)
-            // No hacemos finish() aquí para mantener el instance vivo si PeliculasActivity lo necesita
+            // ... (Tu lógica de redirección de Auth igual) ...
+            navegarSiguientePantalla()
         }
     }
+
+    private fun navegarSiguientePantalla() {
+        val auth = FirebaseAuth.getInstance()
+        val currentUser = auth.currentUser
+
+        val intentDestino = if (currentUser == null || currentUser.email == "invitado@fulltv.com") {
+            auth.signOut()
+            Intent(this, Login::class.java)
+        } else {
+            Intent(this, PeliculasActivity::class.java)
+        }
+
+        startActivity(intentDestino)
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        finish()
+    }
+
 
     companion object {
         var instance: SplashActivity? = null
