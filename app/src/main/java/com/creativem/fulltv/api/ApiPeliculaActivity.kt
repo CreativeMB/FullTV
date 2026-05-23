@@ -335,8 +335,8 @@ class ApiPeliculaActivity : AppCompatActivity() {
                                 val tituloMovie = movieActual?.title ?: movieTitle
                                 activarContadorFirebase(tituloMovie)
 
-                                dialog.dismiss()
-                                CineAlert.show(this@ApiPeliculaActivity, "¡Película activada por 5 horas!", CineAlert.Tipo.EXITO, dialog.window?.decorView as? ViewGroup)
+//
+                                CineAlert.show(this@ApiPeliculaActivity, "¡Película activada por 300 minutos!", CineAlert.Tipo.EXITO, dialog.window?.decorView as? ViewGroup)
                                 {
                                 irAlReproductorDirecto()
                                 }

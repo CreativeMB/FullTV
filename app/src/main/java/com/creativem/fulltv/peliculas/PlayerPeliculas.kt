@@ -442,6 +442,7 @@ class PlayerPeliculas : AppCompatActivity() {
         intent.putExtra("EXTRA_MOVIE_IMAGE_URL", movieImageUrl)
         // Inicia la actividad de reproducción
         startActivity(intent)
+        finish()
     }
 
     @SuppressLint("UnsafeOptInUsageError")
@@ -485,6 +486,131 @@ class PlayerPeliculas : AppCompatActivity() {
             }
         }
     }
+    }
+    @OptIn(UnstableApi::class)
+    private fun prepararReproductor(posicionInicial: Long) {
+        // 1. LIMPIEZA TOTAL: Matamos cualquier hilo de red anterior
+        player?.let {
+            it.stop()
+            it.clearMediaItems()
+            it.release()
+        }
+        player = null
+
+        // 2. CONFIGURACIÓN DE RED: Forzamos el cierre de sockets viejos ("Connection" to "close")
+        // Esto es lo que permite que funcione sin tener que reiniciar la app.
+        val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .setDefaultRequestProperties(mapOf(
+                "Connection" to "close",
+                "ngrok-skip-browser-warning" to "true"
+            ))
+            .setConnectTimeoutMs(20_000)
+            .setReadTimeoutMs(20_000)
+            .setAllowCrossProtocolRedirects(true)
+
+        // 3. LOAD CONTROL: Aceleración de arranque (1 segundo de buffer)
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(1_000, 30_000, 500, 1_000)
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
+        // 4. FACTORÍA MAESTRA: Ella detecta si es HLS, MP4, DASH, etc.
+        // Usamos el extractor por defecto para que analice el flujo si no hay extensión.
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
+        // 5. INSTANCIA DEL REPRODUCTOR
+        player = ExoPlayer.Builder(this@PlayerPeliculas)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(loadControl)
+            .build()
+
+        binding.reproductor.player = player
+
+        // 6. MEDIA ITEM: Creamos el item sin forzar MimeType (dejamos que el Factory lo detecte)
+        val mediaItem = MediaItem.Builder()
+            .setUri(Uri.parse(streamUrl))
+            .build()
+
+        // 7. PREPARAR
+        player?.setMediaItem(mediaItem)
+        player?.prepare()
+        player?.addListener(playerListener)
+
+        if (posicionInicial > 0) {
+            player?.seekTo(posicionInicial)
+        }
+
+        player?.playWhenReady = true
+    }
+
+//    @OptIn(UnstableApi::class)
+//    private fun prepararReproductor(posicionInicial: Long) {
+//        // 1. Limpieza
+//        player?.let {
+//            it.stop()
+//            it.clearMediaItems()
+//            it.release()
+//        }
+//        player = null
+//
+//        // 2. Factory de red: Añadimos "Connection: close" para evitar el bloqueo del CDN
+//        val dataSourceFactory = DefaultHttpDataSource.Factory()
+//            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+//            .setDefaultRequestProperties(mapOf("Connection" to "close")) // Obliga a refrescar el socket
+//            .setConnectTimeoutMs(15_000)
+//            .setReadTimeoutMs(15_000)
+//            .setAllowCrossProtocolRedirects(true)
+//
+//        // 3. Load Control para arranque rápido
+//        val loadControl = DefaultLoadControl.Builder()
+//            .setBufferDurationsMs(1_000, 30_000, 500, 1_000)
+//            .setPrioritizeTimeOverSizeThresholds(true)
+//            .build()
+//
+//        // 4. Instancia del reproductor
+//        player = ExoPlayer.Builder(this@PlayerPeliculas)
+//            .setLoadControl(loadControl)
+//            .build()
+//
+//        binding.reproductor.player = player
+//
+//        // 5. Configuración específica por tipo de archivo
+//        val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+//
+//        if (streamUrl.contains(".m3u8")) {
+//            // Para HLS: Usamos la factoría explícita y desactivamos el Chunkless
+//            // si falla (a veces es más estable sin ello)
+//            val hlsSource = HlsMediaSource.Factory(dataSourceFactory)
+//                .setAllowChunklessPreparation(false) // <--- Cambiado a FALSE para mayor compatibilidad
+//                .createMediaSource(mediaItem)
+//            player?.setMediaSource(hlsSource)
+//        } else {
+//            // Para MP4: Usamos ProgressiveMediaSource
+//            val progressiveSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+//                .createMediaSource(mediaItem)
+//            player?.setMediaSource(progressiveSource)
+//        }
+//
+//        // 6. Preparar
+//        player?.prepare()
+//        player?.addListener(playerListener)
+//
+//        if (posicionInicial > 0) player?.seekTo(posicionInicial)
+//        player?.playWhenReady = true
+//    }
+
+
+
+    private fun obtenerProgresoGuardado(): Long {
+        val clave = generarClaveProgreso()
+        val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
+
+        return try {
+            prefs.getLong(clave, 0L)
+        } catch (e: ClassCastException) {
+            prefs.getInt(clave, 0).toLong() // 🛠️ Conversión segura
+        }
     }
 
     private fun mostrarDialogoContinuar(progresoGuardado: Long) {
@@ -594,72 +720,6 @@ class PlayerPeliculas : AppCompatActivity() {
 
         dialog.show()
     }
-    @OptIn(UnstableApi::class)
-    private fun prepararReproductor(posicionInicial: Long) {
-        // 1. Limpieza
-        player?.let {
-            it.stop()
-            it.clearMediaItems()
-            it.release()
-        }
-        player = null
-
-        // 2. Factory de red: Añadimos "Connection: close" para evitar el bloqueo del CDN
-        val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-            .setDefaultRequestProperties(mapOf("Connection" to "close")) // Obliga a refrescar el socket
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(15_000)
-            .setAllowCrossProtocolRedirects(true)
-
-        // 3. Load Control para arranque rápido
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(1_000, 30_000, 500, 1_000)
-            .setPrioritizeTimeOverSizeThresholds(true)
-            .build()
-
-        // 4. Instancia del reproductor
-        player = ExoPlayer.Builder(this@PlayerPeliculas)
-            .setLoadControl(loadControl)
-            .build()
-
-        binding.reproductor.player = player
-
-        // 5. Configuración específica por tipo de archivo
-        val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
-
-        if (streamUrl.contains(".m3u8")) {
-            // Para HLS: Usamos la factoría explícita y desactivamos el Chunkless
-            // si falla (a veces es más estable sin ello)
-            val hlsSource = HlsMediaSource.Factory(dataSourceFactory)
-                .setAllowChunklessPreparation(false) // <--- Cambiado a FALSE para mayor compatibilidad
-                .createMediaSource(mediaItem)
-            player?.setMediaSource(hlsSource)
-        } else {
-            // Para MP4: Usamos ProgressiveMediaSource
-            val progressiveSource = ProgressiveMediaSource.Factory(dataSourceFactory)
-                .createMediaSource(mediaItem)
-            player?.setMediaSource(progressiveSource)
-        }
-
-        // 6. Preparar
-        player?.prepare()
-        player?.addListener(playerListener)
-
-        if (posicionInicial > 0) player?.seekTo(posicionInicial)
-        player?.playWhenReady = true
-    }
-    private fun obtenerProgresoGuardado(): Long {
-        val clave = generarClaveProgreso()
-        val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
-
-        return try {
-            prefs.getLong(clave, 0L)
-        } catch (e: ClassCastException) {
-            prefs.getInt(clave, 0).toLong() // 🛠️ Conversión segura
-        }
-    }
-
 
     private fun generarClaveProgreso(): String {
         val titulo = movieTitle.trim().ifBlank { "pelicula_sin_titulo" }

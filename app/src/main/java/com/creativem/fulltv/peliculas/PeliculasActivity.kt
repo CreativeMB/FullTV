@@ -1325,11 +1325,9 @@ class PeliculasActivity : AppCompatActivity() {
     // --- En PeliculasActivity.kt ---
 
     private fun cerrarSesion() {
-        CineAlert.show(this, "Cerrando sesión...", CineAlert.Tipo.EXITO)
-        {
         // 1. Cerrar sesión en Firebase (Fundamental)
         auth.signOut()
-        }
+
         // 2. Configurar y cerrar Google
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
