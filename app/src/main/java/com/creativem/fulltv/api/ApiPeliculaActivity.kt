@@ -29,6 +29,7 @@ import com.creativem.fulltv.peliculasvalidas.Validacioneslista
 import com.creativem.fulltv.peliculasvalidas.PelisCarteleraAdapter
 import com.creativem.fulltv.peliculasvalidas.Validaciones
 import com.creativem.fulltv.principal.CastvHelper
+import com.creativem.fulltv.principal.CineAlert
 import com.creativem.fulltv.principal.Movie
 import com.creativem.fulltv.principal.Nosotros
 import com.google.firebase.auth.FirebaseAuth
@@ -176,7 +177,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
                 if (urlActual.isNotBlank()) {
                     irAlReproductorDirecto()
                 } else {
-                    Toast.makeText(this, "Enlace de cuenta regresiva no disponible", Toast.LENGTH_SHORT).show()
+                    CineAlert.show(this, "Enlace de cuenta regresiva no disponible", CineAlert.Tipo.ERROR)
                 }
                 return@setOnClickListener
             }
@@ -239,7 +240,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
     private fun procesarEnlaceBueno(costo: Int) {
         val user = auth.currentUser
         if (user == null || user.email == null) {
-            Toast.makeText(this, "Debes iniciar sesión para reproducir", Toast.LENGTH_SHORT).show()
+            CineAlert.show(this, "Debes iniciar sesión para reproducir", CineAlert.Tipo.ERROR)
             return
         }
 
@@ -335,19 +336,21 @@ class ApiPeliculaActivity : AppCompatActivity() {
                                 activarContadorFirebase(tituloMovie)
 
                                 dialog.dismiss()
-                                Toast.makeText(this@ApiPeliculaActivity, "¡Película activada por 5 horas!", Toast.LENGTH_LONG).show()
-
+                                CineAlert.show(this@ApiPeliculaActivity, "¡Película activada por 5 horas!", CineAlert.Tipo.EXITO, dialog.window?.decorView as? ViewGroup)
+                                {
                                 irAlReproductorDirecto()
+                                }
                             } else {
                                 btnVerAhora.isEnabled = true
                                 btnVerAhora.text = "Ver Ahora"
-                                Toast.makeText(this@ApiPeliculaActivity, "Error procesando el pago", Toast.LENGTH_SHORT).show()
+                                CineAlert.show(this@ApiPeliculaActivity, "Error procesando el pago", CineAlert.Tipo.ERROR, dialog.window?.decorView as? ViewGroup)
                             }
+
                         }
                     } else {
                         btnVerAhora.isEnabled = true
                         btnVerAhora.text = "Ver Ahora"
-                        Toast.makeText(this@ApiPeliculaActivity, "Saldo CasTV insuficiente.", Toast.LENGTH_LONG).show()
+                        CineAlert.show(this@ApiPeliculaActivity, "Saldo CasTV insuficiente.",CineAlert.Tipo.ERROR, dialog.window?.decorView as? ViewGroup)
                     }
                 }
             }
@@ -471,14 +474,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
             .setNegativeButton("Volver al contenido") { dialog, _ ->
                 dialog.dismiss()
-                val intent = Intent(this@ApiPeliculaActivity, PeliculasActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                startActivity(intent)
-
-                // 🟢 ESTA LÍNEA ELIMINA EL PANTALLAZO BRUSCO
-                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
-
-                finish()
+                volverAlContenido()
             }
 
             .setNeutralButton("Alquilar Película", null)
@@ -513,7 +509,19 @@ class ApiPeliculaActivity : AppCompatActivity() {
         alertDialog.show()
         alertDialog.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
     }
+    // 🟢 ESTA FUNCIÓN ES LA QUE HACE EL REGRESO LIMPIO
+    private fun volverAlContenido() {
+        val intent = Intent(this@ApiPeliculaActivity, PeliculasActivity::class.java).apply {
+            // Esto limpia el historial para que no pueda volver al reproductor vacío
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        startActivity(intent)
 
+        // Animación suave para evitar el pantallazo negro
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+
+        finish()
+    }
     // --- LÓGICA DE VERIFICACIÓN Y ENVÍO DE PEDIDOS ---
     private fun verificarYProcesarPedido(dialog: AlertDialog) {
         val query = databaseRef.child("pedidosmovies")
@@ -524,9 +532,19 @@ class ApiPeliculaActivity : AppCompatActivity() {
             if (!snapshot.exists()) {
                 enviarPedido(dialog)
             } else {
-                Toast.makeText(this, "Esta película ya fue pedida, estamos trabajando en ella.", Toast.LENGTH_LONG).show()
-                dialog.dismiss()
+                // 🟢 Usamos el bloque { } para que espere 2.5 segundos antes de cerrar y salir
+                CineAlert.show(
+                    this,
+                    "Esta película ya fue pedida, estamos trabajando en ella.",
+                    CineAlert.Tipo.ERROR,
+                    dialog.window?.decorView as? ViewGroup
+                ) {
+                    // --- TODO ESTO SE EJECUTARÁ DESPUÉS DE 2.5 SEGUNDOS ---
+                    dialog.dismiss()
+                    volverAlContenido()
+                }
             }
+
         }.addOnFailureListener { e ->
             Log.e("ALQUILER_LOG", "ERROR en consulta de pedidos: ${e.message}")
         }
@@ -559,18 +577,24 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
                             databaseRef.child("pedidosmovies").push().setValue(datos)
                                 .addOnSuccessListener {
-                                    dialog.dismiss()
+
                                     descontarPuntos(correoKey, costoPedido)
-                                    Toast.makeText(this, "Pedido enviado. Puntos descontados.", Toast.LENGTH_LONG).show()
+
+                                    CineAlert.show(this, "Pedido enviado. Puntos descontados.", CineAlert.Tipo.EXITO, dialog.window?.decorView as? ViewGroup)
+                                    {
                                     isProcessingOrder = false
+                                    dialog.dismiss()
+                                    volverAlContenido()
+                                }
                                 }
                                 .addOnFailureListener { e ->
                                     isProcessingOrder = false
-                                    Toast.makeText(this, "Error al enviar: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    CineAlert.show(this, "Error al enviar: ${e.message}", CineAlert.Tipo.ERROR, dialog.window?.decorView as? ViewGroup)
                                 }
+
                         } else {
                             isProcessingOrder = false
-                            Toast.makeText(this, "Saldo CasTV insuficiente.", Toast.LENGTH_SHORT).show()
+                            CineAlert.show(this, "Saldo CasTV insuficiente.", CineAlert.Tipo.ERROR, dialog.window?.decorView as? ViewGroup)
                         }
                     }
                 } else {

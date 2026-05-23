@@ -72,6 +72,7 @@ import com.creativem.fulltv.principal.Nosotros
 import com.creativem.fulltv.tv.TvActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.creativem.fulltv.BuildConfig
+import com.creativem.fulltv.principal.CineAlert
 import com.creativem.fulltv.principal.SplashActivity
 import com.creativem.fulltv.principal.ViewUtils
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -921,9 +922,15 @@ class PeliculasActivity : AppCompatActivity() {
                     setOnClickListener {
                         if (saldoActual >= costo) {
                             ejecutarProcesoFinal(correoKey, pedido, costo, nombreUsuario, email, dialog)
-                            dialog.dismiss()
+
                         } else {
-                            Toast.makeText(context, "Saldo insuficiente ❌", Toast.LENGTH_LONG).show()
+                            // 🟢 REEMPLAZO DEL TOAST POR CINEALERT PREMIUM
+                            CineAlert.show(
+                                this@PeliculasActivity, // O la actividad donde estés
+                                "Saldo insuficiente en CasTV ❌",
+                                CineAlert.Tipo.ERROR,
+                                dialog.window?.decorView as? ViewGroup
+                            )
                         }
                     }
                 }
@@ -950,12 +957,18 @@ class PeliculasActivity : AppCompatActivity() {
 
         // 1. Guardamos el pedido
         databaseRef.child("pedidosmovies").push().setValue(data).addOnSuccessListener {
+
             // 2. Descontamos los puntos y pasamos el dialog para que se cierre después
             descontarPuntos(correoKey, costo, titulo, dialog)
 
-            Toast.makeText(this, "¡Pedido registrado con éxito!", Toast.LENGTH_SHORT).show()
         }.addOnFailureListener {
-            Toast.makeText(this, "Error al registrar pedido", Toast.LENGTH_SHORT).show()
+            // 🔴 ERROR: Si falla el guardado, avisamos al usuario sin cerrar el diálogo
+            CineAlert.show(
+                this@PeliculasActivity,
+                "Error al registrar pedido ❌",
+                CineAlert.Tipo.ERROR,
+                dialog.window?.decorView as? ViewGroup
+            )
         }
     }
 
@@ -968,28 +981,25 @@ class PeliculasActivity : AppCompatActivity() {
             if (castvActual >= puntosADescontar) {
                 val nuevoCastv = castvActual - puntosADescontar
 
-                userRef.child("castv").setValue(nuevoCastv)
-                    .addOnSuccessListener {
-                        Log.d("ALQUILER_LOG", "✅ Descuento aplicado. Nuevo saldo: $nuevoCastv")
+                userRef.child("castv").setValue(nuevoCastv).addOnSuccessListener {
+                    val email = correoKey.replace("_", ".")
+                    CastvHelper.registrarConsumo(email, "PEDIDO: $tituloPelicula", puntosADescontar)
 
-                        // 🟢 REGISTRAMOS EL CONSUMO EN EL HISTORIAL
-                        val email = correoKey.replace("_", ".")
-                        // Usamos el título que viene por parámetro, no "title" de la actividad
-                        CastvHelper.registrarConsumo(email, "PEDIDO: $tituloPelicula", puntosADescontar)
-
-                        Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
-
-                        dialog.dismiss()  // Ahora esto cerrará el diálogo correctamente
+                    // 🟢 AVISO FINAL DE ÉXITO (Único y claro)
+                    CineAlert.show(
+                        this@PeliculasActivity,
+                        "¡Pedido realizado con éxito! 🎬",
+                        CineAlert.Tipo.EXITO,
+                        dialog.window?.decorView as? ViewGroup
+                    ) {
+                        // 🕒 TRAS 2.5 SEGUNDOS, CERRAMOS EL DIÁLOGO
+                        dialog.dismiss()
                     }
-                    .addOnFailureListener { e ->
-                        Log.e("ALQUILER_LOG", "❌ Error al actualizar saldo: ${e.message}")
-                        Toast.makeText(this, "Error al actualizar saldo", Toast.LENGTH_SHORT).show()
-                    }
+                }
             } else {
-                Toast.makeText(this, "Saldo insuficiente", Toast.LENGTH_SHORT).show()
+                // Error de saldo
+                CineAlert.show(this@PeliculasActivity, "Saldo insuficiente 💰", CineAlert.Tipo.ERROR, dialog.window?.decorView as? ViewGroup)
             }
-        }.addOnFailureListener { e ->
-            Log.e("ALQUILER_LOG", "Error de conexión: ${e.message}")
         }
     }
     private fun activarpaquete() {
@@ -1136,10 +1146,14 @@ class PeliculasActivity : AppCompatActivity() {
                         withContext(Dispatchers.IO) {
                             databaseRef.child("pedidosmovies").push().setValue(data).await()
                         }
-                        Toast.makeText(this@PeliculasActivity, "✅ Enviado", Toast.LENGTH_SHORT).show()
+                        CineAlert.show(this@PeliculasActivity, "✅ Enviado", CineAlert.Tipo.EXITO,
+                            dialog.window?.decorView as? ViewGroup)
+                        {
                         dialog.dismiss()
+                        }
                     } catch (e: Exception) {
-                        Toast.makeText(this@PeliculasActivity, "❌ Error", Toast.LENGTH_SHORT).show()
+                        CineAlert.show(this@PeliculasActivity, "❌ Error",  CineAlert.Tipo.ERROR,
+                            dialog.window?.decorView as? ViewGroup)
                     }
                 }
             }
@@ -1311,11 +1325,11 @@ class PeliculasActivity : AppCompatActivity() {
     // --- En PeliculasActivity.kt ---
 
     private fun cerrarSesion() {
-        Toast.makeText(this, "Cerrando sesión...", Toast.LENGTH_SHORT).show()
-
+        CineAlert.show(this, "Cerrando sesión...", CineAlert.Tipo.EXITO)
+        {
         // 1. Cerrar sesión en Firebase (Fundamental)
         auth.signOut()
-
+        }
         // 2. Configurar y cerrar Google
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
