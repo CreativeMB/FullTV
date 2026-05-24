@@ -13,10 +13,7 @@ object Validacioneslista {
     private var peliculasInvalidas: List<Movie> = emptyList()
     private var cargado = false
 
-    /**
-     * Carga las películas desde la nueva ruta de Realtime Database.
-     * @param forzarRefresh Si es true, ignora la caché y descarga de nuevo.
-     */
+
     suspend fun cargarPeliculas(forzarRefresh: Boolean = false) {
         // Si ya está cargado y no queremos forzar, salimos
         if (cargado && !forzarRefresh) return
@@ -24,7 +21,7 @@ object Validacioneslista {
         withContext(Dispatchers.IO) {
             // Llama a la nueva lógica de Realtime Database
             val (validas, invalidas) = validaciones.obtenerPeliculas()
-
+            contadorCeroEnlaceMuerto(invalidas)
             // Los IDs y las fechas (Long) ya vienen procesados desde Validaciones.kt
             peliculasValidas = validas
             peliculasInvalidas = invalidas
@@ -38,18 +35,19 @@ object Validacioneslista {
         }
     }
 
-    // --- Getters ---
     fun obtenerPeliculasValidas(): List<Movie> = peliculasValidas
     fun obtenerPeliculasInvalidas(): List<Movie> = peliculasInvalidas
     fun yaCargado(): Boolean = cargado
 
-    /**
-     * Limpia la caché por si necesitas que la App vuelva a consultar
-     * la base de datos (útil si agregaste pelis nuevas en el panel).
-     */
-    fun resetearCache() {
-        cargado = false
-        peliculasValidas = emptyList()
-        peliculasInvalidas = emptyList()
+    private fun contadorCeroEnlaceMuerto(invalidas: List<Movie>) {
+        val database = com.google.firebase.database.FirebaseDatabase.getInstance().getReference("movies")
+
+        invalidas.forEach { movie ->
+            // Si el enlace está muerto (está en la lista de inválidas)
+            // y aún tiene tiempo en el contador, lo ponemos en 0.
+            if (movie.countdownMinutes > 0 && movie.id.isNotEmpty()) {
+                database.child(movie.id).child("countdownMinutes").setValue(0)
+            }
+        }
     }
 }
