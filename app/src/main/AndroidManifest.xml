@@ -38,7 +38,7 @@
         tools:ignore="UnusedAttribute">
         <activity
             android:name=".peliculas.PeliculasActivity"
-            android:theme="@style/Theme.SmoothTransition">
+            android:theme="@style/Theme.FullTV.tv">
 
         </activity>
         <activity

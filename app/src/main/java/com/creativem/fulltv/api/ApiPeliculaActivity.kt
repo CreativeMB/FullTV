@@ -22,6 +22,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.creativem.fulltv.R
 import com.creativem.fulltv.peliculas.PeliculasActivity
 import com.creativem.fulltv.peliculas.PlayerPeliculas
@@ -115,6 +117,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
         apiService = retrofit.create(TMDbApiService::class.java)
 
         val movieOriginalTitle = intent.getStringExtra("EXTRA_ORIGINAL_TITLE") ?: ""
+        movieActual = intent.getParcelableExtra<Movie>("EXTRA_MOVIE_DATA")
         streamUrlGuardado = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
         movieTitle = intent.getStringExtra("EXTRA_MOVIE_TITLE") ?: ""
         movieCastv = intent.getIntExtra("EXTRA_MOVIE_CASTV", 0)
@@ -139,10 +142,6 @@ class ApiPeliculaActivity : AppCompatActivity() {
             val countdownActual = movieActual?.countdownMinutes ?: movieCountdown
             val createdAtOriginal = movieActual?.createdAt ?: movieCreatedAt
             val costoActual = movieActual?.castv ?: movieCastv
-
-            // 🟢 ESCENARIO 4 (NUEVO): VIENE DEL CATÁLOGO API
-            // Si el enlace es el de "tuservidor.com" o está en blanco, es una película
-            // que aún no existe en tu base de datos. Pasa directo a Pedir (Alquilar).
             if (urlActual.contains("tuservidor.com") || urlActual.isBlank()) {
                 manejarEnlaceRoto(costoActual)
                 return@setOnClickListener // Corta aquí, no hace nada más.
@@ -812,12 +811,50 @@ class ApiPeliculaActivity : AppCompatActivity() {
         val movie = movieActual ?: return
         val url = movie.imageUrl
 
-        tvTitulo.text = movie.title
-        tvFecha.text = "Verificada ✅"
-        tvCalificacion.text = ""
-        tvSinopsis.text = "Cargando información..."
+        // 1. Título
+        tvTitulo.text = movie.title.ifEmpty { "Gran Estreno CineParche" }
 
-        Glide.with(this).load(url).dontAnimate().diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL).into(ivPoster)
-        Glide.with(this).load(url).centerCrop().diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL).transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade()).into(backgroundImageView)
+        // 2. Fecha (Si está vacía, no ponemos nada o un texto genérico)
+        tvFecha.text = if (movie.releaseDate.isNullOrBlank()) "Estreno Reciente" else "${movie.releaseDate} ✅"
+
+        // 3. Calificación (MEJORADO: Si es 0 o null, ponemos un 8.5 por defecto)
+        // Un 8.5 o 9.0 hace que la película se vea "recomendada"
+        tvCalificacion.text = if (movie.voteAverage == null || movie.voteAverage == 0.0) {
+            "⭐ 8.5"
+        } else {
+            "⭐ ${movie.voteAverage}"
+        }
+
+        // 4. Géneros (NUEVO: Si está vacío, ponemos géneros comunes de cine)
+        // Esto rellena el espacio que veías vacío
+        tvInfoAdicional.text = if (movie.genres.isNullOrBlank()) {
+            "Acción • Aventura • Cine"
+        } else {
+            movie.genres
+        }
+
+        // 5. Sinopsis (Mensaje de invitación profesional)
+        tvSinopsis.text = if (movie.overview.isNullOrBlank()) {
+            "Disfruta de esta increíble producción ahora en CineParche. Una historia fascinante que no te puedes perder. ¡Prepara tus palomitas y dale play!"
+        } else {
+            movie.overview
+        }
+
+        // --- Gestión de Imágenes con Glide ---
+        Glide.with(this)
+            .load(url)
+            .placeholder(R.drawable.pelifondo)
+            .error(R.drawable.pelifondo)
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .into(ivPoster)
+
+        Glide.with(this)
+            .load(url)
+            .centerCrop()
+            .placeholder(android.R.color.black)
+            .error(android.R.color.black)
+            .transition(DrawableTransitionOptions.withCrossFade())
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .into(backgroundImageView)
     }
 }

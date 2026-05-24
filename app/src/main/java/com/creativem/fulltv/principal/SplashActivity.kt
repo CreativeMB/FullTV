@@ -36,6 +36,7 @@ import android.net.NetworkCapabilities
 import android.content.Context
 import android.util.Log
 import android.widget.Button
+import kotlinx.coroutines.withContext
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {
@@ -132,11 +133,14 @@ class SplashActivity : AppCompatActivity() {
     private fun isNetworkAvailable(): Boolean {
         val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = connectivityManager.activeNetwork ?: return false
-        val activeNetwork = connectivityManager.getNetworkCapabilities(network) ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+
         return when {
-            activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> true
-            activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
-            activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> true // Importante para TV Box
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> true
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> true
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
+            // VPN y Bluetooth también pueden dar red en algunos dispositivos
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> true
             else -> false
         }
     }
@@ -168,32 +172,62 @@ class SplashActivity : AppCompatActivity() {
     }
     private fun iniciarCargaDeDatos() {
         lifecycleScope.launch {
-            // 1. Carga de datos de fondo con Timeout para que no se quede pegado si el server falla
-            val cargaExitosa = withTimeoutOrNull(15000) { // 15 segundos max de espera
-                val cargaTrabajo = launch(Dispatchers.IO) {
-                    try {
-                        Validacioneslista.cargarPeliculas()
-                        val lasPrimeras = Validacioneslista.obtenerPeliculasValidas().take(15)
-                        lasPrimeras.forEach { movie ->
-                            Glide.with(applicationContext).asBitmap().load(movie.imageUrl)
-                                .diskCacheStrategy(DiskCacheStrategy.ALL).submit().get()
-                        }
-                    } catch (e: Exception) {
-                        Log.e("SPLASH", "Error en carga: ${e.message}")
-                    }
+            // --- PASO 1: EL ESCUDO PARA EL PRIMER ARRANQUE ---
+            // Esperamos hasta 5 segundos a que el sistema Android active la red
+            var redLista = false
+            for (i in 1..5) {
+                if (isNetworkAvailable()) {
+                    redLista = true
+                    break
                 }
-                cargaTrabajo.join()
-                true
+                delay(1000) // Espera 1 segundo y vuelve a preguntar
+                Log.d("SPLASH", "Esperando hardware de red... Intento $i")
             }
 
-            if (cargaExitosa == null) {
-                // Si el tiempo se agotó y no cargó nada, mostrar error de red
+            if (!redLista) {
+                // Si después de 5 segundos de verdad no hay red, recién ahí mostramos el error
                 mostrarErrorConexion()
                 return@launch
             }
 
-            // ... (Tu lógica de redirección de Auth igual) ...
-            navegarSiguientePantalla()
+            // --- PASO 2: CARGA DE DATOS CON MANEJO DE ERRORES MEJORADO ---
+            val cargaExitosa = withTimeoutOrNull(20000) { // Aumentamos a 20 seg para el primer inicio
+                try {
+                    // Usamos withContext(Dispatchers.IO) para no congelar la pantalla
+                    withContext(Dispatchers.IO) {
+                        // Cargar lista de películas del servidor
+                        Validacioneslista.cargarPeliculas()
+
+                        val lasPrimeras = Validacioneslista.obtenerPeliculasValidas().take(15)
+                        lasPrimeras.forEach { movie ->
+                            try {
+                                // Pre-carga de imágenes (esto evita destellos de imágenes blancas luego)
+                                Glide.with(applicationContext)
+                                    .asBitmap()
+                                    .load(movie.imageUrl)
+                                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                    .submit()
+                                    .get() // Espera a que la imagen baje
+                            } catch (e: Exception) {
+                                // Si una imagen falla (como el error 403 que vimos), que no detenga la app
+                                Log.w("SPLASH", "No se pudo pre-cargar imagen: ${movie.imageUrl}")
+                            }
+                        }
+                    }
+                    true // Retornamos true si terminó el bloque Dispatchers.IO
+                } catch (e: Exception) {
+                    Log.e("SPLASH", "Error fatal en carga: ${e.message}")
+                    null
+                }
+            }
+
+            // --- PASO 3: DECISIÓN FINAL ---
+            if (cargaExitosa == true) {
+                navegarSiguientePantalla()
+            } else {
+                // Si hubo Timeout (servidor lento) o error de servidor
+                mostrarErrorConexion()
+            }
         }
     }
 
@@ -209,10 +243,12 @@ class SplashActivity : AppCompatActivity() {
         }
 
         startActivity(intentDestino)
-        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+
+        // CAMBIO AQUÍ: 0, 0 elimina el parpadeo y la transición del sistema
+        overridePendingTransition(0, 0)
+
         finish()
     }
-
 
     companion object {
         var instance: SplashActivity? = null

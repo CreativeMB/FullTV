@@ -1,29 +1,28 @@
+
 <resources xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- TEMA PRINCIPAL TV (Optimizado) -->
-    <style name="Theme.FullTV.tv" parent="@style/Theme.Leanback">
+    <!-- TEMA PRINCIPAL TV (Corregido para AppCompat) -->
+    <style name="Theme.FullTV.tv" parent="Theme.AppCompat.NoActionBar">
         <item name="android:colorPrimary">#282828</item>
-        <!-- 1. Fondo consistente (usa el color de tu app) -->
         <item name="android:windowBackground">@android:color/black</item>
-        <!-- 2. Evita parpadeos de pre-visualización -->
         <item name="android:windowDisablePreview">true</item>
-        <!-- 3. Muy importante para TV: permite ver la actividad de abajo al salir -->
-        <item name="android:windowIsTranslucent">true</item>
+        <!-- FALSE para evitar ver el fondo del TV -->
+        <item name="android:windowIsTranslucent">false</item>
         <item name="android:windowAnimationStyle">@null</item>
     </style>
 
-    <!-- TEMA PARA TRANSICIONES SUAVES -->
-    <style name="Theme.SmoothTransition" parent="Theme.MaterialComponents.NoActionBar">
+    <!-- TEMA PARA TRANSICIONES (Corregido para AppCompat) -->
+    <style name="Theme.SmoothTransition" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowAnimationStyle">@null</item>
         <item name="android:windowBackground">@android:color/black</item>
-        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowIsTranslucent">false</item>
     </style>
-
-    <!-- TEMA DE ARRANQUE (Splash) -->
-    <style name="Theme.App.Starting" parent="Theme.MaterialComponents.NoActionBar">
-        <item name="android:windowBackground">@android:color/black</item>
-        <item name="android:windowFullscreen">true</item>
-        <item name="android:windowDisablePreview">false</item>
-    </style>
+<!-- TEMA DE ARRANQUE (Splash) - También debe ser sólido -->
+<style name="Theme.App.Starting" parent="Theme.MaterialComponents.NoActionBar">
+    <item name="android:windowBackground">@android:color/black</item>
+    <item name="android:windowFullscreen">true</item>
+    <item name="android:windowIsTranslucent">false</item>
+    <item name="android:windowDisablePreview">false</item>
+</style>
 
 </resources>

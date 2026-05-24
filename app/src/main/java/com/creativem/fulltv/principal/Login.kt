@@ -77,10 +77,15 @@ class Login : AppCompatActivity() {
     // Mantenemos tu función de navegación limpia
     private fun irAPeliculas() {
         val intent = Intent(this, PeliculasActivity::class.java).apply {
+            // Estas flags son excelentes para limpiar el historial,
+            // pero requieren una transición instantánea para no parpadear.
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
         startActivity(intent)
-        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+
+        // CAMBIO CLAVE: Cambia los fades por 0, 0
+        overridePendingTransition(0, 0)
+
         finish()
     }
     /**

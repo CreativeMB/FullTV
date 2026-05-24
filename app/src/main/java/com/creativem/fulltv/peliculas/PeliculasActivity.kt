@@ -140,9 +140,10 @@ class PeliculasActivity : AppCompatActivity() {
         }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 1. CERO TRANSICIONES: Evita saltos negros entre actividades
+        setTheme(R.style.Theme_FullTV_tv)
         overridePendingTransition(0, 0)
         super.onCreate(savedInstanceState)
+        window.setBackgroundDrawableResource(android.R.color.black)
 
         // 2. CONFIGURACIÓN VISUAL PARA TV (Pantalla Completa e Inmersiva)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -1360,12 +1361,11 @@ class PeliculasActivity : AppCompatActivity() {
         }
 
         val intent = Intent(this, ApiPeliculaActivity::class.java).apply {
-            // 2. Flags de optimización:
-            // CLEAR_TOP: Si la actividad ya existe, cierra las que están encima y la trae al frente.
-            // SINGLE_TOP: Evita crear una copia nueva si ya estás en ella (usa onNewIntent).
+
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
 
             // 3. Empaquetado limpio de datos
+            putExtra("EXTRA_MOVIE_DATA", movie)
             putExtra("EXTRA_STREAM_URL", movie.streamUrl)
             putExtra("EXTRA_MOVIE_TITLE", movie.title)
             putExtra("EXTRA_MOVIE_CASTV", movie.castv)
