@@ -519,7 +519,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
         // 🟢 USAMOS TUS ANIMACIONES PERSONALIZADAS
         // R.anim.fade_in_slow -> Hace aparecer la cartelera suavemente (500ms)
         // R.anim.stay -> Mantiene la pantalla de detalles quieta mientras se desvanece
-        overridePendingTransition(R.animator.fade_in_slow, R.animator.stay)
+        overridePendingTransition(R.anim.fade_in_slow, R.anim.stay)
 
         finish()
     }

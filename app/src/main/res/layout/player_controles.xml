@@ -123,14 +123,15 @@
                 android:layout_marginStart="5dp"
                 android:layout_marginTop="5dp"
                 android:max="100"
-                android:background="@drawable/button_selector"
+                android:background="@drawable/card_focused_background"
                 android:progressDrawable="@android:drawable/progress_horizontal"
                 android:minHeight="15dp"
                 android:maxHeight="15dp"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
-                android:progressTint="@color/rojo"
-                android:thumbTint="@color/colorSeekBar1" />
+                android:progressTint="#C5A059"
+                android:secondaryProgressTint="#fff"
+                android:thumbTint="#000000" />
 
             <!-- Controles inferiores -->
             <LinearLayout
@@ -169,7 +170,7 @@
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:layout_marginEnd="10dp"
-                        android:background="@drawable/button_selector"
+                        android:background="@drawable/card_focused_background"
                         android:scaleType="fitCenter"
                         android:focusable="true"
                         android:focusableInTouchMode="true"
@@ -180,7 +181,7 @@
                         android:id="@+id/render"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
-                        android:background="@drawable/button_selector"
+                        android:background="@drawable/card_focused_background"
                         android:scaleType="fitCenter"
                         android:layout_marginEnd="10dp"
                         android:src="@drawable/zoom"
@@ -194,9 +195,9 @@
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:layout_marginEnd="10dp"
-                        android:background="@drawable/button_selector"
+                        android:background="@drawable/card_focused_background"
                         android:scaleType="fitCenter"
-                        android:src="@drawable/pagos"
+                        android:src="@drawable/perfil"
                         android:focusable="true"
                         android:focusableInTouchMode="true" />
 
@@ -206,7 +207,7 @@
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:layout_marginEnd="10dp"
-                        android:background="@drawable/button_selector"
+                        android:background="@drawable/card_focused_background"
                         android:scaleType="fitCenter"
                         android:src="@drawable/menu"
                         android:focusable="true"
@@ -216,7 +217,7 @@
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:layout_marginEnd="10dp"
-                        android:background="@drawable/button_selector"
+                        android:background="@drawable/card_focused_background"
                         android:scaleType="fitCenter"
                         android:focusable="true"
                         android:focusableInTouchMode="true"
@@ -233,10 +234,10 @@
                     android:gravity="end"
                     android:layout_marginEnd="10dp"
                     android:text="-0:00"
-                    android:textColor="@color/exo_button_color"
-                    android:textSize="25sp"
+                    android:textColor="@color/exo_button_color" android:textSize="25sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
+
 </FrameLayout>

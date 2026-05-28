@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rotate xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fromDegrees="0"
+    android:toDegrees="1080"
+    android:pivotX="50%"
+    android:pivotY="50%">
+    <shape
+        android:shape="ring"
+        android:thicknessRatio="14"
+        android:useLevel="false">
+
+        <!-- Degradado de Dorado Premium a Transparente -->
+        <gradient
+            android:type="sweep"
+            android:useLevel="false"
+            android:startColor="#C5A059"
+            android:centerColor="#E5C07B"
+            android:endColor="#00FFFFFF" />
+    </shape>
+</rotate>

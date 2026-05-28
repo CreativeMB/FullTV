@@ -61,13 +61,13 @@ import android.text.style.RelativeSizeSpan
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup
+import android.view.animation.AnimationUtils
 import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.activity.addCallback
 import com.bumptech.glide.Glide
 
 import com.creativem.fulltv.databinding.PlayerBinding
-
 
 
 import androidx.annotation.OptIn
@@ -118,6 +118,8 @@ class PlayerPeliculas : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private val hideControlsDelay = 5000L // 5 segundos
     private val updateInterval = 1000L    // 1 segundo
+    private var progresoSimulado = 0
+    private var gateoTicks = 0
     private var lastInteractionTime = 0L
     private var startPosition: Long = 0L
     private val databaseRef by lazy { FirebaseDatabase.getInstance().reference }
@@ -328,14 +330,14 @@ class PlayerPeliculas : AppCompatActivity() {
                 }
 
                 else -> {
-                   finish()
+                    finish()
 
                 }
             }
         }
     }
 
-        private fun mostarpelis() {
+    private fun mostarpelis() {
         val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
 
         if (menuAbierto) {
@@ -387,7 +389,8 @@ class PlayerPeliculas : AppCompatActivity() {
         // Función interna para filtrar las películas activas
         fun filtrarActivas(lista: List<Movie>): List<Movie> {
             return lista.filter { movie ->
-                val countdownDurationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
+                val countdownDurationMillis =
+                    java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
                 val timeElapsed = System.currentTimeMillis() - movie.createdAt
                 val remainingTimeMillis = countdownDurationMillis - timeElapsed
 
@@ -433,7 +436,12 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
 
-    private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieCastv: Int, movieImageUrl: String) {
+    private fun startMoviePlayback(
+        streamUrl: String,
+        movieTitle: String,
+        movieCastv: Int,
+        movieImageUrl: String
+    ) {
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP) // Limpia la pila de actividades
         // Envía la URL de transmisión y el título de la película como extras
         intent.putExtra("EXTRA_STREAM_URL", streamUrl)
@@ -458,114 +466,229 @@ class PlayerPeliculas : AppCompatActivity() {
                 }
             }
 
-        CoroutineScope(Dispatchers.Main).launch {
-            // 1. Verificamos localmente contra el objeto Validacioneslista
-            val isUrlValid = withContext(Dispatchers.IO) {
-                // Si por alguna razón el objeto no ha cargado nada, le pedimos que lo haga
-                if (!Validacioneslista.yaCargado()) {
-                    Validacioneslista.cargarPeliculas()
+            CoroutineScope(Dispatchers.Main).launch {
+                // 1. Verificamos localmente contra el objeto Validacioneslista
+                val isUrlValid = withContext(Dispatchers.IO) {
+                    // Si por alguna razón el objeto no ha cargado nada, le pedimos que lo haga
+                    if (!Validacioneslista.yaCargado()) {
+                        Validacioneslista.cargarPeliculas()
+                    }
+
+                    // Comprobamos si la URL de esta película está entre las que pasaron el ping
+                    Validacioneslista.obtenerPeliculasValidas().any { it.streamUrl == streamUrl }
                 }
 
-                // Comprobamos si la URL de esta película está entre las que pasaron el ping
-                Validacioneslista.obtenerPeliculasValidas().any { it.streamUrl == streamUrl }
-            }
-
-            // 2. Si no es válida, mostramos el diálogo de error (pedido)
-            if (!isUrlValid) {
+                // 2. Si no es válida, mostramos el diálogo de error (pedido)
+                if (!isUrlValid) {
 //                showErrorDialog(movieTitle, movieCastv, userId)
-                return@launch
-            }
+                    return@launch
+                }
 
-            val progresoGuardado = obtenerProgresoGuardado()
+                val progresoGuardado = obtenerProgresoGuardado()
 
-            if (progresoGuardado > 0) {
-                mostrarDialogoContinuar(progresoGuardado)
-            } else {
-                prepararReproductor(startPosition)
+                if (progresoGuardado > 0) {
+                    mostrarDialogoContinuar(progresoGuardado)
+                } else {
+                    prepararReproductor(startPosition)
 
+                }
             }
         }
     }
-    }
+
     @OptIn(UnstableApi::class)
     private fun prepararReproductor(posicionInicial: Long) {
-        // 1. LIMPIEZA DE HARDWARE (Crucial en TV Real)
-        binding.reproductor.player = null // Desvincular la vista primero
-        player?.stop()
-        player?.clearMediaItems()
-        player?.release()
-        player = null
+        try {
+            // 1. LIMPIEZA DE HARDWARE
+            binding.reproductor.player = null
+            player?.stop()
+            player?.clearMediaItems()
+            player?.release()
+            player = null
 
-        // 2. CONFIGURACIÓN DE RED PARA TV
-        // Las TV reales manejan una tabla de conexiones más pequeña. Forzamos cierre.
-        val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("Mozilla/5.0 (Linux; Android 10; BRAVIA 4K Build/QTG3.200305.006.A1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-            .setDefaultRequestProperties(mapOf(
-                "Connection" to "close",
-                "ngrok-skip-browser-warning" to "true"
-            ))
-            .setConnectTimeoutMs(30_000)
-            .setReadTimeoutMs(30_000)
-            .setAllowCrossProtocolRedirects(true)
+            // 2. CONFIGURACIÓN DE RED PARA TV
+            val dataSourceFactory = DefaultHttpDataSource.Factory()
+                .setUserAgent("Mozilla/5.0 (Linux; Android 10; BRAVIA 4K Build/QTG3.200305.006.A1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .setDefaultRequestProperties(mapOf(
+                    "Connection" to "close",
+                    "ngrok-skip-browser-warning" to "true"
+                ))
+                .setConnectTimeoutMs(30_000)
+                .setReadTimeoutMs(30_000)
+                .setAllowCrossProtocolRedirects(true)
 
-        // 3. RENDERIZADORES PARA TV (Esto es lo que le falta a la TV real)
-        // Forzamos el modo EXTENSION_RENDERER para que si el hardware falla, use software.
-        val renderersFactory = DefaultRenderersFactory(this@PlayerPeliculas)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-            .setEnableDecoderFallback(true) // Si el codec de la TV no puede, usa uno genérico
+            // 3. RENDERIZADORES PARA TV
+            val renderersFactory = DefaultRenderersFactory(this@PlayerPeliculas)
+                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+                .setEnableDecoderFallback(true)
 
-        // 4. FACTORÍA DE MEDIA CON SOPORTE HLS MEJORADO
-        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+            // 4. FACTORÍA DE MEDIA
+            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
-        // 5. LOAD CONTROL (Un poco más de buffer para TV real por la estabilidad del WiFi)
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                2_500,  // Mínimo para empezar (aumentamos a 2.5s para hardware real)
-                40_000, // Máximo
-                1_500,  // Para reanudar
-                2_000   // Buffer inicial
-            )
-            .setTargetBufferBytes(64 * 1024 * 1024) // Aumentamos a 64MB para 4K/HD
-            .build()
+            // 5. LOAD CONTROL ESTILO "YOUTUBE" (Búfer ultra-agresivo de precarga)
+            val loadControl = DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                    30_000,   // Mínimo buffer antes de evaluar pausar la descarga (7.5s)
+                    300_000, // Máximo buffer: Almacena hasta 2 MINUTOS de video por adelantado (Estilo YouTube)
+                    3_000,   // Buffer necesario para el arranque inicial rápido (3s)
+                    4_500    // Buffer necesario para reanudar tras una pausa (4.5s)
+                )
+                .setTargetBufferBytes(128 * 1024 * 1024) // Aumentamos la memoria a 128MB para aguantar los 2 min de búfer en HD/4K
+                .setPrioritizeTimeOverSizeThresholds(true) // Prioriza siempre acumular tiempo de reproducción (segundos) sobre bytes
+                .build()
 
-        // 6. CREAR EL PLAYER CON RENDERIZADORES DE TV
-        player = ExoPlayer.Builder(this@PlayerPeliculas, renderersFactory)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .setLoadControl(loadControl)
-            .build()
+            // 6. CREAR EL REPRODUCTOR CON BACK-BUFFER (Corregido para Media3)
+            player = ExoPlayer.Builder(this@PlayerPeliculas, renderersFactory)
+                .setMediaSourceFactory(mediaSourceFactory)
+                .setLoadControl(loadControl)
+                .build()
 
-        binding.reproductor.player = player
+            binding.reproductor.player = player
 
-        // 7. MEDIA ITEM LIMPIO
-        val uriLimpia = streamUrl.trim()
-        val mediaItem = MediaItem.Builder()
-            .setUri(Uri.parse(uriLimpia))
-            .build()
-
-        // 8. PREPARAR Y ESCUCHAR ERRORES
-        player?.setMediaItem(mediaItem)
-        player?.prepare()
-
-        // Listener adicional para detectar por qué falla en la TV
-        player?.addListener(object : Player.Listener {
-            override fun onPlayerError(error: PlaybackException) {
-                Log.e("TV_ERROR", "Error en hardware: ${error.errorCodeName}")
-                // Si hay error de hardware, intentamos re-conectar una vez
-                if (error.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED) {
-                    prepararReproductor(player?.currentPosition ?: 0L)
-                }
+            // 7. PROCESAMIENTO SEGURO DEL MEDIA ITEM
+            val uriLimpia = streamUrl.trim()
+            if (uriLimpia.isEmpty()) {
+                mostrarCargando(false)
+                return
             }
-        })
+            val mediaItem = MediaItem.Builder()
+                .setUri(Uri.parse(uriLimpia))
+                .build()
 
-        player?.addListener(playerListener)
+            // 8. ASIGNACIÓN DE LISTENERS
+            player?.addListener(object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    Log.e("TV_ERROR", "Error detectado en reproducción: ${error.errorCodeName}")
+                    mostrarCargando(false)
 
-        if (posicionInicial > 0) {
-            player?.seekTo(posicionInicial)
+                    if (reconnectionAttempts < maxReconnectionAttempts) {
+                        reconnectionAttempts++
+                        val ultimaPosicion = player?.currentPosition ?: posicionInicial
+
+                        when (error.errorCode) {
+                            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> {
+                                prepararReproductor(ultimaPosicion)
+                            }
+                            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> {
+                                handler.postDelayed({
+                                    prepararReproductor(ultimaPosicion)
+                                }, 3000)
+                            }
+                            else -> {
+                                handler.postDelayed({
+                                    prepararReproductor(ultimaPosicion)
+                                }, 3000)
+                            }
+                        }
+                    } else {
+                        reconnectionAttempts = 0
+                    }
+                }
+            })
+
+            player?.addListener(playerListener)
+
+            // 9. INICIALIZACIÓN
+            player?.setMediaItem(mediaItem)
+
+            if (posicionInicial > 0) {
+                player?.seekTo(posicionInicial)
+            }
+
+            player?.playWhenReady = true
+            player?.prepare()
+
+        } catch (e: Exception) {
+            Log.e("TV_ERROR", "Error crítico en la inicialización: ${e.message}")
+            mostrarCargando(false)
         }
-
-        player?.playWhenReady = true
     }
 
+    // Función para activar/desactivar la animación de pulso_premium
+    @SuppressLint("ResourceType")
+    private fun mostrarCargando(mostrar: Boolean) {
+        val loadingIndicator = binding.loadingIndicator
+
+        if (mostrar) {
+            if (loadingIndicator.visibility != View.VISIBLE) {
+                // Reiniciamos el progreso a 0 cada vez que empieza a cargar
+                progresoSimulado = 0
+
+                val txtTitulo = loadingIndicator.findViewById<TextView>(R.id.loadingMovieTitle)
+                if (::movieTitle.isInitialized) {
+                    txtTitulo?.text = "Cargando: $movieTitle"
+                } else {
+                    txtTitulo?.text = "Cargando película..."
+                }
+
+                loadingIndicator.visibility = View.VISIBLE
+                val animacion = AnimationUtils.loadAnimation(this, R.anim.pulso_premium)
+                loadingIndicator.startAnimation(animacion)
+
+                // Iniciamos la simulación del progreso
+                handler.removeCallbacks(runnableBuffer)
+                handler.post(runnableBuffer)
+            }
+        } else {
+            handler.removeCallbacks(runnableBuffer)
+            loadingIndicator.clearAnimation()
+            loadingIndicator.visibility = View.GONE
+        }
+    }
+
+    private val runnableBuffer = object : Runnable {
+        override fun run() {
+            val loadingIndicator = binding.loadingIndicator
+
+            if (player != null && loadingIndicator.visibility == View.VISIBLE) {
+
+                // 1. Calculamos los milisegundos reales cargados en memoria
+                val posicionDescargada = player?.bufferedPosition ?: 0L
+                val posicionActual = player?.currentPosition ?: 0L
+                val milisegundosCargados = maxOf(0L, posicionDescargada - posicionActual)
+
+                // 2. DETECCIÓN DINÁMICA DEL OBJETIVO:
+                // Si la posición actual es muy cercana a 0 (está iniciando la película por primera vez),
+                // el LoadControl exige 3,000 ms para arrancar.
+                // Si ya pasó el inicio (posición > 1 segundo), exige 4,500 ms para reanudar.
+                val objetivoDespegueMs = if (posicionActual <= 1000L) {
+                    3000.0 // Objetivo inicial de tu LoadControl (3s)
+                } else {
+                    4500.0 // Objetivo de re-búfer de tu LoadControl (4.5s)
+                }
+
+                val progresoReal = ((milisegundosCargados / objetivoDespegueMs) * 100).toInt()
+
+                // 3. Lógica de movimiento continuo (gateo)
+                if (progresoReal > progresoSimulado) {
+                    // Si el búfer real avanza, el contador sube moderadamente para alcanzarlo
+                    progresoSimulado += 2
+                    gateoTicks = 0
+                } else {
+                    // Si el búfer se estanca esperando la red, gatea lentamente
+                    if (progresoSimulado < 99) {
+                        gateoTicks++
+                        if (gateoTicks >= 3) {
+                            progresoSimulado += 1
+                            gateoTicks = 0
+                        }
+                    }
+                }
+
+                // Límites de seguridad
+                if (progresoSimulado > 99) progresoSimulado = 99
+                if (progresoSimulado < 0) progresoSimulado = 0
+
+                val txtBuffer = loadingIndicator.findViewById<TextView>(R.id.loadingBufferText)
+                if (txtBuffer != null) {
+                    txtBuffer.text = "Optimizando conexión... $progresoSimulado%"
+                }
+
+                handler.postDelayed(this, 150)
+            }
+        }
+    }
 //    @OptIn(UnstableApi::class)
 //    private fun prepararReproductor(posicionInicial: Long) {
 //        // 1. Limpieza
@@ -621,7 +744,6 @@ class PlayerPeliculas : AppCompatActivity() {
 //        if (posicionInicial > 0) player?.seekTo(posicionInicial)
 //        player?.playWhenReady = true
 //    }
-
 
 
     private fun obtenerProgresoGuardado(): Long {
@@ -699,7 +821,7 @@ class PlayerPeliculas : AppCompatActivity() {
             val focusSelector = R.drawable.focus_selector
 
             listOf(btnReiniciar, btnReanudar).forEach { button ->
-                button.setTextColor(Color.WHITE)
+                button.setTextColor(Color.RED)
                 button.textSize = 18f
                 button.setBackgroundResource(focusSelector)
                 button.isFocusable = true
@@ -781,7 +903,8 @@ class PlayerPeliculas : AppCompatActivity() {
 
             when (playbackState) {
                 Player.STATE_BUFFERING -> {
-                    mostrarBuffer()
+                    mostrarCargando(true)
+//                    mostrarBuffer()
                     if (currentPosition > 0) {
                         ultimaPosicionValida = currentPosition
 
@@ -789,6 +912,7 @@ class PlayerPeliculas : AppCompatActivity() {
                 }
 
                 Player.STATE_READY -> {
+                    mostrarCargando(false)
                     isPlaybackActive = true
                     playbackStartTime.set(System.currentTimeMillis())
                     reconnectionAttempts = 0
@@ -813,6 +937,7 @@ class PlayerPeliculas : AppCompatActivity() {
 
                 Player.STATE_ENDED -> {
                     borrarProgresoGuardado()
+                    mostrarCargando(false)
                     isPlaybackActive = false
 //                    showErrorDialog(movieTitle, movieCastv, userId)
 
@@ -875,17 +1000,6 @@ class PlayerPeliculas : AppCompatActivity() {
                 error.errorCode == PlaybackException.ERROR_CODE_REMOTE_ERROR // Y otros errores recuperables
     }
 
-    // Método para mostrar el estado del búfer
-    private fun mostrarBuffer() {
-        val bufferedPercentage = player?.bufferedPercentage ?: 0
-        val bufferedData = (bufferedPercentage / 100.0) * (2 * 1024) // 2MB de targetBufferBytes
-        Toast.makeText(
-            this,
-            "Búfer almacenado: ${bufferedData.toInt()} KB", // Muestra el tamaño del búfer
-            Toast.LENGTH_SHORT
-        ).show()
-    }
-
     // Método para intentar reconectar
     private fun intentarReconexion() {
         if (isReconnecting) {
@@ -919,14 +1033,20 @@ class PlayerPeliculas : AppCompatActivity() {
         isReconnecting = true // Indica que se está reconectando
 
         // Calcula el tiempo de espera para reconectar
-        val waitTime = (2.0).pow(reconnectionAttempts).toLong() * 1000 // Espera un tiempo exponencial
+        val waitTime =
+            (2.0).pow(reconnectionAttempts).toLong() * 1000 // Espera un tiempo exponencial
 
         // Inicia una corutina para manejar la reconexión
         CoroutineScope(Dispatchers.Main).launch {
             delay(waitTime) // Espera el tiempo calculado
             // Intenta reiniciar la reproducción solo si streamUrl no es nulo
             streamUrl.let { url ->
-                startMoviePlayback(url, movieTitle, movieCastv, movieImageUrl) // Llama al método de inicio
+                startMoviePlayback(
+                    url,
+                    movieTitle,
+                    movieCastv,
+                    movieImageUrl
+                ) // Llama al método de inicio
                 isReconnecting = false // Indica que no se está reconectando
             }
         }
@@ -934,11 +1054,13 @@ class PlayerPeliculas : AppCompatActivity() {
 
     // Método para verificar si hay conexión a Internet
     private fun isNetworkConnected(): Boolean {
-        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val connectivityManager =
+            getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val networkInfo = connectivityManager.activeNetworkInfo
         return networkInfo?.isConnected == true // Devuelve true si hay conexión
     }
-//
+
+    //
 //    @SuppressLint("SetTextI18n")
 //    private fun showErrorDialog(movieTitle: String, movieCastv: Int, correoUsuario: String) {
 //        val dialogView = layoutInflater.inflate(R.layout.player_alerdialogo, null)
@@ -1227,7 +1349,7 @@ class PlayerPeliculas : AppCompatActivity() {
 //    }
     override fun onResume() {
         super.onResume()
-            // Verificar si el player está en reproducción para actualizar el UI
+        // Verificar si el player está en reproducción para actualizar el UI
         if (player?.isPlaying == true) {
             handler.postDelayed(runnableActualizar, 1000)
         }
@@ -1414,7 +1536,6 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
 
-
     private fun togglePlayPause() {
         val player = binding.reproductor.player
         val playPauseButton = findViewById<ImageButton>(R.id.play_pause)
@@ -1452,39 +1573,55 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
     private fun actualizarTiempo() {
-        if (player != null && player!!.isPlaying) {
-            MainScope().launch {
-                val tiemporeproducido = binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido)
-                val tiempototal = binding.reproductor.findViewById<TextView>(R.id.tiempototal)
-                val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
+        val activePlayer = player
+        if (activePlayer != null) {
+            val estado = activePlayer.playbackState
 
-                val posicionActual = player?.currentPosition ?: 0
-                val duracionTotal = player?.duration ?: 0
-                val tiempoRestante = duracionTotal - posicionActual
+            // El ciclo continuará ejecutándose siempre y cuando el reproductor esté activo (reproduciendo o pausado)
+            if (estado != Player.STATE_IDLE && estado != Player.STATE_ENDED) {
+                MainScope().launch {
+                    val tiemporeproducido = binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido)
+                    val tiempototal = binding.reproductor.findViewById<TextView>(R.id.tiempototal)
+                    val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
 
-                // Mostrar tiempo reproducido
-                tiemporeproducido.text = tiempoFormateado(posicionActual)
+                    val posicionActual = activePlayer.currentPosition
+                    val duracionTotal = activePlayer.duration
+                    val tiempoRestante = duracionTotal - posicionActual
 
-                // Mostrar tiempo restante (hacia atrás)
-                if (tiempoRestante > 0) {
-                    val h = TimeUnit.MILLISECONDS.toHours(tiempoRestante)
-                    val m = TimeUnit.MILLISECONDS.toMinutes(tiempoRestante) % 60
-                    val s = TimeUnit.MILLISECONDS.toSeconds(tiempoRestante) % 60
-                    tiempototal.text = String.format("%02d:%02d:%02d", h, m, s)
-                } else {
-                    tiempototal.text = "Finalizado"
-                }
+                    // Mostrar tiempo reproducido
+                    tiemporeproducido.text = tiempoFormateado(posicionActual)
 
-                // Avance del SeekBar
-                if (duracionTotal > 0) {
-                    val progress = (posicionActual.toFloat() / duracionTotal * 100).toInt()
-                    seekBar.progress = progress
+                    // Mostrar tiempo restante (hacia atrás)
+                    if (tiempoRestante > 0) {
+                        val h = TimeUnit.MILLISECONDS.toHours(tiempoRestante)
+                        val m = TimeUnit.MILLISECONDS.toMinutes(tiempoRestante) % 60
+                        val s = TimeUnit.MILLISECONDS.toSeconds(tiempoRestante) % 60
+                        tiempototal.text = String.format("%02d:%02d:%02d", h, m, s)
+                    } else {
+                        tiempototal.text = "Finalizado"
+                    }
+
+                    // Avance del SeekBar y del Búfer
+                    if (duracionTotal > 0) {
+                        val progress = (posicionActual.toFloat() / duracionTotal * 100).toInt()
+                        seekBar.progress = progress
+
+                        // ========================================================
+                        // ACTUALIZACIÓN EN TIEMPO REAL:
+                        // Crecerá en pantalla de forma fluida incluso estando en PAUSA
+                        // ========================================================
+                        val porcentajeBuffer = activePlayer.bufferedPercentage
+                        seekBar.secondaryProgress = porcentajeBuffer
+                        // ========================================================
+                    }
+
+                    // Volvemos a programar la actualización en 1 segundo (esté o no en pausa)
+                    handler.removeCallbacks(runnableActualizar)
                     handler.postDelayed(runnableActualizar, updateInterval)
                 }
             }
         }
     }
-
 
     private fun tiempoFormateado(tiempoMs: Long): String {
         return DateUtils.formatElapsedTime(tiempoMs / 1000)
