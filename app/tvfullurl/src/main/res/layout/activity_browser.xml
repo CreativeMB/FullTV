@@ -4,30 +4,92 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!-- BARRA SUPERIOR -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="8dp">
+        android:padding="5dp"
+        android:background="#EEEEEE">
 
         <EditText
             android:id="@+id/etUrl"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="https://www.google.com"
-            android:inputType="textUri" />
+            android:hint="URL..."
+            android:inputType="textUri"
+            android:textSize="14sp"
+            android:padding="10dp" />
 
         <Button
             android:id="@+id/btnGo"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Ir" />
+            android:text="IR"
+            android:minWidth="50dp" />
+
+        <Button
+            android:id="@+id/btnSaveFav"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⭐"
+            android:minWidth="50dp" />
     </LinearLayout>
 
+    <!-- WEBVIEW -->
     <WebView
         android:id="@+id/webView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
+    <!-- BARRA INFERIOR CON BOTÓN CASA -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="5dp"
+        android:background="#DDDDDD"
+        android:gravity="center">
+
+        <Button
+            android:id="@+id/btnBack"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="⇽" />
+
+        <Button
+            android:id="@+id/btnRefresh"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="↻" />
+
+        <Button
+            android:id="@+id/btnForward"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="⇾" />
+
+        <Button
+            android:id="@+id/btnListFav"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.2"
+            android:text="FAVS" />
+
+        <!-- BOTÓN CASA PARA VOLVER -->
+        <Button
+            android:id="@+id/btnHome"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.2"
+            android:text="CASA"
+            android:backgroundTint="#FF5722"
+            android:textColor="#FFFFFF" />
+
+    </LinearLayout>
 </LinearLayout>
