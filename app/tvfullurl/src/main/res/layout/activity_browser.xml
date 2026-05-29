@@ -1,95 +1,134 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#121214"
     android:orientation="vertical">
 
-    <!-- BARRA SUPERIOR -->
+    <!-- BARRA SUPERIOR (Pizarra Oscuro) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="5dp"
-        android:background="#EEEEEE">
+        android:padding="8dp"
+        android:background="#1A1A24"
+        android:gravity="center_vertical">
 
         <EditText
             android:id="@+id/etUrl"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="URL..."
+            android:layout_marginEnd="6dp"
+            android:hint="Buscar o escribir dirección web..."
+            android:textColorHint="#757585"
+            android:textColor="#E0E0E0"
             android:inputType="textUri"
             android:textSize="14sp"
-            android:padding="10dp" />
+            android:padding="12dp"
+            android:background="@android:color/transparent"/>
 
         <Button
             android:id="@+id/btnGo"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="IR"
-            android:minWidth="50dp" />
+            android:layout_marginEnd="6dp"
+            android:text="🚀"
+            android:textSize="28sp"
+            android:padding="0dp"
+            android:minWidth="48dp"
+            android:minHeight="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless" />
 
         <Button
             android:id="@+id/btnSaveFav"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="⭐"
-            android:minWidth="50dp" />
+            android:textSize="28sp"
+            android:padding="0dp"
+            android:minWidth="48dp"
+            android:minHeight="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless" />
     </LinearLayout>
 
-    <!-- WEBVIEW -->
+    <!-- PESTAÑA DEL WEBVIEW (Navegación limpia) -->
     <WebView
         android:id="@+id/webView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:background="#121214" />
 
-    <!-- BARRA INFERIOR CON BOTÓN CASA -->
+    <!-- BARRA INFERIOR DE CONTROLES (Estilo Cine - Solo Emojis) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="5dp"
-        android:background="#DDDDDD"
-        android:gravity="center">
+        android:padding="8dp"
+        android:background="#1A1A24"
+        android:gravity="center_vertical">
 
         <Button
             android:id="@+id/btnBack"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="⇽" />
+            android:layout_margin="3dp"
+            android:text="◀️"
+            android:textSize="26sp"
+            android:padding="0dp"
+            android:minHeight="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless" />
 
         <Button
             android:id="@+id/btnRefresh"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="↻" />
+            android:layout_margin="3dp"
+            android:text="🔄"
+            android:textSize="26sp"
+            android:padding="0dp"
+            android:minHeight="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless" />
 
         <Button
             android:id="@+id/btnForward"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="⇾" />
+            android:layout_margin="3dp"
+            android:text="▶️"
+            android:textSize="26sp"
+            android:padding="0dp"
+            android:minHeight="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless" />
 
         <Button
             android:id="@+id/btnListFav"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1.2"
-            android:text="FAVS" />
+            android:layout_margin="3dp"
+            android:text="📁"
+            android:textSize="26sp"
+            android:padding="0dp"
+            android:minHeight="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless" />
 
-        <!-- BOTÓN CASA PARA VOLVER -->
         <Button
             android:id="@+id/btnHome"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1.2"
-            android:text="CASA"
-            android:backgroundTint="#FF5722"
-            android:textColor="#FFFFFF" />
+            android:layout_margin="3dp"
+            android:text="🏠"
+            android:textSize="26sp"
+            android:padding="0dp"
+            android:minHeight="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless" />
 
     </LinearLayout>
 </LinearLayout>

@@ -385,7 +385,7 @@ class BrowserActivity : AppCompatActivity() {
         }
     }
 
-    // Ventana de capturas integrada: Sin título, video centrado en fondo negro y controles manuales
+    // Ventana de capturas integrada: Sin título, video redondeado en CardView negro, controles estilizados y lista en modo oscuro premium (Sin usar XML)
     private fun showCapturedLinksDialog() {
         if (isFinishing || isDestroyed) return
 
@@ -400,68 +400,107 @@ class BrowserActivity : AppCompatActivity() {
 
         val builder = AlertDialog.Builder(this)
 
-        // DISEÑO PERSONALIZADO PRINCIPAL (Vertical)
-        val container = LinearLayout(this)
-        container.orientation = LinearLayout.VERTICAL
-        container.setPadding(20, 20, 20, 20)
+        // DISEÑO PERSONALIZADO PRINCIPAL (Vertical con fondo pizarra oscuro y esquinas curvas)
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(30, 30, 30, 30)
+            val dialogBg = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.parseColor("#1A1A24")) // Fondo pizarra oscuro premium
+                cornerRadius = 24f // Bordes redondeados de la tarjeta principal
+            }
+            background = dialogBg
+        }
 
-        // 1. CONTENEDOR NEGRO PARA CENTRAR EL VIDEO
-        val videoContainer = FrameLayout(this)
-        videoContainer.setBackgroundColor(Color.BLACK) // Fondo oscuro de cine
-        val containerParams = LinearLayout.LayoutParams(
+        // 1. REPRODUCTOR DE VIDEO ENVUELTO EN UN CARDVIEW REDONDEADO CON SOMBRA
+        val videoCard = androidx.cardview.widget.CardView(this).apply {
+            radius = 16f // Bordes curvos del video
+            cardElevation = 8f // Efecto de elevación/sombra flotante
+            setCardBackgroundColor(Color.BLACK)
+            preventCornerOverlap = true
+        }
+        val cardParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            380 // Altura del bloque del reproductor
-        )
-        videoContainer.layoutParams = containerParams
+            380
+        ).apply {
+            setMargins(0, 0, 0, 20)
+        }
+        videoCard.layoutParams = cardParams
 
-        // REPRODUCTOR DE VIDEO (Centrado internamente en el contenedor negro)
+        // Instancia del reproductor de video centrado
         val videoView = VideoView(this)
         val videoParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
-        )
-        videoParams.gravity = Gravity.CENTER // Centrado absoluto (horizontal y vertical)
+        ).apply {
+            gravity = Gravity.CENTER
+        }
         videoView.layoutParams = videoParams
 
-        videoContainer.addView(videoView) // Añadir video a su caja negra
-        container.addView(videoContainer) // Añadir caja negra al diseño principal
+        videoCard.addView(videoView) // Añadir reproductor dentro de la tarjeta curva
+        container.addView(videoCard) // Añadir tarjeta curva al contenedor principal
 
-        // 2. PANEL DE CONTROL FIJO (Botón Play/Pausa + Barra de progreso)
-        val controlLayout = LinearLayout(this)
-        controlLayout.orientation = LinearLayout.HORIZONTAL
-        controlLayout.setPadding(0, 15, 0, 15)
-        controlLayout.gravity = Gravity.CENTER_VERTICAL
+        // 2. PANEL DE CONTROL FIJO (Estilizado en Azul Premium)
+        val controlLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 15, 0, 15)
+            gravity = Gravity.CENTER_VERTICAL
+        }
 
-        val btnPlayPause = Button(this)
-        btnPlayPause.text = "⏸"
-        val btnParams = LinearLayout.LayoutParams(
-            120,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        )
-        btnPlayPause.layoutParams = btnParams
+        // Botón de Play/Pausa redondo de color Azul Eléctrico
+        val btnPlayPause = Button(this).apply {
+            text = "⏸"
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            val btnShape = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.parseColor("#2979FF")) // Color azul eléctrico
+                cornerRadius = 14f // Botón con curvas elegantes
+            }
+            background = btnShape
+            layoutParams = LinearLayout.LayoutParams(
+                100, // Ancho cuadrado
+                100  // Alto cuadrado
+            ).apply {
+                setMargins(0, 0, 16, 0)
+            }
+        }
         controlLayout.addView(btnPlayPause)
 
-        val seekBar = SeekBar(this)
-        val seekParams = LinearLayout.LayoutParams(
-            0,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            1.0f
-        )
-        seekBar.layoutParams = seekParams
+        // Barra de progreso teñida para coincidir con la paleta de colores azul
+        val seekBar = SeekBar(this).apply {
+            progressTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#2979FF"))
+            thumbTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#2979FF"))
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1.0f
+            )
+        }
         controlLayout.addView(seekBar)
 
         container.addView(controlLayout)
 
-        // 3. LISTA DE ENLACES
-        val listView = ListView(this)
-        val listParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        )
-        listView.layoutParams = listParams
+        // 3. LISTA DE ENLACES EN MODO OSCURO ADAPTATIVO
+        val listView = ListView(this).apply {
+            divider = android.graphics.drawable.ColorDrawable(Color.parseColor("#2C2C3C")) // Línea de división pizarra
+            dividerHeight = 2
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
         container.addView(listView)
 
-        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, displayItems)
+        // Adaptador con sobrescritura programática de color y espaciado de texto
+        val adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, displayItems) {
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                val view = super.getView(position, convertView, parent)
+                val textView = view.findViewById<TextView>(android.R.id.text1)
+                textView.setTextColor(Color.parseColor("#E0E0E0")) // Color blanco grisáceo de lectura suave
+                textView.textSize = 14f
+                textView.setPadding(12, 16, 12, 16)
+                return view
+            }
+        }
         listView.adapter = adapter
 
         // Hilo de actualización en tiempo real de la barra de progreso
@@ -490,7 +529,15 @@ class BrowserActivity : AppCompatActivity() {
         builder.setNegativeButton("Ir a Casa", null)
 
         captureDialog = builder.create()
+
+        // Habilitar transparencia de ventana para permitir esquinas redondeadas perfectas
+        captureDialog?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
         captureDialog?.show()
+
+        // Estilizar los botones nativos del diálogo para coincidir con la interfaz oscura
+        captureDialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.parseColor("#2979FF")) // Azul
+        captureDialog?.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#90A4AE")) // Gris
+        captureDialog?.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(Color.parseColor("#FF5252"))  // Rojo Alerta
 
         // ACCIONES DE LA BARRA DE DESPLAZAMIENTO (Control manual de tiempo)
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -518,7 +565,6 @@ class BrowserActivity : AppCompatActivity() {
         listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             val selectedUrl = linksArray[position]
 
-            // INTRODUCCIÓN DE LA SOLUCIÓN DEL COPY DE CASTEO (Con User-Agent y Referer inyectados)
             val referer = webView.url ?: ""
             val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
 
@@ -539,7 +585,6 @@ class BrowserActivity : AppCompatActivity() {
             val progressToast = Toast.makeText(this, "Probando enlace...", Toast.LENGTH_SHORT)
             progressToast.show()
 
-            // Inyectamos las mismas cabeceras locales en la prueba para asegurar la reproducción local
             val headers = HashMap<String, String>()
             headers["User-Agent"] = userAgent
             if (referer.isNotEmpty()) {
@@ -611,7 +656,6 @@ class BrowserActivity : AppCompatActivity() {
             goHomeWithoutFinishing()
         }
     }
-
     private fun getFavoritesList(): Set<String> {
         return sharedPreferences.getStringSet("fav_urls", emptySet()) ?: emptySet()
     }
@@ -634,6 +678,7 @@ class BrowserActivity : AppCompatActivity() {
         }
     }
 
+    // 4. MOSTRAR DIÁLOGO (Mejorado con estilo Dark Cinema Premium)
     private fun showFavoritesDialog() {
         val favs = getFavoritesList().toList()
 
@@ -643,24 +688,74 @@ class BrowserActivity : AppCompatActivity() {
         }
 
         val builder = AlertDialog.Builder(this)
-        builder.setTitle("Mis Favoritos")
 
-        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, favs)
-        builder.setAdapter(adapter, null)
+        // DISEÑO PERSONALIZADO PRINCIPAL (Vertical con fondo pizarra oscuro)
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(30, 30, 30, 30)
+            val dialogBg = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.parseColor("#1A1A24")) // Fondo pizarra oscuro
+                cornerRadius = 24f // Esquinas redondeadas
+            }
+            background = dialogBg
+        }
+
+        // Encabezado personalizado para el diálogo
+        val headerTv = TextView(this).apply {
+            text = "⭐ Mis Favoritos"
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setPadding(0, 10, 0, 20)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        container.addView(headerTv)
+
+        // Lista de favoritos adaptativa
+        val listView = ListView(this).apply {
+            divider = android.graphics.drawable.ColorDrawable(Color.parseColor("#2C2C3C")) // Línea de división pizarra
+            dividerHeight = 2
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        container.addView(listView)
+
+        // Adaptador con sobrescritura de color y padding para modo oscuro
+        val adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, favs) {
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                val view = super.getView(position, convertView, parent)
+                val textView = view.findViewById<TextView>(android.R.id.text1)
+                textView.setTextColor(Color.parseColor("#E0E0E0")) // Texto claro de lectura suave
+                textView.textSize = 14f
+                textView.setPadding(12, 16, 12, 16)
+                return view
+            }
+        }
+        listView.adapter = adapter
+
+        builder.setView(container)
         builder.setNegativeButton("Cerrar", null)
 
         val dialog = builder.create()
+
+        // Habilitar transparencia de ventana para permitir esquinas redondeadas perfectas
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
         dialog.show()
 
-        val listView = dialog.listView
+        // Estilizar el botón de cerrar nativo del diálogo
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#90A4AE"))
 
-        listView?.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
+        // ACCIÓN UN TOQUE: Carga el enlace en el navegador y cierra el diálogo
+        listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             val selectedUrl = favs[position]
             webView.loadUrl(selectedUrl)
             dialog.dismiss()
         }
 
-        listView?.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
+        // ACCIÓN TOQUE SOSTENIDO: Menú para eliminar favorito
+        listView.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
             val selectedUrl = favs[position]
 
             AlertDialog.Builder(this)
@@ -669,7 +764,7 @@ class BrowserActivity : AppCompatActivity() {
                 .setPositiveButton("Eliminar") { _, _ ->
                     removeFavorite(selectedUrl)
                     dialog.dismiss()
-                    showFavoritesDialog()
+                    showFavoritesDialog() // Refresca el diálogo con los favoritos restantes
                 }
                 .setNegativeButton("Cancelar", null)
                 .show()
@@ -678,65 +773,6 @@ class BrowserActivity : AppCompatActivity() {
         }
     }
 
-    private fun testVideoPlayback(url: String) {
-        if (isFinishing || isDestroyed) return
-
-        val builder = AlertDialog.Builder(this)
-        builder.setTitle("Probando enlace de video...")
-
-        // Contenedor visual para el reproductor
-        val frameLayout = FrameLayout(this)
-        val videoView = VideoView(this)
-
-        // Asignar un tamaño de previsualización controlado
-        val layoutParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            500 // Altura de la ventana de prueba
-        )
-        layoutParams.gravity = Gravity.CENTER
-        videoView.layoutParams = layoutParams
-
-        frameLayout.addView(videoView)
-        builder.setView(frameLayout)
-
-        builder.setNegativeButton("Cerrar Prueba") { _, _ ->
-            videoView.stopPlayback()
-        }
-
-        val previewDialog = builder.create()
-        previewDialog.show()
-
-        val progressToast = Toast.makeText(this, "Cargando video de prueba...", Toast.LENGTH_SHORT)
-        progressToast.show()
-
-        // Agregar barra de controles de reproducción (Play/Pausa/Progreso)
-        val mediaController = MediaController(this)
-        mediaController.setAnchorView(videoView)
-        videoView.setMediaController(mediaController)
-
-        // Blindaje de cabecera: Enviamos el mismo User-Agent para que el servidor no bloquee la conexión de prueba
-        val headers = HashMap<String, String>()
-        headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
-
-        try {
-            videoView.setVideoURI(Uri.parse(url), headers)
-        } catch (e: Exception) {
-            progressToast.cancel()
-            Toast.makeText(this, "No se pudo iniciar el reproductor", Toast.LENGTH_SHORT).show()
-        }
-
-        videoView.setOnPreparedListener { mediaPlayer ->
-            progressToast.cancel()
-            Toast.makeText(this, "▶️ Enlace funcionando", Toast.LENGTH_SHORT).show()
-            mediaPlayer.start()
-        }
-
-        videoView.setOnErrorListener { _, _, _ ->
-            progressToast.cancel()
-            Toast.makeText(this, "❌ Error de carga: El enlace puede estar caído o protegido.", Toast.LENGTH_LONG).show()
-            true
-        }
-    }
 
     override fun onBackPressed() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
