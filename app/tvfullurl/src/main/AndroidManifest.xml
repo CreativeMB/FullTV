@@ -17,6 +17,7 @@
 
         <activity
             android:name=".BrowserActivity"
+            android:launchMode="singleTask"
             android:exported="true"/>
 
         <activity

@@ -495,7 +495,6 @@ class PlayerPeliculas : AppCompatActivity() {
             }
         }
     }
-
     @OptIn(UnstableApi::class)
     private fun prepararReproductor(posicionInicial: Long) {
         try {
@@ -506,11 +505,13 @@ class PlayerPeliculas : AppCompatActivity() {
             player?.release()
             player = null
 
-            // 2. CONFIGURACIÓN DE RED PARA TV
+            // 2. CONFIGURACIÓN DE RED PARA TV (Blindado con User-Agent sincronizado)
             val dataSourceFactory = DefaultHttpDataSource.Factory()
-                .setUserAgent("Mozilla/5.0 (Linux; Android 10; BRAVIA 4K Build/QTG3.200305.006.A1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                // Usamos el mismo User-Agent de escritorio del navegador para pasar la validación del Token del servidor
+                .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
                 .setDefaultRequestProperties(mapOf(
-                    "Connection" to "close",
+                    "Connection" to "keep-alive",
+                    "Accept" to "*/*",
                     "ngrok-skip-browser-warning" to "true"
                 ))
                 .setConnectTimeoutMs(30_000)
@@ -525,19 +526,21 @@ class PlayerPeliculas : AppCompatActivity() {
             // 4. FACTORÍA DE MEDIA
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
-            // 5. LOAD CONTROL ESTILO "YOUTUBE" (Búfer ultra-agresivo de precarga)
+            // 5. LOAD CONTROL OPTIMIZADO (Evita desbordamiento de memoria - OOM en TV)
             val loadControl = DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
-                    30_000,   // Mínimo buffer antes de evaluar pausar la descarga (7.5s)
-                    300_000, // Máximo buffer: Almacena hasta 2 MINUTOS de video por adelantado (Estilo YouTube)
-                    3_000,   // Buffer necesario para el arranque inicial rápido (3s)
-                    4_500    // Buffer necesario para reanudar tras una pausa (4.5s)
+                    30_000,   // Mínimo buffer inicial (30s)
+                    300_000,  // Máximo buffer acumulado (5 min - Estilo YouTube)
+                    3_000,    // Buffer rápido de arranque (3s)
+                    4_500     // Buffer de reanudación (4.5s)
                 )
-                .setTargetBufferBytes(128 * 1024 * 1024) // Aumentamos la memoria a 128MB para aguantar los 2 min de búfer en HD/4K
-                .setPrioritizeTimeOverSizeThresholds(true) // Prioriza siempre acumular tiempo de reproducción (segundos) sobre bytes
+                // Usamos C.LENGTH_UNSET para que ExoPlayer maneje la memoria de forma inteligente
+                // y no sature la memoria RAM física en TV Boxes de bajos recursos
+                .setTargetBufferBytes(androidx.media3.common.C.LENGTH_UNSET)
+                .setPrioritizeTimeOverSizeThresholds(true)
                 .build()
 
-            // 6. CREAR EL REPRODUCTOR CON BACK-BUFFER (Corregido para Media3)
+            // 6. CREAR EL REPRODUCTOR
             player = ExoPlayer.Builder(this@PlayerPeliculas, renderersFactory)
                 .setMediaSourceFactory(mediaSourceFactory)
                 .setLoadControl(loadControl)
@@ -545,15 +548,24 @@ class PlayerPeliculas : AppCompatActivity() {
 
             binding.reproductor.player = player
 
-            // 7. PROCESAMIENTO SEGURO DEL MEDIA ITEM
+            // 7. PROCESAMIENTO SEGURO DEL MEDIA ITEM Y FORZADO DE MIME TYPE
             val uriLimpia = streamUrl.trim()
             if (uriLimpia.isEmpty()) {
                 mostrarCargando(false)
                 return
             }
-            val mediaItem = MediaItem.Builder()
-                .setUri(Uri.parse(uriLimpia))
-                .build()
+
+            val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(uriLimpia))
+
+            // BLINDAJE: Si la URL contiene .m3u o .m3u8, le forzamos a ExoPlayer el decodificador HLS
+            // evitando que se confunda con los parámetros dinámicos de la URL (?t=...&s=...)
+            if (uriLimpia.lowercase().contains(".m3u8") || uriLimpia.lowercase().contains(".m3u")) {
+                mediaItemBuilder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
+            } else if (uriLimpia.lowercase().contains(".mp4")) {
+                mediaItemBuilder.setMimeType(androidx.media3.common.MimeTypes.VIDEO_MP4)
+            }
+
+            val mediaItem = mediaItemBuilder.build()
 
             // 8. ASIGNACIÓN DE LISTENERS
             player?.addListener(object : Player.Listener {
@@ -604,6 +616,114 @@ class PlayerPeliculas : AppCompatActivity() {
             mostrarCargando(false)
         }
     }
+//    @OptIn(UnstableApi::class)
+//    private fun prepararReproductor(posicionInicial: Long) {
+//        try {
+//            // 1. LIMPIEZA DE HARDWARE
+//            binding.reproductor.player = null
+//            player?.stop()
+//            player?.clearMediaItems()
+//            player?.release()
+//            player = null
+//
+//            // 2. CONFIGURACIÓN DE RED PARA TV
+//            val dataSourceFactory = DefaultHttpDataSource.Factory()
+//                .setUserAgent("Mozilla/5.0 (Linux; Android 10; BRAVIA 4K Build/QTG3.200305.006.A1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+//                .setDefaultRequestProperties(mapOf(
+//                    "Connection" to "close",
+//                    "ngrok-skip-browser-warning" to "true"
+//                ))
+//                .setConnectTimeoutMs(30_000)
+//                .setReadTimeoutMs(30_000)
+//                .setAllowCrossProtocolRedirects(true)
+//
+//            // 3. RENDERIZADORES PARA TV
+//            val renderersFactory = DefaultRenderersFactory(this@PlayerPeliculas)
+//                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+//                .setEnableDecoderFallback(true)
+//
+//            // 4. FACTORÍA DE MEDIA
+//            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+//
+//            // 5. LOAD CONTROL ESTILO "YOUTUBE" (Búfer ultra-agresivo de precarga)
+//            val loadControl = DefaultLoadControl.Builder()
+//                .setBufferDurationsMs(
+//                    30_000,   // Mínimo buffer antes de evaluar pausar la descarga (7.5s)
+//                    300_000, // Máximo buffer: Almacena hasta 2 MINUTOS de video por adelantado (Estilo YouTube)
+//                    3_000,   // Buffer necesario para el arranque inicial rápido (3s)
+//                    4_500    // Buffer necesario para reanudar tras una pausa (4.5s)
+//                )
+//                .setTargetBufferBytes(128 * 1024 * 1024) // Aumentamos la memoria a 128MB para aguantar los 2 min de búfer en HD/4K
+//                .setPrioritizeTimeOverSizeThresholds(true) // Prioriza siempre acumular tiempo de reproducción (segundos) sobre bytes
+//                .build()
+//
+//            // 6. CREAR EL REPRODUCTOR CON BACK-BUFFER (Corregido para Media3)
+//            player = ExoPlayer.Builder(this@PlayerPeliculas, renderersFactory)
+//                .setMediaSourceFactory(mediaSourceFactory)
+//                .setLoadControl(loadControl)
+//                .build()
+//
+//            binding.reproductor.player = player
+//
+//            // 7. PROCESAMIENTO SEGURO DEL MEDIA ITEM
+//            val uriLimpia = streamUrl.trim()
+//            if (uriLimpia.isEmpty()) {
+//                mostrarCargando(false)
+//                return
+//            }
+//            val mediaItem = MediaItem.Builder()
+//                .setUri(Uri.parse(uriLimpia))
+//                .build()
+//
+//            // 8. ASIGNACIÓN DE LISTENERS
+//            player?.addListener(object : Player.Listener {
+//                override fun onPlayerError(error: PlaybackException) {
+//                    Log.e("TV_ERROR", "Error detectado en reproducción: ${error.errorCodeName}")
+//                    mostrarCargando(false)
+//
+//                    if (reconnectionAttempts < maxReconnectionAttempts) {
+//                        reconnectionAttempts++
+//                        val ultimaPosicion = player?.currentPosition ?: posicionInicial
+//
+//                        when (error.errorCode) {
+//                            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> {
+//                                prepararReproductor(ultimaPosicion)
+//                            }
+//                            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+//                            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> {
+//                                handler.postDelayed({
+//                                    prepararReproductor(ultimaPosicion)
+//                                }, 3000)
+//                            }
+//                            else -> {
+//                                handler.postDelayed({
+//                                    prepararReproductor(ultimaPosicion)
+//                                }, 3000)
+//                            }
+//                        }
+//                    } else {
+//                        reconnectionAttempts = 0
+//                    }
+//                }
+//            })
+//
+//            player?.addListener(playerListener)
+//
+//            // 9. INICIALIZACIÓN
+//            player?.setMediaItem(mediaItem)
+//
+//            if (posicionInicial > 0) {
+//                player?.seekTo(posicionInicial)
+//            }
+//
+//            player?.playWhenReady = true
+//            player?.prepare()
+//
+//        } catch (e: Exception) {
+//            Log.e("TV_ERROR", "Error crítico en la inicialización: ${e.message}")
+//            mostrarCargando(false)
+//        }
+//    }
 
     // Función para activar/desactivar la animación de pulso_premium
     @SuppressLint("ResourceType")
@@ -1598,7 +1718,7 @@ class PlayerPeliculas : AppCompatActivity() {
                         val s = TimeUnit.MILLISECONDS.toSeconds(tiempoRestante) % 60
                         tiempototal.text = String.format("%02d:%02d:%02d", h, m, s)
                     } else {
-                        tiempototal.text = "Finalizado"
+                        tiempototal.text = ""
                     }
 
                     // Avance del SeekBar y del Búfer
