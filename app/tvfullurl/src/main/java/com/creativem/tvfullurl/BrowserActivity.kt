@@ -386,6 +386,7 @@ class BrowserActivity : AppCompatActivity() {
     }
 
     // Ventana de capturas integrada: Sin título, video redondeado en CardView negro, controles estilizados y lista en modo oscuro premium (Sin usar XML)
+    // Ventana de capturas integrada: Diseño visual unificado sin franjas transparentes
     private fun showCapturedLinksDialog() {
         if (isFinishing || isDestroyed) return
 
@@ -403,7 +404,7 @@ class BrowserActivity : AppCompatActivity() {
         // DISEÑO PERSONALIZADO PRINCIPAL (Vertical con fondo pizarra oscuro y esquinas curvas)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(30, 30, 30, 30)
+            setPadding(30, 30, 30, 20)
             val dialogBg = android.graphics.drawable.GradientDrawable().apply {
                 setColor(Color.parseColor("#1A1A24")) // Fondo pizarra oscuro premium
                 cornerRadius = 24f // Bordes redondeados de la tarjeta principal
@@ -485,7 +486,7 @@ class BrowserActivity : AppCompatActivity() {
             dividerHeight = 2
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                350 // Altura fija para que no tape los botones inferiores
             )
         }
         container.addView(listView)
@@ -514,30 +515,60 @@ class BrowserActivity : AppCompatActivity() {
             }
         }
 
+        // 4. BOTONES DE ACCIÓN INTEGRADOS EN EL CONTENEDOR (Soluciona la franja transparente inferior)
+        val actionsLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            setPadding(0, 20, 0, 0)
+        }
+
+        val btnLimpiar = Button(this).apply {
+            text = "Limpiar Lista"
+            setTextColor(Color.parseColor("#FF5252")) // Rojo Alerta
+            background = null // Botón plano minimalista
+            setOnClickListener {
+                progressHandler.removeCallbacksAndMessages(null)
+                videoView.stopPlayback()
+                capturedLinksList.clear()
+                Toast.makeText(this@BrowserActivity, "Lista de capturas vaciada", Toast.LENGTH_SHORT).show()
+                captureDialog?.dismiss()
+            }
+        }
+
+        val btnCasa = Button(this).apply {
+            text = "Ir a Casa"
+            setTextColor(Color.parseColor("#90A4AE")) // Gris
+            background = null
+            setOnClickListener {
+                progressHandler.removeCallbacksAndMessages(null)
+                videoView.stopPlayback()
+                captureDialog?.dismiss()
+                goHomeWithoutFinishing()
+            }
+        }
+
+        val btnCerrar = Button(this).apply {
+            text = "Cerrar"
+            setTextColor(Color.parseColor("#2979FF")) // Azul Premium
+            background = null
+            setOnClickListener {
+                progressHandler.removeCallbacksAndMessages(null)
+                videoView.stopPlayback()
+                captureDialog?.dismiss()
+            }
+        }
+
+        actionsLayout.addView(btnLimpiar)
+        actionsLayout.addView(btnCasa)
+        actionsLayout.addView(btnCerrar)
+        container.addView(actionsLayout)
+
         builder.setView(container)
-
-        builder.setPositiveButton("Cerrar") { _, _ ->
-            progressHandler.removeCallbacksAndMessages(null)
-            videoView.stopPlayback()
-        }
-        builder.setNeutralButton("Limpiar Lista") { _, _ ->
-            progressHandler.removeCallbacksAndMessages(null)
-            videoView.stopPlayback()
-            capturedLinksList.clear()
-            Toast.makeText(this, "Lista de capturas vaciada", Toast.LENGTH_SHORT).show()
-        }
-        builder.setNegativeButton("Ir a Casa", null)
-
         captureDialog = builder.create()
 
         // Habilitar transparencia de ventana para permitir esquinas redondeadas perfectas
         captureDialog?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
         captureDialog?.show()
-
-        // Estilizar los botones nativos del diálogo para coincidir con la interfaz oscura
-        captureDialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.parseColor("#2979FF")) // Azul
-        captureDialog?.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#90A4AE")) // Gris
-        captureDialog?.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(Color.parseColor("#FF5252"))  // Rojo Alerta
 
         // ACCIONES DE LA BARRA DE DESPLAZAMIENTO (Control manual de tiempo)
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -561,35 +592,44 @@ class BrowserActivity : AppCompatActivity() {
             }
         }
 
-        // SELECCIÓN RÁPIDA (Un click): Copia enlace e inicia reproducción de prueba arriba
+        // SELECCIÓN RÁPIDA (Un click): Copia enlace e inicia reproducción de prueba arriba con lógica híbrida
         listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             val selectedUrl = linksArray[position]
 
             val referer = webView.url ?: ""
             val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
 
-            // Generamos el enlace empaquetado para evadir el bloqueo de Referer en otros reproductores
-            val castUrl = if (referer.isNotEmpty()) {
+            val urlLower = selectedUrl.lowercase()
+            val isDirectDownload = urlLower.contains(".mp4") || urlLower.contains("acek-cdn.com")
+
+            val castUrl = if (!isDirectDownload && referer.isNotEmpty()) {
                 "$selectedUrl|User-Agent=$userAgent&Referer=$referer"
             } else {
                 selectedUrl
             }
 
-            // 1. COPIAR ENLACE AUTENTICADO
+            // 1. COPIAR ENLACE (Limpio o Autenticado según corresponda)
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip = ClipData.newPlainText("Captura", castUrl)
             clipboard.setPrimaryClip(clip)
-            Toast.makeText(this, "Copiado enlace autenticado #${position + 1}", Toast.LENGTH_SHORT).show()
 
-            // 2. REPRODUCIR EN EL VISOR SUPERIOR
+            val mensajeCopia = if (isDirectDownload) "Enlace directo copiado limpio" else "Copiado enlace con autenticación"
+            Toast.makeText(this, "$mensajeCopia #${position + 1}", Toast.LENGTH_SHORT).show()
+
+            // 2. REPRODUCIR EN EL VISOR SUPERIOR CON CABECERAS COMPLETAS
             val progressToast = Toast.makeText(this, "Probando enlace...", Toast.LENGTH_SHORT)
             progressToast.show()
 
-            val headers = HashMap<String, String>()
-            headers["User-Agent"] = userAgent
-            if (referer.isNotEmpty()) {
-                headers["Referer"] = referer
-                headers["Origin"] = Uri.parse(referer).run { "$scheme://$host" }
+            val headers = HashMap<String, String>().apply {
+                put("User-Agent", userAgent)
+                if (referer.isNotEmpty()) {
+                    put("Referer", referer)
+                    val originUri = Uri.parse(referer)
+                    put("Origin", "${originUri.scheme}://${originUri.host}")
+                }
+                put("Accept", "*/*")
+                put("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
+                put("Connection", "keep-alive")
             }
 
             try {
@@ -611,7 +651,7 @@ class BrowserActivity : AppCompatActivity() {
                 videoView.setOnErrorListener { _, _, _ ->
                     progressToast.cancel()
                     progressHandler.removeCallbacks(updateProgressTask)
-                    Toast.makeText(this, "❌ El enlace no es reproducible en este visor", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "❌ El enlace requiere reproductor externo o ha caducado", Toast.LENGTH_SHORT).show()
                     true
                 }
             } catch (e: Exception) {
@@ -630,7 +670,7 @@ class BrowserActivity : AppCompatActivity() {
                 .setMessage(selectedUrl)
                 .setPositiveButton("Eliminar") { _, _ ->
                     videoView.stopPlayback()
-                    progressHandler.removeCallbacks(updateProgressTask)
+                    progressHandler.removeCallbacksAndMessages(null)
                     seekBar.progress = 0
                     btnPlayPause.text = "⏸"
 
@@ -646,14 +686,6 @@ class BrowserActivity : AppCompatActivity() {
                 .show()
 
             true
-        }
-
-        // Acciones del botón de fondo "Ir a Casa"
-        val btnIrACasa = captureDialog?.getButton(AlertDialog.BUTTON_NEGATIVE)
-        btnIrACasa?.setOnClickListener {
-            progressHandler.removeCallbacksAndMessages(null)
-            videoView.stopPlayback()
-            goHomeWithoutFinishing()
         }
     }
     private fun getFavoritesList(): Set<String> {
@@ -679,6 +711,7 @@ class BrowserActivity : AppCompatActivity() {
     }
 
     // 4. MOSTRAR DIÁLOGO (Mejorado con estilo Dark Cinema Premium)
+    // Diálogo de favoritos con diseño unificado de una sola tarjeta oscura
     private fun showFavoritesDialog() {
         val favs = getFavoritesList().toList()
 
@@ -692,7 +725,7 @@ class BrowserActivity : AppCompatActivity() {
         // DISEÑO PERSONALIZADO PRINCIPAL (Vertical con fondo pizarra oscuro)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(30, 30, 30, 30)
+            setPadding(30, 30, 30, 20)
             val dialogBg = android.graphics.drawable.GradientDrawable().apply {
                 setColor(Color.parseColor("#1A1A24")) // Fondo pizarra oscuro
                 cornerRadius = 24f // Esquinas redondeadas
@@ -718,7 +751,9 @@ class BrowserActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            )
+            ).apply {
+                weight = 1f // Permite flexibilidad si hay muchos favoritos
+            }
         }
         container.addView(listView)
 
@@ -735,17 +770,33 @@ class BrowserActivity : AppCompatActivity() {
         }
         listView.adapter = adapter
 
-        builder.setView(container)
-        builder.setNegativeButton("Cerrar", null)
+        // BOTÓN DE ACCIÓN INTEGRADO (Soluciona la barra de botones transparente)
+        val actionsLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            setPadding(0, 20, 0, 0)
+        }
 
-        val dialog = builder.create()
+        // Declaración previa para poder referenciar el diálogo dentro del listener del botón
+        var dialog: AlertDialog? = null
+
+        val btnCerrar = Button(this).apply {
+            text = "Cerrar"
+            setTextColor(Color.parseColor("#90A4AE")) // Gris sutil
+            background = null // Botón plano sin contorno
+            setOnClickListener {
+                dialog?.dismiss()
+            }
+        }
+        actionsLayout.addView(btnCerrar)
+        container.addView(actionsLayout)
+
+        builder.setView(container)
+        dialog = builder.create()
 
         // Habilitar transparencia de ventana para permitir esquinas redondeadas perfectas
         dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
         dialog.show()
-
-        // Estilizar el botón de cerrar nativo del diálogo
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#90A4AE"))
 
         // ACCIÓN UN TOQUE: Carga el enlace en el navegador y cierra el diálogo
         listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
