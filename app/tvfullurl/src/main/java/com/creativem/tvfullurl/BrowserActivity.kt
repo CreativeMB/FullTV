@@ -3,19 +3,74 @@ package com.creativem.tvfullurl
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Color
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.view.WindowManager
 import android.webkit.*
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import java.net.URLEncoder
 import kotlin.concurrent.thread
+import android.media.MediaMetadataRetriever
+// Clase modelo para estructurar el enlace y sus parámetros de sesión
+data class CapturedLink(
+    val url: String,
+    val userAgent: String?,
+    val referer: String?,
+    val cookie: String?
+) {
+    fun getFormattedUrlForClipboard(): String {
+        val uri = try { Uri.parse(url) } catch (e: Exception) { null }
+        val host = uri?.host?.lowercase() ?: ""
+
+        val protectedHosts = arrayOf("minochinos.com", "acek-cdn.com")
+        val isProtected = protectedHosts.any { host.contains(it) }
+
+        if (isProtected) {
+            val sb = StringBuilder(url)
+            val params = mutableListOf<String>()
+            try {
+                if (!userAgent.isNullOrEmpty()) {
+                    val encodedUA = URLEncoder.encode(userAgent, "UTF-8").replace("+", "%20")
+                    params.add("User-Agent=$encodedUA")
+                }
+                if (!referer.isNullOrEmpty()) {
+                    val encodedRef = URLEncoder.encode(referer, "UTF-8").replace("+", "%20")
+                    params.add("Referer=$encodedRef")
+                }
+                if (!cookie.isNullOrEmpty()) {
+                    val encodedCookie = URLEncoder.encode(cookie, "UTF-8").replace("+", "%20")
+                    params.add("Cookie=$encodedCookie")
+                }
+            } catch (e: Exception) {
+                if (!userAgent.isNullOrEmpty()) params.add("User-Agent=$userAgent")
+                if (!referer.isNullOrEmpty()) params.add("Referer=$referer")
+            }
+            if (params.isNotEmpty()) {
+                sb.append("|").append(params.joinToString("&"))
+            }
+            return sb.toString()
+        }
+
+        return url
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is CapturedLink) return false
+        return this.url == other.url
+    }
+
+    override fun hashCode(): Int {
+        return url.hashCode()
+    }
+}
 
 class BrowserActivity : AppCompatActivity() {
 
@@ -32,15 +87,12 @@ class BrowserActivity : AppCompatActivity() {
     private var mainDomain: String = ""
     private lateinit var sharedPreferences: SharedPreferences
 
-    // Variables de control para el soporte de pantalla completa en videos web
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
 
-    // Lista para acumular los enlaces capturados sin duplicados
-    private val capturedLinksList = LinkedHashSet<String>()
+    private val capturedLinksList = LinkedHashSet<CapturedLink>()
     private var captureDialog: AlertDialog? = null
 
-    // Lista negra para blindaje contra anuncios (solo aplicada a dominios para no romper tokens)
     private val blacklistedDomains = arrayOf(
         "adsystem", "adserver", "pixel", "analytics", "telemetry", "tracker",
         "beacon", "statcounter", "doubleclick", "adsterra", "exoclick",
@@ -50,10 +102,9 @@ class BrowserActivity : AppCompatActivity() {
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // FORZAR ACELERACIÓN POR HARDWARE: Vital para que los videos web no se queden congelados
         window.setFlags(
-            android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-            android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
         )
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_browser)
@@ -74,10 +125,15 @@ class BrowserActivity : AppCompatActivity() {
         setupButtons()
     }
 
+    private fun dpToPx(dp: Int): Int {
+        return (dp * resources.displayMetrics.density).toInt()
+    }
+
+    // Se asegura de mantener la actividad viva en la pila y solo traer otra al frente
     private fun goHomeWithoutFinishing() {
         try {
-            val intent = android.content.Intent(this, MainActivity::class.java)
-            intent.flags = android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            val intent = Intent(this, MainActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             startActivity(intent)
         } catch (e: Exception) {
             moveTaskToBack(true)
@@ -110,7 +166,6 @@ class BrowserActivity : AppCompatActivity() {
         btnSaveFav.setOnClickListener {
             webView.url?.let { saveFavorite(it) }
         }
-
         btnListFav.setOnClickListener {
             showFavoritesDialog()
         }
@@ -138,6 +193,44 @@ class BrowserActivity : AppCompatActivity() {
         webView.evaluateJavascript(script, null)
     }
 
+    private fun isPotentialVideoUrl(url: String): Boolean {
+        val urlLower = url.lowercase()
+        val uri = try { Uri.parse(url) } catch (e: Exception) { null }
+        val path = uri?.path?.lowercase() ?: ""
+        val host = uri?.host?.lowercase() ?: ""
+
+        for (domain in blacklistedDomains) {
+            if (host.contains(domain)) return false
+        }
+
+        if (path.contains("subtitle") || path.contains(".vtt") || path.contains("audio-only")) {
+            return false
+        }
+
+        if (urlLower.contains(".mp4") || urlLower.contains(".m3u8") ||
+            urlLower.contains(".m3u") || urlLower.contains(".mkv") ||
+            urlLower.contains(".webm") || urlLower.contains(".mov") ||
+            urlLower.contains(".bin")) {
+            return true
+        }
+
+        if (host.contains("streamtape.com") || host.contains("dood") ||
+            host.contains("mixdrop") || host.contains("voe.sx") ||
+            host.contains("fembed") || host.contains("googlevideo.com") ||
+            host.contains("acek-cdn.com") ||
+            host.contains("mediafire.com"))
+
+        {
+            return true
+        }
+
+        if (path.contains("get_video") || path.contains("videoplayback") || path.contains("stream")) {
+            return true
+        }
+
+        return false
+    }
+
     private fun setupWebView() {
         val settings = webView.settings
         settings.javaScriptEnabled = true
@@ -145,40 +238,63 @@ class BrowserActivity : AppCompatActivity() {
         settings.databaseEnabled = true
         settings.setSupportMultipleWindows(true)
         settings.javaScriptCanOpenWindowsAutomatically = true
-        settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+        // Simulador de Desktop/Chrome fuerte para evitar capados de servidores móviles
+        settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
 
-        // OPTIMIZACIONES PARA EVITAR VIDEOS PEGADOS / EN PLAY CONGELADO:
-        settings.mediaPlaybackRequiresUserGesture = false // Permite que los videos web arranquen sin bloqueos gestuales
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW // Permite cargar videos HTTP en páginas HTTPS
+        settings.mediaPlaybackRequiresUserGesture = false
+        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         settings.allowFileAccess = true
         settings.allowContentAccess = true
         settings.loadWithOverviewMode = true
         settings.useWideViewPort = true
 
-        // Habilitar soporte de cookies de terceros (requerido por muchos servidores de video)
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
 
+        // 1. CAZADOR DE DESCARGAS DIRECTAS (Mediafire, bin, mkv directos)
+        webView.setDownloadListener { downloadUrl, userAgentHeader, _, _, _ ->
+            val referer = webView.url ?: ""
+            val cookie = CookieManager.getInstance().getCookie(downloadUrl)
+
+            val isVideoDownload = downloadUrl.lowercase().contains(".mp4") ||
+                    downloadUrl.lowercase().contains(".bin") ||
+                    downloadUrl.lowercase().contains(".m3u8") ||
+                    downloadUrl.lowercase().contains("mediafire.com")
+
+            if (isVideoDownload) {
+                val capturedLink = CapturedLink(downloadUrl, userAgentHeader, referer, cookie)
+                runOnUiThread {
+                    if (capturedLinksList.add(capturedLink)) {
+                        lastCapturedUrl = downloadUrl
+                        Toast.makeText(this@BrowserActivity, "📥 ENLACE DIRECTO CAPTURADO", Toast.LENGTH_LONG).show()
+                        showCapturedLinksDialog()
+                    }
+                }
+            }
+        }
+
+        // 2. INTERCEPTOR DE RED Y SNIFFER DE DOM
         webView.webViewClient = object : WebViewClient() {
 
             override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                 val url = request?.url.toString()
-                val urlLower = url.lowercase()
-
-                // Bloqueo de publicidad basado únicamente en el Host (dominio)
                 val host = request?.url?.host?.lowercase() ?: ""
+                val method = request?.method ?: ""
+
+                // Bloqueo de publicidad y rastreadores
                 for (domain in blacklistedDomains) {
                     if (host.contains(domain)) {
                         return WebResourceResponse("text/plain", "UTF-8", null)
                     }
                 }
 
-                // Captura en la capa de red (aquí la URL tiene tokens completos e intactos)
-                if (urlLower.contains(".m3u8") || urlLower.contains(".m3u")) {
-                    processDetectedLink(url)
-                } else if (urlLower.contains(".mp4") || urlLower.contains("acek-cdn.com")) {
-                    if (url.contains("?")) processDetectedLink(url)
+                // Filtro estricto: Solo evaluamos peticiones GET (evita basura OPTIONS/POST)
+                if (method.equals("GET", ignoreCase = true)) {
+                    if (isPotentialVideoUrl(url)) {
+                        val headers = request?.requestHeaders ?: emptyMap()
+                        processDetectedLink(url, headers)
+                    }
                 }
 
                 return super.shouldInterceptRequest(view, request)
@@ -186,38 +302,23 @@ class BrowserActivity : AppCompatActivity() {
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url.toString()
-                val urlLower = url.lowercase()
+                val host = request?.url?.host?.lowercase() ?: ""
 
-                // NO bloqueamos la carga de archivos multimedia para permitir que el navegador solicite el token real
-                if (urlLower.contains(".mp4") || urlLower.contains(".m3u8") || urlLower.contains(".m3u") || urlLower.contains("acek-cdn.com")) {
-                    processDetectedLink(url)
-                    return false // Retornamos false para que la petición de red continúe y se generen los tokens de sesión
+                for (domain in blacklistedDomains) {
+                    if (host.contains(domain)) return true
                 }
 
-                if (request?.hasGesture() == true) return false
-
-                val currentUrl = webView.url
-                if (currentUrl != null) {
-                    val currentHost = Uri.parse(currentUrl).host
-                    val targetHost = Uri.parse(url).host
-                    if (currentHost != null && targetHost != null && currentHost != targetHost) {
-                        return true
+                if (request?.hasGesture() == false) {
+                    val currentUrl = view?.url
+                    if (currentUrl != null) {
+                        val currentHost = Uri.parse(currentUrl).host
+                        if (currentHost != null && currentHost != host && !isPotentialVideoUrl(url)) {
+                            return true
+                        }
                     }
                 }
 
                 return false
-            }
-
-            override fun onLoadResource(view: WebView?, url: String?) {
-                super.onLoadResource(view, url)
-                cleanOverlays()
-
-                url?.let {
-                    val uLower = it.lowercase()
-                    if (uLower.contains(".m3u8") || uLower.contains(".m3u") || (uLower.contains(".mp4") && it.contains("?"))) {
-                        processDetectedLink(it)
-                    }
-                }
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -228,22 +329,73 @@ class BrowserActivity : AppCompatActivity() {
                     uri.host?.let { host -> mainDomain = host }
                 }
                 cleanOverlays()
+
+                // INYECCIÓN DE JS: Atrapa XHR, Fetch y busca en el DOM dinámicamente
+                val extractVideoJs = """
+                javascript:(function() {
+                    var findVideos = function() {
+                        var videos = document.getElementsByTagName('video');
+                        for(var i = 0; i < videos.length; i++) {
+                            if(videos[i].src && !videos[i].src.startsWith('blob:')) {
+                                console.log('VIDEO_ENCONTRADO: ' + videos[i].src);
+                            }
+                            var sources = videos[i].getElementsByTagName('source');
+                            for(var j = 0; j < sources.length; j++) {
+                                if(sources[j].src) console.log('VIDEO_ENCONTRADO: ' + sources[j].src);
+                            }
+                        }
+                    };
+                    findVideos();
+                    setInterval(findVideos, 2000); 
+
+                    var originalFetch = window.fetch;
+                    window.fetch = function() {
+                        var fetchUrl = arguments[0];
+                        if (typeof fetchUrl === 'string' && (fetchUrl.includes('.m3u8') || fetchUrl.includes('.mp4'))) {
+                            console.log('VIDEO_ENCONTRADO: ' + fetchUrl);
+                        }
+                        return originalFetch.apply(this, arguments);
+                    };
+
+                    var originalOpen = XMLHttpRequest.prototype.open;
+                    XMLHttpRequest.prototype.open = function(method, xhrUrl) {
+                        if (typeof xhrUrl === 'string' && (xhrUrl.includes('.m3u8') || xhrUrl.includes('.mp4'))) {
+                            console.log('VIDEO_ENCONTRADO: ' + xhrUrl);
+                        }
+                        originalOpen.apply(this, arguments);
+                    };
+                })();
+            """.trimIndent()
+                view?.evaluateJavascript(extractVideoJs, null)
             }
         }
 
+        // 3. LECTOR DE CONSOLA (Atrapa los mensajes del Sniffer JS)
         webView.webChromeClient = object : WebChromeClient() {
+
+            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                val message = consoleMessage?.message() ?: ""
+                if (message.startsWith("VIDEO_ENCONTRADO: ")) {
+                    val videoUrl = message.removePrefix("VIDEO_ENCONTRADO: ")
+                    val fakeHeaders = mapOf(
+                        "User-Agent" to webView.settings.userAgentString,
+                        "Referer" to (webView.url ?: "")
+                    )
+                    processDetectedLink(videoUrl, fakeHeaders)
+                }
+                return super.onConsoleMessage(consoleMessage)
+            }
+
             override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: android.os.Message?): Boolean {
                 val result = view?.hitTestResult
                 val url = result?.extra
                 if (url != null) {
-                    // Permitimos que el WebView cargue el destino para que se procesen las redirecciones y queries completas
                     view.loadUrl(url)
                     return true
                 }
                 return false
             }
 
-            // SOPORTE DE REPRODUCCIÓN EN PANTALLA COMPLETA (Previene que los reproductores web se queden pegados)
             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                 super.onShowCustomView(view, callback)
                 if (customView != null) {
@@ -253,7 +405,6 @@ class BrowserActivity : AppCompatActivity() {
                 customView = view
                 customViewCallback = callback
 
-                // Agregamos el renderizador de video de pantalla completa al contenedor de la pantalla principal
                 val decor = window.decorView as FrameLayout
                 decor.addView(view, FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
@@ -280,113 +431,87 @@ class BrowserActivity : AppCompatActivity() {
         val host = uri?.host?.lowercase() ?: ""
         val path = uri?.path?.lowercase() ?: ""
 
-        // 1. Debe usar protocolo web
         if (!url.startsWith("http://", ignoreCase = true) && !url.startsWith("https://", ignoreCase = true)) {
             return false
         }
 
-        // 2. Comprobación de lista negra limitada ESTRICTAMENTE al host (evita dañar tokens legítimos con palabras clave)
         for (domain in blacklistedDomains) {
             if (host.contains(domain)) return false
         }
 
-        // 3. Descartar subtítulos y fragmentos de audio
         if (path.contains("subtitle") || path.contains(".vtt") || path.contains("audio-only")) {
             return false
         }
 
-        // 4. Excluir URLs incompletas o vacías
-        if (url.length < 25) {
-            return false
-        }
-
+        // Se eliminó la validación de longitud (< 25) que bloqueaba URLs cortas reales.
         return true
     }
 
-    // SANITIZADOR DE URL (Remueve parámetros que atan la URL a la IP o proveedor de internet del móvil)
-    private fun sanitizeStreamUrl(url: String): String {
-        try {
-            val uri = Uri.parse(url)
-            val queryNames = uri.queryParameterNames
-            if (queryNames.isEmpty()) return url
+    private fun processDetectedLink(url: String, headers: Map<String, String>) {
+        val finalUrl = url
 
-            val builder = uri.buildUpon()
-            builder.clearQuery()
+        // Evitar procesar si es exactamente el último capturado o si ya existe en la lista
+        if (finalUrl == lastCapturedUrl) return
+        if (capturedLinksList.any { it.url == finalUrl }) return
+        if (!isValidVideoUrl(finalUrl)) return
 
-            // Lista de parámetros de IP o ISP conocidos por limitar la reproducción a una red específica
-            val ipTrackingParams = arrayOf("ip", "client_ip", "user_ip", "userip", "asn", "ip_block")
+        val userAgent = headers.entries.firstOrNull { it.key.equals("user-agent", ignoreCase = true) }?.value
+            ?: webView.settings.userAgentString
+        val referer = headers.entries.firstOrNull { it.key.equals("referer", ignoreCase = true) }?.value
+            ?: webView.url ?: ""
+        val cookie = headers.entries.firstOrNull { it.key.equals("cookie", ignoreCase = true) }?.value
+            ?: CookieManager.getInstance().getCookie(url)
 
-            for (name in queryNames) {
-                // Omitir parámetros vinculados a la IP
-                if (ipTrackingParams.contains(name.lowercase())) {
-                    continue
-                }
-                val value = uri.getQueryParameter(name)
-                builder.appendQueryParameter(name, value)
-            }
-            return builder.build().toString()
-        } catch (e: Exception) {
-            return url
-        }
-    }
+        val capturedLink = CapturedLink(finalUrl, userAgent, referer, cookie)
 
-    private fun processDetectedLink(url: String) {
-        if (url == lastCapturedUrl) return
-
-        // Validación de estructura y seguridad
-        if (!isValidVideoUrl(url)) return
-
-        // Sanitización del enlace para desvincularlo de la IP del móvil
-        val sanitizedUrl = sanitizeStreamUrl(url)
-
-        if (sanitizedUrl.contains("acek-cdn.com", ignoreCase = true)) {
-            confirmAndCapture(sanitizedUrl, "🎬 PELÍCULA CAPTURADA (ACEK)")
+        if (finalUrl.contains("acek-cdn.com", ignoreCase = true)) {
+            confirmAndCapture(capturedLink, "🎬 PELÍCULA CAPTURADA (ACEK)")
             return
         }
 
-        if (sanitizedUrl.contains(".mp4", ignoreCase = true)) {
+        // RESTAURADO: Validación estricta para evitar anuncios MP4 cortos
+        if (finalUrl.contains(".mp4", ignoreCase = true)) {
             thread {
                 try {
                     val retriever = MediaMetadataRetriever()
-                    retriever.setDataSource(sanitizedUrl, HashMap<String, String>())
+                    val headersMap = HashMap<String, String>()
+                    headersMap["User-Agent"] = userAgent
+                    if (referer.isNotEmpty()) headersMap["Referer"] = referer
+
+                    retriever.setDataSource(finalUrl, headersMap)
                     val time = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                     val durationMs = time?.toLong() ?: 0
                     retriever.release()
 
                     val cuarentaMinutos = 2400000
-
                     if (durationMs >= cuarentaMinutos) {
-                        confirmAndCapture(sanitizedUrl, "🎬 VIDEO LARGO DETECTADO (>40 min)")
-                    } else {
-                        android.util.Log.d("CAPTURA", "Video corto descartado: ${durationMs / 1000} seg")
+                        confirmAndCapture(capturedLink, "🎬 VIDEO LARGO DETECTADO (>40 min)")
                     }
                 } catch (e: Exception) {
-                    if (sanitizedUrl.contains("?") && isValidVideoUrl(sanitizedUrl)) {
-                        confirmAndCapture(sanitizedUrl, "✅ VIDEO MP4 CAPTURADO")
+                    // Fallback: Si el servidor bloquea la extracción de metadata pero la URL
+                    // tiene parámetros (común en CDNs legítimos), lo capturamos para no perderlo.
+                    if (finalUrl.contains("?") && isValidVideoUrl(finalUrl)) {
+                        confirmAndCapture(capturedLink, "✅ VIDEO MP4 CAPTURADO (Metadata protegida)")
                     }
                 }
             }
             return
         }
 
-        // Captura completa para formato M3U o M3U8 de transmisión continua libre de IP
-        if (sanitizedUrl.contains(".m3u8", ignoreCase = true) || sanitizedUrl.contains(".m3u", ignoreCase = true)) {
-            confirmAndCapture(sanitizedUrl, "📡 STREAMING M3U8 CAPTURADO")
-        }
+        // Capturador general de flujos de video alternativos aprobados (.m3u8, mixdrop, etc.)
+        confirmAndCapture(capturedLink, "📡 ENLACE MULTIMEDIA CAPTURADO")
     }
 
-    private fun confirmAndCapture(url: String, mensaje: String) {
-        lastCapturedUrl = url
+    private fun confirmAndCapture(link: CapturedLink, mensaje: String) {
+        lastCapturedUrl = link.url
         runOnUiThread {
-            if (capturedLinksList.add(url)) {
+            if (capturedLinksList.add(link)) {
                 Toast.makeText(this, mensaje, Toast.LENGTH_SHORT).show()
                 showCapturedLinksDialog()
             }
         }
     }
 
-    // Ventana de capturas integrada: Sin título, video redondeado en CardView negro, controles estilizados y lista en modo oscuro premium (Sin usar XML)
-    // Ventana de capturas integrada: Diseño visual unificado sin franjas transparentes
     private fun showCapturedLinksDialog() {
         if (isFinishing || isDestroyed) return
 
@@ -395,39 +520,44 @@ class BrowserActivity : AppCompatActivity() {
         val linksArray = capturedLinksList.toList()
         if (linksArray.isEmpty()) return
 
-        val displayItems = linksArray.mapIndexed { index, link ->
-            "${index + 1}. $link"
+        val displayItems = linksArray.mapIndexed { index, item ->
+            "${index + 1}. ${item.url}"
         }.toTypedArray()
 
         val builder = AlertDialog.Builder(this)
 
-        // DISEÑO PERSONALIZADO PRINCIPAL (Vertical con fondo pizarra oscuro y esquinas curvas)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(30, 30, 30, 20)
-            val dialogBg = android.graphics.drawable.GradientDrawable().apply {
-                setColor(Color.parseColor("#1A1A24")) // Fondo pizarra oscuro premium
-                cornerRadius = 24f // Bordes redondeados de la tarjeta principal
-            }
-            background = dialogBg
+            setPadding(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(16))
+            setBackgroundColor(Color.parseColor("#1A1A24"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
         }
 
-        // 1. REPRODUCTOR DE VIDEO ENVUELTO EN UN CARDVIEW REDONDEADO CON SOMBRA
+        val titleTextView = TextView(this).apply {
+            text = "📡 Enlaces de Video Capturados"
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(0, 0, 0, dpToPx(12))
+        }
+        container.addView(titleTextView)
+
         val videoCard = androidx.cardview.widget.CardView(this).apply {
-            radius = 16f // Bordes curvos del video
-            cardElevation = 8f // Efecto de elevación/sombra flotante
+            radius = dpToPx(12).toFloat()
+            cardElevation = dpToPx(6).toFloat()
             setCardBackgroundColor(Color.BLACK)
             preventCornerOverlap = true
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dpToPx(240)
+            ).apply {
+                setMargins(0, 0, 0, dpToPx(12))
+            }
         }
-        val cardParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            380
-        ).apply {
-            setMargins(0, 0, 0, 20)
-        }
-        videoCard.layoutParams = cardParams
 
-        // Instancia del reproductor de video centrado
         val videoView = VideoView(this)
         val videoParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -436,75 +566,60 @@ class BrowserActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
         }
         videoView.layoutParams = videoParams
+        videoCard.addView(videoView)
+        container.addView(videoCard)
 
-        videoCard.addView(videoView) // Añadir reproductor dentro de la tarjeta curva
-        container.addView(videoCard) // Añadir tarjeta curva al contenedor principal
-
-        // 2. PANEL DE CONTROL FIJO (Estilizado en Azul Premium)
         val controlLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 15, 0, 15)
+            setPadding(0, dpToPx(4), 0, dpToPx(8))
             gravity = Gravity.CENTER_VERTICAL
         }
 
-        // Botón de Play/Pausa redondo de color Azul Eléctrico
         val btnPlayPause = Button(this).apply {
             text = "⏸"
             setTextColor(Color.WHITE)
             textSize = 16f
             val btnShape = android.graphics.drawable.GradientDrawable().apply {
-                setColor(Color.parseColor("#2979FF")) // Color azul eléctrico
-                cornerRadius = 14f // Botón con curvas elegantes
+                setColor(Color.parseColor("#2979FF"))
+                cornerRadius = dpToPx(12).toFloat()
             }
             background = btnShape
             layoutParams = LinearLayout.LayoutParams(
-                100, // Ancho cuadrado
-                100  // Alto cuadrado
+                dpToPx(44),
+                dpToPx(44)
             ).apply {
-                setMargins(0, 0, 16, 0)
+                setMargins(0, 0, dpToPx(12), 0)
             }
         }
         controlLayout.addView(btnPlayPause)
 
-        // Barra de progreso teñida para coincidir con la paleta de colores azul
         val seekBar = SeekBar(this).apply {
             progressTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#2979FF"))
             thumbTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#2979FF"))
-            layoutParams = LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1.0f
-            )
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
         }
         controlLayout.addView(seekBar)
-
         container.addView(controlLayout)
 
-        // 3. LISTA DE ENLACES EN MODO OSCURO ADAPTATIVO
         val listView = ListView(this).apply {
-            divider = android.graphics.drawable.ColorDrawable(Color.parseColor("#2C2C3C")) // Línea de división pizarra
-            dividerHeight = 2
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                350 // Altura fija para que no tape los botones inferiores
-            )
+            divider = android.graphics.drawable.ColorDrawable(Color.parseColor("#2C2C3C"))
+            dividerHeight = dpToPx(1)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f)
         }
         container.addView(listView)
 
-        // Adaptador con sobrescritura programática de color y espaciado de texto
         val adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, displayItems) {
             override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
                 val view = super.getView(position, convertView, parent)
                 val textView = view.findViewById<TextView>(android.R.id.text1)
-                textView.setTextColor(Color.parseColor("#E0E0E0")) // Color blanco grisáceo de lectura suave
+                textView.setTextColor(Color.parseColor("#E0E0E0"))
                 textView.textSize = 14f
-                textView.setPadding(12, 16, 12, 16)
+                textView.setPadding(dpToPx(12), dpToPx(14), dpToPx(12), dpToPx(14))
                 return view
             }
         }
         listView.adapter = adapter
 
-        // Hilo de actualización en tiempo real de la barra de progreso
         val progressHandler = android.os.Handler(android.os.Looper.getMainLooper())
         val updateProgressTask = object : Runnable {
             override fun run() {
@@ -515,17 +630,16 @@ class BrowserActivity : AppCompatActivity() {
             }
         }
 
-        // 4. BOTONES DE ACCIÓN INTEGRADOS EN EL CONTENEDOR (Soluciona la franja transparente inferior)
         val actionsLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END
-            setPadding(0, 20, 0, 0)
+            setPadding(0, dpToPx(12), 0, 0)
         }
 
         val btnLimpiar = Button(this).apply {
-            text = "Limpiar Lista"
-            setTextColor(Color.parseColor("#FF5252")) // Rojo Alerta
-            background = null // Botón plano minimalista
+            text = "Limpiar"
+            setTextColor(Color.parseColor("#FF5252"))
+            background = null
             setOnClickListener {
                 progressHandler.removeCallbacksAndMessages(null)
                 videoView.stopPlayback()
@@ -535,21 +649,25 @@ class BrowserActivity : AppCompatActivity() {
             }
         }
 
+        // Se modificó para ir a casa SIN destruir el diálogo, manteniéndolo intacto en background
         val btnCasa = Button(this).apply {
             text = "Ir a Casa"
-            setTextColor(Color.parseColor("#90A4AE")) // Gris
+            setTextColor(Color.parseColor("#90A4AE"))
             background = null
             setOnClickListener {
+                // Solo pausamos el video para que no suene de fondo, ¡pero NO cerramos el diálogo!
+                if (videoView.isPlaying) {
+                    videoView.pause()
+                    btnPlayPause.text = "▶"
+                }
                 progressHandler.removeCallbacksAndMessages(null)
-                videoView.stopPlayback()
-                captureDialog?.dismiss()
                 goHomeWithoutFinishing()
             }
         }
 
         val btnCerrar = Button(this).apply {
             text = "Cerrar"
-            setTextColor(Color.parseColor("#2979FF")) // Azul Premium
+            setTextColor(Color.parseColor("#2979FF"))
             background = null
             setOnClickListener {
                 progressHandler.removeCallbacksAndMessages(null)
@@ -566,22 +684,28 @@ class BrowserActivity : AppCompatActivity() {
         builder.setView(container)
         captureDialog = builder.create()
 
-        // Habilitar transparencia de ventana para permitir esquinas redondeadas perfectas
+        // ESTO HACE QUE EL DIÁLOGO SEA INDESTRUCTIBLE A MENOS QUE USEN LOS BOTONES
+        captureDialog?.setCancelable(false)
+        captureDialog?.setCanceledOnTouchOutside(false)
+
         captureDialog?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
         captureDialog?.show()
 
-        // ACCIONES DE LA BARRA DE DESPLAZAMIENTO (Control manual de tiempo)
+        captureDialog?.window?.let { window ->
+            window.setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT
+            )
+        }
+
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    videoView.seekTo(progress)
-                }
+                if (fromUser) videoView.seekTo(progress)
             }
             override fun onStartTrackingTouch(sb: SeekBar?) {}
             override fun onStopTrackingTouch(sb: SeekBar?) {}
         })
 
-        // ACCIONES DEL BOTÓN PLAY/PAUSA
         btnPlayPause.setOnClickListener {
             if (videoView.isPlaying) {
                 videoView.pause()
@@ -592,43 +716,22 @@ class BrowserActivity : AppCompatActivity() {
             }
         }
 
-        // SELECCIÓN RÁPIDA (Un click): Copia enlace e inicia reproducción de prueba arriba con lógica híbrida
         listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
-            val selectedUrl = linksArray[position]
-
-            val referer = webView.url ?: ""
-            val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
-
-            val urlLower = selectedUrl.lowercase()
-            val isDirectDownload = urlLower.contains(".mp4") || urlLower.contains("acek-cdn.com")
-
-            val castUrl = if (!isDirectDownload && referer.isNotEmpty()) {
-                "$selectedUrl|User-Agent=$userAgent&Referer=$referer"
-            } else {
-                selectedUrl
-            }
-
-            // 1. COPIAR ENLACE (Limpio o Autenticado según corresponda)
+            val capturedItem = linksArray[position]
+            val clipboardFormat = capturedItem.getFormattedUrlForClipboard()
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("Captura", castUrl)
+            val clip = ClipData.newPlainText("Captura", clipboardFormat)
             clipboard.setPrimaryClip(clip)
 
-            val mensajeCopia = if (isDirectDownload) "Enlace directo copiado limpio" else "Copiado enlace con autenticación"
-            Toast.makeText(this, "$mensajeCopia #${position + 1}", Toast.LENGTH_SHORT).show()
-
-            // 2. REPRODUCIR EN EL VISOR SUPERIOR CON CABECERAS COMPLETAS
-            val progressToast = Toast.makeText(this, "Probando enlace...", Toast.LENGTH_SHORT)
+            Toast.makeText(this@BrowserActivity, "📋 Copiado y probando en reproductor local", Toast.LENGTH_SHORT).show()
+            val progressToast = Toast.makeText(this@BrowserActivity, "Cargando flujo...", Toast.LENGTH_SHORT)
             progressToast.show()
 
-            val headers = HashMap<String, String>().apply {
-                put("User-Agent", userAgent)
-                if (referer.isNotEmpty()) {
-                    put("Referer", referer)
-                    val originUri = Uri.parse(referer)
-                    put("Origin", "${originUri.scheme}://${originUri.host}")
-                }
+            val playbackHeaders = HashMap<String, String>().apply {
+                capturedItem.userAgent?.let { put("User-Agent", it) }
+                capturedItem.referer?.let { put("Referer", it) }
+                capturedItem.cookie?.let { put("Cookie", it) }
                 put("Accept", "*/*")
-                put("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
                 put("Connection", "keep-alive")
             }
 
@@ -638,43 +741,37 @@ class BrowserActivity : AppCompatActivity() {
                 btnPlayPause.text = "⏸"
                 seekBar.progress = 0
 
-                videoView.setVideoURI(Uri.parse(selectedUrl), headers)
-
+                videoView.setVideoURI(Uri.parse(capturedItem.url), playbackHeaders)
                 videoView.setOnPreparedListener { mediaPlayer ->
                     progressToast.cancel()
                     seekBar.max = videoView.duration
                     mediaPlayer.start()
                     progressHandler.post(updateProgressTask)
-                    Toast.makeText(this, "▶️ Cargado. Arrastre la barra para adelantar.", Toast.LENGTH_SHORT).show()
                 }
-
                 videoView.setOnErrorListener { _, _, _ ->
                     progressToast.cancel()
                     progressHandler.removeCallbacks(updateProgressTask)
-                    Toast.makeText(this, "❌ El enlace requiere reproductor externo o ha caducado", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@BrowserActivity, "⚠️ El flujo requiere reproducción externa", Toast.LENGTH_SHORT).show()
                     true
                 }
             } catch (e: Exception) {
                 progressToast.cancel()
                 progressHandler.removeCallbacks(updateProgressTask)
-                Toast.makeText(this, "❌ Error al conectar con el enlace", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // ACCIÓN ELIMINAR (Toque sostenido / click largo)
         listView.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
-            val selectedUrl = linksArray[position]
-
+            val capturedItem = linksArray[position]
             AlertDialog.Builder(this)
                 .setTitle("¿Eliminar enlace de la lista?")
-                .setMessage(selectedUrl)
+                .setMessage(capturedItem.url)
                 .setPositiveButton("Eliminar") { _, _ ->
                     videoView.stopPlayback()
                     progressHandler.removeCallbacksAndMessages(null)
                     seekBar.progress = 0
                     btnPlayPause.text = "⏸"
 
-                    capturedLinksList.remove(selectedUrl)
+                    capturedLinksList.remove(capturedItem)
                     Toast.makeText(this, "🗑️ Enlace eliminado", Toast.LENGTH_SHORT).show()
 
                     captureDialog?.dismiss()
@@ -684,10 +781,10 @@ class BrowserActivity : AppCompatActivity() {
                 }
                 .setNegativeButton("Cancelar", null)
                 .show()
-
             true
         }
     }
+
     private fun getFavoritesList(): Set<String> {
         return sharedPreferences.getStringSet("fav_urls", emptySet()) ?: emptySet()
     }
@@ -710,30 +807,24 @@ class BrowserActivity : AppCompatActivity() {
         }
     }
 
-    // 4. MOSTRAR DIÁLOGO (Mejorado con estilo Dark Cinema Premium)
-    // Diálogo de favoritos con diseño unificado de una sola tarjeta oscura
     private fun showFavoritesDialog() {
         val favs = getFavoritesList().toList()
-
         if (favs.isEmpty()) {
             Toast.makeText(this, "No tienes favoritos guardados", Toast.LENGTH_SHORT).show()
             return
         }
 
         val builder = AlertDialog.Builder(this)
-
-        // DISEÑO PERSONALIZADO PRINCIPAL (Vertical con fondo pizarra oscuro)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(30, 30, 30, 20)
             val dialogBg = android.graphics.drawable.GradientDrawable().apply {
-                setColor(Color.parseColor("#1A1A24")) // Fondo pizarra oscuro
-                cornerRadius = 24f // Esquinas redondeadas
+                setColor(Color.parseColor("#1A1A24"))
+                cornerRadius = 24f
             }
             background = dialogBg
         }
 
-        // Encabezado personalizado para el diálogo
         val headerTv = TextView(this).apply {
             text = "⭐ Mis Favoritos"
             setTextColor(Color.WHITE)
@@ -744,25 +835,21 @@ class BrowserActivity : AppCompatActivity() {
         }
         container.addView(headerTv)
 
-        // Lista de favoritos adaptativa
         val listView = ListView(this).apply {
-            divider = android.graphics.drawable.ColorDrawable(Color.parseColor("#2C2C3C")) // Línea de división pizarra
+            divider = android.graphics.drawable.ColorDrawable(Color.parseColor("#2C2C3C"))
             dividerHeight = 2
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                weight = 1f // Permite flexibilidad si hay muchos favoritos
-            }
+            ).apply { weight = 1f }
         }
         container.addView(listView)
 
-        // Adaptador con sobrescritura de color y padding para modo oscuro
         val adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, favs) {
             override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
                 val view = super.getView(position, convertView, parent)
                 val textView = view.findViewById<TextView>(android.R.id.text1)
-                textView.setTextColor(Color.parseColor("#E0E0E0")) // Texto claro de lectura suave
+                textView.setTextColor(Color.parseColor("#E0E0E0"))
                 textView.textSize = 14f
                 textView.setPadding(12, 16, 12, 16)
                 return view
@@ -770,60 +857,48 @@ class BrowserActivity : AppCompatActivity() {
         }
         listView.adapter = adapter
 
-        // BOTÓN DE ACCIÓN INTEGRADO (Soluciona la barra de botones transparente)
         val actionsLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END
             setPadding(0, 20, 0, 0)
         }
 
-        // Declaración previa para poder referenciar el diálogo dentro del listener del botón
         var dialog: AlertDialog? = null
-
         val btnCerrar = Button(this).apply {
             text = "Cerrar"
-            setTextColor(Color.parseColor("#90A4AE")) // Gris sutil
-            background = null // Botón plano sin contorno
-            setOnClickListener {
-                dialog?.dismiss()
-            }
+            setTextColor(Color.parseColor("#90A4AE"))
+            background = null
+            setOnClickListener { dialog?.dismiss() }
         }
         actionsLayout.addView(btnCerrar)
         container.addView(actionsLayout)
 
         builder.setView(container)
         dialog = builder.create()
-
-        // Habilitar transparencia de ventana para permitir esquinas redondeadas perfectas
         dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
         dialog.show()
 
-        // ACCIÓN UN TOQUE: Carga el enlace en el navegador y cierra el diálogo
         listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             val selectedUrl = favs[position]
             webView.loadUrl(selectedUrl)
             dialog.dismiss()
         }
 
-        // ACCIÓN TOQUE SOSTENIDO: Menú para eliminar favorito
         listView.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
             val selectedUrl = favs[position]
-
             AlertDialog.Builder(this)
                 .setTitle("¿Eliminar favorito?")
                 .setMessage(selectedUrl)
                 .setPositiveButton("Eliminar") { _, _ ->
                     removeFavorite(selectedUrl)
                     dialog.dismiss()
-                    showFavoritesDialog() // Refresca el diálogo con los favoritos restantes
+                    showFavoritesDialog()
                 }
                 .setNegativeButton("Cancelar", null)
                 .show()
-
             true
         }
     }
-
 
     override fun onBackPressed() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()

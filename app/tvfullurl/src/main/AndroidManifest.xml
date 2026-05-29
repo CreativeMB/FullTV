@@ -18,6 +18,7 @@
         <activity
             android:name=".BrowserActivity"
             android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="true"/>
 
         <activity
