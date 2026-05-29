@@ -330,21 +330,69 @@ class BrowserActivity : AppCompatActivity() {
     }
 
     // --- FAVORITOS ---
+
+    // 1. FUNCIÓN AUXILIAR (Indispensable para obtener la lista)
+    private fun getFavoritesList(): Set<String> {
+        return sharedPreferences.getStringSet("fav_urls", emptySet()) ?: emptySet()
+    }
+
+    // 2. GUARDAR FAVORITO
     private fun saveFavorite(url: String) {
-        val favorites = sharedPreferences.getStringSet("fav_urls", emptySet())?.toMutableSet() ?: mutableSetOf()
+        val favorites = getFavoritesList().toMutableSet()
         if (favorites.add(url)) {
             sharedPreferences.edit().putStringSet("fav_urls", favorites).apply()
-            Toast.makeText(this, "⭐ Guardado", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "⭐ Guardado en favoritos", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Esta página ya es favorita", Toast.LENGTH_SHORT).show()
         }
     }
 
+    // 3. ELIMINAR FAVORITO
+    private fun removeFavorite(url: String) {
+        val favorites = getFavoritesList().toMutableSet()
+        if (favorites.remove(url)) {
+            sharedPreferences.edit().putStringSet("fav_urls", favorites).apply()
+            Toast.makeText(this, "🗑️ Eliminado de favoritos", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // 4. MOSTRAR DIÁLOGO (Corregido con sub-menú de opciones)
     private fun showFavoritesDialog() {
-        val favs = sharedPreferences.getStringSet("fav_urls", emptySet())?.toList() ?: emptyList()
-        if (favs.isEmpty()) return
-        AlertDialog.Builder(this).setTitle("Favoritos")
-            .setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, favs)) { _, which ->
-                webView.loadUrl(favs[which])
-            }.setNegativeButton("Cerrar", null).show()
+        val favs = getFavoritesList().toList()
+
+        if (favs.isEmpty()) {
+            Toast.makeText(this, "No tienes favoritos guardados", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Mis Favoritos")
+
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, favs)
+
+        builder.setAdapter(adapter) { dialog, which ->
+            val selectedUrl = favs[which]
+
+            // Diálogo secundario para elegir acción sobre el favorito seleccionado
+            val options = arrayOf("Abrir enlace", "Eliminar favorito")
+
+            AlertDialog.Builder(this)
+                .setTitle("Opciones para: $selectedUrl")
+                .setItems(options) { _, optionIndex ->
+                    when (optionIndex) {
+                        0 -> webView.loadUrl(selectedUrl) // Opción Abrir
+                        1 -> {
+                            // Opción Eliminar con confirmación rápida
+                            removeFavorite(selectedUrl)
+                            showFavoritesDialog() // Refrescar la lista de favoritos
+                        }
+                    }
+                }
+                .show()
+        }
+
+        builder.setNegativeButton("Cerrar", null)
+        builder.show()
     }
 
     override fun onBackPressed() {
