@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Color
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
@@ -17,7 +18,35 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import java.net.URLEncoder
 import kotlin.concurrent.thread
-import android.media.MediaMetadataRetriever
+
+// --- NUEVO OBJETO: AGENTE CONSTRUCTOR ---
+// Su única función es preparar y blindar las cabeceras para engañar al servidor
+// y alimentar a tu VideoView local.
+object LocalAgentBuilder {
+    fun getSecureHeaders(link: CapturedLink): HashMap<String, String> {
+        val headers = HashMap<String, String>()
+
+        link.userAgent?.let { headers["User-Agent"] = it }
+        link.referer?.let { headers["Referer"] = it }
+        link.cookie?.let { headers["Cookie"] = it }
+
+        // Cabeceras adicionales para simular que la petición sigue en el navegador
+        headers["Accept"] = "*/*"
+        headers["Connection"] = "keep-alive"
+
+        // Extraemos y forzamos el Origin (Vital para servidores con seguridad estricta CORS)
+        link.referer?.let { ref ->
+            try {
+                val uri = Uri.parse(ref)
+                headers["Origin"] = "${uri.scheme}://${uri.host}"
+            } catch (e: Exception) { }
+        }
+
+        return headers
+    }
+}
+// ----------------------------------------
+
 // Clase modelo para estructurar el enlace y sus parámetros de sesión
 data class CapturedLink(
     val url: String,
@@ -98,7 +127,10 @@ class BrowserActivity : AppCompatActivity() {
         "beacon", "statcounter", "doubleclick", "adsterra", "exoclick",
         "onclickads", "popcash", "popads", "propellerads", "histats",
         "traffic", "prebid", "vast", "vpaid", "googlesyndication", "google-analytics",
-        "adservice", "serving", "advert", "banner", "metric"
+        "adservice", "serving", "advert", "banner", "metric",
+        // Nuevos bloqueos agresivos para sitios de streaming:
+        "bet", "casino", "porn", "sex", "xxx", "livejasmin", "chaturbate",
+        "realsrv", "bidgear", "runative", "exo", "nativeads", "popunders"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -129,7 +161,6 @@ class BrowserActivity : AppCompatActivity() {
         return (dp * resources.displayMetrics.density).toInt()
     }
 
-    // Se asegura de mantener la actividad viva en la pila y solo traer otra al frente
     private fun goHomeWithoutFinishing() {
         try {
             val intent = Intent(this, MainActivity::class.java)
@@ -152,7 +183,12 @@ class BrowserActivity : AppCompatActivity() {
                     val encodedQuery = URLEncoder.encode(input, "UTF-8")
                     "https://www.google.com/search?q=$encodedQuery"
                 }
+
+                // Limpiamos todo antes de ir a la nueva URL
+                capturedLinksList.clear()
                 lastCapturedUrl = ""
+                captureDialog?.dismiss()
+
                 webView.loadUrl(finalUrl)
             }
         }
@@ -173,26 +209,53 @@ class BrowserActivity : AppCompatActivity() {
 
     private fun cleanOverlays() {
         val script = """
-            (function() {
-                var elems = document.body.getElementsByTagName('*');
-                for (var i = 0; i < elems.length; i++) {
-                    var style = window.getComputedStyle(elems[i]);
-                    if (parseInt(style.zIndex) > 100 || style.position == 'fixed') {
-                        if (!elems[i].innerHTML.contains('video') && !elems[i].innerHTML.contains('Download')) {
-                            elems[i].remove();
+        (function() {
+            try {
+                // 1. Convertimos los elementos a un Array real para evitar saltos al eliminar
+                var elems = Array.from(document.body.querySelectorAll('*'));
+                
+                elems.forEach(function(el) {
+                    var style = window.getComputedStyle(el);
+                    
+                    // Buscamos elementos flotantes (típico de overlays invisibles y popups)
+                    if (style.position === 'fixed' || style.position === 'absolute') {
+                        var zIndex = parseInt(style.zIndex);
+                        
+                        // Si el elemento está muy al frente o cubre toda la pantalla (trampa de clic)
+                        if (zIndex > 90 || (style.width === '100%' && style.height === '100%')) {
+                            var html = el.innerHTML || '';
+                            
+                            // CORRECCIÓN: En JavaScript se usa .includes(), NO .contains()
+                            var isImportant = html.includes('video') || 
+                                              html.includes('Download') || 
+                                              el.tagName === 'VIDEO';
+                            
+                            // Si no contiene el video o el botón, lo aniquilamos
+                            if (!isImportant) {
+                                // En vez de solo remove(), lo ocultamos también por si falla
+                                el.style.display = 'none';
+                                el.style.pointerEvents = 'none';
+                                el.remove();
+                            }
                         }
                     }
-                }
-                document.querySelectorAll('div').forEach(el => {
-                    if (el.style.position == 'absolute' && el.style.zIndex > 10) {
-                        el.remove();
+                });
+
+                // 2. Limpieza de iframes basura que meten anuncios de apuestas
+                document.querySelectorAll('iframe').forEach(function(iframe) {
+                    var src = iframe.src || '';
+                    if (!src.includes('video') && !src.includes('player')) {
+                        iframe.remove();
                     }
                 });
-            })();
-        """.trimIndent()
+
+            } catch (e) {
+                console.log('Error limpiando overlays: ' + e);
+            }
+        })();
+    """.trimIndent()
         webView.evaluateJavascript(script, null)
     }
-
     private fun isPotentialVideoUrl(url: String): Boolean {
         val urlLower = url.lowercase()
         val uri = try { Uri.parse(url) } catch (e: Exception) { null }
@@ -218,9 +281,7 @@ class BrowserActivity : AppCompatActivity() {
             host.contains("mixdrop") || host.contains("voe.sx") ||
             host.contains("fembed") || host.contains("googlevideo.com") ||
             host.contains("acek-cdn.com") ||
-            host.contains("mediafire.com"))
-
-        {
+            host.contains("mediafire.com")) {
             return true
         }
 
@@ -236,8 +297,8 @@ class BrowserActivity : AppCompatActivity() {
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
-        settings.setSupportMultipleWindows(true)
-        settings.javaScriptCanOpenWindowsAutomatically = true
+        settings.setSupportMultipleWindows(false)
+        settings.javaScriptCanOpenWindowsAutomatically = false
         // Simulador de Desktop/Chrome fuerte para evitar capados de servidores móviles
         settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
 
@@ -252,7 +313,7 @@ class BrowserActivity : AppCompatActivity() {
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
 
-        // 1. CAZADOR DE DESCARGAS DIRECTAS (Mediafire, bin, mkv directos)
+        // 1. CAZADOR DE DESCARGAS DIRECTAS
         webView.setDownloadListener { downloadUrl, userAgentHeader, _, _, _ ->
             val referer = webView.url ?: ""
             val cookie = CookieManager.getInstance().getCookie(downloadUrl)
@@ -277,19 +338,28 @@ class BrowserActivity : AppCompatActivity() {
         // 2. INTERCEPTOR DE RED Y SNIFFER DE DOM
         webView.webViewClient = object : WebViewClient() {
 
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+
+                // Vaciamos la lista y la memoria del último enlace
+                capturedLinksList.clear()
+                lastCapturedUrl = ""
+
+                // Si el diálogo estaba abierto de la página anterior, lo cerramos
+                captureDialog?.dismiss()
+            }
+
             override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                 val url = request?.url.toString()
                 val host = request?.url?.host?.lowercase() ?: ""
                 val method = request?.method ?: ""
 
-                // Bloqueo de publicidad y rastreadores
                 for (domain in blacklistedDomains) {
                     if (host.contains(domain)) {
                         return WebResourceResponse("text/plain", "UTF-8", null)
                     }
                 }
 
-                // Filtro estricto: Solo evaluamos peticiones GET (evita basura OPTIONS/POST)
                 if (method.equals("GET", ignoreCase = true)) {
                     if (isPotentialVideoUrl(url)) {
                         val headers = request?.requestHeaders ?: emptyMap()
@@ -317,7 +387,6 @@ class BrowserActivity : AppCompatActivity() {
                         }
                     }
                 }
-
                 return false
             }
 
@@ -330,7 +399,6 @@ class BrowserActivity : AppCompatActivity() {
                 }
                 cleanOverlays()
 
-                // INYECCIÓN DE JS: Atrapa XHR, Fetch y busca en el DOM dinámicamente
                 val extractVideoJs = """
                 javascript:(function() {
                     var findVideos = function() {
@@ -439,18 +507,26 @@ class BrowserActivity : AppCompatActivity() {
             if (host.contains(domain)) return false
         }
 
+        // Descartar subtítulos y fragmentos de audio
         if (path.contains("subtitle") || path.contains(".vtt") || path.contains("audio-only")) {
             return false
         }
 
-        // Se eliminó la validación de longitud (< 25) que bloqueaba URLs cortas reales.
+        // NUEVO FILTRO: Descartar sub-listas y fragmentos secundarios de m3u8
+        if (path.contains("index-v") ||
+            path.contains("chunklist") ||
+            path.contains("seg-") ||
+            path.contains("fragment") ||
+            (path.endsWith(".ts"))) {
+            return false // Lo ignoramos porque es basura secundaria, el master ya debió pasar o está por pasar.
+        }
+
         return true
     }
 
     private fun processDetectedLink(url: String, headers: Map<String, String>) {
         val finalUrl = url
 
-        // Evitar procesar si es exactamente el último capturado o si ya existe en la lista
         if (finalUrl == lastCapturedUrl) return
         if (capturedLinksList.any { it.url == finalUrl }) return
         if (!isValidVideoUrl(finalUrl)) return
@@ -469,7 +545,6 @@ class BrowserActivity : AppCompatActivity() {
             return
         }
 
-        // RESTAURADO: Validación estricta para evitar anuncios MP4 cortos
         if (finalUrl.contains(".mp4", ignoreCase = true)) {
             thread {
                 try {
@@ -488,8 +563,6 @@ class BrowserActivity : AppCompatActivity() {
                         confirmAndCapture(capturedLink, "🎬 VIDEO LARGO DETECTADO (>40 min)")
                     }
                 } catch (e: Exception) {
-                    // Fallback: Si el servidor bloquea la extracción de metadata pero la URL
-                    // tiene parámetros (común en CDNs legítimos), lo capturamos para no perderlo.
                     if (finalUrl.contains("?") && isValidVideoUrl(finalUrl)) {
                         confirmAndCapture(capturedLink, "✅ VIDEO MP4 CAPTURADO (Metadata protegida)")
                     }
@@ -498,7 +571,6 @@ class BrowserActivity : AppCompatActivity() {
             return
         }
 
-        // Capturador general de flujos de video alternativos aprobados (.m3u8, mixdrop, etc.)
         confirmAndCapture(capturedLink, "📡 ENLACE MULTIMEDIA CAPTURADO")
     }
 
@@ -649,13 +721,11 @@ class BrowserActivity : AppCompatActivity() {
             }
         }
 
-        // Se modificó para ir a casa SIN destruir el diálogo, manteniéndolo intacto en background
         val btnCasa = Button(this).apply {
             text = "Ir a Casa"
             setTextColor(Color.parseColor("#90A4AE"))
             background = null
             setOnClickListener {
-                // Solo pausamos el video para que no suene de fondo, ¡pero NO cerramos el diálogo!
                 if (videoView.isPlaying) {
                     videoView.pause()
                     btnPlayPause.text = "▶"
@@ -684,10 +754,8 @@ class BrowserActivity : AppCompatActivity() {
         builder.setView(container)
         captureDialog = builder.create()
 
-        // ESTO HACE QUE EL DIÁLOGO SEA INDESTRUCTIBLE A MENOS QUE USEN LOS BOTONES
         captureDialog?.setCancelable(false)
         captureDialog?.setCanceledOnTouchOutside(false)
-
         captureDialog?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
         captureDialog?.show()
 
@@ -716,8 +784,11 @@ class BrowserActivity : AppCompatActivity() {
             }
         }
 
+        // --- EL CORAZÓN DEL REPRODUCTOR LOCAL USANDO EL AGENTE CONSTRUCTOR ---
         listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             val capturedItem = linksArray[position]
+
+            // 1. Copiamos al portapapeles
             val clipboardFormat = capturedItem.getFormattedUrlForClipboard()
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip = ClipData.newPlainText("Captura", clipboardFormat)
@@ -727,31 +798,32 @@ class BrowserActivity : AppCompatActivity() {
             val progressToast = Toast.makeText(this@BrowserActivity, "Cargando flujo...", Toast.LENGTH_SHORT)
             progressToast.show()
 
-            val playbackHeaders = HashMap<String, String>().apply {
-                capturedItem.userAgent?.let { put("User-Agent", it) }
-                capturedItem.referer?.let { put("Referer", it) }
-                capturedItem.cookie?.let { put("Cookie", it) }
-                put("Accept", "*/*")
-                put("Connection", "keep-alive")
-            }
+            // 2. INVOCAMOS AL AGENTE PARA OBTENER LAS CABECERAS SEGURAS
+            val secureHeaders = LocalAgentBuilder.getSecureHeaders(capturedItem)
 
             try {
+                // Limpiamos la interfaz antes de cargar
                 progressHandler.removeCallbacks(updateProgressTask)
-                videoView.stopPlayback()
+                if (videoView.isPlaying) {
+                    videoView.stopPlayback()
+                }
                 btnPlayPause.text = "⏸"
                 seekBar.progress = 0
 
-                videoView.setVideoURI(Uri.parse(capturedItem.url), playbackHeaders)
+                // 3. Reproducimos internamente en tu VideoView alimentándolo con el Agente
+                videoView.setVideoURI(Uri.parse(capturedItem.url), secureHeaders)
+
                 videoView.setOnPreparedListener { mediaPlayer ->
                     progressToast.cancel()
                     seekBar.max = videoView.duration
                     mediaPlayer.start()
                     progressHandler.post(updateProgressTask)
                 }
+
                 videoView.setOnErrorListener { _, _, _ ->
                     progressToast.cancel()
                     progressHandler.removeCallbacks(updateProgressTask)
-                    Toast.makeText(this@BrowserActivity, "⚠️ El flujo requiere reproducción externa", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@BrowserActivity, "⚠️ El flujo superó las capacidades del reproductor nativo", Toast.LENGTH_SHORT).show()
                     true
                 }
             } catch (e: Exception) {
@@ -759,6 +831,7 @@ class BrowserActivity : AppCompatActivity() {
                 progressHandler.removeCallbacks(updateProgressTask)
             }
         }
+        // ---------------------------------------------------------------------
 
         listView.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
             val capturedItem = linksArray[position]
