@@ -46,7 +46,7 @@ object LocalAgentBuilder {
     }
 }
 // ----------------------------------------
-
+data class FavoriteItem(val title: String, val url: String)
 // Clase modelo para estructurar el enlace y sus parámetros de sesión
 data class CapturedLink(
     val url: String,
@@ -336,8 +336,6 @@ class BrowserActivity : AppCompatActivity() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
 
-                // Vaciamos la lista y la memoria del último enlace
-                capturedLinksList.clear()
                 lastCapturedUrl = ""
 
                 // Si el diálogo estaba abierto de la página anterior, lo cerramos
@@ -377,6 +375,7 @@ class BrowserActivity : AppCompatActivity() {
                 return false // Permite la carga fluida de cualquier reproductor o servidor incrustado sin bloquear por gestos
             }
 
+            // REEMPLAZAR ESTE MÉTODO COMPLETO DENTRO DE webView.webViewClient:
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 etUrl.setText(url)
@@ -386,42 +385,56 @@ class BrowserActivity : AppCompatActivity() {
                 }
                 cleanOverlays()
 
+                // SNIFFER DE JS EXPANDIDO: Ahora intercepta peticiones XHR/Fetch de cualquier formato y servidor alternativo al dar Play
                 val extractVideoJs = """
-                javascript:(function() {
-                    var findVideos = function() {
-                        var videos = document.getElementsByTagName('video');
-                        for(var i = 0; i < videos.length; i++) {
-                            if(videos[i].src && !videos[i].src.startsWith('blob:')) {
-                                console.log('VIDEO_ENCONTRADO: ' + videos[i].src);
-                            }
-                            var sources = videos[i].getElementsByTagName('source');
-                            for(var j = 0; j < sources.length; j++) {
-                                if(sources[j].src) console.log('VIDEO_ENCONTRADO: ' + sources[j].src);
-                            }
-                        }
-                    };
-                    findVideos();
-                    setInterval(findVideos, 2000); 
+        javascript:(function() {
+            var isVideo = function(u) {
+                if (typeof u !== 'string') return false;
+                var ul = u.toLowerCase();
+                return ul.includes('.m3u8') || ul.includes('.mp4') || ul.includes('.m3u') || 
+                       ul.includes('.bin') || ul.includes('.webm') || ul.includes('.mkv') ||
+                       ul.includes('get_video') || ul.includes('videoplayback') || 
+                       ul.includes('streamtape') || ul.includes('mixdrop') || 
+                       ul.includes('voe.sx') || ul.includes('dood');
+            };
 
-                    var originalFetch = window.fetch;
-                    window.fetch = function() {
-                        var fetchUrl = arguments[0];
-                        if (typeof fetchUrl === 'string' && (fetchUrl.includes('.m3u8') || fetchUrl.includes('.mp4'))) {
-                            console.log('VIDEO_ENCONTRADO: ' + fetchUrl);
-                        }
-                        return originalFetch.apply(this, arguments);
-                    };
+            var findVideos = function() {
+                var videos = document.getElementsByTagName('video');
+                for(var i = 0; i < videos.length; i++) {
+                    if(videos[i].src && !videos[i].src.startsWith('blob:')) {
+                        console.log('VIDEO_ENCONTRADO: ' + videos[i].src);
+                    }
+                    var sources = videos[i].getElementsByTagName('source');
+                    for(var j = 0; j < sources.length; j++) {
+                        if(sources[j].src) console.log('VIDEO_ENCONTRADO: ' + sources[j].src);
+                    }
+                }
+            };
+            findVideos();
+            setInterval(findVideos, 2000); 
 
-                    var originalOpen = XMLHttpRequest.prototype.open;
-                    XMLHttpRequest.prototype.open = function(method, xhrUrl) {
-                        if (typeof xhrUrl === 'string' && (xhrUrl.includes('.m3u8') || xhrUrl.includes('.mp4'))) {
-                            console.log('VIDEO_ENCONTRADO: ' + xhrUrl);
-                        }
-                        originalOpen.apply(this, arguments);
-                    };
-                })();
-            """.trimIndent()
+            var originalFetch = window.fetch;
+            window.fetch = function() {
+                var fetchUrl = arguments[0];
+                if (typeof fetchUrl === 'string' && isVideo(fetchUrl)) {
+                    console.log('VIDEO_ENCONTRADO: ' + fetchUrl);
+                }
+                return originalFetch.apply(this, arguments);
+            };
+
+            var originalOpen = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function(method, xhrUrl) {
+                if (typeof xhrUrl === 'string' && isVideo(xhrUrl)) {
+                    console.log('VIDEO_ENCONTRADO: ' + xhrUrl);
+                }
+                originalOpen.apply(this, arguments);
+            };
+        })();
+    """.trimIndent()
                 view?.evaluateJavascript(extractVideoJs, null)
+            }
+            override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: android.net.http.SslError?) {
+                handler?.proceed()
             }
         }
 
@@ -491,6 +504,7 @@ class BrowserActivity : AppCompatActivity() {
                 webView.visibility = View.VISIBLE
             }
         }
+
     }
 
     private fun isValidVideoUrl(url: String): Boolean {
@@ -522,10 +536,38 @@ class BrowserActivity : AppCompatActivity() {
 
         return true
     }
+    private fun reconstructMasterUrl(url: String): String? {
+        val uri = try { Uri.parse(url) } catch (e: Exception) { return null }
+        val lastSegment = uri.lastPathSegment ?: ""
 
+        // Si el enlace ya es un "master.m3u8", no hace falta reconstruir nada
+        if (lastSegment.equals("master.m3u8", ignoreCase = true)) {
+            return null
+        }
+
+        // Si el enlace es una sub-playlist (index, chunklist, variant, mono)
+        if (lastSegment.endsWith(".m3u8", ignoreCase = true)) {
+            if (lastSegment.startsWith("index", ignoreCase = true) ||
+                lastSegment.contains("chunklist", ignoreCase = true) ||
+                lastSegment.contains("variant", ignoreCase = true) ||
+                lastSegment.contains("mono", ignoreCase = true)) {
+
+                val path = uri.path ?: ""
+                if (path.contains("/")) {
+                    // Reemplaza el final de la ruta por "master.m3u8"
+                    val newPath = path.substringBeforeLast("/") + "/master.m3u8"
+                    return uri.buildUpon().path(newPath).build().toString()
+                }
+            }
+        }
+        return null
+    }
+    // REEMPLAZAR ESTE MÉTODO COMPLETO:
     private fun processDetectedLink(url: String, headers: Map<String, String>) {
-        val finalUrl = url
+        // 1. ACTIVACIÓN: Reconstruye automáticamente sub-playlists (index-v) a enlaces master.m3u8
+        val finalUrl = reconstructMasterUrl(url) ?: url
 
+        // 2. Control de duplicados en la lista de capturas
         if (finalUrl == lastCapturedUrl) return
         if (capturedLinksList.any { it.url == finalUrl }) return
         if (!isValidVideoUrl(finalUrl)) return
@@ -562,14 +604,14 @@ class BrowserActivity : AppCompatActivity() {
                         confirmAndCapture(capturedLink, "🎬 VIDEO LARGO DETECTADO (>40 min)")
                     }
                 } catch (e: Exception) {
-                    if (finalUrl.contains("?") && isValidVideoUrl(finalUrl)) {
-                        confirmAndCapture(capturedLink, "✅ VIDEO MP4 CAPTURADO (Metadata protegida)")
-                    }
+                    // Captura segura en caso de fallo de metadatos del MP4
+                    confirmAndCapture(capturedLink, "✅ VIDEO MP4 CAPTURADO (Directo / Protegido)")
                 }
             }
             return
         }
 
+        // Captura general de listas master.m3u8, directos de Mediafire, Mixdrop, etc.
         confirmAndCapture(capturedLink, "📡 ENLACE MULTIMEDIA CAPTURADO")
     }
 
@@ -862,13 +904,34 @@ class BrowserActivity : AppCompatActivity() {
     }
 
     private fun saveFavorite(url: String) {
-        val favorites = getFavoritesList().toMutableSet()
-        if (favorites.add(url)) {
-            sharedPreferences.edit().putStringSet("fav_urls", favorites).apply()
-            Toast.makeText(this, "⭐ Guardado en favoritos", Toast.LENGTH_SHORT).show()
-        } else {
+        val list = getFavoritesListJSON()
+        if (list.any { it.url == url }) {
             Toast.makeText(this, "Esta página ya es favorita", Toast.LENGTH_SHORT).show()
+            return
         }
+
+        val uri = try { Uri.parse(url) } catch (e: Exception) { null }
+        val defaultName = uri?.host ?: "Favorito"
+
+        // Crear un cuadro de texto para el nombre
+        val input = EditText(this).apply {
+            setText(defaultName)
+            setSelection(defaultName.length)
+            setTextColor(Color.BLACK)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Guardar Favorito")
+            .setMessage("Asigna un nombre para identificarlo:")
+            .setView(input)
+            .setPositiveButton("Guardar") { _, _ ->
+                val customName = input.text.toString().trim().ifEmpty { defaultName }
+                list.add(FavoriteItem(customName, url))
+                saveFavoritesListJSON(list)
+                Toast.makeText(this, "⭐ Guardado en favoritos", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     private fun removeFavorite(url: String) {
@@ -880,7 +943,7 @@ class BrowserActivity : AppCompatActivity() {
     }
 
     private fun showFavoritesDialog() {
-        val favs = getFavoritesList().toList()
+        val favs = getFavoritesListJSON()
         if (favs.isEmpty()) {
             Toast.makeText(this, "No tienes favoritos guardados", Toast.LENGTH_SHORT).show()
             return
@@ -889,7 +952,7 @@ class BrowserActivity : AppCompatActivity() {
         val builder = AlertDialog.Builder(this)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(30, 30, 30, 20)
+            setPadding(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(16))
             val dialogBg = android.graphics.drawable.GradientDrawable().apply {
                 setColor(Color.parseColor("#1A1A24"))
                 cornerRadius = 24f
@@ -909,21 +972,32 @@ class BrowserActivity : AppCompatActivity() {
 
         val listView = ListView(this).apply {
             divider = android.graphics.drawable.ColorDrawable(Color.parseColor("#2C2C3C"))
-            dividerHeight = 2
+            dividerHeight = dpToPx(1)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                dpToPx(300) // Altura fija de scrollable para no solapar botones
             ).apply { weight = 1f }
         }
         container.addView(listView)
 
-        val adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, favs) {
+        // CORRECCIÓN: Se agrega "android.R.id.text1" en el constructor para indicarle al adaptador
+// dónde se encuentra el TextView principal y evitar la caída (ClassCastException)
+        val adapter = object : ArrayAdapter<FavoriteItem>(this, android.R.layout.simple_list_item_2, android.R.id.text1, favs) {
             override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
                 val view = super.getView(position, convertView, parent)
-                val textView = view.findViewById<TextView>(android.R.id.text1)
-                textView.setTextColor(Color.parseColor("#E0E0E0"))
-                textView.textSize = 14f
-                textView.setPadding(12, 16, 12, 16)
+                val textView1 = view.findViewById<TextView>(android.R.id.text1)
+                val textView2 = view.findViewById<TextView>(android.R.id.text2)
+
+                val item = favs[position]
+                textView1.text = "⭐ " + item.title
+                textView1.setTextColor(Color.WHITE)
+                textView1.textSize = 14f
+
+                textView2.text = item.url
+                textView2.setTextColor(Color.parseColor("#90A4AE"))
+                textView2.textSize = 10f
+                textView2.setPadding(0, dpToPx(2), 0, 0)
+
                 return view
             }
         }
@@ -932,13 +1006,13 @@ class BrowserActivity : AppCompatActivity() {
         val actionsLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END
-            setPadding(0, 20, 0, 0)
+            setPadding(0, dpToPx(12), 0, 0)
         }
 
         var dialog: AlertDialog? = null
         val btnCerrar = Button(this).apply {
             text = "Cerrar"
-            setTextColor(Color.parseColor("#90A4AE"))
+            setTextColor(Color.parseColor("#2979FF"))
             background = null
             setOnClickListener { dialog?.dismiss() }
         }
@@ -947,31 +1021,117 @@ class BrowserActivity : AppCompatActivity() {
 
         builder.setView(container)
         dialog = builder.create()
-        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
-        dialog.show()
+        dialog?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+        dialog?.show()
 
+        // MENÚ DE OPCIONES DEL FAVORITO AL SELECCIONARLO
         listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
-            val selectedUrl = favs[position]
-            webView.loadUrl(selectedUrl)
-            dialog.dismiss()
-        }
+            val selectedItem = favs[position]
 
-        listView.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
-            val selectedUrl = favs[position]
-            AlertDialog.Builder(this)
-                .setTitle("¿Eliminar favorito?")
-                .setMessage(selectedUrl)
-                .setPositiveButton("Eliminar") { _, _ ->
-                    removeFavorite(selectedUrl)
-                    dialog.dismiss()
-                    showFavoritesDialog()
+            val opciones = arrayOf(
+                "🌐 Abrir Sitio Web",
+                "✏️ Editar Nombre",
+                "⬆️ Mover Arriba",
+                "⬇️ Mover Abajo",
+                "🗑️ Eliminar"
+            )
+
+            AlertDialog.Builder(this@BrowserActivity)
+                .setTitle(selectedItem.title)
+                .setItems(opciones) { _, which ->
+                    when (which) {
+                        0 -> { // Abrir
+                            webView.loadUrl(selectedItem.url)
+                            dialog?.dismiss()
+                        }
+                        1 -> { // Editar nombre
+                            dialog?.dismiss()
+                            showEditFavoriteNameDialog(position, favs)
+                        }
+                        2 -> { // Mover arriba
+                            if (position > 0) {
+                                val temp = favs[position]
+                                favs[position] = favs[position - 1]
+                                favs[position - 1] = temp
+                                saveFavoritesListJSON(favs)
+                                dialog?.dismiss()
+                                showFavoritesDialog()
+                            } else {
+                                Toast.makeText(this@BrowserActivity, "Ya está en la cima", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        3 -> { // Mover abajo
+                            if (position < favs.size - 1) {
+                                val temp = favs[position]
+                                favs[position] = favs[position + 1]
+                                favs[position + 1] = temp
+                                saveFavoritesListJSON(favs)
+                                dialog?.dismiss()
+                                showFavoritesDialog()
+                            } else {
+                                Toast.makeText(this@BrowserActivity, "Ya está al final", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        4 -> { // Eliminar
+                            favs.removeAt(position)
+                            saveFavoritesListJSON(favs)
+                            dialog?.dismiss()
+                            showFavoritesDialog()
+                        }
+                    }
                 }
-                .setNegativeButton("Cancelar", null)
                 .show()
-            true
         }
     }
 
+    private fun showEditFavoriteNameDialog(position: Int, favs: MutableList<FavoriteItem>) {
+        val item = favs[position]
+        val input = EditText(this).apply {
+            setText(item.title)
+            setSelection(item.title.length)
+            setTextColor(Color.BLACK)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Editar Nombre")
+            .setMessage("Escribe el nuevo nombre de identificación:")
+            .setView(input)
+            .setPositiveButton("Actualizar") { _, _ ->
+                val newName = input.text.toString().trim()
+                if (newName.isNotEmpty()) {
+                    favs[position] = FavoriteItem(newName, item.url)
+                    saveFavoritesListJSON(favs)
+                    showFavoritesDialog() // Redibuja la lista actualizada
+                }
+            }
+            .setNegativeButton("Cancelar") { _, _ ->
+                showFavoritesDialog()
+            }
+            .show()
+    }
+    private fun getFavoritesListJSON(): MutableList<FavoriteItem> {
+        val jsonString = sharedPreferences.getString("fav_list_json", null) ?: return mutableListOf()
+        val list = mutableListOf<FavoriteItem>()
+        try {
+            val jsonArray = org.json.JSONArray(jsonString)
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                list.add(FavoriteItem(obj.getString("title"), obj.getString("url")))
+            }
+        } catch (e: Exception) { }
+        return list
+    }
+
+    private fun saveFavoritesListJSON(list: List<FavoriteItem>) {
+        val jsonArray = org.json.JSONArray()
+        for (item in list) {
+            val obj = org.json.JSONObject()
+            obj.put("title", item.title)
+            obj.put("url", item.url)
+            jsonArray.put(obj)
+        }
+        sharedPreferences.edit().putString("fav_list_json", jsonArray.toString()).apply()
+    }
     override fun onBackPressed() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
