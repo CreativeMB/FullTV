@@ -123,14 +123,9 @@ class BrowserActivity : AppCompatActivity() {
     private var captureDialog: AlertDialog? = null
 
     private val blacklistedDomains = arrayOf(
-        "adsystem", "adserver", "pixel", "analytics", "telemetry", "tracker",
-        "beacon", "statcounter", "doubleclick", "adsterra", "exoclick",
-        "onclickads", "popcash", "popads", "propellerads", "histats",
-        "traffic", "prebid", "vast", "vpaid", "googlesyndication", "google-analytics",
-        "adservice", "serving", "advert", "banner", "metric",
-        // Nuevos bloqueos agresivos para sitios de streaming:
-        "bet", "casino", "porn", "sex", "xxx", "livejasmin", "chaturbate",
-        "realsrv", "bidgear", "runative", "exo", "nativeads", "popunders"
+        "adsterra", "exoclick", "onclickads", "popcash", "popads", "propellerads",
+        "doubleclick", "googlesyndication", "google-analytics", "telemetry", "tracker",
+        "adserver", "adservice", "histats", "statcounter", "beacon"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -297,10 +292,10 @@ class BrowserActivity : AppCompatActivity() {
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
-        settings.setSupportMultipleWindows(false)
+        settings.setSupportMultipleWindows(true)
         settings.javaScriptCanOpenWindowsAutomatically = false
         // Simulador de Desktop/Chrome fuerte para evitar capados de servidores móviles
-        settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+        settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; SM-S901B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
 
         settings.mediaPlaybackRequiresUserGesture = false
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
@@ -370,6 +365,7 @@ class BrowserActivity : AppCompatActivity() {
                 return super.shouldInterceptRequest(view, request)
             }
 
+            // REEMPLAZAR ESTE MÉTODO COMPLETO:
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url.toString()
                 val host = request?.url?.host?.lowercase() ?: ""
@@ -378,16 +374,7 @@ class BrowserActivity : AppCompatActivity() {
                     if (host.contains(domain)) return true
                 }
 
-                if (request?.hasGesture() == false) {
-                    val currentUrl = view?.url
-                    if (currentUrl != null) {
-                        val currentHost = Uri.parse(currentUrl).host
-                        if (currentHost != null && currentHost != host && !isPotentialVideoUrl(url)) {
-                            return true
-                        }
-                    }
-                }
-                return false
+                return false // Permite la carga fluida de cualquier reproductor o servidor incrustado sin bloquear por gestos
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -454,14 +441,26 @@ class BrowserActivity : AppCompatActivity() {
                 return super.onConsoleMessage(consoleMessage)
             }
 
+            // REEMPLAZAR ESTE MÉTODO COMPLETO DENTRO DE webChromeClient:
             override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: android.os.Message?): Boolean {
-                val result = view?.hitTestResult
-                val url = result?.extra
-                if (url != null) {
-                    view.loadUrl(url)
-                    return true
+                // Creamos un WebView temporal en memoria para atrapar el enlace de la publicidad
+                val tempWebView = WebView(this@BrowserActivity)
+                tempWebView.webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                        val url = request?.url.toString()
+                        try {
+                            // Desviamos el anuncio al navegador predeterminado del dispositivo (Chrome, Samsung Internet, etc.)
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                            startActivity(intent)
+                        } catch (e: Exception) { }
+                        return true // Retornamos true para cancelar la carga interna y no perder el progreso de la película
+                    }
                 }
-                return false
+
+                val transport = resultMsg?.obj as? WebView.WebViewTransport
+                transport?.webView = tempWebView
+                resultMsg?.sendToTarget()
+                return true
             }
 
             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
