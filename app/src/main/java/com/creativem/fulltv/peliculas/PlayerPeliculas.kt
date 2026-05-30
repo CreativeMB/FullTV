@@ -96,7 +96,9 @@ import kotlinx.coroutines.isActive
 
 @Suppress("DEPRECATION")
 class PlayerPeliculas : AppCompatActivity() {
-
+    private var userAgent: String? = null
+    private var referer: String? = null
+    private var cookie: String? = null
     private var player: ExoPlayer? = null
     private var streamUrl: String = ""
     private var movieImageUrl: String = ""
@@ -505,28 +507,84 @@ class PlayerPeliculas : AppCompatActivity() {
             player?.release()
             player = null
 
-            // 2. CONFIGURACIÓN DE RED PARA TV (Blindado con User-Agent sincronizado)
+            // --- EXTRACTOR INTELIGENTE DE CABECERAS PARA ENLACES ENCAPSULADOS ---
+            var urlLimpia = streamUrl.trim()
+            var finalUserAgent = userAgent
+            var finalReferer = referer
+            var finalCookie = cookie
+
+            // Si el enlace viene con el formato de barra "|" de seguridad
+            if (urlLimpia.contains("|")) {
+                val partes = urlLimpia.split("|")
+                urlLimpia = partes[0].trim() // Extraemos la URL pura sin los parámetros del agente
+
+                if (partes.size > 1) {
+                    val parametrosCabecera = partes[1].split("&")
+                    parametrosCabecera.forEach { parametro ->
+                        val llaveValor = parametro.split("=")
+                        if (llaveValor.size == 2) {
+                            val clave = llaveValor[0].trim()
+                            // DECODIFICACIÓN: Convierte el %20 de vuelta a espacio real para que la CDN lo acepte
+                            val valor = Uri.decode(llaveValor[1].trim())
+
+                            when {
+                                clave.equals("User-Agent", ignoreCase = true) -> finalUserAgent = valor
+                                clave.equals("Referer", ignoreCase = true) -> finalReferer = valor
+                                clave.equals("Cookie", ignoreCase = true) -> finalCookie = valor
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. CONSTRUCCIÓN DE PROPIEDADES DE RED DINÁMICAS (Se adapta a cada enlace)
+            val requestProperties = HashMap<String, String>()
+            requestProperties["Connection"] = "keep-alive"
+            requestProperties["Accept"] = "*/*"
+            requestProperties["ngrok-skip-browser-warning"] = "true"
+
+            // Si se capturó un referer, lo añadimos y generamos automáticamente la cabecera Origin
+            finalReferer?.let { ref ->
+                if (ref.isNotEmpty()) {
+                    requestProperties["Referer"] = ref
+                    try {
+                        val uri = Uri.parse(ref)
+                        requestProperties["Origin"] = "${uri.scheme}://${uri.host}"
+                    } catch (e: Exception) {}
+                }
+            }
+
+            // Si se capturó una cookie, la asignamos al canal de red de ExoPlayer
+            finalCookie?.let { coo ->
+                if (coo.isNotEmpty()) {
+                    requestProperties["Cookie"] = coo
+                }
+            }
+
+            // Definimos el User-Agent de manera dinámica (usamos el capturado o el de respaldo Safari macOS)
+            val userAgentExo = if (!finalUserAgent.isNullOrEmpty()) {
+                finalUserAgent!!
+            } else {
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15"
+            }
+
+            // 3. CONFIGURACIÓN DEL DATASOURCE FACTORY DINÁMICO
             val dataSourceFactory = DefaultHttpDataSource.Factory()
-                // Usamos el mismo User-Agent de escritorio del navegador para pasar la validación del Token del servidor
-                .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
-                .setDefaultRequestProperties(mapOf(
-                    "Connection" to "keep-alive",
-                    "Accept" to "*/*",
-                    "ngrok-skip-browser-warning" to "true"
-                ))
+                .setUserAgent(userAgentExo)
+                .setDefaultRequestProperties(requestProperties)
                 .setConnectTimeoutMs(30_000)
                 .setReadTimeoutMs(30_000)
-                .setAllowCrossProtocolRedirects(true)
+                .setAllowCrossProtocolRedirects(true) // Indispensable para evitar caídas en redirecciones
 
-            // 3. RENDERIZADORES PARA TV
+            // 4. RENDERIZADORES PARA TV
             val renderersFactory = DefaultRenderersFactory(this@PlayerPeliculas)
                 .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
                 .setEnableDecoderFallback(true)
 
-            // 4. FACTORÍA DE MEDIA
+            // 5. FACTORÍA DE MEDIA
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
-            // 5. LOAD CONTROL OPTIMIZADO (Evita desbordamiento de memoria - OOM en TV)
+            // 6. LOAD CONTROL OPTIMIZADO (Evita desbordamiento de memoria - OOM en TV)
             val loadControl = DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
                     30_000,   // Mínimo buffer inicial (30s)
@@ -534,13 +592,11 @@ class PlayerPeliculas : AppCompatActivity() {
                     3_000,    // Buffer rápido de arranque (3s)
                     4_500     // Buffer de reanudación (4.5s)
                 )
-                // Usamos C.LENGTH_UNSET para que ExoPlayer maneje la memoria de forma inteligente
-                // y no sature la memoria RAM física en TV Boxes de bajos recursos
                 .setTargetBufferBytes(androidx.media3.common.C.LENGTH_UNSET)
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build()
 
-            // 6. CREAR EL REPRODUCTOR
+            // 7. CREAR EL REPRODUCTOR
             player = ExoPlayer.Builder(this@PlayerPeliculas, renderersFactory)
                 .setMediaSourceFactory(mediaSourceFactory)
                 .setLoadControl(loadControl)
@@ -548,8 +604,8 @@ class PlayerPeliculas : AppCompatActivity() {
 
             binding.reproductor.player = player
 
-            // 7. PROCESAMIENTO SEGURO DEL MEDIA ITEM Y FORZADO DE MIME TYPE
-            val uriLimpia = streamUrl.trim()
+            // 8. PROCESAMIENTO SEGURO DEL MEDIA ITEM Y FORZADO DE MIME TYPE
+            val uriLimpia = urlLimpia.trim() // IMPORTANTE: Usamos la URL limpia sin el sufijo de las cabeceras "|"
             if (uriLimpia.isEmpty()) {
                 mostrarCargando(false)
                 return
@@ -558,7 +614,6 @@ class PlayerPeliculas : AppCompatActivity() {
             val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(uriLimpia))
 
             // BLINDAJE: Si la URL contiene .m3u o .m3u8, le forzamos a ExoPlayer el decodificador HLS
-            // evitando que se confunda con los parámetros dinámicos de la URL (?t=...&s=...)
             if (uriLimpia.lowercase().contains(".m3u8") || uriLimpia.lowercase().contains(".m3u")) {
                 mediaItemBuilder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
             } else if (uriLimpia.lowercase().contains(".mp4")) {
@@ -567,7 +622,7 @@ class PlayerPeliculas : AppCompatActivity() {
 
             val mediaItem = mediaItemBuilder.build()
 
-            // 8. ASIGNACIÓN DE LISTENERS
+            // 9. ASIGNACIÓN DE LISTENERS
             player?.addListener(object : Player.Listener {
                 override fun onPlayerError(error: PlaybackException) {
                     Log.e("TV_ERROR", "Error detectado en reproducción: ${error.errorCodeName}")
@@ -601,7 +656,7 @@ class PlayerPeliculas : AppCompatActivity() {
 
             player?.addListener(playerListener)
 
-            // 9. INICIALIZACIÓN
+            // 10. INICIALIZACIÓN
             player?.setMediaItem(mediaItem)
 
             if (posicionInicial > 0) {

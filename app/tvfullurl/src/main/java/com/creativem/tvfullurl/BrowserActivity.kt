@@ -7,21 +7,33 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Color
 import android.media.MediaMetadataRetriever
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.webkit.*
 import android.widget.*
+import androidx.annotation.OptIn
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.media3.common.util.Log
+import androidx.media3.common.util.UnstableApi
+import java.net.HttpURLConnection
+import java.net.URL
 import java.net.URLEncoder
 import kotlin.concurrent.thread
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
-// --- NUEVO OBJETO: AGENTE CONSTRUCTOR ---
-// Su única función es preparar y blindar las cabeceras para engañar al servidor
-// y alimentar a tu VideoView local.
+// --- OBJETO: AGENTE CONSTRUCTOR ---
 object LocalAgentBuilder {
     fun getSecureHeaders(link: CapturedLink): HashMap<String, String> {
         val headers = HashMap<String, String>()
@@ -30,11 +42,9 @@ object LocalAgentBuilder {
         link.referer?.let { headers["Referer"] = it }
         link.cookie?.let { headers["Cookie"] = it }
 
-        // Cabeceras adicionales para simular que la petición sigue en el navegador
         headers["Accept"] = "*/*"
         headers["Connection"] = "keep-alive"
 
-        // Extraemos y forzamos el Origin (Vital para servidores con seguridad estricta CORS)
         link.referer?.let { ref ->
             try {
                 val uri = Uri.parse(ref)
@@ -45,49 +55,19 @@ object LocalAgentBuilder {
         return headers
     }
 }
-// ----------------------------------------
+
 data class FavoriteItem(val title: String, val url: String)
-// Clase modelo para estructurar el enlace y sus parámetros de sesión
+
 data class CapturedLink(
     val url: String,
     val userAgent: String?,
     val referer: String?,
-    val cookie: String?
+    val cookie: String?,
+    var ipLockStatus: String = "🔄 Analizando compatibilidad..."
 ) {
     fun getFormattedUrlForClipboard(): String {
-        val uri = try { Uri.parse(url) } catch (e: Exception) { null }
-        val host = uri?.host?.lowercase() ?: ""
-
-        val protectedHosts = arrayOf("minochinos.com", "acek-cdn.com")
-        val isProtected = protectedHosts.any { host.contains(it) }
-
-        if (isProtected) {
-            val sb = StringBuilder(url)
-            val params = mutableListOf<String>()
-            try {
-                if (!userAgent.isNullOrEmpty()) {
-                    val encodedUA = URLEncoder.encode(userAgent, "UTF-8").replace("+", "%20")
-                    params.add("User-Agent=$encodedUA")
-                }
-                if (!referer.isNullOrEmpty()) {
-                    val encodedRef = URLEncoder.encode(referer, "UTF-8").replace("+", "%20")
-                    params.add("Referer=$encodedRef")
-                }
-                if (!cookie.isNullOrEmpty()) {
-                    val encodedCookie = URLEncoder.encode(cookie, "UTF-8").replace("+", "%20")
-                    params.add("Cookie=$encodedCookie")
-                }
-            } catch (e: Exception) {
-                if (!userAgent.isNullOrEmpty()) params.add("User-Agent=$userAgent")
-                if (!referer.isNullOrEmpty()) params.add("Referer=$referer")
-            }
-            if (params.isNotEmpty()) {
-                sb.append("|").append(params.joinToString("&"))
-            }
-            return sb.toString()
-        }
-
-        return url
+        // Retorna únicamente la URL pura y limpia de origen, sin la barra "|" ni agentes
+        return url.trim()
     }
 
     override fun equals(other: Any?): Boolean {
@@ -100,6 +80,7 @@ data class CapturedLink(
         return url.hashCode()
     }
 }
+
 
 class BrowserActivity : AppCompatActivity() {
 
@@ -115,12 +96,20 @@ class BrowserActivity : AppCompatActivity() {
     private var lastCapturedUrl: String = ""
     private var mainDomain: String = ""
     private lateinit var sharedPreferences: SharedPreferences
-
+    private var btnTogglePopup: Button? = null
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
-
+    private var exoPlayer: androidx.media3.exoplayer.ExoPlayer? = null
     private val capturedLinksList = LinkedHashSet<CapturedLink>()
     private var captureDialog: AlertDialog? = null
+
+    // --- NUEVO ELEMENTO: BOTÓN FLOTANTE PARA REABRIR DIÁLOGO ---
+    private var btnFloatingCapture: View? = null
+
+    // --- NUEVAS VARIABLES PARA EL MANEJO DE PUBLICIDAD ENCAPSULADA ---
+    private var popupContainer: FrameLayout? = null
+    private var popupWebView: WebView? = null
+    private var isPopupMinimized = false
 
     private val blacklistedDomains = arrayOf(
         "adsterra", "exoclick", "onclickads", "popcash", "popads", "propellerads",
@@ -150,6 +139,7 @@ class BrowserActivity : AppCompatActivity() {
 
         setupWebView()
         setupButtons()
+        setupFloatingCaptureButton() // Inicialización del botón flotante
     }
 
     private fun dpToPx(dp: Int): Int {
@@ -179,10 +169,11 @@ class BrowserActivity : AppCompatActivity() {
                     "https://www.google.com/search?q=$encodedQuery"
                 }
 
-                // Limpiamos todo antes de ir a la nueva URL
                 capturedLinksList.clear()
+                updateFloatingButtonVisibility() // Ocultar botón al limpiar capturas antiguas
                 lastCapturedUrl = ""
                 captureDialog?.dismiss()
+                destroyPopup() // Limpiar popups activos al navegar a otra web
 
                 webView.loadUrl(finalUrl)
             }
@@ -202,32 +193,70 @@ class BrowserActivity : AppCompatActivity() {
         }
     }
 
+    // --- MÉTODO PARA GENERAR E INSERTAR EL BOTÓN FLOTANTE DINÁMICAMENTE ---
+    private fun setupFloatingCaptureButton() {
+        val rootView = findViewById<FrameLayout>(android.R.id.content)
+
+        val floatingButton = FrameLayout(this).apply {
+            val shape = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(Color.parseColor("#2979FF")) // Color eléctrico concordante con el tema
+            }
+            background = shape
+            elevation = dpToPx(8).toFloat()
+            visibility = View.GONE // Oculto al inicio, solo aparece si se captura algo
+
+            layoutParams = FrameLayout.LayoutParams(
+                dpToPx(56),
+                dpToPx(56)
+            ).apply {
+                gravity = Gravity.BOTTOM or Gravity.START
+                setMargins(dpToPx(16), 0, 0, dpToPx(80)) // Lado izquierdo, libre de interferencias
+            }
+        }
+
+        val icon = TextView(this).apply {
+            text = "📡"
+            textSize = 20f
+            gravity = Gravity.CENTER
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        floatingButton.addView(icon)
+
+        floatingButton.setOnClickListener {
+            if (capturedLinksList.isNotEmpty()) {
+                showCapturedLinksDialog()
+            }
+        }
+
+        btnFloatingCapture = floatingButton
+        rootView.addView(floatingButton)
+    }
+
+    private fun updateFloatingButtonVisibility() {
+        runOnUiThread {
+            btnFloatingCapture?.visibility = if (capturedLinksList.isNotEmpty()) View.VISIBLE else View.GONE
+        }
+    }
+
     private fun cleanOverlays() {
         val script = """
         (function() {
             try {
-                // 1. Convertimos los elementos a un Array real para evitar saltos al eliminar
                 var elems = Array.from(document.body.querySelectorAll('*'));
-                
                 elems.forEach(function(el) {
                     var style = window.getComputedStyle(el);
-                    
-                    // Buscamos elementos flotantes (típico de overlays invisibles y popups)
                     if (style.position === 'fixed' || style.position === 'absolute') {
                         var zIndex = parseInt(style.zIndex);
-                        
-                        // Si el elemento está muy al frente o cubre toda la pantalla (trampa de clic)
                         if (zIndex > 90 || (style.width === '100%' && style.height === '100%')) {
                             var html = el.innerHTML || '';
-                            
-                            // CORRECCIÓN: En JavaScript se usa .includes(), NO .contains()
                             var isImportant = html.includes('video') || 
                                               html.includes('Download') || 
                                               el.tagName === 'VIDEO';
-                            
-                            // Si no contiene el video o el botón, lo aniquilamos
                             if (!isImportant) {
-                                // En vez de solo remove(), lo ocultamos también por si falla
                                 el.style.display = 'none';
                                 el.style.pointerEvents = 'none';
                                 el.remove();
@@ -236,7 +265,6 @@ class BrowserActivity : AppCompatActivity() {
                     }
                 });
 
-                // 2. Limpieza de iframes basura que meten anuncios de apuestas
                 document.querySelectorAll('iframe').forEach(function(iframe) {
                     var src = iframe.src || '';
                     if (!src.includes('video') && !src.includes('player')) {
@@ -251,6 +279,7 @@ class BrowserActivity : AppCompatActivity() {
     """.trimIndent()
         webView.evaluateJavascript(script, null)
     }
+
     private fun isPotentialVideoUrl(url: String): Boolean {
         val urlLower = url.lowercase()
         val uri = try { Uri.parse(url) } catch (e: Exception) { null }
@@ -287,6 +316,182 @@ class BrowserActivity : AppCompatActivity() {
         return false
     }
 
+    // --- NUEVOS MÉTODOS: CONTROL DE POPUPS ENCAPSULADOS ---
+
+    private fun createPopupContainer(): FrameLayout {
+        val context = this@BrowserActivity
+        isPopupMinimized = true // Iniciamos en estado minimizado para no estorbar
+
+        // Contenedor principal con tamaño mínimo inicial (solo cabecera)
+        val container = FrameLayout(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                dpToPx(160), // Ancho inicial reducido
+                dpToPx(40)   // Altura inicial justa para el título
+            ).apply {
+                gravity = Gravity.BOTTOM or Gravity.END
+                setMargins(0, 0, dpToPx(16), dpToPx(80)) // Ubicado sobre los controles inferiores
+            }
+        }
+
+        // Tarjeta contenedora con bordes redondeados
+        val cardView = androidx.cardview.widget.CardView(context).apply {
+            radius = dpToPx(12).toFloat()
+            cardElevation = dpToPx(8).toFloat()
+            setCardBackgroundColor(Color.parseColor("#222230"))
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        val mainLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        // Barra de título / Cabecera (arrastrable)
+        val header = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundColor(Color.parseColor("#2D2D3F"))
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dpToPx(40)
+            )
+        }
+
+        val titleTv = TextView(context).apply {
+            text = "Anuncio"
+            setTextColor(Color.WHITE)
+            textSize = 11f
+            setPadding(dpToPx(12), 0, 0, 0)
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1.0f
+            )
+        }
+        header.addView(titleTv)
+
+        // Botón para expandir o volver a colapsar
+        btnTogglePopup = Button(context).apply {
+            text = "➕" // Indica que se puede expandir para ver el contenido
+            textSize = 10f
+            setTextColor(Color.WHITE)
+            background = null
+            layoutParams = LinearLayout.LayoutParams(dpToPx(40), dpToPx(40))
+            setOnClickListener {
+                toggleMinimizePopup()
+            }
+        }
+        header.addView(btnTogglePopup)
+
+        // Botón para cerrar definitivamente
+        val btnClose = Button(context).apply {
+            text = "❌"
+            textSize = 10f
+            setTextColor(Color.WHITE)
+            background = null
+            layoutParams = LinearLayout.LayoutParams(dpToPx(40), dpToPx(40))
+            setOnClickListener {
+                destroyPopup()
+            }
+        }
+        header.addView(btnClose)
+
+        mainLayout.addView(header)
+
+        // Permite arrastrar el pequeño título por la pantalla
+        makeHeaderDraggable(header, container)
+
+        // WebView secundario que procesa la publicidad en segundo plano
+        val secWebView = WebView(context).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.supportMultipleWindows()
+            settings.userAgentString = webView.settings.userAgentString
+            visibility = View.GONE // Se mantiene oculto al inicio para no ocupar espacio
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                    return false
+                }
+            }
+        }
+
+        popupWebView = secWebView
+        mainLayout.addView(secWebView)
+        cardView.addView(mainLayout)
+        container.addView(cardView)
+
+        return container
+    }
+
+    private fun toggleMinimizePopup() {
+        val container = popupContainer ?: return
+        val params = container.layoutParams as FrameLayout.LayoutParams
+        if (isPopupMinimized) {
+            // Expandir: Mostramos la ventana de visualización del anuncio
+            params.width = dpToPx(280)
+            params.height = dpToPx(380)
+            popupWebView?.visibility = View.VISIBLE
+            btnTogglePopup?.text = "➖"
+            isPopupMinimized = false
+        } else {
+            // Minimizar: Ocultamos el WebView y dejamos solo la pequeña etiqueta
+            params.width = dpToPx(160)
+            params.height = dpToPx(40)
+            popupWebView?.visibility = View.GONE
+            btnTogglePopup?.text = "➕"
+            isPopupMinimized = true
+        }
+        container.layoutParams = params
+    }
+
+    private fun destroyPopup() {
+        val decor = window.decorView as FrameLayout
+        popupContainer?.let {
+            popupWebView?.stopLoading()
+            popupWebView?.destroy()
+            popupWebView = null
+            decor.removeView(it)
+        }
+        popupContainer = null
+        btnTogglePopup = null
+        isPopupMinimized = false
+    }
+
+    private fun makeHeaderDraggable(header: View, container: View) {
+        var dX = 0f
+        var dY = 0f
+        header.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    dX = container.x - event.rawX
+                    dY = container.y - event.rawY
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    container.animate()
+                        .x(event.rawX + dX)
+                        .y(event.rawY + dY)
+                        .setDuration(0)
+                        .start()
+                }
+            }
+            true
+        }
+    }
+
+
+
+    // ------------------------------------------------------
+
     private fun setupWebView() {
         val settings = webView.settings
         settings.javaScriptEnabled = true
@@ -294,8 +499,8 @@ class BrowserActivity : AppCompatActivity() {
         settings.databaseEnabled = true
         settings.setSupportMultipleWindows(true)
         settings.javaScriptCanOpenWindowsAutomatically = false
-        // Simulador de Desktop/Chrome fuerte para evitar capados de servidores móviles
-        settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; SM-S901B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
+        // Reemplazar por el agente de Safari 14 macOS (Estilo Video Caster)
+        settings.userAgentString = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15"
 
         settings.mediaPlaybackRequiresUserGesture = false
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
@@ -308,7 +513,6 @@ class BrowserActivity : AppCompatActivity() {
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
 
-        // 1. CAZADOR DE DESCARGAS DIRECTAS
         webView.setDownloadListener { downloadUrl, userAgentHeader, _, _, _ ->
             val referer = webView.url ?: ""
             val cookie = CookieManager.getInstance().getCookie(downloadUrl)
@@ -324,21 +528,18 @@ class BrowserActivity : AppCompatActivity() {
                     if (capturedLinksList.add(capturedLink)) {
                         lastCapturedUrl = downloadUrl
                         Toast.makeText(this@BrowserActivity, "📥 ENLACE DIRECTO CAPTURADO", Toast.LENGTH_LONG).show()
+                        updateFloatingButtonVisibility()
                         showCapturedLinksDialog()
                     }
                 }
             }
         }
 
-        // 2. INTERCEPTOR DE RED Y SNIFFER DE DOM
         webView.webViewClient = object : WebViewClient() {
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-
                 lastCapturedUrl = ""
-
-                // Si el diálogo estaba abierto de la página anterior, lo cerramos
                 captureDialog?.dismiss()
             }
 
@@ -363,7 +564,6 @@ class BrowserActivity : AppCompatActivity() {
                 return super.shouldInterceptRequest(view, request)
             }
 
-            // REEMPLAZAR ESTE MÉTODO COMPLETO:
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url.toString()
                 val host = request?.url?.host?.lowercase() ?: ""
@@ -372,10 +572,9 @@ class BrowserActivity : AppCompatActivity() {
                     if (host.contains(domain)) return true
                 }
 
-                return false // Permite la carga fluida de cualquier reproductor o servidor incrustado sin bloquear por gestos
+                return false
             }
 
-            // REEMPLAZAR ESTE MÉTODO COMPLETO DENTRO DE webView.webViewClient:
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 etUrl.setText(url)
@@ -385,7 +584,6 @@ class BrowserActivity : AppCompatActivity() {
                 }
                 cleanOverlays()
 
-                // SNIFFER DE JS EXPANDIDO: Ahora intercepta peticiones XHR/Fetch de cualquier formato y servidor alternativo al dar Play
                 val extractVideoJs = """
         javascript:(function() {
             var isVideo = function(u) {
@@ -433,12 +631,12 @@ class BrowserActivity : AppCompatActivity() {
     """.trimIndent()
                 view?.evaluateJavascript(extractVideoJs, null)
             }
+
             override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: android.net.http.SslError?) {
                 handler?.proceed()
             }
         }
 
-        // 3. LECTOR DE CONSOLA (Atrapa los mensajes del Sniffer JS)
         webView.webChromeClient = object : WebChromeClient() {
 
             override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
@@ -454,25 +652,23 @@ class BrowserActivity : AppCompatActivity() {
                 return super.onConsoleMessage(consoleMessage)
             }
 
-            // REEMPLAZAR ESTE MÉTODO COMPLETO DENTRO DE webChromeClient:
+            // --- REEMPLAZADO: MANEJO SEGURO DE NUEVAS VENTANAS (POPUPS ENCAPSULADOS) ---
             override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: android.os.Message?): Boolean {
-                // Creamos un WebView temporal en memoria para atrapar el enlace de la publicidad
-                val tempWebView = WebView(this@BrowserActivity)
-                tempWebView.webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                        val url = request?.url.toString()
-                        try {
-                            // Desviamos el anuncio al navegador predeterminado del dispositivo (Chrome, Samsung Internet, etc.)
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                            startActivity(intent)
-                        } catch (e: Exception) { }
-                        return true // Retornamos true para cancelar la carga interna y no perder el progreso de la película
-                    }
-                }
+                // Cerramos un popup anterior si estuviera activo para evitar acumulación de procesos
+                destroyPopup()
+
+                val decor = window.decorView as FrameLayout
+                val container = createPopupContainer()
+                popupContainer = container
+
+                // Se integra el contenedor dinámicamente sobre la interfaz actual
+                decor.addView(container)
 
                 val transport = resultMsg?.obj as? WebView.WebViewTransport
-                transport?.webView = tempWebView
+                transport?.webView = popupWebView
                 resultMsg?.sendToTarget()
+
+                Toast.makeText(this@BrowserActivity, "Ad encapsulado en segundo plano", Toast.LENGTH_SHORT).show()
                 return true
             }
 
@@ -504,7 +700,6 @@ class BrowserActivity : AppCompatActivity() {
                 webView.visibility = View.VISIBLE
             }
         }
-
     }
 
     private fun isValidVideoUrl(url: String): Boolean {
@@ -520,32 +715,29 @@ class BrowserActivity : AppCompatActivity() {
             if (host.contains(domain)) return false
         }
 
-        // Descartar subtítulos y fragmentos de audio
         if (path.contains("subtitle") || path.contains(".vtt") || path.contains("audio-only")) {
             return false
         }
 
-        // NUEVO FILTRO: Descartar sub-listas y fragmentos secundarios de m3u8
         if (path.contains("index-v") ||
             path.contains("chunklist") ||
             path.contains("seg-") ||
             path.contains("fragment") ||
             (path.endsWith(".ts"))) {
-            return false // Lo ignoramos porque es basura secundaria, el master ya debió pasar o está por pasar.
+            return false
         }
 
         return true
     }
+
     private fun reconstructMasterUrl(url: String): String? {
         val uri = try { Uri.parse(url) } catch (e: Exception) { return null }
         val lastSegment = uri.lastPathSegment ?: ""
 
-        // Si el enlace ya es un "master.m3u8", no hace falta reconstruir nada
         if (lastSegment.equals("master.m3u8", ignoreCase = true)) {
             return null
         }
 
-        // Si el enlace es una sub-playlist (index, chunklist, variant, mono)
         if (lastSegment.endsWith(".m3u8", ignoreCase = true)) {
             if (lastSegment.startsWith("index", ignoreCase = true) ||
                 lastSegment.contains("chunklist", ignoreCase = true) ||
@@ -554,7 +746,6 @@ class BrowserActivity : AppCompatActivity() {
 
                 val path = uri.path ?: ""
                 if (path.contains("/")) {
-                    // Reemplaza el final de la ruta por "master.m3u8"
                     val newPath = path.substringBeforeLast("/") + "/master.m3u8"
                     return uri.buildUpon().path(newPath).build().toString()
                 }
@@ -562,12 +753,10 @@ class BrowserActivity : AppCompatActivity() {
         }
         return null
     }
-    // REEMPLAZAR ESTE MÉTODO COMPLETO:
+
     private fun processDetectedLink(url: String, headers: Map<String, String>) {
-        // 1. ACTIVACIÓN: Reconstruye automáticamente sub-playlists (index-v) a enlaces master.m3u8
         val finalUrl = reconstructMasterUrl(url) ?: url
 
-        // 2. Control de duplicados en la lista de capturas
         if (finalUrl == lastCapturedUrl) return
         if (capturedLinksList.any { it.url == finalUrl }) return
         if (!isValidVideoUrl(finalUrl)) return
@@ -604,14 +793,12 @@ class BrowserActivity : AppCompatActivity() {
                         confirmAndCapture(capturedLink, "🎬 VIDEO LARGO DETECTADO (>40 min)")
                     }
                 } catch (e: Exception) {
-                    // Captura segura en caso de fallo de metadatos del MP4
                     confirmAndCapture(capturedLink, "✅ VIDEO MP4 CAPTURADO (Directo / Protegido)")
                 }
             }
             return
         }
 
-        // Captura general de listas master.m3u8, directos de Mediafire, Mixdrop, etc.
         confirmAndCapture(capturedLink, "📡 ENLACE MULTIMEDIA CAPTURADO")
     }
 
@@ -620,22 +807,227 @@ class BrowserActivity : AppCompatActivity() {
         runOnUiThread {
             if (capturedLinksList.add(link)) {
                 Toast.makeText(this, mensaje, Toast.LENGTH_SHORT).show()
+                updateFloatingButtonVisibility() // Actualiza visibilidad para mostrar el botón
                 showCapturedLinksDialog()
             }
         }
     }
+    private fun releaseExoPlayer() {
+        exoPlayer?.let { player ->
+            player.stop()
+            player.release()
+        }
+        exoPlayer = null
+    }
+    fun obtenerCaducidadDeUrl(url: String): String {
+        try {
+            val uri = Uri.parse(url)
+            var expirationTimestamp: Long? = null
 
+            // 1. Detección Inteligente de CDN (Parámetros 's' de inicio y 'e' de duración)
+            val sParam = uri.getQueryParameter("s")
+            val eParam = uri.getQueryParameter("e")
+
+            if (sParam != null && sParam.length == 10 && sParam.all { it.isDigit() }) {
+                val start = sParam.toLong()
+                if (eParam != null && eParam.all { it.isDigit() }) {
+                    val duration = eParam.toLong()
+                    // Si 'e' es una duración relativa en segundos (típicamente menor a 30 días)
+                    if (duration < 2592000) {
+                        expirationTimestamp = start + duration // Expiración real = Inicio + Duración
+                    } else {
+                        expirationTimestamp = start
+                    }
+                } else {
+                    expirationTimestamp = start
+                }
+            }
+
+            // 2. Fallback estándar si no se usó el formato 's' y 'e'
+            if (expirationTimestamp == null) {
+                // Buscar en segmentos de ruta de 10 dígitos
+                val pathSegments = uri.pathSegments
+                val routeTimestamp = pathSegments.firstOrNull { segment ->
+                    segment.length == 10 && segment.all { it.isDigit() }
+                }
+
+                if (routeTimestamp != null) {
+                    expirationTimestamp = routeTimestamp.toLong()
+                } else {
+                    // Buscar en cualquier otro parámetro de consulta de 10 dígitos
+                    val queryNames = uri.queryParameterNames
+                    for (name in queryNames) {
+                        val value = uri.getQueryParameter(name) ?: ""
+                        if (value.length == 10 && value.all { it.isDigit() }) {
+                            expirationTimestamp = value.toLong()
+                            break
+                        }
+                    }
+                }
+            }
+
+            if (expirationTimestamp != null) {
+                val timestampMilisegundos = expirationTimestamp * 1000
+
+                // Comprobamos si ya caducó comparándolo con la hora actual
+                val tiempoActual = System.currentTimeMillis()
+                if (timestampMilisegundos < tiempoActual) {
+                    return "⚠️ Enlace ya caducado"
+                }
+
+                // Convertir a formato legible local
+                val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+                sdf.timeZone = TimeZone.getDefault() // Usa la zona horaria del dispositivo
+                val fechaLegible = sdf.format(Date(timestampMilisegundos))
+
+                // Calcular diferencia de tiempo restante
+                val diferenciaHoras = (timestampMilisegundos - tiempoActual) / (1000 * 60 * 60)
+
+                return "Vence el: $fechaLegible (Quedan aprox. $diferenciaHoras horas)"
+            }
+        } catch (e: Exception) {
+            // Manejo de seguridad silencioso ante fallos de parsing
+        }
+        return "Caducidad desconocida / Enlace sin token de tiempo"
+    }
+
+    // --- MÉTODO DE ANÁLISIS REFORZADO CON DIAGNÓSTICO DE VISUALIZACIÓN ACTIVA ---
+    private fun analizarCompatibilidadExterna(context: Context, link: CapturedLink, onComplete: () -> Unit) {
+        if (link.ipLockStatus != "🔄 Analizando compatibilidad...") {
+            return
+        }
+
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        // 1. Detectar la red actual
+        val activeNetwork = connectivityManager.activeNetwork
+        val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
+        val usandoWiFi = networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+
+        // 2. Definir la red contraria para la prueba
+        val redParaPrueba = if (usandoWiFi) {
+            NetworkCapabilities.TRANSPORT_CELLULAR
+        } else {
+            NetworkCapabilities.TRANSPORT_WIFI
+        }
+
+        val nombreRedContraria = if (usandoWiFi) "Datos Móviles" else "Wi-Fi"
+
+        val builder = NetworkRequest.Builder()
+        builder.addTransportType(redParaPrueba)
+        builder.addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+
+        val networkCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                // ¡Red alterna disponible! Ejecutamos la prueba.
+                thread {
+                    ejecutarPruebaPorRedAlterna(network, link, connectivityManager, this, onComplete)
+                }
+            }
+
+            override fun onUnavailable() {
+                // Si capturaste en WiFi pero tienes los datos apagados (o viceversa)
+                runOnUiThread {
+                    link.ipLockStatus = "⚠️ Enciende tu $nombreRedContraria para la prueba externa"
+                    onComplete()
+                }
+            }
+        }
+
+        try {
+            connectivityManager.requestNetwork(builder.build(), networkCallback, 5000)
+        } catch (e: SecurityException) {
+            link.ipLockStatus = "❌ Faltan permisos de red en la app"
+            onComplete()
+        }
+    }
+
+    private fun ejecutarPruebaPorRedAlterna(
+        alternateNetwork: Network,
+        link: CapturedLink,
+        connectivityManager: ConnectivityManager,
+        callback: ConnectivityManager.NetworkCallback,
+        onComplete: () -> Unit
+    ) {
+        try {
+            val SAFARI_OSX_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15"
+
+            // PASO 1: Descubrir la ruta interna usando la red original
+            var urlReal = link.url
+            val isPlaylist = link.url.lowercase().contains(".m3u8") || link.url.lowercase().contains(".m3u")
+
+            if (isPlaylist) {
+                val localConn = URL(link.url).openConnection() as HttpURLConnection
+                localConn.connectTimeout = 5000
+                localConn.readTimeout = 5000
+                localConn.setRequestProperty("User-Agent", SAFARI_OSX_AGENT)
+                if (!link.referer.isNullOrEmpty()) localConn.setRequestProperty("Referer", link.referer)
+
+                if (localConn.responseCode == 200) {
+                    val content = localConn.inputStream.bufferedReader().use { it.readText() }
+                    val innerLine = content.lines().firstOrNull { it.isNotBlank() && !it.trim().startsWith("#") }?.trim()
+                    if (!innerLine.isNullOrEmpty()) {
+                        urlReal = if (innerLine.startsWith("http", ignoreCase = true)) {
+                            innerLine
+                        } else {
+                            URL(URL(link.url), innerLine).toString()
+                        }
+                    }
+                }
+                localConn.disconnect()
+            }
+
+            // PASO 2: Prueba Directa usando la Red Alterna (Simula un dispositivo externo)
+            val testConn = alternateNetwork.openConnection(URL(urlReal)) as HttpURLConnection
+            testConn.requestMethod = "GET"
+            testConn.connectTimeout = 8000
+            testConn.readTimeout = 8000
+            testConn.setRequestProperty("User-Agent", SAFARI_OSX_AGENT)
+            testConn.setRequestProperty("Accept", "*/*")
+            if (!link.referer.isNullOrEmpty()) {
+                testConn.setRequestProperty("Referer", link.referer)
+            }
+
+            val code = testConn.responseCode
+            val contentType = testConn.contentType?.lowercase() ?: ""
+
+            val esVideo = contentType.contains("video") ||
+                    contentType.contains("mpegurl") ||
+                    contentType.contains("application/octet-stream") ||
+                    contentType.contains("application/vnd.apple.mpegurl")
+
+            // PASO 3: Veredicto Absoluto
+            runOnUiThread {
+                if (code == 200 && esVideo) {
+                    link.ipLockStatus = "✅ Enlace 100% Libre (Reproducible en cualquier red)"
+                } else if (code == 403 || code == 401) {
+                    link.ipLockStatus = "🚫 Candado Confirmado: Atado a tu red actual"
+                } else {
+                    link.ipLockStatus = "❓ Error externo ($code) - Posible geobloqueo o caída"
+                }
+                onComplete()
+            }
+            testConn.disconnect()
+
+        } catch (e: Exception) {
+            runOnUiThread {
+                link.ipLockStatus = "❌ Error en prueba externa: Timeout o red inestable"
+                onComplete()
+            }
+        } finally {
+            connectivityManager.unregisterNetworkCallback(callback)
+        }
+    }
+
+    @OptIn(UnstableApi::class)
     private fun showCapturedLinksDialog() {
         if (isFinishing || isDestroyed) return
 
         captureDialog?.dismiss()
+        releaseExoPlayer() // Asegurar de limpiar cualquier instancia previa activa
 
         val linksArray = capturedLinksList.toList()
         if (linksArray.isEmpty()) return
-
-        val displayItems = linksArray.mapIndexed { index, item ->
-            "${index + 1}. ${item.url}"
-        }.toTypedArray()
 
         val builder = AlertDialog.Builder(this)
 
@@ -671,16 +1063,32 @@ class BrowserActivity : AppCompatActivity() {
             }
         }
 
-        val videoView = VideoView(this)
-        val videoParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            gravity = Gravity.CENTER
+        // --- REEMPLAZO DE VIDEOVIEW POR MEDIA3 PLAYERVIEW ---
+        val playerView = androidx.media3.ui.PlayerView(this).apply {
+            useController = false // Desactivamos el panel por defecto para usar tus botones personalizados
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ).apply {
+                gravity = Gravity.CENTER
+            }
         }
-        videoView.layoutParams = videoParams
-        videoCard.addView(videoView)
+        videoCard.addView(playerView)
         container.addView(videoCard)
+
+        // Inicializamos ExoPlayer y lo enlazamos al PlayerView
+        // Configuración de atributos de audio y foco automático para silenciar otras apps/páginas
+        val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
+            .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+            .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
+            .build()
+
+        // Inicializamos ExoPlayer asignándole el foco automático de audio
+        val playerInstance = androidx.media3.exoplayer.ExoPlayer.Builder(this)
+            .setAudioAttributes(audioAttributes, true) // 'true' activa el control de foco nativo
+            .build()
+        exoPlayer = playerInstance
+        playerView.player = playerInstance
 
         val controlLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -721,23 +1129,57 @@ class BrowserActivity : AppCompatActivity() {
         }
         container.addView(listView)
 
-        val adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, displayItems) {
+        // --- ADAPTADOR MODIFICADO: MUESTRA LA URL COMPLETA, LA CADUCIDAD Y EL ESTADO DE IP EN OTRA LÍNEA ---
+        val adapter = object : ArrayAdapter<CapturedLink>(this, android.R.layout.simple_list_item_2, android.R.id.text1, linksArray) {
             override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
                 val view = super.getView(position, convertView, parent)
-                val textView = view.findViewById<TextView>(android.R.id.text1)
-                textView.setTextColor(Color.parseColor("#E0E0E0"))
-                textView.textSize = 14f
-                textView.setPadding(dpToPx(12), dpToPx(14), dpToPx(12), dpToPx(14))
+                val textView1 = view.findViewById<TextView>(android.R.id.text1)
+                val textView2 = view.findViewById<TextView>(android.R.id.text2)
+
+                val item = linksArray[position]
+
+                // Línea principal: URL completa
+                textView1.text = "${position + 1}. ${item.url}"
+                textView1.setTextColor(Color.parseColor("#E0E0E0"))
+                textView1.textSize = 13f
+
+                // Segunda línea combinada: Fecha de caducidad y el estatus del chequeo de IP
+                val caducidadInfo = obtenerCaducidadDeUrl(item.url)
+                val compatibilidadIp = item.ipLockStatus
+
+                // Concatenamos ambos valores separándolos por un salto de línea
+                textView2.text = "$caducidadInfo\n$compatibilidadIp"
+                textView2.textSize = 11f
+                textView2.setPadding(0, dpToPx(2), 0, 0)
+
+                // Coloreamos las descripciones de advertencia de forma dinámica
+                if (caducidadInfo.contains("⚠️") || compatibilidadIp.contains("⚠️") || compatibilidadIp.contains("❌")) {
+                    textView2.setTextColor(Color.parseColor("#FF5252")) // Rojo advertencia
+                } else if (compatibilidadIp.contains("✅")) {
+                    textView2.setTextColor(Color.parseColor("#4CAF50")) // Verde compatible/libre
+                } else {
+                    textView2.setTextColor(Color.parseColor("#90A4AE")) // Gris analizando o default
+                }
+
                 return view
             }
         }
         listView.adapter = adapter
 
+        // Ejecutar de manera paralela el diagnóstico para cada enlace capturado
+        linksArray.forEach { item ->
+            analizarCompatibilidadExterna(this, item) {
+                adapter.notifyDataSetChanged() // Refresca dinámicamente la lista al finalizar cada hilo
+            }
+        }
+
         val progressHandler = android.os.Handler(android.os.Looper.getMainLooper())
         val updateProgressTask = object : Runnable {
             override fun run() {
-                if (videoView.isPlaying) {
-                    seekBar.progress = videoView.currentPosition
+                exoPlayer?.let { player ->
+                    if (player.isPlaying) {
+                        seekBar.progress = player.currentPosition.toInt()
+                    }
                 }
                 progressHandler.postDelayed(this, 1000)
             }
@@ -755,8 +1197,9 @@ class BrowserActivity : AppCompatActivity() {
             background = null
             setOnClickListener {
                 progressHandler.removeCallbacksAndMessages(null)
-                videoView.stopPlayback()
+                releaseExoPlayer()
                 capturedLinksList.clear()
+                updateFloatingButtonVisibility() // Ocultar el botón flotante al limpiar la lista
                 Toast.makeText(this@BrowserActivity, "Lista de capturas vaciada", Toast.LENGTH_SHORT).show()
                 captureDialog?.dismiss()
             }
@@ -767,10 +1210,8 @@ class BrowserActivity : AppCompatActivity() {
             setTextColor(Color.parseColor("#90A4AE"))
             background = null
             setOnClickListener {
-                if (videoView.isPlaying) {
-                    videoView.pause()
-                    btnPlayPause.text = "▶"
-                }
+                exoPlayer?.pause()
+                btnPlayPause.text = "▶"
                 progressHandler.removeCallbacksAndMessages(null)
                 goHomeWithoutFinishing()
             }
@@ -782,7 +1223,7 @@ class BrowserActivity : AppCompatActivity() {
             background = null
             setOnClickListener {
                 progressHandler.removeCallbacksAndMessages(null)
-                videoView.stopPlayback()
+                releaseExoPlayer()
                 captureDialog?.dismiss()
             }
         }
@@ -809,70 +1250,88 @@ class BrowserActivity : AppCompatActivity() {
 
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) videoView.seekTo(progress)
+                if (fromUser) {
+                    exoPlayer?.seekTo(progress.toLong())
+                }
             }
             override fun onStartTrackingTouch(sb: SeekBar?) {}
             override fun onStopTrackingTouch(sb: SeekBar?) {}
         })
 
         btnPlayPause.setOnClickListener {
-            if (videoView.isPlaying) {
-                videoView.pause()
-                btnPlayPause.text = "▶"
-            } else {
-                videoView.start()
-                btnPlayPause.text = "⏸"
+            exoPlayer?.let { player ->
+                if (player.isPlaying) {
+                    player.pause()
+                    btnPlayPause.text = "▶"
+                } else {
+                    player.play()
+                    btnPlayPause.text = "⏸"
+                }
             }
         }
 
-        // --- EL CORAZÓN DEL REPRODUCTOR LOCAL USANDO EL AGENTE CONSTRUCTOR ---
+        // --- INTEGRACIÓN DE CABECERAS HTTP EN EXOPLAYER ---
         listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             val capturedItem = linksArray[position]
 
-            // 1. Copiamos al portapapeles
             val clipboardFormat = capturedItem.getFormattedUrlForClipboard()
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("Captura", clipboardFormat)
+            val clip = ClipData.newPlainText("CapturedLink", clipboardFormat)
             clipboard.setPrimaryClip(clip)
 
             Toast.makeText(this@BrowserActivity, "📋 Copiado y probando en reproductor local", Toast.LENGTH_SHORT).show()
-            val progressToast = Toast.makeText(this@BrowserActivity, "Cargando flujo...", Toast.LENGTH_SHORT)
+            val progressToast = Toast.makeText(this@BrowserActivity, "Cargando flujo con ExoPlayer...", Toast.LENGTH_SHORT)
             progressToast.show()
 
-            // 2. INVOCAMOS AL AGENTE PARA OBTENER LAS CABECERAS SEGURAS
             val secureHeaders = LocalAgentBuilder.getSecureHeaders(capturedItem)
 
             try {
-                // Limpiamos la interfaz antes de cargar
                 progressHandler.removeCallbacks(updateProgressTask)
-                if (videoView.isPlaying) {
-                    videoView.stopPlayback()
-                }
+                exoPlayer?.stop()
                 btnPlayPause.text = "⏸"
                 seekBar.progress = 0
 
-                // 3. Reproducimos internamente en tu VideoView alimentándolo con el Agente
-                videoView.setVideoURI(Uri.parse(capturedItem.url), secureHeaders)
+                // Configurar el DataSourceFactory de ExoPlayer para usar fijamente el agente Safari 14 macOS
+                val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+                    .setUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15")
+                    .setAllowCrossProtocolRedirects(true)
+                    .setConnectTimeoutMs(15000)
+                    .setReadTimeoutMs(15000)
+                // Crear MediaSource con soporte para flujos dinámicos de red
+                val mediaSource = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(this)
+                    .setDataSourceFactory(httpDataSourceFactory)
+                    .createMediaSource(androidx.media3.common.MediaItem.fromUri(Uri.parse(capturedItem.url)))
 
-                videoView.setOnPreparedListener { mediaPlayer ->
-                    progressToast.cancel()
-                    seekBar.max = videoView.duration
-                    mediaPlayer.start()
-                    progressHandler.post(updateProgressTask)
-                }
+                exoPlayer?.setMediaSource(mediaSource)
+                exoPlayer?.prepare()
+                exoPlayer?.playWhenReady = true
 
-                videoView.setOnErrorListener { _, _, _ ->
-                    progressToast.cancel()
-                    progressHandler.removeCallbacks(updateProgressTask)
-                    Toast.makeText(this@BrowserActivity, "⚠️ El flujo superó las capacidades del reproductor nativo", Toast.LENGTH_SHORT).show()
-                    true
-                }
+                exoPlayer?.addListener(object : androidx.media3.common.Player.Listener {
+                    override fun onPlaybackStateChanged(state: Int) {
+                        when (state) {
+                            androidx.media3.common.Player.STATE_READY -> {
+                                progressToast.cancel()
+                                seekBar.max = exoPlayer?.duration?.toInt() ?: 0
+                                progressHandler.post(updateProgressTask)
+                            }
+                            androidx.media3.common.Player.STATE_ENDED -> {
+                                btnPlayPause.text = "▶"
+                            }
+                        }
+                    }
+
+                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                        progressToast.cancel()
+                        progressHandler.removeCallbacks(updateProgressTask)
+                        Toast.makeText(this@BrowserActivity, "⚠️ Error al reproducir el flujo en ExoPlayer", Toast.LENGTH_SHORT).show()
+                    }
+                })
+
             } catch (e: Exception) {
                 progressToast.cancel()
                 progressHandler.removeCallbacks(updateProgressTask)
             }
         }
-        // ---------------------------------------------------------------------
 
         listView.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
             val capturedItem = linksArray[position]
@@ -880,13 +1339,13 @@ class BrowserActivity : AppCompatActivity() {
                 .setTitle("¿Eliminar enlace de la lista?")
                 .setMessage(capturedItem.url)
                 .setPositiveButton("Eliminar") { _, _ ->
-                    videoView.stopPlayback()
+                    exoPlayer?.stop()
                     progressHandler.removeCallbacksAndMessages(null)
                     seekBar.progress = 0
                     btnPlayPause.text = "⏸"
 
                     capturedLinksList.remove(capturedItem)
-                    Toast.makeText(this, "🗑️ Enlace eliminado", Toast.LENGTH_SHORT).show()
+                    updateFloatingButtonVisibility() // Si era el último elemento, oculta el botón flotante
 
                     captureDialog?.dismiss()
                     if (capturedLinksList.isNotEmpty()) {
@@ -899,9 +1358,6 @@ class BrowserActivity : AppCompatActivity() {
         }
     }
 
-    private fun getFavoritesList(): Set<String> {
-        return sharedPreferences.getStringSet("fav_urls", emptySet()) ?: emptySet()
-    }
 
     private fun saveFavorite(url: String) {
         val list = getFavoritesListJSON()
@@ -913,7 +1369,6 @@ class BrowserActivity : AppCompatActivity() {
         val uri = try { Uri.parse(url) } catch (e: Exception) { null }
         val defaultName = uri?.host ?: "Favorito"
 
-        // Crear un cuadro de texto para el nombre
         val input = EditText(this).apply {
             setText(defaultName)
             setSelection(defaultName.length)
@@ -935,9 +1390,11 @@ class BrowserActivity : AppCompatActivity() {
     }
 
     private fun removeFavorite(url: String) {
-        val favorites = getFavoritesList().toMutableSet()
-        if (favorites.remove(url)) {
-            sharedPreferences.edit().putStringSet("fav_urls", favorites).apply()
+        val list = getFavoritesListJSON()
+        // Busca y remueve el favorito que coincida con la URL
+        val removed = list.removeAll { it.url == url }
+        if (removed) {
+            saveFavoritesListJSON(list)
             Toast.makeText(this, "🗑️ Eliminado de favoritos", Toast.LENGTH_SHORT).show()
         }
     }
@@ -975,13 +1432,11 @@ class BrowserActivity : AppCompatActivity() {
             dividerHeight = dpToPx(1)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dpToPx(300) // Altura fija de scrollable para no solapar botones
+                dpToPx(300)
             ).apply { weight = 1f }
         }
         container.addView(listView)
 
-        // CORRECCIÓN: Se agrega "android.R.id.text1" en el constructor para indicarle al adaptador
-// dónde se encuentra el TextView principal y evitar la caída (ClassCastException)
         val adapter = object : ArrayAdapter<FavoriteItem>(this, android.R.layout.simple_list_item_2, android.R.id.text1, favs) {
             override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
                 val view = super.getView(position, convertView, parent)
@@ -1024,12 +1479,19 @@ class BrowserActivity : AppCompatActivity() {
         dialog?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
         dialog?.show()
 
-        // MENÚ DE OPCIONES DEL FAVORITO AL SELECCIONARLO
+        // --- 1. UN SOLO TOQUE: Carga el enlace inmediatamente y cierra el diálogo ---
         listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             val selectedItem = favs[position]
+            webView.loadUrl(selectedItem.url)
+            dialog?.dismiss()
+        }
 
+        // --- 2. TOQUE SOSTENIDO (LONG CLICK): Abre el menú de opciones ---
+        listView.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
+            val selectedItem = favs[position]
+
+            // Se remueve "🌐 Abrir Sitio Web" de aquí, ya que el toque simple cumple esa función ahora
             val opciones = arrayOf(
-                "🌐 Abrir Sitio Web",
                 "✏️ Editar Nombre",
                 "⬆️ Mover Arriba",
                 "⬇️ Mover Abajo",
@@ -1040,15 +1502,11 @@ class BrowserActivity : AppCompatActivity() {
                 .setTitle(selectedItem.title)
                 .setItems(opciones) { _, which ->
                     when (which) {
-                        0 -> { // Abrir
-                            webView.loadUrl(selectedItem.url)
-                            dialog?.dismiss()
-                        }
-                        1 -> { // Editar nombre
+                        0 -> { // Editar nombre
                             dialog?.dismiss()
                             showEditFavoriteNameDialog(position, favs)
                         }
-                        2 -> { // Mover arriba
+                        1 -> { // Mover arriba
                             if (position > 0) {
                                 val temp = favs[position]
                                 favs[position] = favs[position - 1]
@@ -1060,7 +1518,7 @@ class BrowserActivity : AppCompatActivity() {
                                 Toast.makeText(this@BrowserActivity, "Ya está en la cima", Toast.LENGTH_SHORT).show()
                             }
                         }
-                        3 -> { // Mover abajo
+                        2 -> { // Mover abajo
                             if (position < favs.size - 1) {
                                 val temp = favs[position]
                                 favs[position] = favs[position + 1]
@@ -1072,7 +1530,8 @@ class BrowserActivity : AppCompatActivity() {
                                 Toast.makeText(this@BrowserActivity, "Ya está al final", Toast.LENGTH_SHORT).show()
                             }
                         }
-                        4 -> { // Eliminar
+                        3 -> { // Eliminar
+                            removeFavorite(selectedItem.url)
                             favs.removeAt(position)
                             saveFavoritesListJSON(favs)
                             dialog?.dismiss()
@@ -1081,6 +1540,7 @@ class BrowserActivity : AppCompatActivity() {
                     }
                 }
                 .show()
+            true // Retorna true para confirmar que consumimos el evento de toque largo
         }
     }
 
@@ -1101,7 +1561,7 @@ class BrowserActivity : AppCompatActivity() {
                 if (newName.isNotEmpty()) {
                     favs[position] = FavoriteItem(newName, item.url)
                     saveFavoritesListJSON(favs)
-                    showFavoritesDialog() // Redibuja la lista actualizada
+                    showFavoritesDialog()
                 }
             }
             .setNegativeButton("Cancelar") { _, _ ->
@@ -1109,6 +1569,7 @@ class BrowserActivity : AppCompatActivity() {
             }
             .show()
     }
+
     private fun getFavoritesListJSON(): MutableList<FavoriteItem> {
         val jsonString = sharedPreferences.getString("fav_list_json", null) ?: return mutableListOf()
         val list = mutableListOf<FavoriteItem>()
@@ -1132,7 +1593,20 @@ class BrowserActivity : AppCompatActivity() {
         }
         sharedPreferences.edit().putString("fav_list_json", jsonArray.toString()).apply()
     }
+
     override fun onBackPressed() {
+        // Si hay una ventana emergente abierta, el botón físico de atrás la cierra primero
+        if (popupContainer != null) {
+            destroyPopup()
+            return
+        }
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
+
+    override fun onDestroy() {
+        destroyPopup() // Liberar recursos del WebView secundario al destruir la Activity
+        releaseExoPlayer()
+        super.onDestroy()
+    }
+
 }
