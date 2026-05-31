@@ -109,9 +109,7 @@ class BrowserActivity : AppCompatActivity() {
     private var isPopupMinimized = false
 
     private val blacklistedDomains = arrayOf(
-        "adsterra", "exoclick", "onclickads", "popcash", "popads", "propellerads",
-        "doubleclick", "googlesyndication", "google-analytics", "telemetry", "tracker",
-        "adserver", "adservice", "histats", "statcounter", "beacon"
+        "adsterra", "exoclick", "onclickads", "popcash", "popads", "propellerads"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -137,6 +135,7 @@ class BrowserActivity : AppCompatActivity() {
         setupWebView()
         setupButtons()
         setupFloatingCaptureButton()
+        webView.loadUrl("https://onnline.web.app/CineParche")
     }
 
     private fun dpToPx(dp: Int): Int {
@@ -242,16 +241,22 @@ class BrowserActivity : AppCompatActivity() {
         val script = """
         (function() {
             try {
+                // Limpieza más suave para evitar borrar componentes necesarios de los reproductores
                 var elems = Array.from(document.body.querySelectorAll('*'));
                 elems.forEach(function(el) {
                     var style = window.getComputedStyle(el);
                     if (style.position === 'fixed' || style.position === 'absolute') {
                         var zIndex = parseInt(style.zIndex);
-                        if (zIndex > 90 || (style.width === '100%' && style.height === '100%')) {
+                        // Solo removemos si el z-index es extremadamente alto e interfiere con los clics directos
+                        if (zIndex > 150) {
                             var html = el.innerHTML || '';
                             var isImportant = html.includes('video') || 
-                                              html.includes('Download') || 
-                                              el.tagName === 'VIDEO';
+                                              html.includes('player') || 
+                                              html.includes('server') || 
+                                              html.includes('opcion') || 
+                                              el.tagName === 'VIDEO' ||
+                                              el.querySelector('select') || 
+                                              el.querySelector('button');
                             if (!isImportant) {
                                 el.style.display = 'none';
                                 el.style.pointerEvents = 'none';
@@ -261,12 +266,8 @@ class BrowserActivity : AppCompatActivity() {
                     }
                 });
 
-                document.querySelectorAll('iframe').forEach(function(iframe) {
-                    var src = iframe.src || '';
-                    if (!src.includes('video') && !src.includes('player')) {
-                        iframe.remove();
-                    }
-                });
+                // SE REMUEVE la eliminación forzada de iframes, ya que los servidores de video de terceros 
+                // cargan casi en su totalidad dentro de estructuras iframe.
 
             } catch (e) {
                 console.log('Error limpiando overlays: ' + e);
@@ -473,7 +474,20 @@ class BrowserActivity : AppCompatActivity() {
         }
     }
 
-    // --- FUNCIÓN CENTRALIZADA DE EXTRACCIÓN ---
+    private fun abrirUrlEnPopupDeFondo(url: String) {
+        if (isFinishing || isDestroyed) return
+
+        if (popupContainer == null) {
+            val decor = window.decorView as FrameLayout
+            val container = createPopupContainer()
+            popupContainer = container
+            decor.addView(container)
+        }
+
+        popupWebView?.loadUrl(url)
+        Toast.makeText(this, "Publicidad desviada al popup de fondo", Toast.LENGTH_SHORT).show()
+    }
+
     private fun injectVideoExtractor(view: WebView?) {
         val extractVideoJs = """
             javascript:(function() {
@@ -590,7 +604,12 @@ class BrowserActivity : AppCompatActivity() {
                 if (method.equals("GET", ignoreCase = true)) {
                     if (isPotentialVideoUrl(url)) {
                         val headers = request?.requestHeaders ?: emptyMap()
-                        processDetectedLink(url, headers)
+
+                        // SOLUCIÓN: Pasamos el procesamiento al hilo de la interfaz gráfica
+                        // para que pueda leer las propiedades del WebView sin crashear.
+                        runOnUiThread {
+                            processDetectedLink(url, headers)
+                        }
                     }
                 }
 
@@ -601,8 +620,15 @@ class BrowserActivity : AppCompatActivity() {
                 val url = request?.url.toString()
                 val host = request?.url?.host?.lowercase() ?: ""
 
-                for (domain in blacklistedDomains) {
-                    if (host.contains(domain)) return true
+                val isAdDomain = blacklistedDomains.any { host.contains(it) }
+
+                // Modificado: Únicamente desviamos al popup de fondo los dominios confirmados como publicidad.
+                // Esto permite que el reproductor cargue y cambie a servidores externos sin interferir.
+                if (isAdDomain) {
+                    runOnUiThread {
+                        abrirUrlEnPopupDeFondo(url)
+                    }
+                    return true
                 }
 
                 return false
@@ -626,7 +652,6 @@ class BrowserActivity : AppCompatActivity() {
 
         webView.webChromeClient = object : WebChromeClient() {
 
-            // Se integra la inyección del extractor durante el proceso de carga de la web
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 super.onProgressChanged(view, newProgress)
                 if (newProgress > 40) {
@@ -711,7 +736,6 @@ class BrowserActivity : AppCompatActivity() {
             return false
         }
 
-        // Se eliminan 'index-v' y 'chunklist' para permitir la captura de resoluciones alternativas/secundarias
         if (path.contains("seg-") ||
             path.contains("fragment") ||
             (path.endsWith(".ts"))) {
@@ -866,9 +890,19 @@ class BrowserActivity : AppCompatActivity() {
                 sdf.timeZone = TimeZone.getDefault()
                 val fechaLegible = sdf.format(Date(timestampMilisegundos))
 
-                val diferenciaHoras = (timestampMilisegundos - tiempoActual) / (1000 * 60 * 60)
+                // --- CORRECCIÓN DE PRECISIÓN ---
+                val diferenciaMilis = timestampMilisegundos - tiempoActual
+                val horas = diferenciaMilis / (1000 * 60 * 60)
+                val minutos = (diferenciaMilis % (1000 * 60 * 60)) / (1000 * 60)
 
-                return "Vence el: $fechaLegible (Quedan aprox. $diferenciaHoras horas)"
+                // Formateo dinámico para que se vea limpio
+                val tiempoRestante = if (horas > 0) {
+                    "${horas}h ${minutos}m"
+                } else {
+                    "${minutos}m" // Si queda menos de una hora, solo muestra los minutos
+                }
+
+                return "Vence el: $fechaLegible (Quedan aprox. $tiempoRestante)"
             }
         } catch (e: Exception) { }
         return "Caducidad desconocida / Enlace sin token de tiempo"
@@ -891,8 +925,6 @@ class BrowserActivity : AppCompatActivity() {
             NetworkCapabilities.TRANSPORT_WIFI
         }
 
-        val nombreRedContraria = if (usandoWiFi) "Datos Móviles" else "Wi-Fi"
-
         val builder = NetworkRequest.Builder()
         builder.addTransportType(redParaPrueba)
         builder.addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -905,21 +937,21 @@ class BrowserActivity : AppCompatActivity() {
             }
 
             override fun onUnavailable() {
-                runOnUiThread {
-                    link.ipLockStatus = "⚠️ Enciende tu $nombreRedContraria para la prueba externa"
-                    onComplete()
+                // --- MAGIA NUEVA: Si la antena opuesta falla o no hay router físico cerca, pasamos al plan B ---
+                thread {
+                    ejecutarPruebaPorProxyRespaldo(link, onComplete)
                 }
             }
         }
 
         try {
-            connectivityManager.requestNetwork(builder.build(), networkCallback, 5000)
+            // Aumentamos el tiempo a 8 segundos por si el módem del teléfono tarda en despertar la antena
+            connectivityManager.requestNetwork(builder.build(), networkCallback, 8000)
         } catch (e: SecurityException) {
             link.ipLockStatus = "❌ Faltan permisos de red en la app"
             onComplete()
         }
     }
-
     private fun ejecutarPruebaPorRedAlterna(
         alternateNetwork: Network,
         link: CapturedLink,
@@ -930,6 +962,7 @@ class BrowserActivity : AppCompatActivity() {
         try {
             val SAFARI_OSX_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15"
 
+            // PASO 1: Descubrir la ruta interna usando la red original
             var urlReal = link.url
             val isPlaylist = link.url.lowercase().contains(".m3u8") || link.url.lowercase().contains(".m3u")
 
@@ -954,6 +987,7 @@ class BrowserActivity : AppCompatActivity() {
                 localConn.disconnect()
             }
 
+            // PASO 2: Prueba Directa usando la Red Alterna (Simula un dispositivo externo)
             val testConn = alternateNetwork.openConnection(URL(urlReal)) as HttpURLConnection
             testConn.requestMethod = "GET"
             testConn.connectTimeout = 8000
@@ -972,6 +1006,7 @@ class BrowserActivity : AppCompatActivity() {
                     contentType.contains("application/octet-stream") ||
                     contentType.contains("application/vnd.apple.mpegurl")
 
+            // PASO 3: Veredicto Absoluto
             runOnUiThread {
                 if (code == 200 && esVideo) {
                     link.ipLockStatus = "✅ Enlace 100% Libre (Reproducible en cualquier red)"
@@ -990,7 +1025,78 @@ class BrowserActivity : AppCompatActivity() {
                 onComplete()
             }
         } finally {
+            // IMPORTANTE: Liberar la solicitud de red para no gastar batería
             connectivityManager.unregisterNetworkCallback(callback)
+        }
+    }
+    // --- AGREGA ESTA NUEVA FUNCIÓN DEBAJO (Deja ejecutarPruebaPorRedAlterna como está) ---
+    private fun ejecutarPruebaPorProxyRespaldo(link: CapturedLink, onComplete: () -> Unit) {
+        try {
+            val SAFARI_OSX_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15"
+
+            var urlReal = link.url
+            val isPlaylist = link.url.lowercase().contains(".m3u8") || link.url.lowercase().contains(".m3u")
+
+            // 1. Extraer el video real internamente
+            if (isPlaylist) {
+                val localConn = URL(link.url).openConnection() as HttpURLConnection
+                localConn.connectTimeout = 5000
+                localConn.readTimeout = 5000
+                localConn.setRequestProperty("User-Agent", SAFARI_OSX_AGENT)
+                if (!link.referer.isNullOrEmpty()) localConn.setRequestProperty("Referer", link.referer)
+
+                if (localConn.responseCode == 200) {
+                    val content = localConn.inputStream.bufferedReader().use { it.readText() }
+                    val innerLine = content.lines().firstOrNull { it.isNotBlank() && !it.trim().startsWith("#") }?.trim()
+                    if (!innerLine.isNullOrEmpty()) {
+                        urlReal = if (innerLine.startsWith("http", ignoreCase = true)) {
+                            innerLine
+                        } else {
+                            URL(URL(link.url), innerLine).toString()
+                        }
+                    }
+                }
+                localConn.disconnect()
+            }
+
+            // 2. Probar externamente vía Proxy (Plan B)
+            val encodedUrl = URLEncoder.encode(urlReal, "UTF-8")
+            val proxyUrl = "https://api.allorigins.win/raw?url=$encodedUrl"
+
+            val proxyConn = URL(proxyUrl).openConnection() as HttpURLConnection
+            proxyConn.requestMethod = "GET"
+            proxyConn.connectTimeout = 8000
+            proxyConn.readTimeout = 8000
+            proxyConn.setRequestProperty("User-Agent", SAFARI_OSX_AGENT)
+            if (!link.referer.isNullOrEmpty()) {
+                proxyConn.setRequestProperty("Referer", link.referer)
+            }
+
+            val code = proxyConn.responseCode
+            val contentType = proxyConn.contentType?.lowercase() ?: ""
+
+            val esVideo = contentType.contains("video") ||
+                    contentType.contains("mpegurl") ||
+                    contentType.contains("application/octet-stream") ||
+                    contentType.contains("application/vnd.apple.mpegurl")
+
+            runOnUiThread {
+                if (code == 200 && esVideo) {
+                    link.ipLockStatus = "✅ Enlace Libre (Validado por Proxy de respaldo)"
+                } else if (code == 403 || code == 401) {
+                    link.ipLockStatus = "🚫 Candado Confirmado (Proxy rechazado)"
+                } else {
+                    link.ipLockStatus = "❓ Enlace inestable fuera de tu red"
+                }
+                onComplete()
+            }
+            proxyConn.disconnect()
+
+        } catch (e: Exception) {
+            runOnUiThread {
+                link.ipLockStatus = "⚠️ Validación pausada (No hay red opuesta disponible)"
+                onComplete()
+            }
         }
     }
 
@@ -1392,9 +1498,10 @@ class BrowserActivity : AppCompatActivity() {
         val listView = ListView(this).apply {
             divider = android.graphics.drawable.ColorDrawable(Color.parseColor("#2C2C3C"))
             dividerHeight = dpToPx(1)
+            // CAMBIO: Quitamos los 300dp y usamos WRAP_CONTENT para darle flexibilidad
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dpToPx(300)
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { weight = 1f }
         }
         container.addView(listView)
@@ -1440,6 +1547,24 @@ class BrowserActivity : AppCompatActivity() {
         dialog = builder.create()
         dialog?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
         dialog?.show()
+
+        // --- CAMBIO PRINCIPAL: CALCULAR LA PANTALLA DINÁMICAMENTE ---
+        dialog?.window?.let { window ->
+            val screenHeight = resources.displayMetrics.heightPixels
+
+            // Si hay más de 6 favoritos (hartos), ocupa el 90% del alto de la pantalla.
+            // Si hay menos de 6, el alto se adapta solo al tamaño de los elementos (WRAP_CONTENT).
+            val altoDinamico = if (favs.size > 6) {
+                (screenHeight * 0.90).toInt()
+            } else {
+                WindowManager.LayoutParams.WRAP_CONTENT
+            }
+
+            window.setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT, // Ocupa todo el ancho
+                altoDinamico                             // Aplica la lógica de altura
+            )
+        }
 
         listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
             val selectedItem = favs[position]
@@ -1502,7 +1627,6 @@ class BrowserActivity : AppCompatActivity() {
             true
         }
     }
-
     private fun showEditFavoriteNameDialog(position: Int, favs: MutableList<FavoriteItem>) {
         val item = favs[position]
         val input = EditText(this).apply {
