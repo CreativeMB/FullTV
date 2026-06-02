@@ -1,5 +1,6 @@
 package com.creativem.fulltv.peliculas
 
+import android.R.attr.apiKey
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.Dialog
@@ -38,6 +39,7 @@ import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ProgressBar
@@ -51,7 +53,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.creativem.fulltv.BannerPromosAdapter
 import com.creativem.fulltv.R
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.api.PeliculasApiActivity
@@ -86,9 +90,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.TimeUnit
+import com.creativem.fulltv.api.MovieResponse
+import com.creativem.fulltv.api.TmdbMovie
+import com.creativem.fulltv.api.MovieDetailResponse
+import com.creativem.fulltv.api.TMDbApiService
+import okhttp3.OkHttpClient
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 class PeliculasActivity : AppCompatActivity() {
-    private var yaTieneListener = false
+        private var yaTieneListener = false
     private lateinit var binding: ActivityPeliculasBinding
     private lateinit var movieAdapter: MoviesAdapter
     private val modeloList = mutableListOf<Modelo>()
@@ -107,6 +122,23 @@ class PeliculasActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
 
     private var progressDialog: AlertDialog? = null
+    private lateinit var apiService: TMDbApiService
+    private val apiKey = "678193d2c735c6f37840cee035f4d69a"
+    private var bannerTimer: CountDownTimer? = null
+
+    private val promoRotationHandler = Handler(Looper.getMainLooper())
+    private var promoRotationRunnable: Runnable? = null
+    private val peliculasPromoList = mutableListOf<Modelo>()
+    private var currentPromoIndex = 0
+    private var isUserInteractingWithPromo = false
+
+    // Handler y Runnable para detectar inactividad del usuario y retomar la rotación
+    private val inactivityHandler = Handler(Looper.getMainLooper())
+    private val inactivityRunnable = Runnable {
+        isUserInteractingWithPromo = false
+        iniciarRotacionAutomatica()
+    }
+
     private val onDownloadComplete = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
@@ -191,6 +223,227 @@ class PeliculasActivity : AppCompatActivity() {
             CastvHelper.nuevosusuarios(this, nombreAMostrar, currentUser.email!!)
         }
         escucharSaldoUsuario()
+
+
+        // 🟢 Ejecutamos la carga del banner de Netflix
+        cargarBannerPromocional()
+// Configurar cliente Retrofit para TMDB dentro de onCreate de PeliculasActivity
+        val client = OkHttpClient.Builder().hostnameVerifier { _, _ -> true }.build()
+        val retrofit = Retrofit.Builder()
+            .baseUrl("https://api.themoviedb.org/3/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(client)
+            .build()
+        apiService = retrofit.create(TMDbApiService::class.java)
+
+    }
+
+    private fun cargarBannerPromocional() {
+        val bannerContainer = findViewById<View>(R.id.layoutBannerNetflix)
+        val rvBannerPromos = findViewById<RecyclerView>(R.id.rvBannerPromos)
+
+        databaseRef.child("movies").get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                peliculasPromoList.clear()
+
+                for (child in snapshot.children) {
+                    val movie = child.getValue(Modelo::class.java)
+                    if (movie != null) {
+                        movie.id = child.key ?: ""
+
+                        val countdownMinutes = movie.countdownMinutes
+                        val createdAt = movie.createdAt
+
+                        val createdAtMillis = if (createdAt > 0 && createdAt < 1000000000000L) {
+                            createdAt * 1000
+                        } else {
+                            createdAt
+                        }
+
+                        if (countdownMinutes > 0 && createdAtMillis > 0L) {
+                            val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownMinutes.toLong())
+                            val elapsed = System.currentTimeMillis() - createdAtMillis
+                            val remaining = durationMillis - elapsed
+
+                            if (remaining > 0) {
+                                peliculasPromoList.add(movie)
+                            }
+                        }
+                    }
+                }
+
+                if (peliculasPromoList.isNotEmpty()) {
+                    bannerContainer.visibility = View.VISIBLE
+                    currentPromoIndex = 0
+                    isUserInteractingWithPromo = false
+
+                    rvBannerPromos.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+
+                    val adapter = BannerPromosAdapter(
+                        list = peliculasPromoList,
+                        onMovieFocused = { movieSeleccionado ->
+                            detenerRotacionAutomatica()
+                            registrarActividadUsuario()
+
+                            val index = peliculasPromoList.indexOfFirst { it.id == movieSeleccionado.id }
+                            if (index != -1) {
+                                currentPromoIndex = index
+                            }
+                            mostrarDatosPeliculaEnBanner(movieSeleccionado)
+                        },
+                        onFocusLost = {
+                            registrarActividadUsuario()
+                        },
+                        onMovieClicked = { movieSeleccionado ->
+                            irAlReproductor(movieSeleccionado)
+                        }
+                    )
+
+                    rvBannerPromos.adapter = adapter
+                    iniciarRotacionAutomatica()
+
+                } else {
+                    bannerContainer.visibility = View.GONE
+                }
+            } else {
+                bannerContainer.visibility = View.GONE
+            }
+        }.addOnFailureListener {
+            bannerContainer.visibility = View.GONE
+        }
+    }
+
+    private fun iniciarRotacionAutomatica() {
+        if (isUserInteractingWithPromo) return
+
+        promoRotationRunnable?.let { promoRotationHandler.removeCallbacks(it) }
+
+        promoRotationRunnable = object : Runnable {
+            override fun run() {
+                if (peliculasPromoList.isNotEmpty()) {
+                    val peliActual = peliculasPromoList[currentPromoIndex]
+
+                    mostrarDatosPeliculaEnBanner(peliActual)
+
+                    val rvBannerPromos = findViewById<RecyclerView>(R.id.rvBannerPromos)
+                    rvBannerPromos?.smoothScrollToPosition(currentPromoIndex)
+                    (rvBannerPromos?.adapter as? BannerPromosAdapter)?.actualizarSeleccionActiva(currentPromoIndex)
+
+                    currentPromoIndex = (currentPromoIndex + 1) % peliculasPromoList.size
+                    promoRotationHandler.postDelayed(this, 6000)
+                }
+            }
+        }
+        promoRotationHandler.post(promoRotationRunnable!!)
+    }
+
+    private fun detenerRotacionAutomatica() {
+        promoRotationRunnable?.let {
+            promoRotationHandler.removeCallbacks(it)
+        }
+    }
+
+    private fun registrarActividadUsuario() {
+        isUserInteractingWithPromo = true
+        inactivityHandler.removeCallbacks(inactivityRunnable)
+        inactivityHandler.postDelayed(inactivityRunnable, 8000) // 8 segundos de inactividad para reanudar
+    }
+
+    private fun mostrarDatosPeliculaEnBanner(movie: Modelo) {
+        val ivBackdrop = findViewById<ImageView>(R.id.ivBannerBackdrop)
+        val tvTitulo = findViewById<TextView>(R.id.tvBannerTitulo)
+        val tvSinopsis = findViewById<TextView>(R.id.tvBannerSinopsis)
+        val tvContador = findViewById<TextView>(R.id.tvBannerContador)
+        val tvCalificacion = findViewById<TextView>(R.id.tvBannerCalificacion)
+
+        // 🟢 NUEVA VISTA VINCULADA: Información adicional de tu diseño final
+        val tvBannerInfoAdicional = findViewById<TextView>(R.id.tvBannerInfoAdicional)
+
+        // Valores por defecto
+        tvTitulo.text = movie.title
+        tvSinopsis.text = movie.overview.ifBlank { "Estreno exclusivo en CineParche." }
+        tvCalificacion.text = "⭐ 8.5"
+        tvBannerInfoAdicional.text = movie.genres.ifBlank { "Acción • Aventura • Cine" }
+
+        val queryBusqueda = movie.originalTitle.ifBlank { movie.title }
+        apiService.searchMovie(apiKey, "es-MX", queryBusqueda).enqueue(object : retrofit2.Callback<MovieResponse> {
+            override fun onResponse(call: retrofit2.Call<MovieResponse>, response: retrofit2.Response<MovieResponse>) {
+                if (response.isSuccessful) {
+                    val result = response.body()?.results?.firstOrNull()
+                    if (result != null) {
+                        tvTitulo.text = result.title
+                        tvSinopsis.text = result.overview ?: movie.overview
+
+                        val anio = result.release_date?.take(4) ?: "2026"
+                        val cal = if (result.vote_average > 0.0) "${result.vote_average}" else "8.5"
+                        tvCalificacion.text = "⭐ $cal   |   $anio"
+
+                        // Buscamos detalles adicionales para rellenar la info adicional
+                        apiService.getMovieDetails(result.id, apiKey, "es-MX").enqueue(object : retrofit2.Callback<MovieDetailResponse> {
+                            override fun onResponse(call: retrofit2.Call<MovieDetailResponse>, response: retrofit2.Response<MovieDetailResponse>) {
+                                if (response.isSuccessful) {
+                                    val detalles = response.body()
+                                    val generos = detalles?.genres?.joinToString(" • ") { it.name } ?: "Desconocidos"
+                                    val duracion = detalles?.runtime ?: 0
+                                    tvBannerInfoAdicional.text = "🎭 $generos  ⏱️ ${duracion} Min"
+                                }
+                            }
+                            override fun onFailure(call: retrofit2.Call<MovieDetailResponse>, t: Throwable) {}
+                        })
+
+                        val backdropUrl = "https://image.tmdb.org/t/p/w780${result.poster_path ?: result.poster_path}"
+                        Glide.with(this@PeliculasActivity)
+                            .load(backdropUrl)
+                            .centerCrop()
+                            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
+                            .into(ivBackdrop)
+                    } else {
+                        cargarImagenLocal(movie.imageUrl, ivBackdrop)
+                    }
+                } else {
+                    cargarImagenLocal(movie.imageUrl, ivBackdrop)
+                }
+            }
+
+            override fun onFailure(call: retrofit2.Call<MovieResponse>, t: Throwable) {
+                cargarImagenLocal(movie.imageUrl, ivBackdrop)
+            }
+        })
+
+        val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
+        val createdAtMillis = if (movie.createdAt > 0 && movie.createdAt < 1000000000000L) {
+            movie.createdAt * 1000
+        } else {
+            movie.createdAt
+        }
+        val elapsed = System.currentTimeMillis() - createdAtMillis
+        val remaining = durationMillis - elapsed
+
+        iniciarContadorBanner(tvContador, remaining)
+    }
+
+    private fun cargarImagenLocal(url: String, imageView: ImageView) {
+        Glide.with(this)
+            .load(url)
+            .centerCrop()
+            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
+            .into(imageView)
+    }
+
+    private fun iniciarContadorBanner(textView: TextView, remainingTime: Long) {
+        bannerTimer?.cancel()
+        bannerTimer = object : CountDownTimer(remainingTime, 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                val h = TimeUnit.MILLISECONDS.toHours(millisUntilFinished)
+                val m = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished) % 60
+                val s = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
+                textView.text = String.format("⏱️ Disponible hasta: %02d:%02d:%02d", h, m, s)
+            }
+
+            override fun onFinish() {
+                cargarBannerPromocional()
+            }
+        }.start()
     }
 
     private fun escucharSaldoUsuario() {
@@ -327,20 +580,17 @@ class PeliculasActivity : AppCompatActivity() {
     private fun setupMovieGrid() {
         val columnas = ViewUtils.calcularColumnas(this)
 
-        // 1. Forzamos el LayoutManager a ser estático
         val layoutManager = object : GridLayoutManager(this, columnas) {
-            // Esto evita que el RV pida medidas al sistema una y otra vez
             override fun isAutoMeasureEnabled(): Boolean = false
         }
         layoutManager.initialPrefetchItemCount = 25
 
         binding.rvPeliculas.layoutManager = layoutManager
-
-        // 3. ESTO ES VITAL: Le dice al RV que el tamaño no va a cambiar nunca
         binding.rvPeliculas.setHasFixedSize(true)
-
-        // 4. Evita que las tarjetas se re-dibujen al entrar
         binding.rvPeliculas.itemAnimator = null
+
+        // 🟢 OBLIGATORIO: Desactivar scroll interno para funcionar en sincronía con el NestedScrollView
+        binding.rvPeliculas.isNestedScrollingEnabled = false
 
         movieAdapter = MoviesAdapter(
             modeloList,
@@ -1475,6 +1725,8 @@ class PeliculasActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        bannerTimer?.cancel()
+        promoRotationRunnable?.let { promoRotationHandler.removeCallbacks(it) }
 
         // 1. Limpiar el Receptor de Descargas (APK)
         try {

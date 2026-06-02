@@ -5,7 +5,6 @@
     android:layout_height="match_parent"
     android:background="#050505">
 
-    <!-- FONDO -->
     <ImageView
         android:id="@+id/imgFondo"
         android:layout_width="match_parent"
@@ -13,7 +12,6 @@
         android:alpha="0.3"
         android:scaleType="centerCrop" />
 
-    <!-- MENÚ PRINCIPAL (Izquierda/Centro) -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/menuPrincipal"
         android:layout_width="0dp"
@@ -21,15 +19,13 @@
         android:layout_marginTop="10dp"
         android:clipToPadding="false"
         android:elevation="10dp"
-        android:nextFocusDown="@id/rvPeliculas"
         android:paddingHorizontal="20dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
+        android:descendantFocusability="afterDescendants"
+        android:nextFocusDown="@id/rvBannerPromos"
         app:layout_constraintEnd_toStartOf="@+id/layoutSaldo"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-
-    <!-- CONTENEDOR DE SALDO PREMIUM (Esquina Superior Derecha) -->
     <LinearLayout
         android:id="@+id/layoutSaldo"
         android:layout_width="wrap_content"
@@ -53,10 +49,153 @@
             android:textSize="16sp"
             android:textStyle="bold"
             android:maxLines="1" />
-
     </LinearLayout>
 
-    <!-- GRID DE PELÍCULAS -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/layoutBannerNetflix"
+        android:layout_width="match_parent"
+        android:layout_height="350dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginHorizontal="20dp"
+        android:focusable="false"
+        android:clickable="false"
+        android:visibility="visible"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="8dp"
+        app:layout_constraintTop_toBottomOf="@id/menuPrincipal"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <ImageView
+                android:id="@+id/ivBannerBackdrop"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:contentDescription="Banner Backdrop" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="210dp"
+                    android:orientation="horizontal"
+                    android:weightSum="1"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="5dp">
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="0.45"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="10dp"
+                        app:cardBackgroundColor="#CC141A24">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical"
+                            android:gravity="center_vertical"
+                            android:padding="18dp">
+
+                            <TextView
+                                android:id="@+id/tvBannerTitulo"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:textColor="#FFFFFF"
+                                android:textSize="20sp"
+                                android:textStyle="bold"
+                                android:maxLines="1"
+                                android:ellipsize="end" />
+
+                            <TextView
+                                android:id="@+id/tvBannerInfoAdicional"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:textColor="#B0BEC5"
+                                android:textSize="11sp"
+                                android:layout_marginTop="4dp" />
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:layout_marginTop="4dp">
+
+                                <TextView
+                                    android:id="@+id/tvBannerCalificacion"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textColor="#FFEB3B"
+                                    android:textSize="12sp"
+                                    android:textStyle="bold"
+                                    android:layout_marginEnd="12dp" />
+
+                                <TextView
+                                    android:id="@+id/tvBannerContador"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textColor="#00E676"
+                                    android:textSize="11sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/tvBannerSinopsis"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:textColor="#E0E0E0"
+                                android:textSize="11sp"
+                                android:maxLines="3"
+                                android:ellipsize="end"
+                                android:lineSpacingMultiplier="1.2" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:text="▶ PRESIONA ENTER PARA VER GRATIS"
+                                android:textColor="#C5A059"
+                                android:textSize="10sp"
+                                android:textStyle="bold" />
+
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="0.55" />
+
+                </LinearLayout>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvBannerPromos"
+                    android:layout_width="match_parent"
+                    android:layout_height="110dp"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginHorizontal="5dp"
+                    android:clipToPadding="false"
+                    android:scrollbars="none"
+                    android:descendantFocusability="afterDescendants"
+                    android:nextFocusUp="@id/menuPrincipal"
+                    android:nextFocusDown="@id/rvPeliculas" />
+
+            </LinearLayout>
+        </FrameLayout>
+    </androidx.cardview.widget.CardView>
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvPeliculas"
         android:layout_width="0dp"
@@ -64,10 +203,7 @@
         android:clipToPadding="false"
         android:descendantFocusability="afterDescendants"
         android:focusable="true"
-        android:nextFocusLeft="@id/menuPrincipal"
-        android:nextFocusRight="@id/menuPrincipal"
-        android:nextFocusUp="@id/menuPrincipal"
-        android:nextFocusDown="@id/rvPeliculas"
+        android:nextFocusUp="@id/rvBannerPromos"
         android:overScrollMode="never"
         android:paddingHorizontal="10dp"
         android:paddingTop="20dp"
@@ -75,6 +211,6 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/menuPrincipal" />
+        app:layout_constraintTop_toBottomOf="@id/layoutBannerNetflix" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
