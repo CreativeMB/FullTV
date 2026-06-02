@@ -24,7 +24,7 @@
 //import com.creativem.fulltv.R
 //import com.creativem.fulltv.api.ApiPeliculaActivity
 //import com.creativem.fulltv.principal.CastvHelper
-//import com.creativem.fulltv.principal.Movie
+//import com.creativem.fulltv.principal.Modelo
 //import com.google.firebase.auth.FirebaseAuth
 //import com.google.firebase.database.FirebaseDatabase
 //import com.google.firebase.database.ValueEventListener
@@ -72,13 +72,13 @@
 //        adapter = rowsAdapter
 //
 //        setOnItemViewClickedListener { _, item, _, _ ->
-//            if (item is Movie) {
+//            if (item is Modelo) {
 //                irAlReproductor(item)
 //            }
 //        }
 //
 //        setOnItemViewSelectedListener { _, item, _, _ ->
-//            val movie = item as? Movie
+//            val movie = item as? Modelo
 //            if (movie != null && !movie.imageUrl.isNullOrEmpty()) {
 //                handler.removeCallbacksAndMessages(null)
 //                fondoAnimando = false
@@ -116,11 +116,11 @@
 //        peliculasListener = moviesRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
 //            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
 //                if (snapshot.exists()) {
-//                    val peliculas = mutableListOf<Movie>()
+//                    val peliculas = mutableListOf<Modelo>()
 //
 //                    // Recorremos cada hijo dentro de "movies"
 //                    for (child in snapshot.children) {
-//                        val movie = child.getValue(Movie::class.java)
+//                        val movie = child.getValue(Modelo::class.java)
 //                        if (movie != null) {
 //                            // En Realtime, el ID es la llave del nodo (child.key)
 //                            val movieConId = movie.copy(id = child.key ?: "")
@@ -144,7 +144,7 @@
 //        })
 //    }
 //
-//    private fun updateMovieList(peliculas: List<Movie>) {
+//    private fun updateMovieList(peliculas: List<Modelo>) {
 //        rowsAdapter.clear()
 //
 //        // ✅ Agregar encabezado
@@ -176,7 +176,7 @@
 //            }
 //        }
 //    }
-//    private fun agregarALista(peliculas: List<Movie>, titulo: String) {
+//    private fun agregarALista(peliculas: List<Modelo>, titulo: String) {
 //        val cardPresenter = CardPresenter()
 //        val elementosPorFila = calcularElementosPorFila()
 //
@@ -201,7 +201,7 @@
 //    }
 //
 //
-//    private fun irAlReproductor(movie: Movie) {
+//    private fun irAlReproductor(movie: Modelo) {
 //        val intent = Intent(requireContext(), ApiPeliculaActivity::class.java).apply {
 //            putExtra("EXTRA_STREAM_URL", movie.streamUrl)
 //            putExtra("EXTRA_MOVIE_TITLE", movie.title)

@@ -1,10 +1,11 @@
 package com.creativem.fulltv.principal
 
+import android.graphics.Movie
 import android.os.Parcel
 import android.os.Parcelable
 import com.google.firebase.database.IgnoreExtraProperties
 @IgnoreExtraProperties
-data class Movie(
+data class Modelo(
     var id: String = "",
     val title: String = "",
     val correo: String = "",
@@ -67,8 +68,13 @@ data class Movie(
 
     override fun describeContents(): Int = 0
 
-    companion object CREATOR : Parcelable.Creator<Movie> {
-        override fun createFromParcel(parcel: Parcel): Movie = Movie(parcel)
-        override fun newArray(size: Int): Array<Movie?> = arrayOfNulls(size)
+    companion object CREATOR : Parcelable.Creator<Modelo> {
+        override fun createFromParcel(parcel: Parcel): Modelo = Modelo(parcel)
+        override fun newArray(size: Int): Array<Modelo?> = arrayOfNulls(size)
     }
+    data class AlquilerItem(
+        val movie: Modelo,
+        val createdAt: Long,
+        val countdownMinutes: Int
+    )
 }

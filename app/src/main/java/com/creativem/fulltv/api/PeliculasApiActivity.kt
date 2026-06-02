@@ -11,7 +11,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
 import com.creativem.fulltv.menu.MenuSuperiorAdapter
-import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.Modelo
 import com.creativem.fulltv.principal.ViewUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -96,7 +96,7 @@ class PeliculasApiActivity : AppCompatActivity() {
     // FUNCIÓN ÚNICA PARA CARGAR CATEGORÍAS (Evita repetir código)
     private fun cargarCategoria(categoria: String) {
         lifecycleScope.launch(Dispatchers.IO) {
-            val allMovies = mutableListOf<Movie>()
+            val allModelos = mutableListOf<Modelo>()
 
             try {
                 for (page in 1..5) {
@@ -104,7 +104,7 @@ class PeliculasApiActivity : AppCompatActivity() {
 
                     if (response.isSuccessful) {
                         val mapped = response.body()?.results?.map { movie ->
-                            Movie(
+                            Modelo(
                                 id = movie.id.toString(),
                                 title = "${movie.title} (${movie.release_date})",// El año se puede añadir en el adapter si prefieres
                                 originalTitle = movie.original_title,
@@ -115,12 +115,12 @@ class PeliculasApiActivity : AppCompatActivity() {
                                 createdAt = 0L
                             )
                         } ?: emptyList()
-                        allMovies.addAll(mapped)
+                        allModelos.addAll(mapped)
                     }
                 }
 
                 withContext(Dispatchers.Main) {
-                    adapter.updateMovies(allMovies)
+                    adapter.updateMovies(allModelos)
                     recyclerView.scrollToPosition(0) // Regresa al inicio al cambiar categoría
                 }
 

@@ -38,12 +38,11 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultHttpDataSource
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
-import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.Modelo
 import com.creativem.fulltv.databinding.PlayerBinding
 import com.creativem.fulltv.principal.AudioFocusHelper
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.database.FirebaseDatabase // ASEGÚRATE DE TENER ESTE IMPORT
-import com.google.firebase.database.DatabaseReference
+
 class PlayerTv : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
@@ -241,10 +240,10 @@ class PlayerTv : AppCompatActivity() {
         // Consultamos el nodo "tv" en Realtime Database
         databaseRef.get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
-                val tvList = mutableListOf<Movie>()
+                val tvList = mutableListOf<Modelo>()
 
                 for (child in snapshot.children) {
-                    val canal = child.getValue(Movie::class.java)
+                    val canal = child.getValue(Modelo::class.java)
                     canal?.let {
                         // Asignamos el ID desde la llave del nodo y lo añadimos a la lista
                         tvList.add(it.copy(id = child.key ?: ""))
@@ -260,7 +259,7 @@ class PlayerTv : AppCompatActivity() {
         }
     }
 
-    private fun updateRecyclerView(tvList: List<Movie>) {
+    private fun updateRecyclerView(tvList: List<Modelo>) {
         adapter.updateData(tvList) // ✅ Ahora actualizamos la lista en vez de reemplazar el adaptador
     }
 

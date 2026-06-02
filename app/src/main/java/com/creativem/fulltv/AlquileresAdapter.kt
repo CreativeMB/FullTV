@@ -1,4 +1,4 @@
-package com.creativem.fulltv.peliculas
+package com.creativem.fulltv.peliculasvalidas
 
 import android.graphics.Color
 import android.os.CountDownTimer
@@ -17,67 +17,74 @@ import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Modelo
 import java.util.concurrent.TimeUnit
 
-class MoviesAdapter(
-    private var modeloList: MutableList<Modelo>,
-    private val onItemClick: (Modelo) -> Unit,
-    private val onFocusChange: (Modelo) -> Unit
-) : RecyclerView.Adapter<MoviesAdapter.MovieViewHolder>() {
+class AlquileresAdapter(
+    private val items: MutableList<Modelo.AlquilerItem>,
+    private val onListEmpty: () -> Unit,
+    private val onItemExpired: (Modelo.AlquilerItem) -> Unit,
+    private val onItemClick: (Modelo.AlquilerItem) -> Unit
+) : RecyclerView.Adapter<AlquileresAdapter.ViewHolder>() {
 
     private val timers = mutableMapOf<String, CountDownTimer>()
 
-    // Configuración de Glide optimizada para evitar saltos y ahorrar RAM en TV
     private val glideOptions = RequestOptions()
         .format(DecodeFormat.PREFER_RGB_565)
         .diskCacheStrategy(DiskCacheStrategy.ALL)
         .override(200, 300)
         .centerCrop()
-        .placeholder(R.drawable.pelifondo) // Placeholder estático fijo
+        .placeholder(R.drawable.pelifondo)
         .error(R.drawable.pelifondo)
-        .dontAnimate() // Las animaciones causan parpadeos en el reciclaje
+        .dontAnimate()
         .dontTransform()
 
     init {
-        // Crucial: indica que cada ítem tiene un ID único basado en su origen (Firebase ID)
         setHasStableIds(true)
     }
 
     override fun getItemId(position: Int): Long {
-        // Retorna el hash del ID de Firebase para que el RecyclerView reconozca el ítem siempre
-        return modeloList[position].id.hashCode().toLong()
+        return items[position].movie.id.hashCode().toLong()
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MovieViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_movie, parent, false)
-        return MovieViewHolder(view)
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_pelicula_alquilada, parent, false)
+
+        val context = parent.context
+        val orientation = context.resources.configuration.orientation
+
+        if (orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            val density = context.resources.displayMetrics.density
+            val widthInPx = (150 * density).toInt()
+            val heightInPx = (255 * density).toInt()
+
+            val params = view.layoutParams ?: ViewGroup.LayoutParams(widthInPx, heightInPx)
+            params.width = widthInPx
+            params.height = heightInPx
+            view.layoutParams = params
+        }
+
+        return ViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: MovieViewHolder, position: Int) {
-        val movie = modeloList[position]
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val item = items[position]
+        val movie = item.movie
 
-        // 1. Reset visual básico (sin limpiar imágenes para evitar parpadeo blanco)
-        holder.txtStatus.text = ""
         holder.txtTitle.text = movie.title
         holder.txtTitle.isSelected = false
 
-        // 2. Carga de imagen optimizada
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
             .apply(glideOptions)
-            .priority(Priority.IMMEDIATE) // 👈 Carga inmediata
-            .thumbnail(0.2f) // Muestra una versión rápida mientras carga la original
+            .priority(Priority.IMMEDIATE)
+            .thumbnail(0.2f)
             .into(holder.imgMovie)
 
-        // 3. Timers
-        configurarTiempos(holder, movie)
+        configurarContador(holder, item)
 
-        // 4. Gestión de foco y zoom
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             val card = view as? androidx.cardview.widget.CardView
             val currentPos = holder.bindingAdapterPosition
 
             if (hasFocus && currentPos != RecyclerView.NO_POSITION) {
-                onFocusChange(movie)
-
                 val parentView = view.parent
                 if (parentView is RecyclerView) {
                     val smoothScroller = object : androidx.recyclerview.widget.LinearSmoothScroller(view.context) {
@@ -118,33 +125,36 @@ class MoviesAdapter(
             }
         }
 
-        holder.itemView.setOnClickListener { onItemClick(movie) }
+        holder.itemView.setOnClickListener { onItemClick(item) }
     }
 
-    override fun getItemCount(): Int = modeloList.size
+    override fun getItemCount(): Int = items.size
 
-    private fun configurarTiempos(holder: MovieViewHolder, modelo: Modelo) {
-        val movieKey = modelo.title
+    private fun configurarContador(holder: ViewHolder, item: Modelo.AlquilerItem) {
+        val movieKey = item.movie.title
         timers[movieKey]?.cancel()
 
-        val countdownDurationMillis = TimeUnit.MINUTES.toMillis(modelo.countdownMinutes.toLong())
-        val timeElapsed = System.currentTimeMillis() - modelo.createdAt
-        val remainingTimeMillis = countdownDurationMillis - timeElapsed
+        val durationMillis = TimeUnit.MINUTES.toMillis(item.countdownMinutes.toLong())
+        val timeElapsed = System.currentTimeMillis() - item.createdAt
+        val remainingTimeMillis = durationMillis - timeElapsed
 
         if (remainingTimeMillis <= 0) {
-            actualizarInterfazFinal(holder, modelo)
+            eliminarItemEnTiempoReal(holder)
         } else {
             val timer = object : CountDownTimer(remainingTimeMillis, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
-                    if (holder.txtTitle.text == modelo.title) {
+                    if (holder.txtTitle.text == item.movie.title) {
                         val h = TimeUnit.MILLISECONDS.toHours(millisUntilFinished)
                         val m = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished) % 60
                         val s = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
 
-                        holder.txtStatus.text = String.format("%02d:%02d:%02d", h, m, s)
-                        holder.txtBadge.text = "ONLINE 🎬"
-                        holder.infoArea.setBackgroundColor(Color.parseColor("#001f3f"))
-                        holder.txtBadge.setBackgroundColor(Color.parseColor("#001f3f"))
+                        // 🟢 Actualizamos directamente la etiqueta superior con el texto y formato solicitado
+                        holder.txtBadge.text = String.format("DISPONIBLE POR: %02d:%02d:%02d", h, m, s)
+
+                        val colorActivo = Color.parseColor("#004D40")
+                        holder.infoArea.setBackgroundColor(colorActivo)
+                        holder.txtBadge.setBackgroundColor(Color.parseColor("#E6004D40")) // Fondo verde oscuro traslúcido
+                        holder.txtBadge.setTextColor(Color.parseColor("#00E676")) // Texto verde brillante
                         holder.txtBadge.visibility = View.VISIBLE
                     } else {
                         this.cancel()
@@ -152,44 +162,44 @@ class MoviesAdapter(
                 }
 
                 override fun onFinish() {
-                    if (holder.txtTitle.text == modelo.title) {
-                        actualizarInterfazFinal(holder, modelo)
-                    }
+                    eliminarItemEnTiempoReal(holder)
                 }
             }.start()
             timers[movieKey] = timer
         }
     }
 
-    private fun actualizarInterfazFinal(holder: MovieViewHolder, modelo: Modelo) {
-        holder.txtBadge.visibility = View.VISIBLE
-        if (modelo.isValid) {
-            holder.txtStatus.text = "CasTV $${modelo.castv}"
-            holder.txtBadge.text = "ACTIVAR 💳"
-            val color = Color.parseColor("#006064")
-            holder.infoArea.setBackgroundColor(color)
-            holder.txtBadge.setBackgroundColor(color)
-        } else {
-            holder.txtStatus.text = "CasTV $${modelo.castv}"
-            holder.txtBadge.text = "ALQUILA 💳"
-            val color = Color.parseColor("#880E4F")
-            holder.infoArea.setBackgroundColor(color)
-            holder.txtBadge.setBackgroundColor(color)
+    private fun eliminarItemEnTiempoReal(holder: ViewHolder) {
+        val currentPos = holder.bindingAdapterPosition
+        if (currentPos != RecyclerView.NO_POSITION && currentPos < items.size) {
+            val itemExpirado = items[currentPos]
+            val tituloExpirado = itemExpirado.movie.title
+
+            timers[tituloExpirado]?.cancel()
+            timers.remove(tituloExpirado)
+
+            items.removeAt(currentPos)
+            notifyItemRemoved(currentPos)
+            notifyItemRangeChanged(currentPos, items.size)
+
+            onItemExpired(itemExpirado)
+
+            if (items.isEmpty()) {
+                onListEmpty()
+            }
         }
     }
 
-    override fun onViewRecycled(holder: MovieViewHolder) {
+    override fun onViewRecycled(holder: ViewHolder) {
         super.onViewRecycled(holder)
-        // No limpiamos Glide aquí para evitar parpadeos en scroll rápido en TV
         val movieKey = holder.txtTitle.text.toString()
         timers[movieKey]?.cancel()
         timers.remove(movieKey)
     }
 
-    class MovieViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val imgMovie: ImageView = view.findViewById(R.id.imgMovie)
         val txtTitle: TextView = view.findViewById(R.id.txtMovieTitle)
-        val txtStatus: TextView = view.findViewById(R.id.txtStatus)
         val txtBadge: TextView = view.findViewById(R.id.txtBadge)
         val infoArea: View = view.findViewById(R.id.infoArea)
     }

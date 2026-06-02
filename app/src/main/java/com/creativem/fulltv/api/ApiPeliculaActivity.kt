@@ -32,8 +32,8 @@ import com.creativem.fulltv.peliculasvalidas.PelisCarteleraAdapter
 import com.creativem.fulltv.peliculasvalidas.Validaciones
 import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.CineAlert
-import com.creativem.fulltv.principal.Movie
-import com.creativem.fulltv.principal.Nosotros
+import com.creativem.fulltv.principal.Modelo
+import com.creativem.fulltv.principal.Perfil
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
@@ -41,8 +41,6 @@ import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import retrofit2.*
 import retrofit2.converter.gson.GsonConverterFactory
-import java.net.HttpURLConnection
-import java.net.URL
 
 class ApiPeliculaActivity : AppCompatActivity() {
 
@@ -84,7 +82,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
     private var movieCastv: Int = 0
     private var movieImageUrl = ""
     private var movieCountdown = 0
-    private var movieActual: Movie? = null
+    private var modeloActual: Modelo? = null
     private var movieReleaseDate: String = ""
 
     private var movieCreatedAt: Long = 0L
@@ -117,7 +115,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
         apiService = retrofit.create(TMDbApiService::class.java)
 
         val movieOriginalTitle = intent.getStringExtra("EXTRA_ORIGINAL_TITLE") ?: ""
-        movieActual = intent.getParcelableExtra<Movie>("EXTRA_MOVIE_DATA")
+        modeloActual = intent.getParcelableExtra<Modelo>("EXTRA_MOVIE_DATA")
         streamUrlGuardado = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
         movieTitle = intent.getStringExtra("EXTRA_MOVIE_TITLE") ?: ""
         movieCastv = intent.getIntExtra("EXTRA_MOVIE_CASTV", 0)
@@ -136,73 +134,169 @@ class ApiPeliculaActivity : AppCompatActivity() {
         recyclerCartelera.nextFocusRightId = R.id.peliscartelera
         recyclerCartelera.preserveFocusAfterLayout = true
 
-        // --- BOTÓN REPRODUCIR ---
+        // --- BOTÓN REPRODUCIR (CON DETECTOR DE PROMOCIÓN GLOBAL) ---
         tvReproducir.setOnClickListener {
             val urlActual = streamUrlGuardado
-            val countdownActual = movieActual?.countdownMinutes ?: movieCountdown
-            val createdAtOriginal = movieActual?.createdAt ?: movieCreatedAt
-            val costoActual = movieActual?.castv ?: movieCastv
+            val costoActual = modeloActual?.castv ?: movieCastv
+            val user = auth.currentUser
+
+            // 1. Verificación inicial de enlace roto
             if (urlActual.contains("tuservidor.com") || urlActual.isBlank()) {
                 manejarEnlaceRoto(costoActual)
-                return@setOnClickListener // Corta aquí, no hace nada más.
+                return@setOnClickListener
             }
 
-            // 🟢 SOLUCIÓN: Ajuste de Fechas (Milisegundos vs Segundos)
-            val createdAtMillis = if (createdAtOriginal > 0 && createdAtOriginal < 1000000000000L) {
-                createdAtOriginal * 1000
+            // 🟢 DETECTOR DE PROMOCIONES / CONTADORES GLOBALES (PANTALLA PRINCIPAL)
+            val countdownGlobal = modeloActual?.countdownMinutes ?: movieCountdown
+            val createdAtGlobal = modeloActual?.createdAt ?: movieCreatedAt
+
+            val createdAtMillis = if (createdAtGlobal > 0 && createdAtGlobal < 1000000000000L) {
+                createdAtGlobal * 1000
             } else {
-                createdAtOriginal
+                createdAtGlobal
             }
 
-            // 🟢 MATEMÁTICA DEL CONTADOR
-            var isCountdownActive = false
+            var isPromoGlobalActiva = false
 
-            if (countdownActual > 0) {
+            if (countdownGlobal > 0) {
                 if (createdAtMillis == 0L) {
-                    isCountdownActive = true
+                    isPromoGlobalActiva = true
                 } else {
-                    val countdownDurationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownActual.toLong())
+                    val countdownDurationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownGlobal.toLong())
                     val timeElapsed = System.currentTimeMillis() - createdAtMillis
                     val remainingTimeMillis = countdownDurationMillis - timeElapsed
 
                     if (remainingTimeMillis > 0) {
-                        isCountdownActive = true
+                        isPromoGlobalActiva = true
                     }
                 }
             }
 
-            // ESCENARIO 3: Viene de un contador ACTIVO -> Reproduce directo sin cobrar
-            if (isCountdownActive) {
-                if (urlActual.isNotBlank()) {
-                    irAlReproductorDirecto()
-                } else {
-                    CineAlert.show(this, "Enlace de cuenta regresiva no disponible", CineAlert.Tipo.ERROR)
-                }
+            // 🟢 ESCENARIO PRIORITARIO: Si la película tiene promoción global, reproduce de inmediato
+            if (isPromoGlobalActiva) {
+                irAlReproductorDirecto()
+                return@setOnClickListener // Detiene el código aquí (sin perfiles ni cobros)
+            }
+
+            // 2. Verificación de usuario (solo se requiere si NO es una película promocional/gratuita)
+            if (user == null || user.email == null) {
+                CineAlert.show(this, "Debes iniciar sesión para reproducir", CineAlert.Tipo.ERROR)
                 return@setOnClickListener
             }
 
-            // ESCENARIO 1 y 2: Preparar UI para cobrar/validar
+            val correoKey = user.email!!.replace(".", "_").replace("@", "_")
+            val tituloMovie = modeloActual?.title ?: movieTitle
+
+            // Bloqueamos el botón y cambiamos el estado visual para el flujo normal de compra/alquiler
             tvReproducir.isEnabled = false
             val textoOriginal = tvReproducir.text
-            tvReproducir.text = "Procesando Datos..."
+            tvReproducir.text = "Verificando..."
 
+            // Iniciamos la corrutina en el hilo principal para el flujo de validación y renta individual
             CoroutineScope(Dispatchers.Main).launch {
-                val enlaceValido = withContext(Dispatchers.IO) {
-                    validaciones.isUrlValid(urlActual)
+
+                // Verificamos si este usuario tiene un alquiler activo personal (en segundo plano)
+                val isAlquilerActivo = withContext(Dispatchers.IO) {
+                    verificarAlquilerVigenteSincrono(correoKey, tituloMovie)
                 }
 
-                if (enlaceValido) {
-                    // ESCENARIO 1: El enlace sirve -> Mostrar AlertDialog de Confirmación
-                    procesarEnlaceBueno(costoActual)
+                if (isAlquilerActivo) {
+                    // ESCENARIO 3: El usuario ya tiene un alquiler activo personal -> Reproduce directo
+                    tvReproducir.isEnabled = true
+                    tvReproducir.text = textoOriginal
+                    irAlReproductorDirecto()
                 } else {
-                    // ESCENARIO 2: El enlace está roto -> Mostrar AlertDialog para pedir la película
-                    manejarEnlaceRoto(costoActual)
-                }
+                    // El usuario no tiene alquiler activo -> Procedemos a validar el enlace para iniciar cobro
+                    tvReproducir.text = "Procesando Datos..."
 
-                tvReproducir.isEnabled = true
-                tvReproducir.text = textoOriginal
+                    val enlaceValido = withContext(Dispatchers.IO) {
+                        validaciones.isUrlValid(urlActual)
+                    }
+
+                    if (enlaceValido) {
+                        // ESCENARIO 1: El enlace sirve -> Mostrar AlertDialog de Confirmación de Compra
+                        procesarEnlaceBueno(costoActual)
+                    } else {
+                        // ESCENARIO 2: El enlace está roto -> Mostrar AlertDialog para pedir la película
+                        manejarEnlaceRoto(costoActual)
+                    }
+
+                    tvReproducir.isEnabled = true
+                    tvReproducir.text = textoOriginal
+                }
             }
         }
+
+
+
+
+
+//        tvReproducir.setOnClickListener {
+//            val urlActual = streamUrlGuardado
+//            val countdownActual = modeloActual?.countdownMinutes ?: movieCountdown
+//            val createdAtOriginal = modeloActual?.createdAt ?: movieCreatedAt
+//            val costoActual = modeloActual?.castv ?: movieCastv
+//            if (urlActual.contains("tuservidor.com") || urlActual.isBlank()) {
+//                manejarEnlaceRoto(costoActual)
+//                return@setOnClickListener // Corta aquí, no hace nada más.
+//            }
+//
+//            // 🟢 SOLUCIÓN: Ajuste de Fechas (Milisegundos vs Segundos)
+//            val createdAtMillis = if (createdAtOriginal > 0 && createdAtOriginal < 1000000000000L) {
+//                createdAtOriginal * 1000
+//            } else {
+//                createdAtOriginal
+//            }
+//
+//            // 🟢 MATEMÁTICA DEL CONTADOR
+//            var isCountdownActive = false
+//
+//            if (countdownActual > 0) {
+//                if (createdAtMillis == 0L) {
+//                    isCountdownActive = true
+//                } else {
+//                    val countdownDurationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownActual.toLong())
+//                    val timeElapsed = System.currentTimeMillis() - createdAtMillis
+//                    val remainingTimeMillis = countdownDurationMillis - timeElapsed
+//
+//                    if (remainingTimeMillis > 0) {
+//                        isCountdownActive = true
+//                    }
+//                }
+//            }
+//
+//            // ESCENARIO 3: Viene de un contador ACTIVO -> Reproduce directo sin cobrar
+//            if (isCountdownActive) {
+//                if (urlActual.isNotBlank()) {
+//                    irAlReproductorDirecto()
+//                } else {
+//                    CineAlert.show(this, "Enlace de cuenta regresiva no disponible", CineAlert.Tipo.ERROR)
+//                }
+//                return@setOnClickListener
+//            }
+//
+//            // ESCENARIO 1 y 2: Preparar UI para cobrar/validar
+//            tvReproducir.isEnabled = false
+//            val textoOriginal = tvReproducir.text
+//            tvReproducir.text = "Procesando Datos..."
+//
+//            CoroutineScope(Dispatchers.Main).launch {
+//                val enlaceValido = withContext(Dispatchers.IO) {
+//                    validaciones.isUrlValid(urlActual)
+//                }
+//
+//                if (enlaceValido) {
+//                    // ESCENARIO 1: El enlace sirve -> Mostrar AlertDialog de Confirmación
+//                    procesarEnlaceBueno(costoActual)
+//                } else {
+//                    // ESCENARIO 2: El enlace está roto -> Mostrar AlertDialog para pedir la película
+//                    manejarEnlaceRoto(costoActual)
+//                }
+//
+//                tvReproducir.isEnabled = true
+//                tvReproducir.text = textoOriginal
+//            }
+//        }
 
         tvReproducir.isFocusableInTouchMode = true
         tvReproducir.requestFocus()
@@ -214,27 +308,86 @@ class ApiPeliculaActivity : AppCompatActivity() {
         cargarCartelera()
         buscarPelicula(movieOriginalTitle.ifBlank { movieTitle })
     }
-    // --- FUNCIÓN PARA ACTIVAR EL CONTADOR DE 300 MINUTOS ---
-    private fun activarContadorFirebase(tituloPelicula: String) {
-        val query = databaseRef.child("movies").orderByChild("title").equalTo(tituloPelicula)
 
-        query.get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                for (child in snapshot.children) {
-                    // Actualizamos para que el contador inicie AHORA MISMO con 300 minutos (5 horas)
-                    val updates = mapOf<String, Any>(
-                        "countdownMinutes" to 300,
-                        "createdAt" to System.currentTimeMillis()
-                    )
-                    child.ref.updateChildren(updates).addOnSuccessListener {
-                        Log.d("ALQUILER", "Contador de 300 minutos activado para: $tituloPelicula")
+    private suspend fun verificarAlquilerVigenteSincrono(correoKey: String, tituloPelicula: String): Boolean =
+        kotlin.coroutines.suspendCoroutine { continuation ->
+            // Limpiamos caracteres que no se permiten en claves de Firebase
+            val peliculaKey = tituloPelicula.replace(".", "_")
+                .replace("$", "_")
+                .replace("#", "_")
+                .replace("[", "_")
+                .replace("]", "_")
+
+            databaseRef.child("usuarios")
+                .child(correoKey)
+                .child("alquileres")
+                .child(peliculaKey)
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    if (snapshot.exists()) {
+                        val createdAt = snapshot.child("createdAt").value as? Long ?: 0L
+                        val countdownMinutes = (snapshot.child("countdownMinutes").value as? Number)?.toInt() ?: 0
+
+                        if (countdownMinutes > 0 && createdAt > 0) {
+                            val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownMinutes.toLong())
+                            val timeElapsed = System.currentTimeMillis() - createdAt
+                            val remainingTime = durationMillis - timeElapsed
+
+                            // Si queda tiempo restante, retorna true
+                            continuation.resumeWith(Result.success(remainingTime > 0))
+                            return@addOnSuccessListener
+                        }
                     }
+                    continuation.resumeWith(Result.success(false))
                 }
-            }
+                .addOnFailureListener {
+                    continuation.resumeWith(Result.success(false))
+                }
+        }
+    private fun activarAlquilerUsuario(correoKey: String, tituloPelicula: String) {
+        val peliculaKey = tituloPelicula.replace(".", "_")
+            .replace("$", "_")
+            .replace("#", "_")
+            .replace("[", "_")
+            .replace("]", "_")
+
+        val alquilerRef = databaseRef.child("usuarios")
+            .child(correoKey)
+            .child("alquileres")
+            .child(peliculaKey)
+
+        val datosAlquiler = mapOf<String, Any>(
+            "countdownMinutes" to 300,
+            "createdAt" to com.google.firebase.database.ServerValue.TIMESTAMP
+        )
+
+        alquilerRef.setValue(datosAlquiler).addOnSuccessListener {
+            Log.d("ALQUILER", "Alquiler individual activado con éxito para: $tituloPelicula")
         }.addOnFailureListener {
-            Log.e("ALQUILER", "Error activando contador: ${it.message}")
+            Log.e("ALQUILER", "Error al registrar alquiler local: ${it.message}")
         }
     }
+    // --- FUNCIÓN PARA ACTIVAR EL CONTADOR DE 300 MINUTOS ---
+//    private fun activarContadorFirebase(tituloPelicula: String) {
+//        val query = databaseRef.child("movies").orderByChild("title").equalTo(tituloPelicula)
+//
+//        query.get().addOnSuccessListener { snapshot ->
+//            if (snapshot.exists()) {
+//                for (child in snapshot.children) {
+//                    // Actualizamos para que el contador inicie AHORA MISMO con 300 minutos (5 horas)
+//                    val updates = mapOf<String, Any>(
+//                        "countdownMinutes" to 300,
+//                        "createdAt" to System.currentTimeMillis()
+//                    )
+//                    child.ref.updateChildren(updates).addOnSuccessListener {
+//                        Log.d("ALQUILER", "Contador de 300 minutos activado para: $tituloPelicula")
+//                    }
+//                }
+//            }
+//        }.addOnFailureListener {
+//            Log.e("ALQUILER", "Error activando contador: ${it.message}")
+//        }
+//    }
     // --- ESCENARIO 1: ENLACE BUENO (AHORA CON CONFIRMACIÓN) ---
     private fun procesarEnlaceBueno(costo: Int) {
         val user = auth.currentUser
@@ -251,7 +404,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
     // --- DIALOGO DE CONFIRMACIÓN DE ALQUILER (ENLACE BUENO) ---
     private fun showConfirmPurchaseDialog(costo: Int, correoKey: String) {
-        val tituloUsado = movieActual?.title ?: movieTitle
+        val tituloUsado = modeloActual?.title ?: movieTitle
         val colorDorado = Color.parseColor("#C5A059")
         val colorFondo = Color.parseColor("#0A122A")
 
@@ -328,24 +481,40 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
                 verificarPuntos(correoKey, costo) { tienePuntos ->
                     if (tienePuntos) {
+                        // DENTRO DE showConfirmPurchaseDialog (btnVerAhora.setOnClickListener):
                         descontarPuntos(correoKey, costo) { exito ->
                             if (exito) {
-                                // 🟢 ACTIVAMOS EL CONTADOR AL COBRAR
-                                val tituloMovie = movieActual?.title ?: movieTitle
-                                activarContadorFirebase(tituloMovie)
+                                // 🟢 REGISTRAMOS EL ALQUILER EXCLUSIVAMENTE EN EL PERFIL DE ESTE USUARIO
+                                val tituloMovie = modeloActual?.title ?: movieTitle
+                                activarAlquilerUsuario(correoKey, tituloMovie)
 
-//
-                                CineAlert.show(this@ApiPeliculaActivity, "¡Película activada por 300 minutos!", CineAlert.Tipo.EXITO, dialog.window?.decorView as? ViewGroup)
-                                {
-                                irAlReproductorDirecto()
+                                CineAlert.show(this@ApiPeliculaActivity, "¡Alquiler exitoso! Disponible por 5 horas. Puedes pausar y continuar viendo desde tu Perfil.", CineAlert.Tipo.EXITO, dialog.window?.decorView as? ViewGroup) {
+                                    irAlReproductorDirecto()
                                 }
                             } else {
                                 btnVerAhora.isEnabled = true
                                 btnVerAhora.text = "Ver Ahora"
                                 CineAlert.show(this@ApiPeliculaActivity, "Error procesando el pago", CineAlert.Tipo.ERROR, dialog.window?.decorView as? ViewGroup)
                             }
-
                         }
+//                        descontarPuntos(correoKey, costo) { exito ->
+//                            if (exito) {
+//                                // 🟢 ACTIVAMOS EL CONTADOR AL COBRAR
+//                                val tituloMovie = modeloActual?.title ?: movieTitle
+//                                activarContadorFirebase(tituloMovie)
+//
+////
+//                                CineAlert.show(this@ApiPeliculaActivity, "¡Película activada por 300 minutos!", CineAlert.Tipo.EXITO, dialog.window?.decorView as? ViewGroup)
+//                                {
+//                                irAlReproductorDirecto()
+//                                }
+//                            } else {
+//                                btnVerAhora.isEnabled = true
+//                                btnVerAhora.text = "Ver Ahora"
+//                                CineAlert.show(this@ApiPeliculaActivity, "Error procesando el pago", CineAlert.Tipo.ERROR, dialog.window?.decorView as? ViewGroup)
+//                            }
+//
+//                        }
                     } else {
                         btnVerAhora.isEnabled = true
                         btnVerAhora.text = "Ver Ahora"
@@ -390,7 +559,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
     // --- ESCENARIO 2: ENLACE ROTO ---
     private fun manejarEnlaceRoto(costo: Int) {
         val correoUsuario = auth.currentUser?.email ?: ""
-        val tituloUsado = movieActual?.title ?: movieTitle
+        val tituloUsado = modeloActual?.title ?: movieTitle
         showErrorDialog(tituloUsado, costo, correoUsuario)
     }
 
@@ -461,7 +630,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
         linkNosotros.setTextColor(Color.RED)
         linkNosotros.paintFlags = linkNosotros.paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
         linkNosotros.setOnClickListener {
-            startActivity(Intent(this, Nosotros::class.java))
+            startActivity(Intent(this, Perfil::class.java))
         }
 
         val colorDorado = Color.parseColor("#C5A059")
@@ -563,7 +732,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
                 if (snapshot.exists()) {
                     val userName = snapshot.child("nombre").value?.toString() ?: "Sin nombre"
                     val userEmail = snapshot.child("correo").value?.toString() ?: user.email!!
-                    val costoPedido = movieActual?.castv ?: movieCastv // Usamos el costo actualizado
+                    val costoPedido = modeloActual?.castv ?: movieCastv // Usamos el costo actualizado
 
                     verificarPuntos(correoKey, costoPedido) { tienePuntos ->
                         if (tienePuntos) {
@@ -630,7 +799,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
                         // 🟢 AHORA: Registramos el consumo en el historial
                         // Necesitamos obtener el email original para el historial
                         val emailOriginal = correoKey.replace("_", ".")
-                        val tituloPelicula = movieActual?.title ?: movieTitle
+                        val tituloPelicula = modeloActual?.title ?: movieTitle
 
                         CastvHelper.registrarConsumo(emailOriginal, tituloPelicula, costo)
 
@@ -644,9 +813,9 @@ class ApiPeliculaActivity : AppCompatActivity() {
     }
 
     private fun irAlReproductorDirecto() {
-        val tituloConFecha = if (movieActual != null) {
-            val fecha = movieActual?.releaseDate ?: movieReleaseDate
-            "${movieActual?.title} $fecha"
+        val tituloConFecha = if (modeloActual != null) {
+            val fecha = modeloActual?.releaseDate ?: movieReleaseDate
+            "${modeloActual?.title} $fecha"
         } else {
             "$movieTitle $movieReleaseDate"
         }
@@ -654,9 +823,9 @@ class ApiPeliculaActivity : AppCompatActivity() {
         val intent = Intent(this, PlayerPeliculas::class.java).apply {
             putExtra("EXTRA_STREAM_URL", streamUrlGuardado)
             putExtra("EXTRA_MOVIE_TITLE", tituloConFecha)
-            putExtra("EXTRA_MOVIE_CASTV", movieActual?.castv ?: movieCastv)
-            putExtra("EXTRA_MOVIE_IMAGE_URL", movieActual?.imageUrl ?: movieImageUrl)
-            putExtra("EXTRA_COUNTDOWN", movieActual?.countdownMinutes ?: movieCountdown)
+            putExtra("EXTRA_MOVIE_CASTV", modeloActual?.castv ?: movieCastv)
+            putExtra("EXTRA_MOVIE_IMAGE_URL", modeloActual?.imageUrl ?: movieImageUrl)
+            putExtra("EXTRA_COUNTDOWN", modeloActual?.countdownMinutes ?: movieCountdown)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         startActivity(intent)
@@ -665,7 +834,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
     // --- CARGA DE UI Y API ---
     private fun cargarCartelera() {
-        val pelisMostradas = mutableListOf<Movie>()
+        val pelisMostradas = mutableListOf<Modelo>()
 
         carteleraAdapter = PelisCarteleraAdapter(pelisMostradas) { movieSeleccionado ->
             actualizarPeliculaSeleccionada(movieSeleccionado)
@@ -699,43 +868,43 @@ class ApiPeliculaActivity : AppCompatActivity() {
             }
         }
     }
-    private fun calcularSiContadorEstaActivo(movie: Movie): Boolean {
-        if (movie.countdownMinutes <= 0) return false
+    private fun calcularSiContadorEstaActivo(modelo: Modelo): Boolean {
+        if (modelo.countdownMinutes <= 0) return false
 
-        val createdAtMillis = if (movie.createdAt > 0 && movie.createdAt < 1000000000000L) {
-            movie.createdAt * 1000
+        val createdAtMillis = if (modelo.createdAt > 0 && modelo.createdAt < 1000000000000L) {
+            modelo.createdAt * 1000
         } else {
-            movie.createdAt
+            modelo.createdAt
         }
 
         if (createdAtMillis == 0L) return false
 
-        val countdownDurationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
+        val countdownDurationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(modelo.countdownMinutes.toLong())
         val timeElapsed = System.currentTimeMillis() - createdAtMillis
         val remainingTimeMillis = countdownDurationMillis - timeElapsed
 
         // Si remainingTimeMillis > 0, significa que el contador está corriendo
         return remainingTimeMillis > 0
     }
-    private fun actualizarPeliculaSeleccionada(movieSeleccionado: Movie) {
-        tvTitulo.text = movieSeleccionado.title
+    private fun actualizarPeliculaSeleccionada(modeloSeleccionado: Modelo) {
+        tvTitulo.text = modeloSeleccionado.title
         tvSinopsis.text = "Cargando información detallada..."
         tvInfoAdicional.text = "Obteniendo géneros y duración..."
         recyclerActores.adapter = null
 
-        Glide.with(this).load(movieSeleccionado.imageUrl).placeholder(ivPoster.drawable).diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL).into(ivPoster)
-        Glide.with(this).load(movieSeleccionado.imageUrl).centerCrop().transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade()).diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL).into(backgroundImageView)
+        Glide.with(this).load(modeloSeleccionado.imageUrl).placeholder(ivPoster.drawable).diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL).into(ivPoster)
+        Glide.with(this).load(modeloSeleccionado.imageUrl).centerCrop().transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade()).diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL).into(backgroundImageView)
 
         // 🟢 ACTUALIZACIÓN CRÍTICA DE VARIABLES GLOBALES
-        streamUrlGuardado = movieSeleccionado.streamUrl
-        movieTitle = movieSeleccionado.title
-        movieImageUrl = movieSeleccionado.imageUrl
-        movieCastv = movieSeleccionado.castv
-        movieCountdown = movieSeleccionado.countdownMinutes
-        movieCreatedAt = movieSeleccionado.createdAt
-        movieActual = movieSeleccionado
+        streamUrlGuardado = modeloSeleccionado.streamUrl
+        movieTitle = modeloSeleccionado.title
+        movieImageUrl = modeloSeleccionado.imageUrl
+        movieCastv = modeloSeleccionado.castv
+        movieCountdown = modeloSeleccionado.countdownMinutes
+        movieCreatedAt = modeloSeleccionado.createdAt
+        modeloActual = modeloSeleccionado
 
-        val consulta = movieSeleccionado.originalTitle ?: movieSeleccionado.title
+        val consulta = modeloSeleccionado.originalTitle ?: modeloSeleccionado.title
         buscarPelicula(consulta)
 
         tvReproducir.requestFocus()
@@ -808,7 +977,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
     }
 
     private fun mostrarContenidoLocal() {
-        val movie = movieActual ?: return
+        val movie = modeloActual ?: return
         val url = movie.imageUrl
 
         // 1. Título

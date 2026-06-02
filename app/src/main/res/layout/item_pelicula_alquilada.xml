@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="150dp"
+    android:layout_height="255dp"
+    android:layout_margin="8dp"
+
+    android:focusable="true"
+    android:clickable="true"
+    android:clipToPadding="false"
+    android:background="@drawable/focus_selector">
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:cardCornerRadius="8dp"
+        app:cardBackgroundColor="#1A1A1A">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/txtBadge"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="#141A24"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="5dp"
+                android:textColor="#00E676"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/imgMovie"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:scaleType="fitXY"
+                android:contentDescription="Poster Alquiler" />
+
+            <LinearLayout
+                android:id="@+id/infoArea"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#141A24"
+                android:padding="6dp">
+
+                <TextView
+                    android:id="@+id/txtMovieTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:maxLines="2"
+                    android:gravity="center_horizontal" />
+
+                <TextView
+                    android:id="@+id/txtStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+</FrameLayout>

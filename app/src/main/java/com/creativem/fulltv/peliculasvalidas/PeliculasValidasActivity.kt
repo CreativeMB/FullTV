@@ -11,7 +11,7 @@ import com.bumptech.glide.Glide
 import com.creativem.fulltv.peliculas.MoviesAdapter
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.databinding.ActivityPeliculasValidasBinding
-import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.Modelo
 import com.creativem.fulltv.principal.ViewUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +22,7 @@ class PeliculasValidasActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityPeliculasValidasBinding
     private lateinit var movieAdapter: MoviesAdapter
-    private val movieList = mutableListOf<Movie>()
+    private val modeloList = mutableListOf<Modelo>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,7 +48,7 @@ class PeliculasValidasActivity : AppCompatActivity() {
             itemAnimator = null
 
             adapter = MoviesAdapter(
-                movieList,
+                modeloList,
                 onItemClick = { movie -> irAlDetalle(movie) },
                 onFocusChange = { movie -> actualizarFondo(movie.imageUrl) }
             )
@@ -70,9 +70,9 @@ class PeliculasValidasActivity : AppCompatActivity() {
 
             withContext(Dispatchers.Main) {
                 if (validadas.isNotEmpty()) {
-                    movieList.clear()
+                    modeloList.clear()
                     validadas.forEach { it.isValid = true }
-                    movieList.addAll(validadas.sortedByDescending { it.createdAt })
+                    modeloList.addAll(validadas.sortedByDescending { it.createdAt })
 
                     // 🟢 SOLUCIÓN AL CRASH:
                     // Verificamos si el adapter ya fue creado antes de usarlo
@@ -104,15 +104,15 @@ class PeliculasValidasActivity : AppCompatActivity() {
         }
     }
 
-    private fun irAlDetalle(movie: Movie) {
+    private fun irAlDetalle(modelo: Modelo) {
         val intent = Intent(this, ApiPeliculaActivity::class.java).apply {
-            putExtra("EXTRA_STREAM_URL", movie.streamUrl)
-            putExtra("EXTRA_MOVIE_TITLE", movie.title)
-            putExtra("EXTRA_MOVIE_CASTV", movie.castv)
-            putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
-            putExtra("EXTRA_ORIGINAL_TITLE", movie.originalTitle)
-            putExtra("EXTRA_COUNTDOWN", movie.countdownMinutes)
-            putExtra("EXTRA_CREATED_AT", movie.createdAt / 1000)
+            putExtra("EXTRA_STREAM_URL", modelo.streamUrl)
+            putExtra("EXTRA_MOVIE_TITLE", modelo.title)
+            putExtra("EXTRA_MOVIE_CASTV", modelo.castv)
+            putExtra("EXTRA_MOVIE_IMAGE_URL", modelo.imageUrl)
+            putExtra("EXTRA_ORIGINAL_TITLE", modelo.originalTitle)
+            putExtra("EXTRA_COUNTDOWN", modelo.countdownMinutes)
+            putExtra("EXTRA_CREATED_AT", modelo.createdAt / 1000)
             putExtra("EXTRA_IS_VALID", true)
         }
         startActivity(intent)

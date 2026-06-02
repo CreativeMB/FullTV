@@ -283,14 +283,27 @@ class BrowserActivity : AppCompatActivity() {
         val path = uri?.path?.lowercase() ?: ""
         val host = uri?.host?.lowercase() ?: ""
 
+        // 1. Filtrar dominios en lista negra (publicidad)
         for (domain in blacklistedDomains) {
             if (host.contains(domain)) return false
         }
 
-        if (path.contains("subtitle") || path.contains(".vtt") || path.contains("audio-only")) {
+        // 2. Excluir explícitamente recursos estáticos, imágenes, scripts y hojas de estilo
+        val excludedExtensions = listOf(
+            ".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".webp",
+            ".svg", ".ico", ".woff", ".woff2", ".ttf", ".otf", ".json",
+            ".xml", ".html", ".htm", ".vtt", ".srt"
+        )
+        if (excludedExtensions.any { path.endsWith(it) || urlLower.contains("$it?") || urlLower.contains("$it&") }) {
             return false
         }
 
+        // 3. Excluir otros segmentos conocidos que no son flujos de video
+        if (path.contains("subtitle") || path.contains("audio-only") || path.contains("/js/")) {
+            return false
+        }
+
+        // 4. Coincidencia de extensiones de video legítimas
         if (urlLower.contains(".mp4") || urlLower.contains(".m3u8") ||
             urlLower.contains(".m3u") || urlLower.contains(".mkv") ||
             urlLower.contains(".webm") || urlLower.contains(".mov") ||
@@ -298,11 +311,11 @@ class BrowserActivity : AppCompatActivity() {
             return true
         }
 
+        // 5. Dominios e indicadores conocidos de servidores de video o streaming
         if (host.contains("streamtape.com") || host.contains("dood") ||
             host.contains("mixdrop") || host.contains("voe.sx") ||
             host.contains("fembed") || host.contains("googlevideo.com") ||
-            host.contains("acek-cdn.com") ||
-            host.contains("mediafire.com")) {
+            host.contains("acek-cdn.com") || host.contains("mediafire.com")) {
             return true
         }
 
@@ -311,6 +324,40 @@ class BrowserActivity : AppCompatActivity() {
         }
 
         return false
+    }
+
+    private fun isValidVideoUrl(url: String): Boolean {
+        if (!url.startsWith("http://", ignoreCase = true) && !url.startsWith("https://", ignoreCase = true)) {
+            return false
+        }
+
+        val urlLower = url.lowercase()
+        val uri = try { Uri.parse(url) } catch (e: Exception) { null }
+        val host = uri?.host?.lowercase() ?: ""
+        val path = uri?.path?.lowercase() ?: ""
+
+        // 1. Filtrar dominios en lista negra
+        for (domain in blacklistedDomains) {
+            if (host.contains(domain)) return false
+        }
+
+        // 2. Excluir recursos estáticos, imágenes y scripts
+        val excludedExtensions = listOf(
+            ".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".webp",
+            ".svg", ".ico", ".woff", ".woff2", ".ttf", ".otf", ".json",
+            ".xml", ".html", ".htm", ".vtt", ".srt"
+        )
+        if (excludedExtensions.any { path.endsWith(it) || urlLower.contains("$it?") || urlLower.contains("$it&") }) {
+            return false
+        }
+
+        // 3. Excluir segmentos y fragmentos parciales de video (HLS/DASH segmentados)
+        if (path.contains("subtitle") || path.contains("audio-only") ||
+            path.contains("seg-") || path.contains("fragment") || path.endsWith(".ts")) {
+            return false
+        }
+
+        return true
     }
 
     private fun createPopupContainer(): FrameLayout {
@@ -717,32 +764,6 @@ class BrowserActivity : AppCompatActivity() {
                 webView.visibility = View.VISIBLE
             }
         }
-    }
-
-    private fun isValidVideoUrl(url: String): Boolean {
-        val uri = try { Uri.parse(url) } catch (e: Exception) { null }
-        val host = uri?.host?.lowercase() ?: ""
-        val path = uri?.path?.lowercase() ?: ""
-
-        if (!url.startsWith("http://", ignoreCase = true) && !url.startsWith("https://", ignoreCase = true)) {
-            return false
-        }
-
-        for (domain in blacklistedDomains) {
-            if (host.contains(domain)) return false
-        }
-
-        if (path.contains("subtitle") || path.contains(".vtt") || path.contains("audio-only")) {
-            return false
-        }
-
-        if (path.contains("seg-") ||
-            path.contains("fragment") ||
-            (path.endsWith(".ts"))) {
-            return false
-        }
-
-        return true
     }
 
     private fun reconstructMasterUrl(url: String): String? {

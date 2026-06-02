@@ -42,7 +42,6 @@ class HeaderPresenter : Presenter() {
         val userOnline = viewHolder.view.findViewById<TextView>(R.id.useronline)
         val userOff = viewHolder.view.findViewById<TextView>(R.id.useroff)
         val textCastv = viewHolder.view.findViewById<TextView>(R.id.textCastv)
-        val txtActualizacion = viewHolder.view.findViewById<TextView>(R.id.txtActualizacion)
         val imagenUser = viewHolder.view.findViewById<ImageView>(R.id.imagenuser)
         val txtBanner = viewHolder.view.findViewById<TextView>(R.id.txtBanner)
 
@@ -129,42 +128,7 @@ class HeaderPresenter : Presenter() {
             }
             override fun onCancelled(error: DatabaseError) {}
         }
-        databaseRef.child("usuarios").addValueEventListener(usuariosListener!!)
 
-        // --- MARQUESINA DE PEDIDOS RECIENTES (Nueva Ruta Realtime Database) ---
-        databaseRef.child("pedidosmovies").limitToLast(10).get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                val listaPedidos = StringBuilder()
-                for (pedidoSnapshot in snapshot.children) {
-                    val nombre = pedidoSnapshot.child("nombre").value?.toString() ?: "Desconocido"
-                    val title = pedidoSnapshot.child("title").value?.toString() ?: "Película"
-                    listaPedidos.append("🎬 $nombre pidió: $title        ") // Espacio para que se lea mejor en marquesina
-                }
-
-                txtActualizacion.apply {
-                    text = listaPedidos.toString().trim()
-                    visibility = View.VISIBLE
-                    isSelected = true // Para que funcione el marquee (desplazamiento)
-
-                    // Animación de arcoíris (Mantenemos tu lógica original)
-                    ObjectAnimator.ofArgb(
-                        this, "textColor",
-                        Color.RED, Color.parseColor("#FF9800"), Color.YELLOW,
-                        Color.GREEN, Color.BLUE, Color.parseColor("#4B0082"),
-                        Color.parseColor("#EE82EE"), Color.RED
-                    ).apply {
-                        duration = 4000L
-                        repeatCount = ValueAnimator.INFINITE
-                        repeatMode = ValueAnimator.RESTART
-                        start()
-                    }
-                }
-            } else {
-                txtActualizacion.visibility = View.GONE
-            }
-        }.addOnFailureListener {
-            txtActualizacion.visibility = View.GONE
-        }
     }
 
     override fun onUnbindViewHolder(viewHolder: ViewHolder?) {

@@ -11,12 +11,12 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
-import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.Modelo
 
 class TvMenuAdapter(
     private val context: Context,
-    private var tvList: MutableList<Movie>,
-    private val clickListener: (Movie) -> Unit
+    private var tvList: MutableList<Modelo>,
+    private val clickListener: (Modelo) -> Unit
 ) : RecyclerView.Adapter<TvMenuAdapter.TvViewHolder>() {
 
     private var selectedPosition = RecyclerView.NO_POSITION
@@ -77,7 +77,7 @@ class TvMenuAdapter(
     override fun getItemCount(): Int = tvList.size
 
     // ✅ Método para actualizar la lista de películas
-    fun updateData(newTvList: List<Movie>) {
+    fun updateData(newTvList: List<Modelo>) {
         tvList.clear()
         tvList.addAll(newTvList)
         notifyDataSetChanged()

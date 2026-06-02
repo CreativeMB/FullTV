@@ -115,19 +115,52 @@
                         android:textSize="18sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-            </LinearLayout>
 
-            <TextView
-                android:id="@+id/txtActualizacion"
+            </LinearLayout>
+            <!-- Contenedor dinámico de películas alquiladas (se oculta automáticamente si no hay películas activas) -->
+            <LinearLayout
+                android:id="@+id/layoutAlquileresContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:orientation="vertical"
                 android:layout_marginTop="15dp"
-                android:text="Soporte disponible 24/7 vía Telegram"
-                android:textColor="#FF5252"
-                android:textSize="16sp"
-                android:textStyle="italic" />
+                android:layout_marginBottom="5dp"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:paddingStart="15dp"
+                android:paddingEnd="15dp"
+                android:visibility="gone">
 
-            <!-- NOTICIA ELEGANTE (Fondo Dorado con texto blanco) -->
+                <!-- Título de la sección -->
+                <TextView
+                    android:id="@+id/tvTituloSeccionAlquileres"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🍿 Mis Alquileres Activos"
+                    android:textColor="#C5A059"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp"/>
+
+                <!-- RecyclerView de alquileres -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerMisAlquileres"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:scrollbars="none"
+                    android:clipToPadding="false"
+                    android:descendantFocusability="afterDescendants"
+                    android:focusable="true"
+                    android:overScrollMode="never"
+                    android:paddingHorizontal="10dp"
+                    android:clipChildren="false"
+                    android:paddingTop="25dp"
+                android:paddingBottom="25dp"
+                android:nextFocusUp="@id/imagenuser"
+                android:nextFocusDown="@id/cardSoporte" />
+            </LinearLayout>
+                        <!-- NOTICIA ELEGANTE (Fondo Dorado con texto blanco) -->
             <TextView
                 android:id="@+id/txtBanner"
                 android:layout_width="match_parent"
@@ -148,6 +181,7 @@
             android:layout_height="1dp"
             android:layout_marginHorizontal="20dp"
             android:background="#1AFFFFFF"/>
+
 
         <!-- ========================================== -->
         <!-- CONTENIDO DE TARJETAS (Azul Oscuro Web)    -->

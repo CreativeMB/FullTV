@@ -1,6 +1,6 @@
 package com.creativem.fulltv.peliculasvalidas
 
-import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.Modelo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -9,8 +9,8 @@ object Validacioneslista {
     // Usamos la clase Validaciones que ya apunta a Realtime Database
     private val validaciones = Validaciones()
 
-    private var peliculasValidas: List<Movie> = emptyList()
-    private var peliculasInvalidas: List<Movie> = emptyList()
+    private var peliculasValidas: List<Modelo> = emptyList()
+    private var peliculasInvalidas: List<Modelo> = emptyList()
     private var cargado = false
 
 
@@ -35,11 +35,11 @@ object Validacioneslista {
         }
     }
 
-    fun obtenerPeliculasValidas(): List<Movie> = peliculasValidas
-    fun obtenerPeliculasInvalidas(): List<Movie> = peliculasInvalidas
+    fun obtenerPeliculasValidas(): List<Modelo> = peliculasValidas
+    fun obtenerPeliculasInvalidas(): List<Modelo> = peliculasInvalidas
     fun yaCargado(): Boolean = cargado
 
-    private fun contadorCeroEnlaceMuerto(invalidas: List<Movie>) {
+    private fun contadorCeroEnlaceMuerto(invalidas: List<Modelo>) {
         val database = com.google.firebase.database.FirebaseDatabase.getInstance().getReference("movies")
 
         invalidas.forEach { movie ->

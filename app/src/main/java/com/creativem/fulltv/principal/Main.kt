@@ -289,7 +289,7 @@
 //                "Gratis" -> navegarAPeliculasValidas()
 //                "Peliculas"-> navegarAPeliculasApi()
 //                "Pago" -> {
-//                    val intent = Intent(this, Nosotros::class.java)
+//                    val intent = Intent(this, Perfil::class.java)
 //                    startActivity(intent)
 //                }
 //                "TV" -> navegarATv()
@@ -323,7 +323,7 @@
 //        val searchResultsView = dialogView.findViewById<ListView>(R.id.list_view)
 //        val progressBar = dialogView.findViewById<ProgressBar>(R.id.progress_bar)
 //
-//        val filteredMovieList = mutableListOf<Movie>()
+//        val filteredMovieList = mutableListOf<Modelo>()
 //        val adapter = ArrayAdapter(
 //            this,
 //            android.R.layout.simple_list_item_1,
@@ -363,7 +363,7 @@
 //                    if (response.isSuccessful) {
 //                        val moviesApi = response.body()?.results ?: emptyList()
 //                        val mapped = moviesApi.map {
-//                            Movie(
+//                            Modelo(
 //                                id = it.id.toString(),
 //                                title = "${it.title} (${it.release_date ?: "N/A"})",
 //                                originalTitle = it.original_title,
@@ -790,7 +790,7 @@
 //        }
 //    }
 //
-//    private fun irAlReproductor(movie: Movie) {
+//    private fun irAlReproductor(movie: Modelo) {
 //        val intent = Intent(this, ApiPeliculaActivity::class.java).apply {
 //            putExtra("EXTRA_STREAM_URL", movie.streamUrl)
 //            putExtra("EXTRA_MOVIE_TITLE", movie.title)

@@ -7,7 +7,7 @@
 //import androidx.leanback.widget.Presenter
 //import com.bumptech.glide.Glide
 //import com.creativem.fulltv.R
-//import com.creativem.fulltv.principal.Movie
+//import com.creativem.fulltv.principal.Modelo
 //import java.util.concurrent.TimeUnit
 //import android.graphics.Color
 //import android.text.TextUtils
@@ -82,7 +82,7 @@
 //        val holder = viewHolder as CardViewHolder
 //        val cardView = holder.cardView
 //        val etiquetaValida = holder.etiquetaValida
-//        val movie = item as? Movie ?: return
+//        val movie = item as? Modelo ?: return
 //
 //        val casText = "CasTV $"
 //        cardView.titleText = movie.title

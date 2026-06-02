@@ -12,12 +12,12 @@ import com.bumptech.glide.load.DecodeFormat
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
 import com.creativem.fulltv.R
-import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.Modelo
 
 class ChannelsAdapter(
-    private var channelList: MutableList<Movie>,
-    private val onItemClick: (Movie) -> Unit,
-    private val onFocusChange: (Movie) -> Unit
+    private var channelList: MutableList<Modelo>,
+    private val onItemClick: (Modelo) -> Unit,
+    private val onFocusChange: (Modelo) -> Unit
 ) : RecyclerView.Adapter<ChannelsAdapter.ChannelViewHolder>() {
 
     private val glideOptions = RequestOptions()

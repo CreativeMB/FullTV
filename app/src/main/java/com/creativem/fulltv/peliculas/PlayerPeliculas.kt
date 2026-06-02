@@ -33,31 +33,20 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import android.text.format.DateUtils
-import android.widget.Toast
-import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import kotlinx.coroutines.MainScope
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultHttpDataSource
-import com.android.volley.Response
-import com.android.volley.toolbox.JsonObjectRequest
-import com.android.volley.toolbox.Volley
 import com.creativem.fulltv.R
-import com.creativem.fulltv.api.PeliculasApiAdapter
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
-import org.json.JSONObject
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.os.CountDownTimer
-import android.text.Spannable
-import android.text.SpannableStringBuilder
-import android.text.style.ForegroundColorSpan
-import android.text.style.RelativeSizeSpan
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup
@@ -71,26 +60,18 @@ import com.creativem.fulltv.databinding.PlayerBinding
 
 
 import androidx.annotation.OptIn
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.hls.HlsMediaSource
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.recyclerview.widget.RecyclerView
 import java.util.concurrent.TimeUnit
-import com.android.volley.Request
 import com.creativem.fulltv.peliculasvalidas.PelisCarteleraAdapter
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
-import com.creativem.fulltv.principal.CastvHelper
-import com.creativem.fulltv.principal.Movie
-import com.creativem.fulltv.principal.Nosotros
+import com.creativem.fulltv.principal.Modelo
+import com.creativem.fulltv.principal.Perfil
 
 
 import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ServerValue
 import kotlinx.coroutines.isActive
 
 
@@ -237,8 +218,8 @@ class PlayerPeliculas : AppCompatActivity() {
         // Botón pedidos
         val pedidosButton: ImageButton = findViewById(R.id.pedidos)
         pedidosButton.setOnClickListener {
-            // Creamos el Intent para ir a la Activity "Nosotros"
-            val intent = Intent(this, Nosotros::class.java)
+            // Creamos el Intent para ir a la Activity "Perfil"
+            val intent = Intent(this, Perfil::class.java)
 
             // Si necesitas pasarle datos a esa nueva pantalla (como el userId), puedes hacerlo así:
             // intent.putExtra("USER_ID", userId)
@@ -389,7 +370,7 @@ class PlayerPeliculas : AppCompatActivity() {
         val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
 
         // Función interna para filtrar las películas activas
-        fun filtrarActivas(lista: List<Movie>): List<Movie> {
+        fun filtrarActivas(lista: List<Modelo>): List<Modelo> {
             return lista.filter { movie ->
                 val countdownDurationMillis =
                     java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
@@ -1321,7 +1302,7 @@ class PlayerPeliculas : AppCompatActivity() {
 //        linkNosotros.setTextColor(Color.RED)
 //        linkNosotros.paintFlags = linkNosotros.paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
 //        linkNosotros.setOnClickListener {
-//            val intent = Intent(this, Nosotros::class.java)
+//            val intent = Intent(this, Perfil::class.java)
 //            startActivity(intent)
 //        }
 //
@@ -1510,7 +1491,7 @@ class PlayerPeliculas : AppCompatActivity() {
 //                        Log.d("ALQUILER_LOG", "✅ Descuento aplicado. Nuevo saldo: $nuevoCastv")
 //                        Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
 //
-//                        val intent = Intent(this, Nosotros::class.java)
+//                        val intent = Intent(this, Perfil::class.java)
 //                        startActivity(intent)
 //                        finish()
 //                    }

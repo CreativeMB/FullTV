@@ -7,16 +7,15 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
-import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.Modelo
 
 class PeliculasApiAdapter(
-    private val movieList: MutableList<Movie>,
-    private val onMovieClick: (Movie) -> Unit
+    private val modeloList: MutableList<Modelo>,
+    private val onMovieClick: (Modelo) -> Unit
 ) : RecyclerView.Adapter<PeliculasApiAdapter.SmallMovieViewHolder>() {
 
     private var selectedPosition = RecyclerView.NO_POSITION
@@ -34,7 +33,7 @@ class PeliculasApiAdapter(
     }
 
     override fun onBindViewHolder(holder: SmallMovieViewHolder, position: Int) {
-        val movie = movieList[position]
+        val movie = modeloList[position]
 
         // 1. CONFIGURACIÓN DEL TÍTULO Y AÑO
         val tituloLimpio = movie.title.replace(Regex("\\(\\d{4}-\\d{2}-\\d{2}\\)"), "").trim()
@@ -129,16 +128,16 @@ class PeliculasApiAdapter(
             if (pos != RecyclerView.NO_POSITION) {
                 selectedPosition = pos
                 notifyDataSetChanged() // Refresca para el resaltado
-                onMovieClick(movieList[pos])
+                onMovieClick(modeloList[pos])
             }
         }
     }
 
-    override fun getItemCount(): Int = movieList.size
+    override fun getItemCount(): Int = modeloList.size
 
-    fun updateMovies(newMovies: List<Movie>) {
-        movieList.clear()
-        movieList.addAll(newMovies)
+    fun updateMovies(newModelos: List<Modelo>) {
+        modeloList.clear()
+        modeloList.addAll(newModelos)
         notifyDataSetChanged()
     }
 }

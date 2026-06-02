@@ -33,17 +33,14 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.view.Window
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
 import android.widget.EditText
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ProgressBar
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
@@ -54,14 +51,12 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.api.PeliculasApiActivity
 import com.creativem.fulltv.api.TMDbApiClient
 import com.creativem.fulltv.databinding.ActivityPeliculasBinding
-import com.creativem.fulltv.enlinea.UsuarioEstadoManager
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
 import com.creativem.fulltv.menu.MenuPrincipalItem
 import com.creativem.fulltv.peliculasvalidas.PeliculasValidasActivity
@@ -69,13 +64,12 @@ import com.creativem.fulltv.peliculasvalidas.Validaciones
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
 import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Login
-import com.creativem.fulltv.principal.Movie
-import com.creativem.fulltv.principal.Nosotros
+import com.creativem.fulltv.principal.Modelo
+import com.creativem.fulltv.principal.Perfil
 import com.creativem.fulltv.tv.TvActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.creativem.fulltv.BuildConfig
 import com.creativem.fulltv.principal.CineAlert
-import com.creativem.fulltv.principal.SplashActivity
 import com.creativem.fulltv.principal.ViewUtils
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -85,11 +79,9 @@ import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
-import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -99,7 +91,7 @@ class PeliculasActivity : AppCompatActivity() {
     private var yaTieneListener = false
     private lateinit var binding: ActivityPeliculasBinding
     private lateinit var movieAdapter: MoviesAdapter
-    private val movieList = mutableListOf<Movie>()
+    private val modeloList = mutableListOf<Modelo>()
     private var esModoGratis = false // Para saber si estamos filtrando por validación o no
     // --- Firebase & Listeners ---
     private val auth by lazy { FirebaseAuth.getInstance() }
@@ -159,8 +151,8 @@ class PeliculasActivity : AppCompatActivity() {
         // 3. CARGA DE DATOS DESDE LA RAM (Rápido y Seguro)
         val peliculasYaCargadas = Validacioneslista.obtenerPeliculasValidas()
         if (peliculasYaCargadas.isNotEmpty()) {
-            movieList.clear()
-            movieList.addAll(peliculasYaCargadas)
+            modeloList.clear()
+            modeloList.addAll(peliculasYaCargadas)
         }
 
         // 4. INICIALIZACIÓN DE COMPONENTES UI
@@ -297,7 +289,7 @@ class PeliculasActivity : AppCompatActivity() {
                 "Paquete" -> activarpaquete()
                 "Alquila" -> navegarAPeliculasApi()
                 "Perfil" -> {
-                    val intent = Intent(this, Nosotros::class.java)
+                    val intent = Intent(this, Perfil::class.java)
                     startActivity(intent)
                 }
 
@@ -351,7 +343,7 @@ class PeliculasActivity : AppCompatActivity() {
         binding.rvPeliculas.itemAnimator = null
 
         movieAdapter = MoviesAdapter(
-            movieList,
+            modeloList,
             onItemClick = { movie -> irAlReproductor(movie) },
             onFocusChange = { movie -> actualizarImagenDeFondo(movie.imageUrl) }
         )
@@ -716,8 +708,8 @@ class PeliculasActivity : AppCompatActivity() {
 
         progressBar.visibility = View.GONE
 
-        val filteredMovieList = mutableListOf<Movie>()
-        val allFirebaseMovies = mutableListOf<Movie>() // Cache local de Firebase
+        val filteredModeloList = mutableListOf<Modelo>()
+        val allFirebaseModelos = mutableListOf<Modelo>() // Cache local de Firebase
 
         val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, mutableListOf<String>())
         searchResultsView.adapter = adapter
@@ -737,10 +729,10 @@ class PeliculasActivity : AppCompatActivity() {
             try {
                 val snapshot = FirebaseDatabase.getInstance().getReference("movies").get().await()
                 val loadedMovies = snapshot.children.mapNotNull { doc ->
-                    val m = doc.getValue(Movie::class.java)
+                    val m = doc.getValue(Modelo::class.java)
                     m?.copy(id = doc.key ?: "")
                 }
-                allFirebaseMovies.addAll(loadedMovies)
+                allFirebaseModelos.addAll(loadedMovies)
             } catch (e: Exception) {
                 Log.e("FIREBASE", "Error cargando base de datos local: ${e.message}")
             }
@@ -764,7 +756,7 @@ class PeliculasActivity : AppCompatActivity() {
                 searchJob = CoroutineScope(Dispatchers.IO).launch {
                     // --- A. FILTRADO EN FIREBASE (LOCAL) ---
                     // Buscamos cualquier coincidencia en el título (infalible)
-                    val firebaseMatches = allFirebaseMovies.filter {
+                    val firebaseMatches = allFirebaseModelos.filter {
                         it.title.normalizar().contains(queryNormalizada)
                     }.map { it.copy(title = "💿 ${it.title}") }
 
@@ -778,7 +770,7 @@ class PeliculasActivity : AppCompatActivity() {
 
                         if (response.isSuccessful) {
                             response.body()?.results?.map {
-                                Movie(
+                                Modelo(
                                     id = it.id.toString(),
                                     title = "🌐 ${it.title} (${it.release_date?.take(4) ?: "N/A"})",
                                     originalTitle = it.original_title,
@@ -796,10 +788,10 @@ class PeliculasActivity : AppCompatActivity() {
                     val combined = firebaseMatches + apiResults
 
                     withContext(Dispatchers.Main) {
-                        filteredMovieList.clear()
-                        filteredMovieList.addAll(combined)
+                        filteredModeloList.clear()
+                        filteredModeloList.addAll(combined)
                         adapter.clear()
-                        adapter.addAll(filteredMovieList.map { it.title })
+                        adapter.addAll(filteredModeloList.map { it.title })
                         adapter.notifyDataSetChanged()
                     }
                 }
@@ -809,7 +801,7 @@ class PeliculasActivity : AppCompatActivity() {
         })
 
         searchResultsView.setOnItemClickListener { _, _, position, _ ->
-            val selectedMovie = filteredMovieList[position]
+            val selectedMovie = filteredModeloList[position]
             irAlReproductor(selectedMovie)
             dialog.dismiss()
         }
@@ -1238,17 +1230,17 @@ class PeliculasActivity : AppCompatActivity() {
         peliculasListener = moviesRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
-                    val nuevasPeliculasRaw = mutableListOf<Movie>()
+                    val nuevasPeliculasRaw = mutableListOf<Modelo>()
 
                     // 1. Mapeamos los IDs de las películas ya validadas para compararlas rápido
                     val yaValidadas = Validacioneslista.obtenerPeliculasValidas().map { it.id }.toSet()
 
                     // 2. Extraemos los datos de Firebase
                     for (child in snapshot.children) {
-                        val movie = child.getValue(Movie::class.java)
-                        if (movie != null) {
+                        val modelo = child.getValue(Modelo::class.java)
+                        if (modelo != null) {
                             // Copiamos el objeto incluyendo el ID del nodo de Firebase
-                            val movieConId = movie.copy(id = child.key ?: "")
+                            val movieConId = modelo.copy(id = child.key ?: "")
 
                             // Si ya está validada, marcamos el flag para que el adapter lo sepa
                             if (yaValidadas.contains(movieConId.id)) {
@@ -1262,13 +1254,13 @@ class PeliculasActivity : AppCompatActivity() {
                     val listaNuevaOrdenada = nuevasPeliculasRaw.sortedByDescending { it.createdAt }
 
                     // 4. Lógica de actualización Inteligente (Premium)
-                    if (movieList.isEmpty()) {
+                    if (modeloList.isEmpty()) {
                         // Primera carga: Llenamos y notificamos todo de golpe para rapidez
-                        movieList.addAll(listaNuevaOrdenada)
+                        modeloList.addAll(listaNuevaOrdenada)
                         movieAdapter.notifyDataSetChanged()
                     } else {
                         // Cargas posteriores o cambios en vivo: Usamos DiffUtil para evitar parpadeos
-                        val listaVieja = ArrayList(movieList) // Copia de seguridad de la lista actual
+                        val listaVieja = ArrayList(modeloList) // Copia de seguridad de la lista actual
 
                         val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
                             override fun getOldListSize(): Int = listaVieja.size
@@ -1279,14 +1271,14 @@ class PeliculasActivity : AppCompatActivity() {
                             }
 
                             override fun areContentsTheSame(oldPos: Int, newPos: Int): Boolean {
-                                // Esto compara todos los campos de la data class Movie
+                                // Esto compara todos los campos de la data class Modelo
                                 return listaVieja[oldPos] == listaNuevaOrdenada[newPos]
                             }
                         })
 
                         // Actualizamos la lista principal y aplicamos los cambios quirúrgicos
-                        movieList.clear()
-                        movieList.addAll(listaNuevaOrdenada)
+                        modeloList.clear()
+                        modeloList.addAll(listaNuevaOrdenada)
                         diffResult.dispatchUpdatesTo(movieAdapter)
                     }
 
@@ -1298,7 +1290,7 @@ class PeliculasActivity : AppCompatActivity() {
                     yaTieneListener = true
                 } else {
                     // Si el nodo "movies" está vacío
-                    movieList.clear()
+                    modeloList.clear()
                     movieAdapter.notifyDataSetChanged()
                 }
             }
@@ -1315,7 +1307,7 @@ class PeliculasActivity : AppCompatActivity() {
             val validador = Validaciones()
 
             // Hacemos una copia para no tener errores de concurrencia
-            val listaActual = ArrayList(movieList)
+            val listaActual = ArrayList(modeloList)
 
             // Lanzamos la validación de cada película INDEPENDIENTEMENTE
             listaActual.forEach { movie ->
@@ -1326,9 +1318,9 @@ class PeliculasActivity : AppCompatActivity() {
                     }
 
                     // Buscamos la posición por si la lista se movió (scroll)
-                    val posicionActual = movieList.indexOfFirst { it.id == movie.id }
+                    val posicionActual = modeloList.indexOfFirst { it.id == movie.id }
                     if (posicionActual != -1) {
-                        movieList[posicionActual].isValid = esValida
+                        modeloList[posicionActual].isValid = esValida
                         // 🔄 ACTUALIZA LA VISTA AL INSTANTE (una por una)
                         movieAdapter.notifyItemChanged(posicionActual)
                     }
@@ -1345,17 +1337,17 @@ class PeliculasActivity : AppCompatActivity() {
     private fun sincronizarConCacheLocal() {
         val validadas = Validacioneslista.obtenerPeliculasValidas().map { it.id }.toSet()
 
-        for (index in movieList.indices) {
-            val movie = movieList[index]
+        for (index in modeloList.indices) {
+            val movie = modeloList[index]
             if (validadas.contains(movie.id) && !movie.isValid) {
                 movie.isValid = true
                 movieAdapter.notifyItemChanged(index)
             }
         }
     }
-    private fun irAlReproductor(movie: Movie) {
+    private fun irAlReproductor(modelo: Modelo) {
         // 1. Verificación de seguridad: No iniciar si el link es nulo
-        if (movie.streamUrl.isNullOrBlank()) {
+        if (modelo.streamUrl.isNullOrBlank()) {
             Toast.makeText(this, "El enlace de reproducción no es válido", Toast.LENGTH_SHORT).show()
             return
         }
@@ -1367,16 +1359,16 @@ class PeliculasActivity : AppCompatActivity() {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
 
             // 3. Empaquetado limpio de datos
-            putExtra("EXTRA_MOVIE_DATA", movie)
-            putExtra("EXTRA_STREAM_URL", movie.streamUrl)
-            putExtra("EXTRA_MOVIE_TITLE", movie.title)
-            putExtra("EXTRA_MOVIE_CASTV", movie.castv)
-            putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
-            putExtra("EXTRA_ORIGINAL_TITLE", movie.originalTitle)
-            putExtra("EXTRA_COUNTDOWN", movie.countdownMinutes)
+            putExtra("EXTRA_MOVIE_DATA", modelo)
+            putExtra("EXTRA_STREAM_URL", modelo.streamUrl)
+            putExtra("EXTRA_MOVIE_TITLE", modelo.title)
+            putExtra("EXTRA_MOVIE_CASTV", modelo.castv)
+            putExtra("EXTRA_MOVIE_IMAGE_URL", modelo.imageUrl)
+            putExtra("EXTRA_ORIGINAL_TITLE", modelo.originalTitle)
+            putExtra("EXTRA_COUNTDOWN", modelo.countdownMinutes)
 
             // Evitamos errores de precisión enviando el Long directamente si es necesario
-            putExtra("EXTRA_CREATED_AT", movie.createdAt / 1000)
+            putExtra("EXTRA_CREATED_AT", modelo.createdAt / 1000)
         }
 
         // 4. Ejecución
@@ -1466,7 +1458,7 @@ class PeliculasActivity : AppCompatActivity() {
         super.onStart()
 
         // Solo iniciamos el listener si la lista está vacía
-        if (movieList.isEmpty()) {
+        if (modeloList.isEmpty()) {
             escucharCambiosEnPeliculas()
         } else {
             // Si ya hay películas, solo asegúrate de que las etiquetas estén al día

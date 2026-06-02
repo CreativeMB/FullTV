@@ -67,7 +67,7 @@
             tools:ignore="Instantiatable"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".principal.Nosotros"
+            android:name=".principal.Perfil"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".peliculas.PlayerPeliculas"

@@ -1,7 +1,7 @@
 package com.creativem.fulltv.peliculasvalidas
 
 import android.util.Log
-import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.Modelo
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
@@ -9,7 +9,6 @@ import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class Validaciones {
@@ -30,11 +29,11 @@ class Validaciones {
         })
         .build()
 
-    suspend fun obtenerPeliculas(): Pair<List<Movie>, List<Movie>> = withContext(dispatcher) {
+    suspend fun obtenerPeliculas(): Pair<List<Modelo>, List<Modelo>> = withContext(dispatcher) {
         try {
             val snapshot = databaseRef.child("movies").get().await()
             val peliculas = snapshot.children.mapNotNull { child ->
-                child.getValue(Movie::class.java)?.copy(id = child.key ?: "")
+                child.getValue(Modelo::class.java)?.copy(id = child.key ?: "")
             }
 
             // Validación en PARALELO masivo usando async

@@ -9,11 +9,9 @@ import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import com.bumptech.glide.Glide
-import com.creativem.fulltv.peliculas.MoviesAdapter
 import com.creativem.fulltv.databinding.ActivityTvBinding
-import com.creativem.fulltv.peliculas.PlayerPeliculas
 import com.creativem.fulltv.principal.AudioFocusHelper
-import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.Modelo
 import com.creativem.fulltv.principal.ViewUtils
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.CoroutineScope
@@ -26,7 +24,7 @@ class TvActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityTvBinding
     private lateinit var adapter: ChannelsAdapter
-    private val channelList = mutableListOf<Movie>()
+    private val channelList = mutableListOf<Modelo>()
     private val databaseRef = FirebaseDatabase.getInstance().getReference("tv")
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,10 +61,10 @@ class TvActivity : AppCompatActivity() {
                 val snapshot = databaseRef.get().await()
                 Log.d("TV_DEBUG", "Hijos encontrados en Firebase: ${snapshot.childrenCount}")
 
-                val canales = mutableListOf<Movie>()
+                val canales = mutableListOf<Modelo>()
                 for (child in snapshot.children) {
                     // Firebase a veces necesita que la clase tenga constructor vacío
-                    val canal = child.getValue(Movie::class.java)
+                    val canal = child.getValue(Modelo::class.java)
                     canal?.let {
                         it.isValid = true
                         // Asignamos el ID directamente
@@ -108,11 +106,11 @@ class TvActivity : AppCompatActivity() {
         }
     }
 
-    private fun abrirReproductor(movie: Movie) {
+    private fun abrirReproductor(modelo: Modelo) {
         val intent = Intent(this, PlayerTv::class.java).apply {
-            putExtra("EXTRA_STREAM_URL", movie.streamUrl)
-            putExtra("EXTRA_MOVIE_TITLE", movie.title)
-            putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
+            putExtra("EXTRA_STREAM_URL", modelo.streamUrl)
+            putExtra("EXTRA_MOVIE_TITLE", modelo.title)
+            putExtra("EXTRA_MOVIE_IMAGE_URL", modelo.imageUrl)
             putExtra("EXTRA_IS_LIVE", true) // Indica que es un canal de TV
         }
         startActivity(intent)

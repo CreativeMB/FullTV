@@ -16,7 +16,7 @@
 //import androidx.leanback.widget.Presenter
 //import com.bumptech.glide.Glide
 //import com.creativem.fulltv.R
-//import com.creativem.fulltv.principal.Movie
+//import com.creativem.fulltv.principal.Modelo
 //import java.lang.reflect.Field
 //
 //class CardPresenterTV : Presenter() {
@@ -83,7 +83,7 @@
 //    }
 //
 //    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any) {
-//        if (item !is Movie) return
+//        if (item !is Modelo) return
 //        val holder = viewHolder as CardViewHolder
 //        val cardView = holder.cardView
 //        val etiquetaGratis = holder.etiquetaGratis

@@ -1,7 +1,6 @@
 package com.creativem.fulltv.peliculasvalidas
 
 import android.graphics.Color
-import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,16 +12,16 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.creativem.fulltv.R
-import com.creativem.fulltv.principal.Movie
+import com.creativem.fulltv.principal.Modelo
 
 class PelisCarteleraAdapter(
-    private val items: MutableList<Movie> = mutableListOf(),
-    private val onClick: (Movie) -> Unit
+    private val items: MutableList<Modelo> = mutableListOf(),
+    private val onClick: (Modelo) -> Unit
 ) : RecyclerView.Adapter<PelisCarteleraAdapter.ViewHolder>() {
 
-    fun updateMovies(newMovies: List<Movie>) {
+    fun updateMovies(newModelos: List<Modelo>) {
         this.items.clear()
-        this.items.addAll(newMovies)
+        this.items.addAll(newModelos)
         notifyDataSetChanged()
     }
 
