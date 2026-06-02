@@ -128,6 +128,7 @@ class HeaderPresenter : Presenter() {
             }
             override fun onCancelled(error: DatabaseError) {}
         }
+        databaseRef.child("usuarios").addValueEventListener(usuariosListener!!)
 
     }
 
