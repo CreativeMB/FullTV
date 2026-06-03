@@ -116,7 +116,7 @@ class PeliculasActivity : AppCompatActivity() {
     private var downloadId: Long = -1
     // --- Estado y Control ---
     private var haProcesadoEliminacion = false
-    private var yaMostroPublicidad = false
+    private var isRotationRunning = false // Candado para evitar saltos locos al mover el control
     private var publicidadDialog: Dialog? = null
     private var lastFocusedMovie: View? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -130,12 +130,15 @@ class PeliculasActivity : AppCompatActivity() {
     private var promoRotationRunnable: Runnable? = null
     private val peliculasPromoList = mutableListOf<Modelo>()
     private var currentPromoIndex = 0
-    private var isUserInteractingWithPromo = false
 
     // Handler y Runnable para detectar inactividad del usuario y retomar la rotación
+    private var isUserInteractingWithPromo = false
     private val inactivityHandler = Handler(Looper.getMainLooper())
+
+    // 🟢 ASÍ SE DECLARA PARA EVITAR EL ERROR "Val cannot be reassigned"
     private val inactivityRunnable = Runnable {
         isUserInteractingWithPromo = false
+        // Forzamos la reanudación automática
         iniciarRotacionAutomatica()
     }
 
@@ -238,26 +241,36 @@ class PeliculasActivity : AppCompatActivity() {
         apiService = retrofit.create(TMDbApiService::class.java)
 
     }
+
     private fun configurarAnimacionDelBanner() {
         val layoutBannerNetflix = findViewById<View>(R.id.layoutBannerNetflix)
         val rvPeliculas = findViewById<RecyclerView>(R.id.rvPeliculas)
+        val rvBannerPromos = findViewById<RecyclerView>(R.id.rvBannerPromos)
 
-        // Este "radar" vigila cada vez que el control remoto cambia de elemento
         window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
-
-            // 1. Verificamos si la vista que acaba de recibir el foco pertenece a la lista de abajo
             val focoEnPeliculas = rvPeliculas?.findContainingItemView(newFocus) != null
+            val focoEnGuiones = rvBannerPromos?.findContainingItemView(newFocus) != null || newFocus == rvBannerPromos
 
             if (focoEnPeliculas) {
-                // Si el usuario bajó a las películas, ocultamos el banner
+                // Caso 1: Bajó a las películas -> Ocultar banner y apagar rotación por completo
                 if (layoutBannerNetflix?.visibility == View.VISIBLE) {
                     layoutBannerNetflix.visibility = View.GONE
+                    detenerRotacionAutomatica()
                 }
             } else {
-                // Si el usuario subió (al menú o a las miniaturas)
-                // 🟢 TRUCO: Solo lo volvemos a mostrar si realmente hay películas promocionales cargadas
+                // Caso 2: El foco está en la zona superior (Menú lateral/superior o Banner)
                 if (layoutBannerNetflix?.visibility == View.GONE && peliculasPromoList.isNotEmpty()) {
                     layoutBannerNetflix.visibility = View.VISIBLE
+                }
+
+                if (focoEnGuiones) {
+                    // Si está navegando los guiones, el temporizador de inactividad toma el control
+                    registrarActividadUsuario()
+                } else {
+                    // 🟢 REACCIÓN INMEDIATA: Si el foco salió de los guiones hacia el menú,
+                    // apagamos los flags de usuario y forzamos el arranque del carrusel.
+                    isUserInteractingWithPromo = false
+                    iniciarRotacionAutomatica()
                 }
             }
         }
@@ -275,22 +288,14 @@ class PeliculasActivity : AppCompatActivity() {
                     val movie = child.getValue(Modelo::class.java)
                     if (movie != null) {
                         movie.id = child.key ?: ""
-
                         val countdownMinutes = movie.countdownMinutes
                         val createdAt = movie.createdAt
-
-                        val createdAtMillis = if (createdAt > 0 && createdAt < 1000000000000L) {
-                            createdAt * 1000
-                        } else {
-                            createdAt
-                        }
+                        val createdAtMillis = if (createdAt > 0 && createdAt < 1000000000000L) createdAt * 1000 else createdAt
 
                         if (countdownMinutes > 0 && createdAtMillis > 0L) {
                             val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownMinutes.toLong())
                             val elapsed = System.currentTimeMillis() - createdAtMillis
-                            val remaining = durationMillis - elapsed
-
-                            if (remaining > 0) {
+                            if (durationMillis - elapsed > 0) {
                                 peliculasPromoList.add(movie)
                             }
                         }
@@ -304,36 +309,30 @@ class PeliculasActivity : AppCompatActivity() {
 
                     rvBannerPromos.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
 
+                    // CONFIGURACIÓN CLAVE: Pasamos los dos eventos interactivos al adaptador
                     val adapter = BannerPromosAdapter(
                         list = peliculasPromoList,
                         onMovieFocused = { movieSeleccionado ->
-                            detenerRotacionAutomatica()
-                            registrarActividadUsuario()
+                            detenerRotacionAutomatica() // Frenamos el auto-giro para que no salte solo
+                            registrarActividadUsuario()  // Espera 8 segundos de inactividad antes de reanudar
 
-                            val index = peliculasPromoList.indexOfFirst { it.id == movieSeleccionado.id }
-                            if (index != -1) {
-                                currentPromoIndex = index
-                            }
+                            currentPromoIndex = peliculasPromoList.indexOfFirst { it.id == movieSeleccionado.id }.coerceAtLeast(0)
                             mostrarDatosPeliculaEnBanner(movieSeleccionado)
                         },
-                        onFocusLost = {
-                            registrarActividadUsuario()
-                        },
                         onMovieClicked = { movieSeleccionado ->
-                            irAlReproductor(movieSeleccionado)
+                            irAlReproductor(movieSeleccionado) // Acción de la tecla ENTER
                         }
                     )
-
                     rvBannerPromos.adapter = adapter
 
-                    // Forzar visualización de la primera peli al iniciar
                     mostrarDatosPeliculaEnBanner(peliculasPromoList[0])
+
                     rvBannerPromos.postDelayed({
-                        resaltarMiniaturaVisualmente(rvBannerPromos, 0)
+                        val currentAdapter = rvBannerPromos.adapter as? BannerPromosAdapter
+                        currentAdapter?.updateSelectedPosition(0, rvBannerPromos)
                     }, 300)
 
                     iniciarRotacionAutomatica()
-
                 } else {
                     bannerContainer.visibility = View.GONE
                 }
@@ -346,36 +345,48 @@ class PeliculasActivity : AppCompatActivity() {
     }
 
     private fun iniciarRotacionAutomatica() {
+        // Si el usuario está interactuando activamente con el mando, esperamos.
         if (isUserInteractingWithPromo) return
 
+        // Si la transición ya está corriendo en segundo plano, no duplicamos el bucle.
+        if (isRotationRunning) return
+
+        isRotationRunning = true
         promoRotationRunnable?.let { promoRotationHandler.removeCallbacks(it) }
 
         promoRotationRunnable = object : Runnable {
             override fun run() {
                 if (peliculasPromoList.isNotEmpty()) {
-                    val peliActual = peliculasPromoList[currentPromoIndex]
-
-                    mostrarDatosPeliculaEnBanner(peliActual)
-
                     val rvBannerPromos = findViewById<RecyclerView>(R.id.rvBannerPromos)
-                    rvBannerPromos?.smoothScrollToPosition(currentPromoIndex)
 
-                    // 🟢 SE REEMPLAZA EL LLAMADO AL ADAPTER POR LA ANIMACIÓN VISUAL DIRECTA
-                    rvBannerPromos?.let { rv ->
-                        rv.postDelayed({
-                            resaltarMiniaturaVisualmente(rv, currentPromoIndex)
-                        }, 300)
+                    // 🟢 LA CLAVE AQUÍ: Si el usuario tiene el foco en los guiones, NO matamos el bucle.
+                    // Simplemente lo posponemos otros 6 segundos. El corazón del carrusel sigue latiendo.
+                    if (isUserInteractingWithPromo || rvBannerPromos?.hasFocus() == true) {
+                        promoRotationHandler.postDelayed(this, 6000)
+                        return
                     }
 
+                    // Avanzamos al siguiente índice de película de forma segura
                     currentPromoIndex = (currentPromoIndex + 1) % peliculasPromoList.size
+
+                    val peliActual = peliculasPromoList[currentPromoIndex]
+                    mostrarDatosPeliculaEnBanner(peliActual)
+
+                    val adapter = rvBannerPromos?.adapter as? BannerPromosAdapter
+                    adapter?.updateSelectedPosition(currentPromoIndex, rvBannerPromos)
+
+                    // Programar el siguiente cambio en 6 segundos
                     promoRotationHandler.postDelayed(this, 6000)
                 }
             }
         }
-        promoRotationHandler.post(promoRotationRunnable!!)
+
+        // Inicia el ciclo con una espera inicial de 6 segundos completos
+        promoRotationHandler.postDelayed(promoRotationRunnable!!, 6000)
     }
 
     private fun detenerRotacionAutomatica() {
+        isRotationRunning = false // Liberamos el candado
         promoRotationRunnable?.let {
             promoRotationHandler.removeCallbacks(it)
         }
@@ -384,44 +395,53 @@ class PeliculasActivity : AppCompatActivity() {
     private fun registrarActividadUsuario() {
         isUserInteractingWithPromo = true
         inactivityHandler.removeCallbacks(inactivityRunnable)
-        inactivityHandler.postDelayed(inactivityRunnable, 8000) // 8 segundos de inactividad para reanudar
+        // Si el usuario deja de presionar botones por 6 segundos, el carrusel vuelve a girar solo
+        inactivityHandler.postDelayed(inactivityRunnable, 6000)
     }
 
     private fun mostrarDatosPeliculaEnBanner(movie: Modelo) {
         val ivBackdrop = findViewById<ImageView>(R.id.ivBannerBackdrop)
         val ivPoster = findViewById<ImageView>(R.id.ivBannerPoster)
-        val layoutInfo = findViewById<LinearLayout>(R.id.layoutInfo) // 🟢 El contenedor de todo el texto
+        val layoutInfo = findViewById<LinearLayout>(R.id.layoutInfo)
         val tvTitulo = findViewById<TextView>(R.id.tvBannerTitulo)
         val tvSinopsis = findViewById<TextView>(R.id.tvBannerSinopsis)
         val tvContador = findViewById<TextView>(R.id.tvBannerContador)
         val tvCalificacion = findViewById<TextView>(R.id.tvBannerCalificacion)
         val tvBannerInfoAdicional = findViewById<TextView>(R.id.tvBannerInfoAdicional)
 
-        // 🟢 PASO 1: Desvanecimiento MUY LENTO del texto (500 milisegundos)
-        layoutInfo.animate().alpha(0f).setDuration(500).withEndAction {
+        // Si la Activity se está cerrando antes de iniciar la animación, cancelamos
+        if (isFinishing || isDestroyed) return
 
-            // 🟢 PASO 2: Cuando el texto ya es invisible, cambiamos la información
+        layoutInfo.animate().alpha(0f).setDuration(400).withEndAction {
+            // Doble verificación al terminar la animación de ocultado
+            if (isFinishing || isDestroyed) return@withEndAction
+
             tvTitulo.text = movie.title
-            tvSinopsis.text = movie.overview.ifBlank { "Estreno exclusivo en CineParche." }
+            tvSinopsis.text = movie.overview.ifBlank { "Estreno exclusivo." }
             tvCalificacion.text = "⭐ 8.5"
             tvBannerInfoAdicional.text = movie.genres.ifBlank { "Acción • Aventura • Cine" }
 
             val queryBusqueda = movie.originalTitle.ifBlank { movie.title }
             apiService.searchMovie(apiKey, "es-MX", queryBusqueda).enqueue(object : retrofit2.Callback<MovieResponse> {
                 override fun onResponse(call: retrofit2.Call<MovieResponse>, response: retrofit2.Response<MovieResponse>) {
+                    // 🟢 CANDADO 1: Detiene el proceso si la Activity murió durante la búsqueda de la película
+                    if (isFinishing || isDestroyed) return
+
                     if (response.isSuccessful) {
                         val result = response.body()?.results?.firstOrNull()
                         if (result != null) {
                             tvTitulo.text = result.title
                             tvSinopsis.text = result.overview ?: movie.overview
-
                             val anio = result.release_date?.take(4) ?: "2026"
                             val cal = if (result.vote_average > 0.0) "${result.vote_average}" else "8.5"
                             tvCalificacion.text = "⭐ $cal   |   $anio"
 
-                            // (Opcional) Llamada a getMovieDetails para más info...
+                            // Petición anidada para los detalles del género y duración
                             apiService.getMovieDetails(result.id, apiKey, "es-MX").enqueue(object : retrofit2.Callback<MovieDetailResponse> {
                                 override fun onResponse(call: retrofit2.Call<MovieDetailResponse>, response: retrofit2.Response<MovieDetailResponse>) {
+                                    // 🟢 CANDADO 2: Detiene si murió durante la descarga de detalles extra
+                                    if (isFinishing || isDestroyed) return
+
                                     if (response.isSuccessful) {
                                         val detalles = response.body()
                                         val generos = detalles?.genres?.joinToString(" • ") { it.name } ?: "Desconocidos"
@@ -429,54 +449,55 @@ class PeliculasActivity : AppCompatActivity() {
                                         tvBannerInfoAdicional.text = "🎭 $generos  ⏱️ ${duracion} Min"
                                     }
                                 }
-                                override fun onFailure(call: retrofit2.Call<MovieDetailResponse>, t: Throwable) {}
+                                override fun onFailure(call: retrofit2.Call<MovieDetailResponse>, t: Throwable) {
+                                    // 🟢 CANDADO 3: Evita fugas si falla la petición de detalles
+                                    if (isFinishing || isDestroyed) return
+                                }
                             })
 
-                            // 🟢 PASO 3: Aparición SUAVE y majestuosa del texto nuevo (800 milisegundos)
-                            layoutInfo.animate().alpha(1f).setDuration(800).start()
-
+                            layoutInfo.animate().alpha(1f).setDuration(500).start()
                             val backdropUrl = "https://image.tmdb.org/t/p/w1280${result.backdrop_path ?: result.poster_path}"
                             val posterUrl = "https://image.tmdb.org/t/p/w500${result.poster_path ?: result.backdrop_path}"
-
                             cargarImagenSuave(backdropUrl, ivBackdrop)
                             cargarImagenSuave(posterUrl, ivPoster)
-
                         } else {
-                            // Si falla, igual debemos volver a mostrar el texto suavemente
-                            layoutInfo.animate().alpha(1f).setDuration(800).start()
+                            layoutInfo.animate().alpha(1f).setDuration(500).start()
                             cargarImagenSuave(movie.imageUrl, ivBackdrop)
                             cargarImagenSuave(movie.imageUrl, ivPoster)
                         }
                     } else {
-                        layoutInfo.animate().alpha(1f).setDuration(800).start()
+                        layoutInfo.animate().alpha(1f).setDuration(500).start()
                         cargarImagenSuave(movie.imageUrl, ivBackdrop)
                         cargarImagenSuave(movie.imageUrl, ivPoster)
                     }
                 }
 
                 override fun onFailure(call: retrofit2.Call<MovieResponse>, t: Throwable) {
-                    layoutInfo.animate().alpha(1f).setDuration(800).start()
+                    // 🟢 CANDADO 4: Detiene el fallo si el usuario ya cerró la pantalla
+                    if (isFinishing || isDestroyed) return
+
+                    layoutInfo.animate().alpha(1f).setDuration(500).start()
                     cargarImagenSuave(movie.imageUrl, ivBackdrop)
                     cargarImagenSuave(movie.imageUrl, ivPoster)
                 }
             })
 
-            // Lógica del contador
+            // Lógica del contador del Banner
             val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
-            val createdAtMillis = if (movie.createdAt > 0 && movie.createdAt < 1000000000000L) { movie.createdAt * 1000 } else { movie.createdAt }
+            val createdAtMillis = if (movie.createdAt > 0 && movie.createdAt < 1000000000000L) movie.createdAt * 1000 else movie.createdAt
             val elapsed = System.currentTimeMillis() - createdAtMillis
-            val remaining = durationMillis - elapsed
-            iniciarContadorBanner(tvContador, remaining)
-
-        }.start() // Inicia la animación de desvanecimiento
+            iniciarContadorBanner(tvContador, durationMillis - elapsed)
+        }.start()
     }
 
-    // 🟢 FUNCIÓN AUXILIAR PARA IMÁGENES: Aplica un CrossFade súper prolongado (1000ms / 1 segundo)
     private fun cargarImagenSuave(url: String, imageView: ImageView) {
-        Glide.with(this)
+        // 🟢 EL CANDADO: Si el usuario cerró la Activity mientras la red respondía, salimos de inmediato
+        if (isFinishing || isDestroyed) return
+
+        // Tu código actual de Glide aquí abajo
+        Glide.with(this) // O Glide.with(this@PeliculasActivity)
             .load(url)
-            .centerCrop()
-            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade(1000))
+            // .placeholder(...) si tienes uno
             .into(imageView)
     }
 
@@ -495,24 +516,6 @@ class PeliculasActivity : AppCompatActivity() {
             }
         }.start()
     }
-
-    // 🟢 LA FUNCIÓN VISUAL NECESARIA PARA LA ROTACIÓN FLUIDA
-    private fun resaltarMiniaturaVisualmente(rv: RecyclerView, posicionObjetivo: Int) {
-        for (i in 0 until rv.childCount) {
-            val child = rv.getChildAt(i)
-            child.animate().scaleX(1.0f).scaleY(1.0f).translationZ(0f).setDuration(200).start()
-            (child as? androidx.cardview.widget.CardView)?.setCardBackgroundColor(android.graphics.Color.parseColor("#1A1A1A"))
-        }
-
-        val viewActiva = rv.layoutManager?.findViewByPosition(posicionObjetivo)
-        viewActiva?.let { v ->
-            v.animate().scaleX(1.15f).scaleY(1.15f).translationZ(15f).setDuration(250).start()
-            (v as? androidx.cardview.widget.CardView)?.setCardBackgroundColor(android.graphics.Color.parseColor("#C5A059"))
-            v.bringToFront()
-        }
-    }
-
-
 
     private fun escucharSaldoUsuario() {
         val email = auth.currentUser?.email ?: return

@@ -52,6 +52,8 @@
     </LinearLayout>
 
     <androidx.cardview.widget.CardView
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
         android:id="@+id/layoutBannerNetflix"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -67,7 +69,9 @@
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:clipChildren="false"
+            android:clipToPadding="false">
 
             <ImageView
                 android:id="@+id/ivBannerBackdrop"
@@ -120,7 +124,8 @@
                 android:id="@+id/layoutInfo"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="8dp"
                 android:orientation="vertical"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toEndOf="@id/cvBannerPoster"
@@ -188,13 +193,15 @@
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvBannerPromos"
                 android:layout_width="0dp"
-                android:layout_height="50dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
                 android:orientation="horizontal"
-                android:clipToPadding="false"
                 android:scrollbars="none"
                 android:descendantFocusability="afterDescendants"
                 android:nextFocusUp="@id/menuPrincipal"
                 android:nextFocusDown="@id/rvPeliculas"
+                android:clipChildren="false"
+                android:clipToPadding="false"
                 app:layout_constraintTop_toBottomOf="@id/layoutInfo"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintStart_toEndOf="@id/cvBannerPoster"

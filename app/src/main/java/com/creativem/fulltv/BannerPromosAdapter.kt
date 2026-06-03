@@ -1,92 +1,140 @@
 package com.creativem.fulltv
 
+import android.annotation.SuppressLint
 import android.graphics.Color
-import android.view.LayoutInflater
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.TextView
+import android.widget.FrameLayout
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.creativem.fulltv.principal.Modelo
 
 class BannerPromosAdapter(
     private val list: List<Modelo>,
     private val onMovieFocused: (Modelo) -> Unit,
-    private val onFocusLost: () -> Unit,
     private val onMovieClicked: (Modelo) -> Unit
 ) : RecyclerView.Adapter<BannerPromosAdapter.ViewHolder>() {
 
-    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val ivPoster: ImageView = view.findViewById(R.id.imgMovie)
-        val tvTitulo: TextView = view.findViewById(R.id.txtMovieTitle)
-        val tvStatus: TextView = view.findViewById(R.id.txtStatus)
-        val tvBadge: TextView = view.findViewById(R.id.txtBadge)
-        val infoArea: View = view.findViewById(R.id.infoArea)
-    }
+    private var selectedPosition = 0
+
+    class ViewHolder(val container: FrameLayout, val lineIndicator: View) : RecyclerView.ViewHolder(container)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_pelicula_alquilada, parent, false)
-
         val context = parent.context
         val density = context.resources.displayMetrics.density
-        val widthInPx = (28 * density).toInt()
-        val heightInPx = (50 * density).toInt()
 
-        val params = view.layoutParams ?: ViewGroup.LayoutParams(widthInPx, heightInPx)
-        params.width = widthInPx
-        params.height = heightInPx
-        view.layoutParams = params
+        val lineWidth = (24 * density).toInt()
+        val lineHeight = (6 * density).toInt()
 
-        return ViewHolder(view)
-    }
+        val container = FrameLayout(context).apply {
+            isFocusable = true
+            isFocusableInTouchMode = true
+            clipChildren = false
+            clipToPadding = false
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val movie = list[position]
+            layoutParams = RecyclerView.LayoutParams(
+                (36 * density).toInt(),
+                (24 * density).toInt()
+            )
+        }
 
-        holder.tvStatus.visibility = View.GONE
-        holder.tvBadge.visibility = View.GONE
-        holder.infoArea.visibility = View.GONE
-
-        Glide.with(holder.itemView.context)
-            .load(movie.imageUrl)
-            .diskCacheStrategy(DiskCacheStrategy.ALL)
-            .into(holder.ivPoster)
-
-        holder.itemView.isFocusable = true
-        holder.itemView.isFocusableInTouchMode = true // Útil para garantizar que el foco del D-Pad atrape la celda
-
-        // 1. Estado por defecto de la celda al cargarse (sin foco)
-        holder.itemView.scaleX = 1.0f
-        holder.itemView.scaleY = 1.0f
-        holder.itemView.translationZ = 0f
-        val card = holder.itemView as? androidx.cardview.widget.CardView
-        card?.setCardBackgroundColor(Color.parseColor("#1A1A1A"))
-
-        // 2. Manejo dinámico directo sobre la vista (Cero recargas del Adapter)
-        holder.itemView.setOnFocusChangeListener { v, hasFocus ->
-            if (hasFocus) {
-                // Dispara el callback para que la Activity actualice el póster gigante
-                onMovieFocused(movie)
-
-                // Anima esta celda para hacerla crecer
-                v.animate().scaleX(1.15f).scaleY(1.15f).translationZ(15f).setDuration(250).start()
-                card?.setCardBackgroundColor(Color.parseColor("#C5A059"))
-
-                // Mantiene la vista seleccionada por encima de las demás (evita que los bordes se tapen)
-                v.bringToFront()
-            } else {
-                onFocusLost()
-
-                // Regresa la celda a su tamaño original
-                v.animate().scaleX(1.0f).scaleY(1.0f).translationZ(0f).setDuration(200).start()
-                card?.setCardBackgroundColor(Color.parseColor("#1A1A1A"))
+        val lineView = View(context).apply {
+            isFocusable = false
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 3 * density
+                setColor(Color.parseColor("#33FFFFFF"))
+            }
+            layoutParams = FrameLayout.LayoutParams(lineWidth, lineHeight).apply {
+                gravity = Gravity.CENTER
             }
         }
 
-        holder.itemView.setOnClickListener { onMovieClicked(movie) }
+        container.addView(lineView)
+        return ViewHolder(container, lineView)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, @SuppressLint("RecyclerView") position: Int) {
+        val movie = list[position]
+        val root = holder.container
+        val line = holder.lineIndicator
+        val shapeDrawable = line.background as? GradientDrawable
+
+        line.animate().cancel()
+
+        val hasFocus = root.hasFocus()
+        val isSelected = position == selectedPosition
+
+        // 🔥 CONTROL DE ESTADOS LÓGICOS PERFECTO
+        when {
+            hasFocus -> {
+                // Si el control remoto está físicamente aquí arriba
+                line.scaleX = 1.6f
+                line.scaleY = 1.3f
+                shapeDrawable?.setColor(Color.parseColor("#FFB300")) // Dorado de Foco Activo
+            }
+            isSelected -> {
+                // Si es la peli actual pero el control remoto está abajo en las películas
+                line.scaleX = 1.0f
+                line.scaleY = 1.0f
+                shapeDrawable?.setColor(Color.parseColor("#FFFFFF")) // Blanco Sólido (No compite con las pelis)
+            }
+            else -> {
+                // Estado apagado estándar
+                line.scaleX = 1.0f
+                line.scaleY = 1.0f
+                shapeDrawable?.setColor(Color.parseColor("#33FFFFFF")) // Translúcido
+            }
+        }
+
+        // ESCUCHADOR DE FOCO DINÁMICO
+        root.setOnFocusChangeListener { _, focused ->
+            val currentDrawable = line.background as? GradientDrawable
+            if (focused) {
+                val oldPosition = selectedPosition
+                selectedPosition = position
+
+                // El elemento seleccionado se agranda y se vuelve dorado al instante
+                line.animate().scaleX(1.6f).scaleY(1.3f).setDuration(200).start()
+                currentDrawable?.setColor(Color.parseColor("#FFB300"))
+
+                // Al viejo le quitamos el estado de forma inmediata
+                if (oldPosition != position) {
+                    notifyItemChanged(oldPosition)
+                }
+
+                onMovieFocused(movie)
+            } else {
+                // 🔥 LA SOLUCIÓN CUANDO EL FOCO SE VA AL OTRO RECYCLERVIEW:
+                // Si este elemento pierde el foco pero sigue siendo el seleccionado actual,
+                // lo encogemos suavemente y lo pasamos a Blanco para liberar el diseño visual.
+                if (position == selectedPosition) {
+                    line.animate().scaleX(1.0f).scaleY(1.0f).setDuration(200).start()
+                    currentDrawable?.setColor(Color.parseColor("#FFFFFF"))
+                } else {
+                    line.animate().scaleX(1.0f).scaleY(1.0f).setDuration(200).start()
+                    currentDrawable?.setColor(Color.parseColor("#33FFFFFF"))
+                }
+            }
+        }
+
+        root.setOnClickListener { onMovieClicked(movie) }
     }
 
     override fun getItemCount(): Int = list.size
+
+    fun updateSelectedPosition(newPosition: Int, recyclerView: RecyclerView? = null) {
+        if (newPosition in list.indices && newPosition != selectedPosition) {
+            val oldPosition = selectedPosition
+            selectedPosition = newPosition
+
+            notifyItemChanged(oldPosition)
+            notifyItemChanged(newPosition)
+
+            if (recyclerView?.hasFocus() == false) {
+                recyclerView.smoothScrollToPosition(newPosition)
+            }
+        }
+    }
 }
