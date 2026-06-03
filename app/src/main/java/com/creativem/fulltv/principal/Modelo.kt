@@ -1,9 +1,9 @@
 package com.creativem.fulltv.principal
 
-import android.graphics.Movie
 import android.os.Parcel
 import android.os.Parcelable
 import com.google.firebase.database.IgnoreExtraProperties
+
 @IgnoreExtraProperties
 data class Modelo(
     var id: String = "",
@@ -20,10 +20,9 @@ data class Modelo(
     val countdownMinutes: Int = 0,
     var fechaCreacion: Long = 0L,
     val releaseDate: String = "",
-    // --- CAMPOS NUEVOS AGREGADOS ---
     val voteAverage: Double = 0.0,  // Calificación (ej: 8.5)
     val overview: String = "",       // Sinopsis o descripción
-    val genres: String = ""
+    val genres: String = ""          // Géneros de la película
 ) : Parcelable {
 
     constructor(parcel: Parcel) : this(
@@ -41,9 +40,9 @@ data class Modelo(
         parcel.readInt(),
         parcel.readLong(),
         parcel.readString() ?: "",
-        // --- LEER CAMPOS NUEVOS ---
         parcel.readDouble(),
-        parcel.readString() ?: ""
+        parcel.readString() ?: "",
+        parcel.readString() ?: "" // 🟢 CORREGIDO: Ahora sí lee el campo 'genres'
     )
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {
@@ -61,9 +60,9 @@ data class Modelo(
         parcel.writeInt(countdownMinutes)
         parcel.writeLong(fechaCreacion)
         parcel.writeString(releaseDate)
-        // --- ESCRIBIR CAMPOS NUEVOS ---
         parcel.writeDouble(voteAverage)
         parcel.writeString(overview)
+        parcel.writeString(genres) // 🟢 CORREGIDO: Ahora sí escribe el campo 'genres'
     }
 
     override fun describeContents(): Int = 0
@@ -72,6 +71,7 @@ data class Modelo(
         override fun createFromParcel(parcel: Parcel): Modelo = Modelo(parcel)
         override fun newArray(size: Int): Array<Modelo?> = arrayOfNulls(size)
     }
+
     data class AlquilerItem(
         val movie: Modelo,
         val createdAt: Long,

@@ -5,7 +5,6 @@ import com.google.firebase.database.IgnoreExtraProperties
 @IgnoreExtraProperties // Evita que la app se cierre si Firebase tiene campos que no están en esta clase
 class Movie {
     // 1. Campos con valores por defecto
-    // Esto es vital para que Firebase pueda "rellenar" el objeto al leerlo
     var id: String = ""
     var userId: String = ""
     var nombre: String = ""
@@ -19,12 +18,13 @@ class Movie {
     var createdAt: Long = System.currentTimeMillis()
     var countdownMinutes: Int = 0
 
-    // 2. Constructor vacío
-    // OBLIGATORIO para Firebase. Sin esto, Firebase no puede hacer 'doc.getValue(Movie::class.java)'
+    // NUEVO CAMPO: Agregado para almacenar el año de la película
+    var year: String = ""
+
+    // 2. Constructor vacío obligatorio para Firebase
     constructor()
 
     // 3. Constructor secundario
-    // Útil para crear objetos rápidamente desde tu código sin llenar todos los campos
     constructor(id: String, title: String, imageUrl: String, streamUrl: String) {
         this.id = id
         this.title = title
@@ -32,9 +32,16 @@ class Movie {
         this.streamUrl = streamUrl
     }
 
-    // 4. Función de clonado manual
-    // Como ya no es una 'data class', no tienes el método .copy().
-    // Esta función te permite crear una copia modificada fácilmente.
+    // Constructor secundario opcional (con año incluido)
+    constructor(id: String, title: String, imageUrl: String, streamUrl: String, year: String) {
+        this.id = id
+        this.title = title
+        this.imageUrl = imageUrl
+        this.streamUrl = streamUrl
+        this.year = year
+    }
+
+    // 4. Función de clonado manual actualizada con la propiedad 'year'
     fun clona(title: String, imageUrl: String, streamUrl: String): Movie {
         val nuevo = Movie()
         nuevo.id = this.id
@@ -42,6 +49,7 @@ class Movie {
         nuevo.imageUrl = imageUrl
         nuevo.streamUrl = streamUrl
         nuevo.createdAt = this.createdAt
+        nuevo.year = this.year // Se asegura de transferir el año al clonar
         return nuevo
     }
 }

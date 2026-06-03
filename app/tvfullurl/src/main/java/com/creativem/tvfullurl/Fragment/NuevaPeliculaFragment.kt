@@ -9,8 +9,6 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.webkit.URLUtil
-import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.navigation.fragment.findNavController
@@ -24,7 +22,6 @@ import com.creativem.tvfullurl.SugerenciaAdapter
 import com.creativem.tvfullurl.TMDbApiService
 import com.creativem.tvfullurl.TmdbMovie
 import com.creativem.tvfullurl.databinding.FragmentNuevaEditarBinding
-import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.*
 import retrofit2.Call
@@ -42,6 +39,9 @@ class NuevaPeliculaFragment : Fragment() {
     private lateinit var sugerenciaAdapter: SugerenciaAdapter
     private var searchJob: Job? = null
     private var movieId: String? = null
+
+    // Variable para registrar temporalmente la fecha de la película seleccionada
+    private var selectedYear: String = ""
 
     private val apiService: TMDbApiService by lazy {
         Retrofit.Builder().baseUrl("https://api.themoviedb.org/3/")
@@ -65,7 +65,14 @@ class NuevaPeliculaFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupRecyclerView()
         setupListeners()
-        movieId?.let { loadMovieData(it) }
+
+        // MODIFICADO: Si es una creación nueva, pre-cargamos 10 y 0 por defecto en los campos correspondientes
+        if (movieId != null) {
+            loadMovieData(movieId!!)
+        } else {
+            binding.validEditText.setText("0")   // Contador por defecto
+            binding.castvEditText.setText("10")   // Castv por defecto
+        }
     }
 
     private fun setupRecyclerView() {
@@ -111,7 +118,19 @@ class NuevaPeliculaFragment : Fragment() {
     private fun rellenarCampos(movie: TmdbMovie) {
         isAutoFilling = true
         binding.originalTitleEditText.setText(movie.original_title)
-        binding.titleEditText.setText(movie.title)
+
+        val fechaOriginal = movie.release_date ?: ""
+
+        selectedYear = fechaOriginal
+
+        val tituloFormateado = if (fechaOriginal.isNotEmpty()) {
+            "${movie.title} ($fechaOriginal)"
+        } else {
+            movie.title
+        }
+
+        binding.titleEditText.setText(tituloFormateado)
+
         val url = "https://image.tmdb.org/t/p/w500${movie.poster_path}"
         binding.imageUrlEditText.setText(url)
         binding.rvSugerencias.visibility = View.GONE
@@ -130,6 +149,8 @@ class NuevaPeliculaFragment : Fragment() {
                 binding.trailerUrlEditText.setText(it.trailerUrl)
                 binding.validEditText.setText(it.countdownMinutes.toString())
                 Glide.with(this).load(it.imageUrl).into(binding.previewImageView)
+
+                selectedYear = it.year
             }
         }
     }
@@ -143,12 +164,14 @@ class NuevaPeliculaFragment : Fragment() {
             this.id = id
             this.title = title
             this.originalTitle = binding.originalTitleEditText.text.toString().trim()
-            this.castv = binding.castvEditText.text.toString().toIntOrNull() ?: 0
+            this.castv = binding.castvEditText.text.toString().toIntOrNull() ?: 10 // Respaldo a 10 si se borra
             this.imageUrl = binding.imageUrlEditText.text.toString().trim()
             this.streamUrl = binding.streamUrlEditText.text.toString().trim()
             this.trailerUrl = binding.trailerUrlEditText.text.toString().trim()
-            this.countdownMinutes = binding.validEditText.text.toString().toIntOrNull() ?: 0
+            this.countdownMinutes = binding.validEditText.text.toString().toIntOrNull() ?: 0 // Respaldo a 0 si se borra
             this.createdAt = System.currentTimeMillis()
+
+            this.year = selectedYear
         }
 
         databaseRef.child(id).setValue(movie).addOnSuccessListener {
@@ -157,11 +180,17 @@ class NuevaPeliculaFragment : Fragment() {
         }
     }
 
+    // MODIFICADO: Al limpiar campos, restablece los valores predeterminados de contador a 0 y castv a 10
     private fun clearFields() {
         binding.titleEditText.text.clear()
         binding.originalTitleEditText.text.clear()
         binding.imageUrlEditText.text.clear()
         binding.streamUrlEditText.text.clear()
         binding.previewImageView.setImageResource(R.drawable.icono)
+
+        binding.validEditText.setText("0")   // Restablece a 0
+        binding.castvEditText.setText("10")   // Restablece a 10
+
+        selectedYear = ""
     }
 }

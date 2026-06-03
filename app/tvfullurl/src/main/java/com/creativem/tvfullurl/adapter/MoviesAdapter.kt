@@ -11,6 +11,7 @@ import com.creativem.tvfullurl.R
 class MoviesAdapter(
     private var movieList: List<Movie>, // Cambié a var para permitir la actualización
     private val onDeleteClick: (String) -> Unit,
+    private val onAssignClick: (Movie) -> Unit,
     private val onEditClick: (Movie) -> Unit,
     private val isEditable: Boolean
 ) : RecyclerView.Adapter<MoviesAdapter.MovieViewHolder>() {
@@ -42,6 +43,10 @@ class MoviesAdapter(
         holder.deleteButton.setOnClickListener {
             onDeleteClick(movie.id ?: "")
         }
+        // Configurar el nuevo botón de asignar usuario
+        holder.assignButton.setOnClickListener {
+            onAssignClick(movie)
+        }
 
         // Configurar el botón de editar si es editable
         if (isEditable) {
@@ -64,6 +69,7 @@ class MoviesAdapter(
 
         var deleteButton: TextView = itemView.findViewById(R.id.deleteButton)
         var editButton: TextView = itemView.findViewById(R.id.editButton)
+        var assignButton: TextView = itemView.findViewById(R.id.assignButton)
 
         fun bind(movie: Movie) {
             titleTextView.text = movie.title

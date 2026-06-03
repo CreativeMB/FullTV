@@ -49,8 +49,9 @@ class TvFragment : Fragment() {
 
         moviesAdapter = MoviesAdapter(
             movieList,
-            onDeleteClick = { movieId -> deleteMovie(movieId) },
+            onDeleteClick = { id -> deleteMovie(id) },
             onEditClick = { movie -> editMovie(movie) },
+            onAssignClick = { movie ->(movie) }, // Se muestra el botón
             isEditable = true
         )
 

@@ -84,7 +84,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
     private var movieCountdown = 0
     private var modeloActual: Modelo? = null
     private var movieReleaseDate: String = ""
-
+    private var movieOriginalTitle = ""
     private var movieCreatedAt: Long = 0L
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -114,7 +114,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
             .build()
         apiService = retrofit.create(TMDbApiService::class.java)
 
-        val movieOriginalTitle = intent.getStringExtra("EXTRA_ORIGINAL_TITLE") ?: ""
+        movieOriginalTitle = intent.getStringExtra("EXTRA_ORIGINAL_TITLE") ?: ""
         modeloActual = intent.getParcelableExtra<Modelo>("EXTRA_MOVIE_DATA")
         streamUrlGuardado = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
         movieTitle = intent.getStringExtra("EXTRA_MOVIE_TITLE") ?: ""
@@ -217,7 +217,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
                         // ESCENARIO 1: El enlace sirve -> Mostrar AlertDialog de Confirmación de Compra
                         procesarEnlaceBueno(costoActual)
                     } else {
-                        // ESCENARIO 2: El enlace está roto -> Mostrar AlertDialog para pedir la película
+
                         manejarEnlaceRoto(costoActual)
                     }
 
@@ -226,77 +226,6 @@ class ApiPeliculaActivity : AppCompatActivity() {
                 }
             }
         }
-
-
-
-
-
-//        tvReproducir.setOnClickListener {
-//            val urlActual = streamUrlGuardado
-//            val countdownActual = modeloActual?.countdownMinutes ?: movieCountdown
-//            val createdAtOriginal = modeloActual?.createdAt ?: movieCreatedAt
-//            val costoActual = modeloActual?.castv ?: movieCastv
-//            if (urlActual.contains("tuservidor.com") || urlActual.isBlank()) {
-//                manejarEnlaceRoto(costoActual)
-//                return@setOnClickListener // Corta aquí, no hace nada más.
-//            }
-//
-//            // 🟢 SOLUCIÓN: Ajuste de Fechas (Milisegundos vs Segundos)
-//            val createdAtMillis = if (createdAtOriginal > 0 && createdAtOriginal < 1000000000000L) {
-//                createdAtOriginal * 1000
-//            } else {
-//                createdAtOriginal
-//            }
-//
-//            // 🟢 MATEMÁTICA DEL CONTADOR
-//            var isCountdownActive = false
-//
-//            if (countdownActual > 0) {
-//                if (createdAtMillis == 0L) {
-//                    isCountdownActive = true
-//                } else {
-//                    val countdownDurationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownActual.toLong())
-//                    val timeElapsed = System.currentTimeMillis() - createdAtMillis
-//                    val remainingTimeMillis = countdownDurationMillis - timeElapsed
-//
-//                    if (remainingTimeMillis > 0) {
-//                        isCountdownActive = true
-//                    }
-//                }
-//            }
-//
-//            // ESCENARIO 3: Viene de un contador ACTIVO -> Reproduce directo sin cobrar
-//            if (isCountdownActive) {
-//                if (urlActual.isNotBlank()) {
-//                    irAlReproductorDirecto()
-//                } else {
-//                    CineAlert.show(this, "Enlace de cuenta regresiva no disponible", CineAlert.Tipo.ERROR)
-//                }
-//                return@setOnClickListener
-//            }
-//
-//            // ESCENARIO 1 y 2: Preparar UI para cobrar/validar
-//            tvReproducir.isEnabled = false
-//            val textoOriginal = tvReproducir.text
-//            tvReproducir.text = "Procesando Datos..."
-//
-//            CoroutineScope(Dispatchers.Main).launch {
-//                val enlaceValido = withContext(Dispatchers.IO) {
-//                    validaciones.isUrlValid(urlActual)
-//                }
-//
-//                if (enlaceValido) {
-//                    // ESCENARIO 1: El enlace sirve -> Mostrar AlertDialog de Confirmación
-//                    procesarEnlaceBueno(costoActual)
-//                } else {
-//                    // ESCENARIO 2: El enlace está roto -> Mostrar AlertDialog para pedir la película
-//                    manejarEnlaceRoto(costoActual)
-//                }
-//
-//                tvReproducir.isEnabled = true
-//                tvReproducir.text = textoOriginal
-//            }
-//        }
 
         tvReproducir.isFocusableInTouchMode = true
         tvReproducir.requestFocus()
@@ -307,6 +236,76 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
         cargarCartelera()
         buscarPelicula(movieOriginalTitle.ifBlank { movieTitle })
+    }
+
+    private fun verificarYCrearPeliculaRota(
+        tituloMovie: String,
+        originalTitleMovie: String,
+        imageUrlMovie: String,
+        urlRota: String,
+        anio: String
+    ) {
+        if (isFinishing || isDestroyed) return
+
+        // 🟢 CORREGIDO: URL exacta de tu Realtime Database y nodo "movies"
+        val customDbUrl = "https://corario-16991-default-rtdb.firebaseio.com/"
+        val databaseRef = com.google.firebase.database.FirebaseDatabase
+            .getInstance(customDbUrl)
+            .getReference("movies")
+
+        // 🟢 Si el título original está vacío, no podemos buscar ni guardar correctamente
+        if (originalTitleMovie.isBlank()) {
+            android.util.Log.w("FirebaseTV", "⚠️ No se puede registrar película rota: título original vacío.")
+            return
+        }
+
+        // 🟢 Busca rigurosamente por el campo "originalTitle" para evitar duplicados
+        databaseRef.orderByChild("originalTitle").equalTo(originalTitleMovie)
+            .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    if (isFinishing || isDestroyed) return
+
+                    if (snapshot.exists()) {
+                        android.util.Log.d("FirebaseTV", "✅ La película '$originalTitleMovie' YA existe en 'movies'. Omitiendo guardado.")
+                        return
+                    }
+
+                    // 🟢 NO EXISTE -> Procedemos a GUARDARLA
+                    val newId = databaseRef.push().key ?: return
+                    val nombreFormateado = "$tituloMovie ($anio)".trim()
+
+                    // 🟢 Estructura EXACTA igual a tus películas actuales en Firebase
+                    val nuevaPeliculaMap = hashMapOf(
+                        "id" to newId,
+                        "title" to tituloMovie,
+                        "originalTitle" to originalTitleMovie,
+                        "nombre" to nombreFormateado,
+                        "imageUrl" to imageUrlMovie,
+                        "streamUrl" to urlRota,
+                        "castv" to 10,
+                        "countdownMinutes" to 0,
+                        "createdAt" to System.currentTimeMillis(),
+                        "email" to "",
+                        "trailerUrl" to "",
+                        "userId" to ""
+                    )
+
+                    // Subida a Firebase
+                    databaseRef.child(newId).setValue(nuevaPeliculaMap)
+                        .addOnSuccessListener {
+                            if (isFinishing || isDestroyed) return@addOnSuccessListener
+                            android.util.Log.d("FirebaseTV", "🟢 Película rota GUARDADA exitosamente en 'movies': $newId")
+                        }
+                        .addOnFailureListener { e ->
+                            if (isFinishing || isDestroyed) return@addOnFailureListener
+                            android.util.Log.e("FirebaseTV", "❌ Error al guardar en Firebase", e)
+                        }
+                }
+
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                    android.util.Log.e("FirebaseTV", "Error de base de datos: ${error.message}")
+                }
+            })
     }
 
     private suspend fun verificarAlquilerVigenteSincrono(correoKey: String, tituloPelicula: String): Boolean =
@@ -670,7 +669,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
             // ⚠️ ACÁ CONECTAMOS EL BOTÓN CON LA LÓGICA DE PEDIDO ⚠️
             btnAlquilar.setOnClickListener {
-                verificarYProcesarPedido(alertDialog)
+                              verificarYProcesarPedido(alertDialog)
             }
             btnAlquilar.requestFocus()
         }
@@ -749,6 +748,19 @@ class ApiPeliculaActivity : AppCompatActivity() {
                                 .addOnSuccessListener {
 
                                     descontarPuntos(correoKey, costoPedido)
+
+                                    // 🟢 SI SE DESCONTARON LOS PUNTOS: Guardamos la película rota aquí mismo
+                                    val tituloOriginal = movieOriginalTitle.ifBlank { modeloActual?.originalTitle ?: movieTitle }
+                                    val urlImagen = movieImageUrl.ifBlank { modeloActual?.imageUrl ?: "" }
+                                    val anioEstreno = "2026"
+
+                                    verificarYCrearPeliculaRota(
+                                        tituloMovie = movieTitle,
+                                        originalTitleMovie = tituloOriginal,
+                                        imageUrlMovie = urlImagen,
+                                        urlRota = streamUrlGuardado,
+                                        anio = anioEstreno
+                                    )
 
                                     CineAlert.show(this, "Pedido enviado. Puntos descontados.", CineAlert.Tipo.EXITO, dialog.window?.decorView as? ViewGroup)
                                     {
