@@ -224,9 +224,10 @@ class PeliculasActivity : AppCompatActivity() {
         }
         escucharSaldoUsuario()
 
-
+        configurarAnimacionDelBanner()
         // 🟢 Ejecutamos la carga del banner de Netflix
         cargarBannerPromocional()
+
 // Configurar cliente Retrofit para TMDB dentro de onCreate de PeliculasActivity
         val client = OkHttpClient.Builder().hostnameVerifier { _, _ -> true }.build()
         val retrofit = Retrofit.Builder()
@@ -237,7 +238,30 @@ class PeliculasActivity : AppCompatActivity() {
         apiService = retrofit.create(TMDbApiService::class.java)
 
     }
+    private fun configurarAnimacionDelBanner() {
+        val layoutBannerNetflix = findViewById<View>(R.id.layoutBannerNetflix)
+        val rvPeliculas = findViewById<RecyclerView>(R.id.rvPeliculas)
 
+        // Este "radar" vigila cada vez que el control remoto cambia de elemento
+        window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
+
+            // 1. Verificamos si la vista que acaba de recibir el foco pertenece a la lista de abajo
+            val focoEnPeliculas = rvPeliculas?.findContainingItemView(newFocus) != null
+
+            if (focoEnPeliculas) {
+                // Si el usuario bajó a las películas, ocultamos el banner
+                if (layoutBannerNetflix?.visibility == View.VISIBLE) {
+                    layoutBannerNetflix.visibility = View.GONE
+                }
+            } else {
+                // Si el usuario subió (al menú o a las miniaturas)
+                // 🟢 TRUCO: Solo lo volvemos a mostrar si realmente hay películas promocionales cargadas
+                if (layoutBannerNetflix?.visibility == View.GONE && peliculasPromoList.isNotEmpty()) {
+                    layoutBannerNetflix.visibility = View.VISIBLE
+                }
+            }
+        }
+    }
 
     private fun cargarBannerPromocional() {
         val bannerContainer = findViewById<View>(R.id.layoutBannerNetflix)
@@ -365,98 +389,95 @@ class PeliculasActivity : AppCompatActivity() {
 
     private fun mostrarDatosPeliculaEnBanner(movie: Modelo) {
         val ivBackdrop = findViewById<ImageView>(R.id.ivBannerBackdrop)
-        val ivPoster = findViewById<ImageView>(R.id.ivBannerPoster) // 🟢 NUEVO: El póster grande
+        val ivPoster = findViewById<ImageView>(R.id.ivBannerPoster)
+        val layoutInfo = findViewById<LinearLayout>(R.id.layoutInfo) // 🟢 El contenedor de todo el texto
         val tvTitulo = findViewById<TextView>(R.id.tvBannerTitulo)
         val tvSinopsis = findViewById<TextView>(R.id.tvBannerSinopsis)
         val tvContador = findViewById<TextView>(R.id.tvBannerContador)
         val tvCalificacion = findViewById<TextView>(R.id.tvBannerCalificacion)
         val tvBannerInfoAdicional = findViewById<TextView>(R.id.tvBannerInfoAdicional)
 
-        // Valores por defecto
-        tvTitulo.text = movie.title
-        tvSinopsis.text = movie.overview.ifBlank { "Estreno exclusivo en CineParche." }
-        tvCalificacion.text = "⭐ 8.5"
-        tvBannerInfoAdicional.text = movie.genres.ifBlank { "Acción • Aventura • Cine" }
+        // 🟢 PASO 1: Desvanecimiento MUY LENTO del texto (500 milisegundos)
+        layoutInfo.animate().alpha(0f).setDuration(500).withEndAction {
 
-        val queryBusqueda = movie.originalTitle.ifBlank { movie.title }
-        apiService.searchMovie(apiKey, "es-MX", queryBusqueda).enqueue(object : retrofit2.Callback<MovieResponse> {
-            override fun onResponse(call: retrofit2.Call<MovieResponse>, response: retrofit2.Response<MovieResponse>) {
-                if (response.isSuccessful) {
-                    val result = response.body()?.results?.firstOrNull()
-                    if (result != null) {
-                        tvTitulo.text = result.title
-                        tvSinopsis.text = result.overview ?: movie.overview
+            // 🟢 PASO 2: Cuando el texto ya es invisible, cambiamos la información
+            tvTitulo.text = movie.title
+            tvSinopsis.text = movie.overview.ifBlank { "Estreno exclusivo en CineParche." }
+            tvCalificacion.text = "⭐ 8.5"
+            tvBannerInfoAdicional.text = movie.genres.ifBlank { "Acción • Aventura • Cine" }
 
-                        val anio = result.release_date?.take(4) ?: "2026"
-                        val cal = if (result.vote_average > 0.0) "${result.vote_average}" else "8.5"
-                        tvCalificacion.text = "⭐ $cal   |   $anio"
+            val queryBusqueda = movie.originalTitle.ifBlank { movie.title }
+            apiService.searchMovie(apiKey, "es-MX", queryBusqueda).enqueue(object : retrofit2.Callback<MovieResponse> {
+                override fun onResponse(call: retrofit2.Call<MovieResponse>, response: retrofit2.Response<MovieResponse>) {
+                    if (response.isSuccessful) {
+                        val result = response.body()?.results?.firstOrNull()
+                        if (result != null) {
+                            tvTitulo.text = result.title
+                            tvSinopsis.text = result.overview ?: movie.overview
 
-                        apiService.getMovieDetails(result.id, apiKey, "es-MX").enqueue(object : retrofit2.Callback<MovieDetailResponse> {
-                            override fun onResponse(call: retrofit2.Call<MovieDetailResponse>, response: retrofit2.Response<MovieDetailResponse>) {
-                                if (response.isSuccessful) {
-                                    val detalles = response.body()
-                                    val generos = detalles?.genres?.joinToString(" • ") { it.name } ?: "Desconocidos"
-                                    val duracion = detalles?.runtime ?: 0
-                                    tvBannerInfoAdicional.text = "🎭 $generos  ⏱️ ${duracion} Min"
+                            val anio = result.release_date?.take(4) ?: "2026"
+                            val cal = if (result.vote_average > 0.0) "${result.vote_average}" else "8.5"
+                            tvCalificacion.text = "⭐ $cal   |   $anio"
+
+                            // (Opcional) Llamada a getMovieDetails para más info...
+                            apiService.getMovieDetails(result.id, apiKey, "es-MX").enqueue(object : retrofit2.Callback<MovieDetailResponse> {
+                                override fun onResponse(call: retrofit2.Call<MovieDetailResponse>, response: retrofit2.Response<MovieDetailResponse>) {
+                                    if (response.isSuccessful) {
+                                        val detalles = response.body()
+                                        val generos = detalles?.genres?.joinToString(" • ") { it.name } ?: "Desconocidos"
+                                        val duracion = detalles?.runtime ?: 0
+                                        tvBannerInfoAdicional.text = "🎭 $generos  ⏱️ ${duracion} Min"
+                                    }
                                 }
-                            }
-                            override fun onFailure(call: retrofit2.Call<MovieDetailResponse>, t: Throwable) {}
-                        })
+                                override fun onFailure(call: retrofit2.Call<MovieDetailResponse>, t: Throwable) {}
+                            })
 
-                        // 🟢 Se cargan las dos imágenes: Fondo y Póster
-                        val backdropUrl = "https://image.tmdb.org/t/p/w780${result.backdrop_path ?: result.poster_path}"
-                        val posterUrl = "https://image.tmdb.org/t/p/w500${result.poster_path ?: result.backdrop_path}"
+                            // 🟢 PASO 3: Aparición SUAVE y majestuosa del texto nuevo (800 milisegundos)
+                            layoutInfo.animate().alpha(1f).setDuration(800).start()
 
-                        Glide.with(this@PeliculasActivity)
-                            .load(backdropUrl)
-                            .centerCrop()
-                            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
-                            .into(ivBackdrop)
+                            val backdropUrl = "https://image.tmdb.org/t/p/w1280${result.backdrop_path ?: result.poster_path}"
+                            val posterUrl = "https://image.tmdb.org/t/p/w500${result.poster_path ?: result.backdrop_path}"
 
-                        Glide.with(this@PeliculasActivity)
-                            .load(posterUrl)
-                            .centerCrop()
-                            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
-                            .into(ivPoster)
+                            cargarImagenSuave(backdropUrl, ivBackdrop)
+                            cargarImagenSuave(posterUrl, ivPoster)
 
+                        } else {
+                            // Si falla, igual debemos volver a mostrar el texto suavemente
+                            layoutInfo.animate().alpha(1f).setDuration(800).start()
+                            cargarImagenSuave(movie.imageUrl, ivBackdrop)
+                            cargarImagenSuave(movie.imageUrl, ivPoster)
+                        }
                     } else {
-                        cargarImagenLocal(movie.imageUrl, ivBackdrop, ivPoster)
+                        layoutInfo.animate().alpha(1f).setDuration(800).start()
+                        cargarImagenSuave(movie.imageUrl, ivBackdrop)
+                        cargarImagenSuave(movie.imageUrl, ivPoster)
                     }
-                } else {
-                    cargarImagenLocal(movie.imageUrl, ivBackdrop, ivPoster)
                 }
-            }
 
-            override fun onFailure(call: retrofit2.Call<MovieResponse>, t: Throwable) {
-                cargarImagenLocal(movie.imageUrl, ivBackdrop, ivPoster)
-            }
-        })
+                override fun onFailure(call: retrofit2.Call<MovieResponse>, t: Throwable) {
+                    layoutInfo.animate().alpha(1f).setDuration(800).start()
+                    cargarImagenSuave(movie.imageUrl, ivBackdrop)
+                    cargarImagenSuave(movie.imageUrl, ivPoster)
+                }
+            })
 
-        val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
-        val createdAtMillis = if (movie.createdAt > 0 && movie.createdAt < 1000000000000L) {
-            movie.createdAt * 1000
-        } else {
-            movie.createdAt
-        }
-        val elapsed = System.currentTimeMillis() - createdAtMillis
-        val remaining = durationMillis - elapsed
+            // Lógica del contador
+            val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
+            val createdAtMillis = if (movie.createdAt > 0 && movie.createdAt < 1000000000000L) { movie.createdAt * 1000 } else { movie.createdAt }
+            val elapsed = System.currentTimeMillis() - createdAtMillis
+            val remaining = durationMillis - elapsed
+            iniciarContadorBanner(tvContador, remaining)
 
-        iniciarContadorBanner(tvContador, remaining)
+        }.start() // Inicia la animación de desvanecimiento
     }
 
-    // 🟢 Se ajusta para recibir ambos ImageViews
-    private fun cargarImagenLocal(url: String, ivBackdrop: ImageView, ivPoster: ImageView) {
+    // 🟢 FUNCIÓN AUXILIAR PARA IMÁGENES: Aplica un CrossFade súper prolongado (1000ms / 1 segundo)
+    private fun cargarImagenSuave(url: String, imageView: ImageView) {
         Glide.with(this)
             .load(url)
             .centerCrop()
-            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
-            .into(ivBackdrop)
-
-        Glide.with(this)
-            .load(url)
-            .centerCrop()
-            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
-            .into(ivPoster)
+            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade(1000))
+            .into(imageView)
     }
 
     private fun iniciarContadorBanner(textView: TextView, remainingTime: Long) {
@@ -466,7 +487,7 @@ class PeliculasActivity : AppCompatActivity() {
                 val h = TimeUnit.MILLISECONDS.toHours(millisUntilFinished)
                 val m = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished) % 60
                 val s = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
-                textView.text = String.format("⏱️ Disponible hasta: %02d:%02d:%02d", h, m, s)
+                textView.text = String.format("▶\uFE0F %02d:%02d:%02d", h, m, s)
             }
 
             override fun onFinish() {
