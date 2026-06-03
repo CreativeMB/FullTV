@@ -18,8 +18,6 @@ class BannerPromosAdapter(
     private val onMovieClicked: (Modelo) -> Unit
 ) : RecyclerView.Adapter<BannerPromosAdapter.ViewHolder>() {
 
-    private var posSeleccionadaActiva = -1
-
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val ivPoster: ImageView = view.findViewById(R.id.imgMovie)
         val tvTitulo: TextView = view.findViewById(R.id.txtMovieTitle)
@@ -33,8 +31,8 @@ class BannerPromosAdapter(
 
         val context = parent.context
         val density = context.resources.displayMetrics.density
-        val widthInPx = (75 * density).toInt()
-        val heightInPx = (110 * density).toInt()
+        val widthInPx = (28 * density).toInt()
+        val heightInPx = (50 * density).toInt()
 
         val params = view.layoutParams ?: ViewGroup.LayoutParams(widthInPx, heightInPx)
         params.width = widthInPx
@@ -57,24 +55,33 @@ class BannerPromosAdapter(
             .into(holder.ivPoster)
 
         holder.itemView.isFocusable = true
-        holder.itemView.isFocusableInTouchMode = true
+        holder.itemView.isFocusableInTouchMode = true // Útil para garantizar que el foco del D-Pad atrape la celda
 
-        if (position == posSeleccionadaActiva) {
-            holder.itemView.animate().scaleX(1.15f).scaleY(1.15f).translationZ(15f).setDuration(250).start()
-            val card = holder.itemView as? androidx.cardview.widget.CardView
-            card?.setCardBackgroundColor(Color.parseColor("#C5A059"))
-        } else {
-            holder.itemView.animate().scaleX(1.0f).scaleY(1.0f).translationZ(0f).setDuration(200).start()
-            val card = holder.itemView as? androidx.cardview.widget.CardView
-            card?.setCardBackgroundColor(Color.parseColor("#1A1A1A"))
-        }
+        // 1. Estado por defecto de la celda al cargarse (sin foco)
+        holder.itemView.scaleX = 1.0f
+        holder.itemView.scaleY = 1.0f
+        holder.itemView.translationZ = 0f
+        val card = holder.itemView as? androidx.cardview.widget.CardView
+        card?.setCardBackgroundColor(Color.parseColor("#1A1A1A"))
 
+        // 2. Manejo dinámico directo sobre la vista (Cero recargas del Adapter)
         holder.itemView.setOnFocusChangeListener { v, hasFocus ->
             if (hasFocus) {
+                // Dispara el callback para que la Activity actualice el póster gigante
                 onMovieFocused(movie)
-                actualizarSeleccionActiva(position)
+
+                // Anima esta celda para hacerla crecer
+                v.animate().scaleX(1.15f).scaleY(1.15f).translationZ(15f).setDuration(250).start()
+                card?.setCardBackgroundColor(Color.parseColor("#C5A059"))
+
+                // Mantiene la vista seleccionada por encima de las demás (evita que los bordes se tapen)
+                v.bringToFront()
             } else {
                 onFocusLost()
+
+                // Regresa la celda a su tamaño original
+                v.animate().scaleX(1.0f).scaleY(1.0f).translationZ(0f).setDuration(200).start()
+                card?.setCardBackgroundColor(Color.parseColor("#1A1A1A"))
             }
         }
 
@@ -82,11 +89,4 @@ class BannerPromosAdapter(
     }
 
     override fun getItemCount(): Int = list.size
-
-    fun actualizarSeleccionActiva(nuevaPosicion: Int) {
-        val posAnterior = posSeleccionadaActiva
-        posSeleccionadaActiva = nuevaPosicion
-        notifyItemChanged(posAnterior)
-        notifyItemChanged(posSeleccionadaActiva)
-    }
 }

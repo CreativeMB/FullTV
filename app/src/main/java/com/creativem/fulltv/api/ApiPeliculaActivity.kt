@@ -936,7 +936,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
         tvSinopsis.text = movie.overview ?: "Sin sinopsis disponible"
 
         val posterUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}"
-        val backdropUrl = "https://image.tmdb.org/t/p/w780${movie.poster_path}"
+        val backdropUrl = "https://image.tmdb.org/t/p/w780${movie.backdrop_path}"
 
         Glide.with(this).load(posterUrl).placeholder(ivPoster.drawable).into(ivPoster)
         Glide.with(this).load(backdropUrl).centerCrop().diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL).transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade(800)).into(backgroundImageView)

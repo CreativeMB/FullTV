@@ -12,11 +12,13 @@ data class TmdbMovie(
     val overview: String,
     val release_date: String,
     val poster_path: String?,
+    val backdrop_path: String?, // 🟢 AQUÍ ESTÁ EL FONDO GIGANTE
     val vote_average: Double,
+
     // Campos adicionales necesarios
-    val streamUrl: String = "",         // Puedes manejar esto con una función si lo generas tú
-    val imageUrl: String = "",          // Alternativa a poster_path si la construyes tú
-    val castv: Int = 0,           // Puedes usar vote_average o un campo auxiliar
+    val streamUrl: String = "",
+    val imageUrl: String = "",
+    val castv: Int = 0,
 )
 
     {

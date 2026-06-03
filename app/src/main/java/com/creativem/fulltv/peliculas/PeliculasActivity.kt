@@ -238,6 +238,7 @@ class PeliculasActivity : AppCompatActivity() {
 
     }
 
+
     private fun cargarBannerPromocional() {
         val bannerContainer = findViewById<View>(R.id.layoutBannerNetflix)
         val rvBannerPromos = findViewById<RecyclerView>(R.id.rvBannerPromos)
@@ -300,6 +301,13 @@ class PeliculasActivity : AppCompatActivity() {
                     )
 
                     rvBannerPromos.adapter = adapter
+
+                    // Forzar visualización de la primera peli al iniciar
+                    mostrarDatosPeliculaEnBanner(peliculasPromoList[0])
+                    rvBannerPromos.postDelayed({
+                        resaltarMiniaturaVisualmente(rvBannerPromos, 0)
+                    }, 300)
+
                     iniciarRotacionAutomatica()
 
                 } else {
@@ -327,7 +335,13 @@ class PeliculasActivity : AppCompatActivity() {
 
                     val rvBannerPromos = findViewById<RecyclerView>(R.id.rvBannerPromos)
                     rvBannerPromos?.smoothScrollToPosition(currentPromoIndex)
-                    (rvBannerPromos?.adapter as? BannerPromosAdapter)?.actualizarSeleccionActiva(currentPromoIndex)
+
+                    // 🟢 SE REEMPLAZA EL LLAMADO AL ADAPTER POR LA ANIMACIÓN VISUAL DIRECTA
+                    rvBannerPromos?.let { rv ->
+                        rv.postDelayed({
+                            resaltarMiniaturaVisualmente(rv, currentPromoIndex)
+                        }, 300)
+                    }
 
                     currentPromoIndex = (currentPromoIndex + 1) % peliculasPromoList.size
                     promoRotationHandler.postDelayed(this, 6000)
@@ -351,12 +365,11 @@ class PeliculasActivity : AppCompatActivity() {
 
     private fun mostrarDatosPeliculaEnBanner(movie: Modelo) {
         val ivBackdrop = findViewById<ImageView>(R.id.ivBannerBackdrop)
+        val ivPoster = findViewById<ImageView>(R.id.ivBannerPoster) // 🟢 NUEVO: El póster grande
         val tvTitulo = findViewById<TextView>(R.id.tvBannerTitulo)
         val tvSinopsis = findViewById<TextView>(R.id.tvBannerSinopsis)
         val tvContador = findViewById<TextView>(R.id.tvBannerContador)
         val tvCalificacion = findViewById<TextView>(R.id.tvBannerCalificacion)
-
-        // 🟢 NUEVA VISTA VINCULADA: Información adicional de tu diseño final
         val tvBannerInfoAdicional = findViewById<TextView>(R.id.tvBannerInfoAdicional)
 
         // Valores por defecto
@@ -378,7 +391,6 @@ class PeliculasActivity : AppCompatActivity() {
                         val cal = if (result.vote_average > 0.0) "${result.vote_average}" else "8.5"
                         tvCalificacion.text = "⭐ $cal   |   $anio"
 
-                        // Buscamos detalles adicionales para rellenar la info adicional
                         apiService.getMovieDetails(result.id, apiKey, "es-MX").enqueue(object : retrofit2.Callback<MovieDetailResponse> {
                             override fun onResponse(call: retrofit2.Call<MovieDetailResponse>, response: retrofit2.Response<MovieDetailResponse>) {
                                 if (response.isSuccessful) {
@@ -391,22 +403,32 @@ class PeliculasActivity : AppCompatActivity() {
                             override fun onFailure(call: retrofit2.Call<MovieDetailResponse>, t: Throwable) {}
                         })
 
-                        val backdropUrl = "https://image.tmdb.org/t/p/w780${result.poster_path ?: result.poster_path}"
+                        // 🟢 Se cargan las dos imágenes: Fondo y Póster
+                        val backdropUrl = "https://image.tmdb.org/t/p/w780${result.backdrop_path ?: result.poster_path}"
+                        val posterUrl = "https://image.tmdb.org/t/p/w500${result.poster_path ?: result.backdrop_path}"
+
                         Glide.with(this@PeliculasActivity)
                             .load(backdropUrl)
                             .centerCrop()
                             .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
                             .into(ivBackdrop)
+
+                        Glide.with(this@PeliculasActivity)
+                            .load(posterUrl)
+                            .centerCrop()
+                            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
+                            .into(ivPoster)
+
                     } else {
-                        cargarImagenLocal(movie.imageUrl, ivBackdrop)
+                        cargarImagenLocal(movie.imageUrl, ivBackdrop, ivPoster)
                     }
                 } else {
-                    cargarImagenLocal(movie.imageUrl, ivBackdrop)
+                    cargarImagenLocal(movie.imageUrl, ivBackdrop, ivPoster)
                 }
             }
 
             override fun onFailure(call: retrofit2.Call<MovieResponse>, t: Throwable) {
-                cargarImagenLocal(movie.imageUrl, ivBackdrop)
+                cargarImagenLocal(movie.imageUrl, ivBackdrop, ivPoster)
             }
         })
 
@@ -422,12 +444,19 @@ class PeliculasActivity : AppCompatActivity() {
         iniciarContadorBanner(tvContador, remaining)
     }
 
-    private fun cargarImagenLocal(url: String, imageView: ImageView) {
+    // 🟢 Se ajusta para recibir ambos ImageViews
+    private fun cargarImagenLocal(url: String, ivBackdrop: ImageView, ivPoster: ImageView) {
         Glide.with(this)
             .load(url)
             .centerCrop()
             .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
-            .into(imageView)
+            .into(ivBackdrop)
+
+        Glide.with(this)
+            .load(url)
+            .centerCrop()
+            .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
+            .into(ivPoster)
     }
 
     private fun iniciarContadorBanner(textView: TextView, remainingTime: Long) {
@@ -445,6 +474,24 @@ class PeliculasActivity : AppCompatActivity() {
             }
         }.start()
     }
+
+    // 🟢 LA FUNCIÓN VISUAL NECESARIA PARA LA ROTACIÓN FLUIDA
+    private fun resaltarMiniaturaVisualmente(rv: RecyclerView, posicionObjetivo: Int) {
+        for (i in 0 until rv.childCount) {
+            val child = rv.getChildAt(i)
+            child.animate().scaleX(1.0f).scaleY(1.0f).translationZ(0f).setDuration(200).start()
+            (child as? androidx.cardview.widget.CardView)?.setCardBackgroundColor(android.graphics.Color.parseColor("#1A1A1A"))
+        }
+
+        val viewActiva = rv.layoutManager?.findViewByPosition(posicionObjetivo)
+        viewActiva?.let { v ->
+            v.animate().scaleX(1.15f).scaleY(1.15f).translationZ(15f).setDuration(250).start()
+            (v as? androidx.cardview.widget.CardView)?.setCardBackgroundColor(android.graphics.Color.parseColor("#C5A059"))
+            v.bringToFront()
+        }
+    }
+
+
 
     private fun escucharSaldoUsuario() {
         val email = auth.currentUser?.email ?: return
