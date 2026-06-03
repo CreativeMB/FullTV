@@ -52,14 +52,9 @@
     </LinearLayout>
 
     <androidx.cardview.widget.CardView
-        xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
         android:id="@+id/layoutBannerNetflix"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:layout_marginHorizontal="20dp"
-        android:visibility="gone"
         app:cardCornerRadius="8dp"
         app:cardElevation="0dp"
         app:cardBackgroundColor="@android:color/transparent"
@@ -70,9 +65,11 @@
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:padding="8dp"
             android:clipChildren="false"
             android:clipToPadding="false">
 
+            <!-- FONDO: Se mantienen igual -->
             <ImageView
                 android:id="@+id/ivBannerBackdrop"
                 android:layout_width="0dp"
@@ -102,13 +99,14 @@
                 app:layout_constraintStart_toEndOf="@id/cvBannerPoster"
                 app:layout_constraintEnd_toEndOf="parent" />
 
+            <!-- PÓSTER: CAMBIO -> Se elimina el anclaje superior y se fuerza al fondo con un margen -->
             <androidx.cardview.widget.CardView
                 android:id="@+id/cvBannerPoster"
                 android:layout_width="120dp"
                 android:layout_height="170dp"
+                android:layout_marginStart="10dp"
                 app:cardCornerRadius="8dp"
                 app:cardElevation="10dp"
-                app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintStart_toStartOf="parent">
 
@@ -120,14 +118,15 @@
                     android:background="#333333" />
             </androidx.cardview.widget.CardView>
 
+            <!-- INFO: CAMBIO -> Se elimina el anclaje superior. Ahora se ancla justo ENCIMA de las promos -->
             <LinearLayout
                 android:id="@+id/layoutInfo"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
-                android:layout_marginTop="8dp"
+                android:layout_marginBottom="4dp"
                 android:orientation="vertical"
-                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toTopOf="@id/rvBannerPromos"
                 app:layout_constraintStart_toEndOf="@id/cvBannerPoster"
                 app:layout_constraintEnd_toEndOf="parent">
 
@@ -136,7 +135,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textColor="#FFFFFF"
-                    android:textSize="18sp"
+                    android:textSize="24sp"
                     android:textStyle="bold"
                     android:maxLines="1"
                     android:ellipsize="end" />
@@ -182,18 +181,20 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
+                    android:layout_marginEnd="15dp"
                     android:textColor="#E0E0E0"
-                    android:textSize="11sp"
+                    android:textSize="18sp"
                     android:maxLines="2"
                     android:ellipsize="end"
                     android:lineSpacingMultiplier="1.2" />
 
             </LinearLayout>
 
+            <!-- PROMOS: CAMBIO -> Se ancla su parte inferior a la parte inferior del póster para que todo quede alineado abajo -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvBannerPromos"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="15dp"
                 android:layout_marginStart="16dp"
                 android:orientation="horizontal"
                 android:scrollbars="none"
@@ -202,8 +203,7 @@
                 android:nextFocusDown="@id/rvPeliculas"
                 android:clipChildren="false"
                 android:clipToPadding="false"
-                app:layout_constraintTop_toBottomOf="@id/layoutInfo"
-                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintBottom_toBottomOf="@id/cvBannerPoster"
                 app:layout_constraintStart_toEndOf="@id/cvBannerPoster"
                 app:layout_constraintEnd_toEndOf="parent" />
 
@@ -214,7 +214,6 @@
         android:id="@+id/rvPeliculas"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="10dp"
         android:paddingTop="25dp"
         android:paddingBottom="25dp"
         android:clipToPadding="false"

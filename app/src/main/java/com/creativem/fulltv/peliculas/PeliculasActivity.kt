@@ -590,13 +590,13 @@ class PeliculasActivity : AppCompatActivity() {
     // ==========================================
     private fun setupMenuHorizontal() {
         val menuItems = listOf(
-            "Activar", "Alquila", "Buscar",
-            "Pedir", "Paquete", "Perfil", "TV", "Cerrar"
+            "Perfil", "Activar", "Alquila", "Buscar",
+            "Pedir", "Paquete",  "TV", "Cerrar"
         )
         val menuIcons = listOf(
-            R.drawable.cartelera,
+            R.drawable.home, R.drawable.cartelera,
             R.drawable.cine, R.drawable.buscar, R.drawable.pedido,
-            R.drawable.activacion, R.drawable.home, R.drawable.tv, R.drawable.cerrrarp
+            R.drawable.activacion, R.drawable.tv, R.drawable.cerrrarp
         )
 
 
@@ -666,23 +666,23 @@ class PeliculasActivity : AppCompatActivity() {
         movieAdapter = MoviesAdapter(
             modeloList,
             onItemClick = { movie -> irAlReproductor(movie) },
-            onFocusChange = { movie -> actualizarImagenDeFondo(movie.imageUrl) }
+            onFocusChange = { movie -> (movie.imageUrl) }
         )
 
         binding.rvPeliculas.adapter = movieAdapter
     }
-    private fun actualizarImagenDeFondo(url: String?) {
-        if (!url.isNullOrEmpty()) {
-            Glide.with(this)
-                .load(url)
-                .centerCrop() // Asegura que llene toda la pantalla
-                .error(R.drawable.pelifondo) // Imagen por defecto si falla
-                .into(binding.imgFondo)
-
-            // Opcional: ajustar la transparencia si se ve muy fuerte
-            binding.imgFondo.alpha = 0.3f
-        }
-    }
+//    private fun actualizarImagenDeFondo(url: String?) {
+//        if (!url.isNullOrEmpty()) {
+//            Glide.with(this)
+//                .load(url)
+//                .centerCrop() // Asegura que llene toda la pantalla
+//                .error(R.drawable.pelifondo) // Imagen por defecto si falla
+//                .into(binding.imgFondo)
+//
+//            // Opcional: ajustar la transparencia si se ve muy fuerte
+//            binding.imgFondo.alpha = 0.3f
+//        }
+//    }
 
     // ==========================================
     // 2. SEGURIDAD: CUENTA ELIMINADA
