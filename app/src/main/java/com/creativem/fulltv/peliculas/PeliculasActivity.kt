@@ -1069,6 +1069,7 @@ class PeliculasActivity : AppCompatActivity() {
     // ==========================================
     // 5. BUSCADOR TMDB
     // ==========================================
+    // ==========================================
     private fun buscarPeliculaDialogo() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.buscador, null)
         val searchEditText = dialogView.findViewById<EditText>(R.id.search_edit_text)

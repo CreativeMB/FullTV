@@ -732,25 +732,15 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
                     verificarPuntos(correoKey, costoPedido) { tienePuntos ->
                         if (tienePuntos) {
-                            val datos = hashMapOf(
-                                "title" to movieTitle,
-                                "castv" to costoPedido,
-                                "email" to userEmail,
-                                "nombre" to userName,
-                                "userId" to snapshot.child("userId").value?.toString(),
-                                "timestamp" to ServerValue.TIMESTAMP
-                            )
 
-                            databaseRef.child("pedidosmovies").push().setValue(datos)
-                                .addOnSuccessListener {
-
-                                    descontarPuntos(correoKey, costoPedido)
-
+                            // 🟢 Descontamos los puntos de manera directa y segura primero
+                            descontarPuntos(correoKey, costoPedido) { exitoDescuento ->
+                                if (exitoDescuento) {
                                     val tituloOriginal = movieOriginalTitle.ifBlank { modeloActual?.originalTitle ?: movieTitle }
                                     val urlImagen = movieImageUrl.ifBlank { modeloActual?.imageUrl ?: "" }
                                     val anioEstreno = "2026"
 
-                                    // Enviamos el correo y nombre para que la función se encargue de la solicitud en cualquier escenario
+                                    // Procesamos la creación de la película o adición a la cola de solicitudes
                                     verificarYCrearPeliculaRota(
                                         tituloMovie = movieTitle,
                                         originalTitleMovie = tituloOriginal,
@@ -767,11 +757,11 @@ class ApiPeliculaActivity : AppCompatActivity() {
                                         dialog.dismiss()
                                         volverAlContenido()
                                     }
-                                }
-                                .addOnFailureListener { e ->
+                                } else {
                                     isProcessingOrder = false
-                                    CineAlert.show(this, "Error al enviar: ${e.message}", CineAlert.Tipo.ERROR, dialog.window?.decorView as? ViewGroup)
+                                    CineAlert.show(this, "Error al procesar el descuento de puntos.", CineAlert.Tipo.ERROR, dialog.window?.decorView as? ViewGroup)
                                 }
+                            }
 
                         } else {
                             isProcessingOrder = false
