@@ -243,38 +243,52 @@ class ApiPeliculaActivity : AppCompatActivity() {
         originalTitleMovie: String,
         imageUrlMovie: String,
         urlRota: String,
-        anio: String
+        anio: String,
+        userEmail: String, // 🟢 NUEVO: Recibe el correo del solicitante
+        userName: String   // 🟢 NUEVO: Recibe el nombre del solicitante
     ) {
         if (isFinishing || isDestroyed) return
 
-        // 🟢 CORREGIDO: URL exacta de tu Realtime Database y nodo "movies"
         val customDbUrl = "https://corario-16991-default-rtdb.firebaseio.com/"
         val databaseRef = com.google.firebase.database.FirebaseDatabase
             .getInstance(customDbUrl)
             .getReference("movies")
 
-        // 🟢 Si el título original está vacío, no podemos buscar ni guardar correctamente
         if (originalTitleMovie.isBlank()) {
             android.util.Log.w("FirebaseTV", "⚠️ No se puede registrar película rota: título original vacío.")
             return
         }
 
-        // 🟢 Busca rigurosamente por el campo "originalTitle" para evitar duplicados
         databaseRef.orderByChild("originalTitle").equalTo(originalTitleMovie)
             .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
                 override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
                     if (isFinishing || isDestroyed) return
 
+                    // 🟢 ESCENARIO A: La película YA existe en la base de datos
                     if (snapshot.exists()) {
-                        android.util.Log.d("FirebaseTV", "✅ La película '$originalTitleMovie' YA existe en 'movies'. Omitiendo guardado.")
+                        android.util.Log.d("FirebaseTV", "✅ La película '$originalTitleMovie' YA existe en 'movies'. Agregando solicitud al ID existente.")
+
+                        val existingId = snapshot.children.firstOrNull()?.key ?: ""
+                        if (existingId.isNotEmpty()) {
+                            // Añadimos la solicitud al listado de espera de la película existente
+                            val solicitudesRef = databaseRef.child(existingId).child("solicitudes").push()
+                            val idSolicitud = solicitudesRef.key ?: ""
+
+                            val datosSolicitud = mapOf<String, Any>(
+                                "id" to idSolicitud,
+                                "email" to userEmail,
+                                "userId" to userName,
+                                "timestamp" to com.google.firebase.database.ServerValue.TIMESTAMP
+                            )
+                            solicitudesRef.setValue(datosSolicitud)
+                        }
                         return
                     }
 
-                    // 🟢 NO EXISTE -> Procedemos a GUARDARLA
+                    // 🟢 ESCENARIO B: La película NO existe -> Procedemos a crearla
                     val newId = databaseRef.push().key ?: return
                     val nombreFormateado = "$tituloMovie ($anio)".trim()
 
-                    // 🟢 Estructura EXACTA igual a tus películas actuales en Firebase
                     val nuevaPeliculaMap = hashMapOf(
                         "id" to newId,
                         "title" to tituloMovie,
@@ -290,11 +304,22 @@ class ApiPeliculaActivity : AppCompatActivity() {
                         "userId" to ""
                     )
 
-                    // Subida a Firebase
                     databaseRef.child(newId).setValue(nuevaPeliculaMap)
                         .addOnSuccessListener {
                             if (isFinishing || isDestroyed) return@addOnSuccessListener
                             android.util.Log.d("FirebaseTV", "🟢 Película rota GUARDADA exitosamente en 'movies': $newId")
+
+                            // Añadimos la solicitud directamente a la nueva película recién creada
+                            val solicitudesRef = databaseRef.child(newId).child("solicitudes").push()
+                            val idSolicitud = solicitudesRef.key ?: ""
+
+                            val datosSolicitud = mapOf<String, Any>(
+                                "id" to idSolicitud,
+                                "email" to userEmail,
+                                "userId" to userName,
+                                "timestamp" to com.google.firebase.database.ServerValue.TIMESTAMP
+                            )
+                            solicitudesRef.setValue(datosSolicitud)
                         }
                         .addOnFailureListener { e ->
                             if (isFinishing || isDestroyed) return@addOnFailureListener
@@ -721,25 +746,27 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
                                     descontarPuntos(correoKey, costoPedido)
 
-                                    // 🟢 SI SE DESCONTARON LOS PUNTOS: Guardamos la película rota aquí mismo
                                     val tituloOriginal = movieOriginalTitle.ifBlank { modeloActual?.originalTitle ?: movieTitle }
                                     val urlImagen = movieImageUrl.ifBlank { modeloActual?.imageUrl ?: "" }
                                     val anioEstreno = "2026"
 
+                                    // Enviamos el correo y nombre para que la función se encargue de la solicitud en cualquier escenario
                                     verificarYCrearPeliculaRota(
                                         tituloMovie = movieTitle,
                                         originalTitleMovie = tituloOriginal,
                                         imageUrlMovie = urlImagen,
                                         urlRota = streamUrlGuardado,
-                                        anio = anioEstreno
+                                        anio = anioEstreno,
+                                        userEmail = userEmail,
+                                        userName = userName
                                     )
 
                                     CineAlert.show(this, "Pedido enviado. Puntos descontados.", CineAlert.Tipo.EXITO, dialog.window?.decorView as? ViewGroup)
                                     {
-                                    isProcessingOrder = false
-                                    dialog.dismiss()
-                                    volverAlContenido()
-                                }
+                                        isProcessingOrder = false
+                                        dialog.dismiss()
+                                        volverAlContenido()
+                                    }
                                 }
                                 .addOnFailureListener { e ->
                                     isProcessingOrder = false
@@ -757,7 +784,6 @@ class ApiPeliculaActivity : AppCompatActivity() {
             }.addOnFailureListener { isProcessingOrder = false }
         }
     }
-
     private fun verificarPuntos(correoKey: String, costo: Int, callback: (Boolean) -> Unit) {
         val userRef = databaseRef.child("usuarios").child(correoKey)
         userRef.child("castv").get().addOnSuccessListener { snapshot ->

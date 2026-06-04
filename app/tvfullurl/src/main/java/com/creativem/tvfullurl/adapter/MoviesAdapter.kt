@@ -9,14 +9,13 @@ import com.creativem.cineflexurl.modelo.Movie
 import com.creativem.tvfullurl.R
 
 class MoviesAdapter(
-    private var movieList: List<Movie>, // Cambié a var para permitir la actualización
+    private var movieList: List<Movie>,
     private val onDeleteClick: (String) -> Unit,
     private val onAssignClick: (Movie) -> Unit,
     private val onEditClick: (Movie) -> Unit,
     private val isEditable: Boolean
 ) : RecyclerView.Adapter<MoviesAdapter.MovieViewHolder>() {
 
-    // La lista filtrada ahora se inicializa con la lista completa
     private var movieListFiltered: List<Movie> = movieList
 
     fun updateMovieList(newMovieList: List<Movie>) {
@@ -24,6 +23,7 @@ class MoviesAdapter(
         movieListFiltered = newMovieList
         notifyDataSetChanged()
     }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MovieViewHolder {
         val view: View =
             LayoutInflater.from(parent.context).inflate(R.layout.item_movies_pedidos, parent, false)
@@ -36,13 +36,24 @@ class MoviesAdapter(
 
         // Asigna los datos a las vistas
         holder.titleTextView.text = movie.title
+// Configurar visibilidad, datos del solicitante y fecha formateada
+        if (!movie.email.isNullOrBlank()) {
+            holder.requesterInfoTextView.visibility = View.VISIBLE
 
+            // Formateamos la marca de tiempo de la solicitud
+            val fechaHoraFormateada = formatearFecha(movie.requestTimestamp)
 
-
-        // Configurar el botón de eliminar
+            // Concatenamos el nombre, correo y la fecha legible
+            holder.requesterInfoTextView.text =
+                "Pedido por: ${movie.userId} (${movie.email})\n📅 Fecha: $fechaHoraFormateada"
+        } else {
+            holder.requesterInfoTextView.visibility = View.GONE
+        }
+               // Configurar el botón de eliminar
         holder.deleteButton.setOnClickListener {
             onDeleteClick(movie.id ?: "")
         }
+
         // Configurar el nuevo botón de asignar usuario
         holder.assignButton.setOnClickListener {
             onAssignClick(movie)
@@ -66,6 +77,8 @@ class MoviesAdapter(
     class MovieViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         var titleTextView: TextView = itemView.findViewById(R.id.titleTextView)
 
+        // 🟢 NUEVO: Referencia al TextView del solicitante
+        var requesterInfoTextView: TextView = itemView.findViewById(R.id.requesterInfoTextView)
 
         var deleteButton: TextView = itemView.findViewById(R.id.deleteButton)
         var editButton: TextView = itemView.findViewById(R.id.editButton)
@@ -73,8 +86,6 @@ class MoviesAdapter(
 
         fun bind(movie: Movie) {
             titleTextView.text = movie.title
-
-
         }
     }
 
@@ -88,5 +99,11 @@ class MoviesAdapter(
             }
         }
         notifyDataSetChanged()
+    }
+    private fun formatearFecha(timestamp: Long): String {
+        if (timestamp == 0L) return ""
+        // Formato: día/mes/año hora:minuto AM/PM
+        val sdf = java.text.SimpleDateFormat("dd/MM/yyyy hh:mm a", java.util.Locale.getDefault())
+        return sdf.format(java.util.Date(timestamp))
     }
 }

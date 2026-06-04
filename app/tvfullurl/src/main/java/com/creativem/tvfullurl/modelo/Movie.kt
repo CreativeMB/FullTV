@@ -6,6 +6,7 @@ import com.google.firebase.database.IgnoreExtraProperties
 class Movie {
     // 1. Campos con valores por defecto
     var id: String = ""
+    var requestTimestamp: Long = 0L // Almacena la fecha exacta de la solicitud
     var userId: String = ""
     var nombre: String = ""
     var title: String = ""
@@ -15,6 +16,7 @@ class Movie {
     var imageUrl: String = ""
     var streamUrl: String = ""
     var trailerUrl: String = ""
+    var activeRequestId: String = "" // Almacena el ID de la solicitud actual que se va a procesar
     var createdAt: Long = System.currentTimeMillis()
     var countdownMinutes: Int = 0
 
