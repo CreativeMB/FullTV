@@ -669,7 +669,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
             // ⚠️ ACÁ CONECTAMOS EL BOTÓN CON LA LÓGICA DE PEDIDO ⚠️
             btnAlquilar.setOnClickListener {
-                              verificarYProcesarPedido(alertDialog)
+                enviarPedido(alertDialog)
             }
             btnAlquilar.requestFocus()
         }
@@ -691,34 +691,6 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
         finish()
     }
-    // --- LÓGICA DE VERIFICACIÓN Y ENVÍO DE PEDIDOS ---
-    private fun verificarYProcesarPedido(dialog: AlertDialog) {
-        val query = databaseRef.child("pedidosmovies")
-            .orderByChild("title")
-            .equalTo(movieTitle)
-
-        query.get().addOnSuccessListener { snapshot ->
-            if (!snapshot.exists()) {
-                enviarPedido(dialog)
-            } else {
-                // 🟢 Usamos el bloque { } para que espere 2.5 segundos antes de cerrar y salir
-                CineAlert.show(
-                    this,
-                    "Esta película ya fue pedida, estamos trabajando en ella.",
-                    CineAlert.Tipo.ERROR,
-                    dialog.window?.decorView as? ViewGroup
-                ) {
-                    // --- TODO ESTO SE EJECUTARÁ DESPUÉS DE 2.5 SEGUNDOS ---
-                    dialog.dismiss()
-                    volverAlContenido()
-                }
-            }
-
-        }.addOnFailureListener { e ->
-            Log.e("ALQUILER_LOG", "ERROR en consulta de pedidos: ${e.message}")
-        }
-    }
-
     private fun enviarPedido(dialog: AlertDialog) {
         if (isProcessingOrder) return
         isProcessingOrder = true
