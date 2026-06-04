@@ -278,6 +278,9 @@ class PeliculasActivity : AppCompatActivity() {
         val bannerContainer = findViewById<View>(R.id.layoutBannerNetflix)
         val rvBannerPromos = findViewById<RecyclerView>(R.id.rvBannerPromos)
 
+        // Ocultar el contenedor inmediatamente al iniciar la carga para prevenir el parpadeo
+        bannerContainer.visibility = View.GONE
+
         databaseRef.child("movies").get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
                 peliculasPromoList.clear()
@@ -301,19 +304,17 @@ class PeliculasActivity : AppCompatActivity() {
                 }
 
                 if (peliculasPromoList.isNotEmpty()) {
-
-                    // ⭐ CAMBIO 1: Seleccionar índice aleatorio al inicio
+                    // Seleccionar índice aleatorio al inicio
                     val indiceInicialAleatorio = (0 until peliculasPromoList.size).random()
                     val peliculaInicial = peliculasPromoList[indiceInicialAleatorio]
 
                     currentPromoIndex = indiceInicialAleatorio
                     isUserInteractingWithPromo = false
 
-                    // ⭐ CAMBIO 2: PRE-CARGAR los datos en el banner ANTES de hacerlo visible
-                    // Así cuando aparezca, ya tendrá la imagen, título, etc. (sin lag)
+                    // Pre-cargar los datos en el banner antes de hacerlo visible
                     mostrarDatosPeliculaEnBanner(peliculaInicial)
 
-                    // Ahora sí, hacer visible el banner (ya con datos)
+                    // Una vez cargados los datos, se hace visible el contenedor
                     bannerContainer.visibility = View.VISIBLE
 
                     // Configurar RecyclerView
@@ -334,7 +335,6 @@ class PeliculasActivity : AppCompatActivity() {
                             }.coerceAtLeast(0)
                             mostrarDatosPeliculaEnBanner(movieSeleccionado)
 
-                            // ⭐ NUEVO: Posicionamiento instantáneo sin barrido
                             val rv = findViewById<RecyclerView>(R.id.rvBannerPromos)
                             val layoutManager = rv.layoutManager as? LinearLayoutManager
                             layoutManager?.scrollToPositionWithOffset(currentPromoIndex, 0)
@@ -345,7 +345,6 @@ class PeliculasActivity : AppCompatActivity() {
                     )
                     rvBannerPromos.adapter = adapter
 
-                    // ✅ AHORA (posicionamiento instantáneo)
                     rvBannerPromos.post {
                         val currentAdapter = rvBannerPromos.adapter as? BannerPromosAdapter
                         currentAdapter?.updateSelectedPosition(indiceInicialAleatorio, rvBannerPromos)
@@ -354,10 +353,10 @@ class PeliculasActivity : AppCompatActivity() {
                         layoutManager?.scrollToPositionWithOffset(indiceInicialAleatorio, 0)
                     }
 
-                    // ⭐ CAMBIO 4: Iniciar rotación automática desde el índice aleatorio
                     iniciarRotacionAutomaticaDesde(indiceInicialAleatorio)
 
                 } else {
+                    // Si la lista está vacía, nos aseguramos de que siga oculto
                     bannerContainer.visibility = View.GONE
                 }
             } else {
