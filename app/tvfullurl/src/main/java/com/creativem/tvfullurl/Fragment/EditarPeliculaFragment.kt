@@ -351,9 +351,23 @@ class EditarPeliculaFragment : Fragment() {
     }
 
     private fun deleteMovie(movieId: String) {
-        databaseRef.child(movieId).removeValue().addOnSuccessListener {
-            Toast.makeText(requireContext(), "Eliminada", Toast.LENGTH_SHORT).show()
-        }
+        AlertDialog.Builder(requireContext())
+            .setTitle("⚠️ Confirmar Eliminación")
+            .setMessage("¿Está seguro de que desea eliminar esta película de forma permanente? Esta acción no se puede deshacer y borrará también su cola de solicitudes.")
+            .setPositiveButton("Sí, Eliminar") { dialog, _ ->
+                databaseRef.child(movieId).removeValue()
+                    .addOnSuccessListener {
+                        Toast.makeText(requireContext(), "Película eliminada con éxito", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(requireContext(), "Error al eliminar: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+            }
+            .setNegativeButton("Cancelar") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
     }
 }
 

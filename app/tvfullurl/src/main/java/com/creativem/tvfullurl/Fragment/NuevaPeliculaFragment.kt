@@ -160,23 +160,51 @@ class NuevaPeliculaFragment : Fragment() {
         if (title.isEmpty()) return
 
         val id = movieId ?: databaseRef.push().key ?: return
-        val movie = Movie().apply {
-            this.id = id
-            this.title = title
-            this.originalTitle = binding.originalTitleEditText.text.toString().trim()
-            this.castv = binding.castvEditText.text.toString().toIntOrNull() ?: 10 // Respaldo a 10 si se borra
-            this.imageUrl = binding.imageUrlEditText.text.toString().trim()
-            this.streamUrl = binding.streamUrlEditText.text.toString().trim()
-            this.trailerUrl = binding.trailerUrlEditText.text.toString().trim()
-            this.countdownMinutes = binding.validEditText.text.toString().toIntOrNull() ?: 0 // Respaldo a 0 si se borra
-            this.createdAt = System.currentTimeMillis()
 
-            this.year = selectedYear
-        }
+        if (movieId != null) {
+            // 🟢 ESCENARIO DE EDICIÓN:
+            // Usamos updateChildren para actualizar únicamente los campos modificables.
+            // Esto conserva intacta la cola de "solicitudes" y el "createdAt" original de la película.
+            val camposEditados = mapOf<String, Any>(
+                "title" to title,
+                "originalTitle" to binding.originalTitleEditText.text.toString().trim(),
+                "castv" to (binding.castvEditText.text.toString().toIntOrNull() ?: 10),
+                "imageUrl" to binding.imageUrlEditText.text.toString().trim(),
+                "streamUrl" to binding.streamUrlEditText.text.toString().trim(),
+                "trailerUrl" to binding.trailerUrlEditText.text.toString().trim(),
+                "countdownMinutes" to (binding.validEditText.text.toString().toIntOrNull() ?: 0),
+                "year" to selectedYear
+            )
 
-        databaseRef.child(id).setValue(movie).addOnSuccessListener {
-            Toast.makeText(requireContext(), "Éxito", Toast.LENGTH_SHORT).show()
-            if (movieId != null) findNavController().navigateUp() else clearFields()
+            databaseRef.child(id).updateChildren(camposEditados).addOnSuccessListener {
+                Toast.makeText(requireContext(), "Éxito al actualizar", Toast.LENGTH_SHORT).show()
+                findNavController().navigateUp()
+            }.addOnFailureListener { e ->
+                Toast.makeText(requireContext(), "Error al actualizar: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+
+        } else {
+            // 🟢 ESCENARIO DE CREACIÓN NUEVA:
+            // Creamos el modelo completo con la fecha de registro actual (System.currentTimeMillis())
+            val movie = Movie().apply {
+                this.id = id
+                this.title = title
+                this.originalTitle = binding.originalTitleEditText.text.toString().trim()
+                this.castv = binding.castvEditText.text.toString().toIntOrNull() ?: 10
+                this.imageUrl = binding.imageUrlEditText.text.toString().trim()
+                this.streamUrl = binding.streamUrlEditText.text.toString().trim()
+                this.trailerUrl = binding.trailerUrlEditText.text.toString().trim()
+                this.countdownMinutes = binding.validEditText.text.toString().toIntOrNull() ?: 0
+                this.createdAt = System.currentTimeMillis()
+                this.year = selectedYear
+            }
+
+            databaseRef.child(id).setValue(movie).addOnSuccessListener {
+                Toast.makeText(requireContext(), "Éxito al crear", Toast.LENGTH_SHORT).show()
+                clearFields()
+            }.addOnFailureListener { e ->
+                Toast.makeText(requireContext(), "Error al crear: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
