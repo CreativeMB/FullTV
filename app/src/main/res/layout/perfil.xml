@@ -4,12 +4,27 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#0A0E14"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:overScrollMode="never"
+    android:scrollbars="none">
 
+    <!-- ⭐ UN SOLO LinearLayout contenedor de TODO -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:descendantFocusability="afterDescendants">
+
+        <!-- Indicador de carga -->
+        <ProgressBar
+            android:id="@+id/progressCargaAlquileres"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="20dp"
+            android:indeterminateTint="#C5A059"
+            android:visibility="gone" />
 
         <!-- ========================================== -->
         <!-- HEADER (Fondo Azul Muy Oscuro)             -->
@@ -35,6 +50,7 @@
                     android:scaleType="centerCrop"
                     android:src="@drawable/icono"
                     android:background="@drawable/focus_selector"
+                    android:focusable="true"
                     android:layout_marginEnd="15dp" />
 
                 <LinearLayout
@@ -115,15 +131,15 @@
                         android:textSize="18sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-
             </LinearLayout>
-            <!-- Contenedor dinámico de películas alquiladas (se oculta automáticamente si no hay películas activas) -->
+            <!-- ========================================== -->
+            <!-- CONTENEDOR DE ALQUILERES (FUERA DEL HEADER) -->
+            <!-- ========================================== -->
             <LinearLayout
                 android:id="@+id/layoutAlquileresContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:layout_marginTop="15dp"
                 android:layout_marginBottom="5dp"
                 android:clipChildren="false"
                 android:clipToPadding="false"
@@ -131,7 +147,6 @@
                 android:paddingEnd="15dp"
                 android:visibility="gone">
 
-                <!-- Título de la sección -->
                 <TextView
                     android:id="@+id/tvTituloSeccionAlquileres"
                     android:layout_width="wrap_content"
@@ -139,10 +154,11 @@
                     android:text="🍿 Mis Alquileres Activos"
                     android:textColor="#C5A059"
                     android:textSize="18sp"
+                    android:layout_gravity="center"
                     android:textStyle="bold"
                     android:layout_marginBottom="8dp"/>
 
-                <!-- RecyclerView de alquileres -->
+                <!-- ⭐ RecyclerView con foco habilitado -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recyclerMisAlquileres"
                     android:layout_width="match_parent"
@@ -150,41 +166,37 @@
                     android:orientation="horizontal"
                     android:scrollbars="none"
                     android:clipToPadding="false"
-                    android:descendantFocusability="afterDescendants"
-                    android:focusable="true"
-                    android:overScrollMode="never"
-                    android:paddingHorizontal="10dp"
                     android:clipChildren="false"
+                    android:overScrollMode="never"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:descendantFocusability="afterDescendants"
+                    android:paddingHorizontal="10dp"
                     android:paddingTop="25dp"
-                android:paddingBottom="25dp"
-                android:nextFocusUp="@id/imagenuser"
-                android:nextFocusDown="@id/cardSoporte" />
+                    android:paddingBottom="25dp"
+                    android:nextFocusUp="@id/imagenuser"
+                    android:nextFocusDown="@id/cardSoporte" />
+
             </LinearLayout>
-                        <!-- NOTICIA ELEGANTE (Fondo Dorado con texto blanco) -->
+            <!-- ⭐ NOTICIA ELEGANTE (DENTRO DEL HEADER) -->
             <TextView
                 android:id="@+id/txtBanner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
                 android:background="#141A24"
-                android:padding="20dp"
                 android:text="Cargando noticia..."
                 android:textColor="#FFFFFF"
-                android:textSize="18sp"
+                android:textSize="12sp"
                 android:textStyle="bold"
                 android:lineSpacingMultiplier="1.2" />
 
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginHorizontal="20dp"
-            android:background="#1AFFFFFF"/>
 
 
         <!-- ========================================== -->
-        <!-- CONTENIDO DE TARJETAS (Azul Oscuro Web)    -->
+        <!-- CONTENIDO DE TARJETAS                      -->
         <!-- ========================================== -->
         <LinearLayout
             android:id="@+id/containerLayout"

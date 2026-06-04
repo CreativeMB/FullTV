@@ -7,78 +7,320 @@ import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.text.HtmlCompat
 import androidx.leanback.widget.Presenter
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
 import com.creativem.fulltv.peliculas.PlayerPeliculas
 import com.creativem.fulltv.peliculasvalidas.AlquileresAdapter
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
 class Perfil : AppCompatActivity() {
 
-    // Inicialización de Firebase Database
+    // 🔥 Firebase
     private val databaseRef by lazy { FirebaseDatabase.getInstance().reference }
+    private val auth by lazy { FirebaseAuth.getInstance() }
+
+    // 💾 Caché local para evitar consultas repetidas
+    private val cachePeliculas = mutableMapOf<String, Modelo>()
+    private var peliculasListener: ValueEventListener? = null
+
+    // 📍 Estado del RecyclerView
+    private var posicionAlquileresGuardada = 0
+    private var adapterAlquileres: AlquileresAdapter? = null
+
+    // 🎯 Views cacheadas (evita findViewById repetido)
+    private lateinit var layoutAlquileresContainer: LinearLayout
+    private lateinit var recyclerAlquileres: RecyclerView
+    private lateinit var progressCarga: ProgressBar
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.perfil)
 
-        // Pantalla completa inmersiva
+        // 🎬 Pantalla completa inmersiva
         window.decorView.systemUiVisibility =
             View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
 
-        val container = findViewById<LinearLayout>(R.id.containerLayout)
-        val card1 = findViewById<View>(R.id.cardSoporte)
-        val card2 = findViewById<View>(R.id.cardColumna2)
-        val card3 = findViewById<View>(R.id.cardNotificacion)
+        // 🎯 Cachear views (solo 1 findViewById en toda la Activity)
+        layoutAlquileresContainer = findViewById(R.id.layoutAlquileresContainer)
+        recyclerAlquileres = findViewById(R.id.recyclerMisAlquileres)
+        progressCarga = findViewById(R.id.progressCargaAlquileres) // ⭐ Agrégalo al XML
 
-        val orientation = resources.configuration.orientation
-
-        if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            // MODO TV / HORIZONTAL
-            container.orientation = LinearLayout.HORIZONTAL
-
-            // Definimos que cada tarjeta ocupe 0dp de ancho pero con peso 1 (reparto equitativo)
-            val params = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
-            params.setMargins(10, 10, 10, 10)
-
-            card1.layoutParams = params
-            card2.layoutParams = params
-            card3.layoutParams = params
-        } else {
-            // MODO MÓVIL / VERTICAL
-            container.orientation = LinearLayout.VERTICAL
-
-            // En vertical cada una ocupa todo el ancho
-            val params = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            params.setMargins(0, 10, 0, 10)
-
-            card1.layoutParams = params
-            card2.layoutParams = params
-            card3.layoutParams = params
-        }
-
-        // Asignar contenido HTML
-        val col1: TextView = findViewById(R.id.col1)
-        val col2: TextView = findViewById(R.id.col2)
-        val col3: TextView = findViewById(R.id.col3)
-
-        col1.text = HtmlCompat.fromHtml(getString(R.string.columna_1), HtmlCompat.FROM_HTML_MODE_LEGACY)
-        col2.text = HtmlCompat.fromHtml(getString(R.string.columna_2), HtmlCompat.FROM_HTML_MODE_LEGACY)
-        col3.text = HtmlCompat.fromHtml(getString(R.string.columna_3), HtmlCompat.FROM_HTML_MODE_LEGACY)
-
+        configurarLayout()
+        configurarTextos()
         setupHeader()
 
-        // Ejecutamos la carga de películas alquiladas
+        // ⭐ Cargar películas globales UNA SOLA VEZ (caché)
+        cargarPeliculasEnCache()
+
+        // Luego cargar los alquileres del usuario
         cargarPeliculasAlquiladas()
     }
 
-    // 🟢 Función auxiliar para normalizar los títulos de la misma forma que al guardar
+    // ==========================================
+    // 1. CONFIGURACIÓN DE UI
+    // ==========================================
+
+    private fun configurarLayout() {
+        val container = findViewById<LinearLayout>(R.id.containerLayout)
+        val cards = listOf(
+            findViewById<View>(R.id.cardSoporte),
+            findViewById<View>(R.id.cardColumna2),
+            findViewById<View>(R.id.cardNotificacion)
+        )
+
+        val esHorizontal = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+        container.orientation = if (esHorizontal) {
+            LinearLayout.HORIZONTAL
+        } else {
+            LinearLayout.VERTICAL
+        }
+
+        cards.forEach { card ->
+            card.layoutParams = if (esHorizontal) {
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f).apply {
+                    setMargins(10, 10, 10, 10)
+                }
+            } else {
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, 10, 0, 10)
+                }
+            }
+        }
+    }
+
+    private fun configurarTextos() {
+        val columnas = listOf(
+            findViewById<TextView>(R.id.col1) to R.string.columna_1,
+            findViewById<TextView>(R.id.col2) to R.string.columna_2,
+            findViewById<TextView>(R.id.col3) to R.string.columna_3
+        )
+
+        columnas.forEach { (textView, stringRes) ->
+            textView.text = HtmlCompat.fromHtml(
+                getString(stringRes),
+                HtmlCompat.FROM_HTML_MODE_LEGACY
+            )
+        }
+    }
+
+    private fun setupHeader() {
+        val headerView = findViewById<View>(R.id.headerContainer) ?: return
+        val presenter = HeaderPresenter()
+        presenter.onBindViewHolder(Presenter.ViewHolder(headerView), null)
+    }
+
+    // ==========================================
+    // 2. CACHÉ DE PELÍCULAS (Optimización clave)
+    // ==========================================
+
+    /**
+     * ⚡ Carga todas las películas UNA SOLA VEZ y las guarda en memoria
+     * Así no tenemos que descargarlas cada vez que consultamos alquileres
+     */
+    private fun cargarPeliculasEnCache() {
+        databaseRef.child("movies").addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                cachePeliculas.clear()
+                for (child in snapshot.children) {
+                    val movie = child.getValue(Modelo::class.java) ?: continue
+                    movie.id = child.key ?: ""
+                    // Guardamos con la clave normalizada para búsqueda O(1)
+                    cachePeliculas[normalizarClave(movie.title)] = movie
+                }
+                Log.d("CACHE", "✅ Películas cacheadas: ${cachePeliculas.size}")
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("CACHE", "❌ Error al cachear películas: ${error.message}")
+            }
+        })
+    }
+
+    // ==========================================
+    // 3. CARGA DE ALQUILERES (Optimizada)
+    // ==========================================
+
+    private fun cargarPeliculasAlquiladas() {
+        val user = auth.currentUser
+        val email = user?.email
+        if (email == null) {
+            ocultarSeccionAlquileres("Usuario no autenticado")
+            return
+        }
+
+        mostrarCarga(true)
+
+        val correoKey = email.replace(".", "_").replace("@", "_")
+
+        databaseRef.child("usuarios").child(correoKey).child("alquileres")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                procesarAlquileres(snapshot, correoKey)
+            }
+            .addOnFailureListener { e ->
+                mostrarCarga(false)
+                ocultarSeccionAlquileres("Error: ${e.message}")
+            }
+    }
+
+    /**
+     * Procesa los alquileres usando la caché local (sin segunda consulta a Firebase)
+     */
+    private fun procesarAlquileres(snapshot: DataSnapshot, correoKey: String) {
+        if (!snapshot.exists()) {
+            mostrarCarga(false)
+            ocultarSeccionAlquileres("Sin alquileres activos")
+            return
+        }
+
+        val alquileresVigentes = mutableListOf<Modelo.AlquilerItem>()
+        val ahora = System.currentTimeMillis()
+
+        // 1. Filtrar alquileres vigentes y limpiar los expirados
+        for (child in snapshot.children) {
+            val tituloKey = child.key ?: continue
+            val createdAt = (child.child("createdAt").value as? Number)?.toLong() ?: 0L
+            val countdownMinutes = (child.child("countdownMinutes").value as? Number)?.toInt() ?: 0
+
+            val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownMinutes.toLong())
+            val tiempoRestante = durationMillis - (ahora - createdAt)
+
+            if (tiempoRestante > 0) {
+                // ⭐ BÚSQUEDA EN CACHÉ (O(1)) en vez de recorrer todas las películas
+                val movie = cachePeliculas[tituloKey]
+                if (movie != null) {
+                    alquileresVigentes.add(
+                        Modelo.AlquilerItem(
+                            movie = movie,
+                            createdAt = createdAt,
+                            countdownMinutes = countdownMinutes
+                        )
+                    )
+                }
+            } else {
+                // 🧹 Limpieza pasiva: borrar expirados
+                child.ref.removeValue()
+                    .addOnSuccessListener {
+                        Log.d("CLEANUP", "🗑️ Alquiler expirado eliminado: $tituloKey")
+                    }
+            }
+        }
+
+        mostrarCarga(false)
+
+        if (alquileresVigentes.isEmpty()) {
+            ocultarSeccionAlquileres("Sin alquileres vigentes")
+            return
+        }
+
+        // 2. Mostrar el RecyclerView
+        mostrarSeccionAlquileres(alquileresVigentes, correoKey)
+    }
+
+    // ==========================================
+    // 4. CONFIGURACIÓN DEL RECYCLERVIEW
+    // ==========================================
+
+    private fun mostrarSeccionAlquileres(
+        alquileres: List<Modelo.AlquilerItem>,
+        correoKey: String
+    ) {
+        layoutAlquileresContainer.visibility = View.VISIBLE
+        configurarRecyclerView()
+
+        val listaMutable = alquileres.toMutableList()
+
+        if (adapterAlquileres == null) {
+            adapterAlquileres = AlquileresAdapter(
+                items = listaMutable,
+                onListEmpty = { ocultarSeccionAlquileres("Lista vacía") },
+                onItemExpired = { itemExpirado ->
+                    eliminarAlquilerDeFirebase(correoKey, itemExpirado.movie.title)
+                },
+                onItemClick = { abrirReproductor(it) }
+            )
+            recyclerAlquileres.adapter = adapterAlquileres
+        } else {
+            adapterAlquileres?.actualizarLista(listaMutable)
+        }
+
+        // ⭐ CLAVE: Forzar recálculo de layout después de cargar datos
+        recyclerAlquileres.post {
+            recyclerAlquileres.requestLayout()
+
+            // Restaurar posición
+            val posicion = posicionAlquileresGuardada.coerceAtMost(alquileres.size - 1)
+            recyclerAlquileres.scrollToPosition(posicion)
+        }
+    }
+
+    /**
+     * ⚡ Configuración optimizada del RecyclerView
+     */
+    private fun configurarRecyclerView() {
+        // Guardar posición actual antes de cambiar
+        val layoutManagerActual = recyclerAlquileres.layoutManager
+        if (layoutManagerActual is LinearLayoutManager) {
+            posicionAlquileresGuardada = layoutManagerActual.findFirstVisibleItemPosition()
+                .coerceAtLeast(0)
+        }
+
+        // ⭐ SIEMPRE usar LinearLayoutManager HORIZONTAL (una sola línea)
+        recyclerAlquileres.layoutManager = LinearLayoutManager(
+            this,
+            LinearLayoutManager.HORIZONTAL,
+            false
+        ).apply {
+            initialPrefetchItemCount = 8 // Pre-carga para scroll fluido
+        }
+
+        // ⚡ Optimizaciones para scroll horizontal
+        recyclerAlquileres.isNestedScrollingEnabled = true // Necesario para scroll horizontal
+        recyclerAlquileres.setHasFixedSize(true)
+        recyclerAlquileres.itemAnimator = null // Sin animaciones (más rápido)
+        recyclerAlquileres.setItemViewCacheSize(20)
+        recyclerAlquileres.overScrollMode = View.OVER_SCROLL_NEVER
+        recyclerAlquileres.isFocusable = true
+
+        // Restaurar posición guardada
+        recyclerAlquileres.post {
+            val posicion = posicionAlquileresGuardada.coerceAtMost(
+                (recyclerAlquileres.adapter?.itemCount ?: 1) - 1
+            )
+            recyclerAlquileres.scrollToPosition(posicion)
+        }
+    }
+
+    private fun abrirReproductor(item: Modelo.AlquilerItem) {
+        val intent = Intent(this, PlayerPeliculas::class.java).apply {
+            putExtra("EXTRA_STREAM_URL", item.movie.streamUrl)
+            putExtra("EXTRA_MOVIE_TITLE", item.movie.title)
+            putExtra("EXTRA_MOVIE_IMAGE_URL", item.movie.imageUrl)
+            putExtra("EXTRA_COUNTDOWN", item.countdownMinutes)
+            putExtra("EXTRA_CREATED_AT", item.createdAt)
+        }
+        startActivity(intent)
+    }
+
+    // ==========================================
+    // 5. UTILIDADES
+    // ==========================================
+
     private fun normalizarClave(texto: String): String {
         return texto.replace(".", "_")
             .replace("$", "_")
@@ -87,132 +329,57 @@ class Perfil : AppCompatActivity() {
             .replace("]", "_")
     }
 
-    private fun cargarPeliculasAlquiladas() {
-        val user = FirebaseAuth.getInstance().currentUser
-        if (user == null || user.email == null) return
-
-        val correoKey = user.email!!.replace(".", "_").replace("@", "_")
-        val listadoAlquileres = mutableListOf<Modelo.AlquilerItem>()
-        val layoutAlquileresContainer = findViewById<LinearLayout>(R.id.layoutAlquileresContainer)
-
-        // 1. Obtenemos los alquileres del usuario
-        databaseRef.child("usuarios").child(correoKey).child("alquileres")
-            .get()
-            .addOnSuccessListener { snapshot ->
-                if (snapshot.exists()) {
-                    val alquileresMap = mutableMapOf<String, Pair<Long, Int>>()
-
-                    for (child in snapshot.children) {
-                        val tituloKey = child.key ?: continue // Ej: "La Empleada (2025)"
-
-                        // 🟢 SOLUCIÓN AL ERROR DE CASTEO: Leemos de forma segura como Number
-                        val createdAt = (child.child("createdAt").value as? Number)?.toLong() ?: 0L
-                        val countdownMinutes = (child.child("countdownMinutes").value as? Number)?.toInt() ?: 0
-
-                        val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownMinutes.toLong())
-                        val timeElapsed = System.currentTimeMillis() - createdAt
-                        if (durationMillis - timeElapsed > 0) {
-                            alquileresMap[tituloKey] = Pair(createdAt, countdownMinutes)
-                        } else {
-                            // 🟢 LIMPIEZA PASIVA: Borramos el nodo de Firebase de inmediato porque ya expiró
-                            child.ref.removeValue()
-                        }
-                    }
-
-                    if (alquileresMap.isEmpty()) {
-                        layoutAlquileresContainer?.visibility = View.GONE
-                        return@addOnSuccessListener
-                    }
-
-                    // 2. Buscamos las películas globales correspondientes
-                    databaseRef.child("movies").get().addOnSuccessListener { moviesSnapshot ->
-                        if (moviesSnapshot.exists()) {
-                            for (movieChild in moviesSnapshot.children) {
-                                val movieData = movieChild.getValue(Modelo::class.java)
-                                if (movieData != null) {
-                                    movieData.id = movieChild.key ?: ""
-
-                                    val tituloNormalizado = normalizarClave(movieData.title)
-
-                                    if (alquileresMap.containsKey(tituloNormalizado)) {
-                                        val alquilerInfo = alquileresMap[tituloNormalizado]!!
-                                        listadoAlquileres.add(
-                                            Modelo.AlquilerItem(
-                                                movie = movieData,
-                                                createdAt = alquilerInfo.first,
-                                                countdownMinutes = alquilerInfo.second
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-
-                            // 3. Inicializamos o actualizamos el RecyclerView si hay resultados vigentes
-                            if (listadoAlquileres.isNotEmpty()) {
-                                layoutAlquileresContainer?.visibility = View.VISIBLE
-                                val recycler = findViewById<RecyclerView>(R.id.recyclerMisAlquileres)
-
-                                val orientation = resources.configuration.orientation
-                                if (orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
-                                    recycler.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-                                    recycler.isNestedScrollingEnabled = true
-                                } else {
-                                    recycler.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, 2)
-                                    recycler.isNestedScrollingEnabled = false
-                                }
-
-                                // Inicialización del adaptador con los callbacks correspondientes
-                                recycler.adapter = AlquileresAdapter(
-                                    items = listadoAlquileres,
-                                    onListEmpty = {
-                                        layoutAlquileresContainer?.visibility = View.GONE
-                                    },
-                                    onItemExpired = { itemExpirado ->
-                                        // 🟢 LIMPIEZA ACTIVA: Borramos de Firebase al llegar a cero en tiempo real
-                                        val clavePelicula = normalizarClave(itemExpirado.movie.title)
-                                        databaseRef.child("usuarios").child(correoKey)
-                                            .child("alquileres")
-                                            .child(clavePelicula)
-                                            .removeValue()
-                                            .addOnSuccessListener {
-                                                Log.d("CLEANUP", "Registro de alquiler expirado eliminado: $clavePelicula")
-                                            }
-                                    },
-                                    onItemClick = { itemSeleccionado ->
-                                        val intent = Intent(this, PlayerPeliculas::class.java).apply {
-                                            putExtra("EXTRA_STREAM_URL", itemSeleccionado.movie.streamUrl)
-                                            putExtra("EXTRA_MOVIE_TITLE", itemSeleccionado.movie.title)
-                                            putExtra("EXTRA_MOVIE_IMAGE_URL", itemSeleccionado.movie.imageUrl)
-                                            putExtra("EXTRA_COUNTDOWN", itemSeleccionado.countdownMinutes)
-                                        }
-                                        startActivity(intent)
-                                    }
-                                )
-                            } else {
-                                layoutAlquileresContainer?.visibility = View.GONE
-                            }
-                        } else {
-                            layoutAlquileresContainer?.visibility = View.GONE
-                        }
-                    }
-                } else {
-                    layoutAlquileresContainer?.visibility = View.GONE
-                    Log.d("ALQUILERES", "El usuario no cuenta con alquileres activos.")
-                }
-            }
-            .addOnFailureListener { e ->
-                layoutAlquileresContainer?.visibility = View.GONE
-                Log.e("ALQUILERES", "Error al consultar alquileres: ${e.message}")
+    private fun eliminarAlquilerDeFirebase(correoKey: String, titulo: String) {
+        val clave = normalizarClave(titulo)
+        databaseRef.child("usuarios").child(correoKey)
+            .child("alquileres")
+            .child(clave)
+            .removeValue()
+            .addOnSuccessListener {
+                Log.d("CLEANUP", "🗑️ Alquiler expirado eliminado: $clave")
             }
     }
 
-    private fun setupHeader() {
-        val headerView = findViewById<View>(R.id.headerContainer)
-        if (headerView != null) {
-            val presenter = HeaderPresenter()
-            val viewHolder = Presenter.ViewHolder(headerView)
-            presenter.onBindViewHolder(viewHolder, null)
-            Log.d("HEADER_LOG", "Header vinculado con éxito")
+    private fun mostrarCarga(mostrar: Boolean) {
+        if (::progressCarga.isInitialized) {
+            progressCarga.visibility = if (mostrar) View.VISIBLE else View.GONE
         }
+    }
+
+    private fun ocultarSeccionAlquileres(motivo: String = "") {
+        layoutAlquileresContainer.visibility = View.GONE
+        if (motivo.isNotBlank()) {
+            Log.d("ALQUILERES", motivo)
+        }
+    }
+
+    // ==========================================
+    // 6. CICLO DE VIDA
+    // ==========================================
+
+    /**
+     * ⭐ Detecta rotación de pantalla sin reiniciar la Activity
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+
+        // Reconfigurar layout de tarjetas
+        configurarLayout()
+
+        // Reconfigurar RecyclerView (mantiene posición)
+        if (layoutAlquileresContainer.visibility == View.VISIBLE) {
+            configurarRecyclerView()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // 🧹 Limpieza para evitar fugas de memoria
+        adapterAlquileres = null
+        cachePeliculas.clear()
+        peliculasListener?.let {
+            databaseRef.child("movies").removeEventListener(it)
+        }
+        Log.d("PERFIL", "🧹 onDestroy completado")
     }
 }

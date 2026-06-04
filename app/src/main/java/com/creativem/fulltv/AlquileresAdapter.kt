@@ -203,4 +203,11 @@ class AlquileresAdapter(
         val txtBadge: TextView = view.findViewById(R.id.txtBadge)
         val infoArea: View = view.findViewById(R.id.infoArea)
     }
+    fun actualizarLista(nuevaLista: List<Modelo.AlquilerItem>) {
+        // Si tu adapter usa DiffUtil, úsalo aquí
+        // Si no, simplemente:
+        items.clear()
+        items.addAll(nuevaLista)
+        notifyDataSetChanged()
+    }
 }
