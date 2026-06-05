@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.Typeface
@@ -42,9 +43,11 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
@@ -98,8 +101,12 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
 import java.util.concurrent.TimeUnit
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.MultiFormatWriter
+import com.google.zxing.common.BitMatrix
 
 class PeliculasActivity : AppCompatActivity() {
+
     private var primeraCargaBanner = true
     private var jobRotacion: Job? = null
     private var yaTieneListener = false
@@ -1427,40 +1434,71 @@ class PeliculasActivity : AppCompatActivity() {
             }
         }
     }
+    // 1. PUNTO DE ENTRADA: Decide qué pantalla mostrar según Firebase
     private fun activarpaquete() {
         val user = auth.currentUser ?: return
         val email = user.email ?: return
-        val uid = user.uid
         val correoKey = email.replace(".", "_").replace("@", "_")
 
+        lifecycleScope.launch {
+            try {
+                // Buscamos si ya tiene un pedido en la base de datos
+                val snapshot = withContext(Dispatchers.IO) {
+                    databaseRef.child("usuarios").child(correoKey).get().await()
+                }
+
+                val estado = snapshot.child("estado").value?.toString() ?: ""
+                val paqueteGuardado = snapshot.child("paquete").value?.toString() ?: ""
+                val pedidoIdGuardado = snapshot.child("pedidoId").value?.toString() ?: ""
+
+                // 1. SI TIENE UN PEDIDO PENDIENTE -> Va directo al diálogo informativo del QR (con sus 4 parámetros)
+                if (estado.equals("pendiente", ignoreCase = true) && paqueteGuardado.isNotEmpty() && pedidoIdGuardado.isNotEmpty()) {
+                    val monto = when (paqueteGuardado) {
+                        "Bronce" -> "10000"
+                        "Plata" -> "22000"
+                        "Oro" -> "45000"
+                        else -> "0"
+                    }
+
+                    // Llamamos al diálogo informativo con los 4 parámetros que requiere
+                    mostrarDialogoPagoInformativo(correoKey, paqueteGuardado, monto, pedidoIdGuardado)
+
+                } else {
+                    // 2. SI NO TIENE PEDIDOS PENDIENTES -> Muestra tu diseño de selección normal (con solo 1 parámetro)
+                    mostrarDialogoSeleccion(correoKey)
+                }
+            } catch (e: Exception) {
+                // En caso de cualquier error de conexión, por seguridad abrimos el de selección
+                mostrarDialogoSeleccion(correoKey)
+            }
+        }
+    }
+    private fun mostrarDialogoSeleccion(correoKey: String) {
         val colorTextoLogo = Color.parseColor("#C5A059")
         val colorFondoPrincipal = Color.parseColor("#2A2A2A")
 
-        // 1. Contenedor principal sin ScrollView para forzar el ajuste
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(40, 30, 40, 20) // Reducido de 60/50 a 40/30
+            setPadding(40, 30, 40, 20)
             setBackgroundColor(colorFondoPrincipal)
         }
 
-        // 2. Título y Descripción más compactos
         val titulo = TextView(this).apply {
-            text = "💎 ACTIVAR PAQUETE"
-            textSize = 18f // Reducido de 22f a 18f
+            text = "💎 SELECCIONAR PAQUETE"
+            textSize = 18f
             setTextColor(colorTextoLogo)
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
-            setPadding(0, 0, 0, 15) // Espacio inferior reducido a la mitad
+            setPadding(0, 0, 0, 15)
         }
 
         val descripcion = TextView(this).apply {
-            text = "Selecciona el paquete que pagaste:"
-            textSize = 14f // Reducido de 16f a 14f
+            text = "Selecciona el paquete que deseas activar:"
+            textSize = 14f
             setTextColor(Color.WHITE)
             setPadding(0, 0, 0, 10)
         }
 
-        // 3. RadioGroup con menos padding
         val radioGroup = android.widget.RadioGroup(this).apply {
             setPadding(10, 0, 10, 10)
         }
@@ -1469,124 +1507,283 @@ class PeliculasActivity : AppCompatActivity() {
             return android.widget.RadioButton(this).apply {
                 text = texto
                 setTextColor(Color.WHITE)
-                textSize = 14f // Reducido de 16f a 14f
+                textSize = 14f
                 buttonTintList = ColorStateList.valueOf(colorTextoLogo)
                 id = View.generateViewId()
-                setPadding(15, 10, 15, 10) // Padding interno mucho más pequeño
+                setPadding(15, 10, 15, 10)
             }
         }
 
-        val rbPlata = crearRadioButton("Bronce: $10.000 (50 Castv)")
-        val rbBronce = crearRadioButton("Plata: $22.000 (120 Castv)")
+        val rbBronce = crearRadioButton("Bronce: $10.000 (50 Castv)")
+        val rbPlata = crearRadioButton("Plata: $22.000 (120 Castv)")
         val rbOro = crearRadioButton("Oro: $45.000 (250 Castv)")
 
-        radioGroup.addView(rbPlata)
         radioGroup.addView(rbBronce)
+        radioGroup.addView(rbPlata)
         radioGroup.addView(rbOro)
-        rbPlata.isChecked = true
-
-        // 4. EL CUADRO DE TEXTO ajustado
-        val inputReferencia = EditText(this).apply {
-            id = View.generateViewId()
-            hint = "Banco y Nombre de quien envía"
-            setHintTextColor(Color.parseColor("#80FFFFFF"))
-            setTextColor(Color.WHITE)
-            textSize = 15f
-            isFocusable = true
-            isFocusableInTouchMode = true
-
-            val gd = GradientDrawable().apply {
-                setColor(Color.parseColor("#33FFFFFF"))
-                cornerRadius = 8f // Bordes más discretos
-                setStroke(2, colorTextoLogo) // Borde más delgado
-            }
-            background = gd
-
-            setPadding(25, 25, 25, 25) // Altura del cuadro reducida
-
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 10, 0, 10) // Márgenes externos reducidos
-            }
-
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
-            imeOptions = EditorInfo.IME_ACTION_DONE
-        }
+        rbBronce.isChecked = true
 
         layout.addView(titulo)
         layout.addView(descripcion)
         layout.addView(radioGroup)
-        layout.addView(inputReferencia)
 
-        // 5. Mostrar Diálogo
-        val dialog = AlertDialog.Builder(this)
-            .setView(layout) // Usamos el layout directamente
-            .setPositiveButton("ENVIAR REPORTE", null)
+        val dialog1 = AlertDialog.Builder(this)
+            .setView(layout)
+            .setPositiveButton("SIGUIENTE", null)
             .setNegativeButton("CANCELAR", null)
             .create()
 
-        dialog.show()
+        dialog1.show()
 
-        // Lógica de botones (Sin cambios en funcionalidad)
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
+        dialog1.getButton(AlertDialog.BUTTON_POSITIVE).apply {
             setTextColor(colorTextoLogo)
             textSize = 15f
             setTypeface(null, Typeface.BOLD)
             setOnClickListener {
-                val detalle = inputReferencia.text.toString().trim()
-                if (detalle.isEmpty()) {
-                    inputReferencia.error = "Faltan detalles"
-                    return@setOnClickListener
+                val paqueteNombre = when (radioGroup.checkedRadioButtonId) {
+                    rbBronce.id -> "Bronce"
+                    rbPlata.id -> "Plata"
+                    rbOro.id -> "Oro"
+                    else -> "Desconocido"
+                }
+                val monto = when (radioGroup.checkedRadioButtonId) {
+                    rbBronce.id -> "10000"
+                    rbPlata.id -> "22000"
+                    rbOro.id -> "45000"
+                    else -> "0"
                 }
 
-                val planSeleccionado = when (radioGroup.checkedRadioButtonId) {
-                    rbPlata.id -> "PLATA"
-                    rbBronce.id -> "BRONCE"
-                    rbOro.id -> "ORO"
-                    else -> "DESCONOCIDO"
-                }
-                val puntosPlan = when (radioGroup.checkedRadioButtonId) {
-                    rbPlata.id -> 50
-                    rbBronce.id -> 120
-                    rbOro.id -> 250
-                    else -> 0
-                }
+                isEnabled = false
 
                 lifecycleScope.launch {
                     try {
-                        val snapshot = withContext(Dispatchers.IO) {
-                            databaseRef.child("usuarios").child(correoKey).get().await()
-                        }
-                        val nombreReal = snapshot.child("nombre").value?.toString() ?: "Usuario"
-                        val data = hashMapOf(
-                            "title" to "$planSeleccionado - $detalle",
-                            "castv" to puntosPlan,
-                            "email" to email,
-                            "nombre" to nombreReal,
-                            "timestamp" to ServerValue.TIMESTAMP,
-                            "userId" to uid
+                        val timestamp = System.currentTimeMillis().toString().takeLast(4)
+                        val numeroAleatorio = (100..999).random()
+                        val pedidoIdGenerico = "ORD$timestamp$numeroAleatorio"
+
+                        val datosUsuarioActualizados = hashMapOf<String, Any>(
+                            "pedidoId" to pedidoIdGenerico,
+                            "paquete" to paqueteNombre,
+                            "estado" to "pendiente"
                         )
+
                         withContext(Dispatchers.IO) {
-                            databaseRef.child("pedidosmovies").push().setValue(data).await()
+                            databaseRef.child("usuarios").child(correoKey)
+                                .updateChildren(datosUsuarioActualizados)
+                                .await()
                         }
-                        CineAlert.show(this@PeliculasActivity, "✅ Enviado", CineAlert.Tipo.EXITO,
-                            dialog.window?.decorView as? ViewGroup)
-                        {
-                        dialog.dismiss()
-                        }
+
+                        dialog1.dismiss()
+
+                        // Abrimos el diálogo informativo con el QR pasando los 4 parámetros correctos
+                        mostrarDialogoPagoInformativo(correoKey, paqueteNombre, monto, pedidoIdGenerico)
+
                     } catch (e: Exception) {
-                        CineAlert.show(this@PeliculasActivity, "❌ Error",  CineAlert.Tipo.ERROR,
-                            dialog.window?.decorView as? ViewGroup)
+                        isEnabled = true
+                        CineAlert.show(this@PeliculasActivity, "❌ Error al registrar", CineAlert.Tipo.ERROR,
+                            dialog1.window?.decorView as? ViewGroup)
                     }
                 }
             }
         }
 
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).apply {
+        dialog1.getButton(AlertDialog.BUTTON_NEGATIVE).apply {
             setTextColor(Color.WHITE)
             textSize = 14f
+        }
+    }
+    // 2. DIÁLOGO DE SELECCIÓN (Conserva tu diseño exacto y la acción de guardar al dar Siguiente)
+    private fun mostrarDialogoPagoInformativo(correoKey: String, paquete: String, monto: String, pedidoId: String) {
+        val colorTextoLogo = Color.parseColor("#C5A059")
+        val colorFondoPrincipal = Color.parseColor("#2A2A2A")
+
+        val urlSubidaImagen = "https://onnline.web.app/CineParche/public/pagos/index.html?user=$correoKey&pedido=$pedidoId&paquete=$paquete&monto=$monto"
+
+        // 1. Contenedor del contenido (Layout interno)
+        val mainLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 30, 40, 20)
+            setBackgroundColor(colorFondoPrincipal)
+        }
+
+        // 2. ScrollView envolvente para hacerlo responsivo
+        val scrollView = ScrollView(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            setBackgroundColor(colorFondoPrincipal)
+            addView(mainLayout)
+        }
+
+        val titulo = TextView(this).apply {
+            text = "💎 PEDIDO REGISTRADO"
+            textSize = 18f
+            setTextColor(colorTextoLogo)
+            gravity = Gravity.CENTER
+            setTypeface(null, Typeface.BOLD)
+            setPadding(0, 0, 0, 15)
+        }
+
+        val infoPaquete = TextView(this).apply {
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 15)
+        }
+
+        // Escalado responsivo del QR (180dp convertido a píxeles de acuerdo a la densidad)
+        val scale = resources.displayMetrics.density
+        val qrSizePx = (180 * scale + 0.5f).toInt()
+
+        val qrImageView = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(qrSizePx, qrSizePx).apply {
+                gravity = Gravity.CENTER
+                setMargins(0, 10, 0, 10)
+            }
+            val qrBitmap = generarCodigoQR(urlSubidaImagen)
+            if (qrBitmap != null) {
+                setImageBitmap(qrBitmap)
+            }
+
+            setOnClickListener {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(urlSubidaImagen))
+                context.startActivity(intent)
+            }
+        }
+
+        val indicaciones = TextView(this).apply {
+            val textoHtml = """
+            <b>Bre-Be:</b> Código <b>@TMB833</b><br>
+            ✔ Soporte activo 24/7<br><br>
+            <i>Toca o escanea el QR para subir tu comprobante</i>
+        """.trimIndent()
+
+            text = androidx.core.text.HtmlCompat.fromHtml(textoHtml, androidx.core.text.HtmlCompat.FROM_HTML_MODE_LEGACY)
+            textSize = 14f
+            setTextColor(Color.WHITE)
+
+            gravity = Gravity.CENTER
+            setPadding(40, 15, 40, 15)
+        }
+
+        val mensajeInformativo = TextView(this).apply {
+            textSize = 14f
+            setTextColor(Color.WHITE)
+
+            gravity = Gravity.CENTER
+            setPadding(40, 25, 40, 25)
+            visibility = View.GONE
+        }
+
+        // Escuchador dinámico de estado en tiempo real
+        val estadoListener = object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                val estado = snapshot.child("estado").value?.toString() ?: "pendiente"
+                val urlpagos = snapshot.child("urlpagos").value?.toString() ?: ""
+
+                val (estadoVisual, colorHex) = if (urlpagos.isNotEmpty() && estado.equals("pendiente", ignoreCase = true)) {
+                    Pair("EN REVISIÓN", "#34D399")
+                } else if (estado.equals("pendiente", ignoreCase = true)) {
+                    Pair("PENDIENTE DE PAGO", "#F87171")
+                } else {
+                    Pair(estado.uppercase(), "#C5A059")
+                }
+
+                val htmlTexto = """
+                ID Pedido: $pedidoId<br>
+                Paquete: $paquete ($$monto)<br>
+                Estado actual: <b><font color='$colorHex'>$estadoVisual</font></b>
+            """.trimIndent()
+
+                infoPaquete.text = androidx.core.text.HtmlCompat.fromHtml(
+                    htmlTexto,
+                    androidx.core.text.HtmlCompat.FROM_HTML_MODE_LEGACY
+                )
+
+                val esRevision = urlpagos.isNotEmpty() && estado.equals("pendiente", ignoreCase = true)
+                val esActivo = estado.equals("activo", ignoreCase = true)
+
+                when {
+                    esActivo -> {
+                        qrImageView.visibility = View.GONE
+                        indicaciones.visibility = View.GONE
+                        mensajeInformativo.visibility = View.VISIBLE
+
+                        val textoActivo = """
+                        <font color='#34D399'><b>✅ ¡PAQUETE ACTIVADO!</b></font><br><br>
+                        Tu pago fue aprobado con éxito y tu saldo de créditos <b>CasTV</b> ya ha sido abonado a tu cuenta.<br><br>
+                        <i>¡Gracias por preferir CineParche!</i>
+                    """.trimIndent()
+                        mensajeInformativo.text = androidx.core.text.HtmlCompat.fromHtml(textoActivo, androidx.core.text.HtmlCompat.FROM_HTML_MODE_LEGACY)
+                    }
+                    esRevision -> {
+                        qrImageView.visibility = View.GONE
+                        indicaciones.visibility = View.GONE
+                        mensajeInformativo.visibility = View.VISIBLE
+
+                        val textoRevision = """
+                        <font color='#34D399'><b>🔍 COMPROBANTE EN REVISIÓN</b></font><br><br>
+                        Nuestro equipo está verificando tu comprobante de pago.<br>
+                        Una vez finalizada la revisión, tu saldo de <b>CasTV</b> se abonará de inmediato a tu cuenta.<br><br>
+                        <i>¡Gracias por tu paciencia!</i>
+                    """.trimIndent()
+                        mensajeInformativo.text = androidx.core.text.HtmlCompat.fromHtml(textoRevision, androidx.core.text.HtmlCompat.FROM_HTML_MODE_LEGACY)
+                    }
+                    else -> {
+                        qrImageView.visibility = View.VISIBLE
+                        indicaciones.visibility = View.VISIBLE
+                        mensajeInformativo.visibility = View.GONE
+                    }
+                }
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+        }
+
+        databaseRef.child("usuarios").child(correoKey).addValueEventListener(estadoListener)
+
+        mainLayout.addView(titulo)
+        mainLayout.addView(infoPaquete)
+        mainLayout.addView(qrImageView)
+        mainLayout.addView(indicaciones)
+        mainLayout.addView(mensajeInformativo)
+
+        val dialog2 = AlertDialog.Builder(this)
+            .setView(scrollView)
+            .setPositiveButton("CERRAR", null)
+            .create()
+
+        dialog2.setOnDismissListener {
+            databaseRef.child("usuarios").child(correoKey).removeEventListener(estadoListener)
+        }
+
+        dialog2.show()
+
+        dialog2.getButton(AlertDialog.BUTTON_POSITIVE).apply {
+            setTextColor(colorTextoLogo)
+            textSize = 15f
+            setTypeface(null, Typeface.BOLD)
+        }
+    }
+
+    // Función auxiliar para codificar un enlace de texto en un Bitmap de código QR
+    private fun generarCodigoQR(texto: String): Bitmap? {
+        return try {
+            val size = 500 // Dimensiones de la imagen QR en píxeles
+            val bitMatrix: BitMatrix = MultiFormatWriter().encode(texto, BarcodeFormat.QR_CODE, size, size)
+            val width = bitMatrix.width
+            val height = bitMatrix.height
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+            for (x in 0 until width) {
+                for (y in 0 until height) {
+                    bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) Color.BLACK else Color.WHITE)
+                }
+            }
+            bitmap
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
     // ==========================================

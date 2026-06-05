@@ -73,7 +73,7 @@ class CastvFragment : Fragment() {
                 if (snapshot.exists()) {
                     for (userSnapshot in snapshot.children) {
                         try {
-                            // 1. Cargamos el usuario (con la nueva data class ya no explota)
+                            // 1. Cargamos el usuario
                             val user = userSnapshot.getValue(User::class.java)
 
                             if (user != null) {
@@ -97,10 +97,13 @@ class CastvFragment : Fragment() {
                         }
                     }
 
-                    // 3. 🔄 ORDENAR (Convertimos a Long para comparar)
+                    // 3. 🔄 ORDENAR (Prioridad: 1. Pagos Pendientes, 2. Última Conexión, 3. Nombre)
                     userList.sortWith(
                         compareByDescending<User> { user ->
-                            // Convertimos ultimaConexion a Long de forma segura para ordenar
+                            // Coloca de primero (true) a los que tienen pago pendiente
+                            user.estado.equals("pendiente", ignoreCase = true) && !user.urlpagos.isNullOrEmpty()
+                        }.thenByDescending { user ->
+                            // Luego ordena por fecha de conexión descendente
                             when (val fecha = user.ultimaConexion) {
                                 is Long -> fecha
                                 is String -> fecha.toLongOrNull() ?: 0L
@@ -139,15 +142,12 @@ class CastvFragment : Fragment() {
 
                     for (userSnapshot in snapshot.children) {
                         val userId = userSnapshot.key
-//                        val isOnline = userSnapshot.child("enlinea").getValue(Boolean::class.java) ?: false
-
                         val estado = userSnapshot.child("estado").getValue(String::class.java)
                         val isOnline = if (estado == "activo") {
                             userSnapshot.child("enlinea").getValue(Boolean::class.java) ?: false
                         } else {
                             false // Usuario eliminado no debe marcarse como en línea
                         }
-
 
                         Log.d("Conexion", "Usuario ID: $userId, Estado de Conexión: $isOnline")
 
@@ -191,55 +191,69 @@ class CastvFragment : Fragment() {
         }
     }
 
-    // Actualizar solo el campo de puntos de un usuario
+    // Sumar créditos asignados y limpiar campos de compra temporales en Realtime Database
     private fun updateCastv(userId: String, puntosASumar: Int) {
-        val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId).child("castv")
+        val databaseRef = FirebaseDatabase.getInstance().reference
+        val userNodeRef = databaseRef.child("usuarios").child(userId)
 
-        userRef.runTransaction(object : ValueEventListener, Transaction.Handler {
-            override fun doTransaction(mutableData: MutableData): Transaction.Result {
-                // 1. Obtener los puntos actuales de forma segura
-                val puntosActuales = mutableData.getValue(Int::class.java) ?: 0
+        // Definimos los campos de limpieza comunes para ambos casos
+        val actualizacionesLimpieza = hashMapOf<String, Any?>(
+            "pedidoId" to null,
+            "paquete" to null,
+            "estado" to "activo", // Cambia de "pendiente" a "activo" para liberar la cuenta
+            "urlpagos" to null
+        )
 
-                // 2. Sumar el nuevo paquete a lo que ya tenía
-                mutableData.value = puntosActuales + puntosASumar
-
-                return Transaction.success(mutableData)
-            }
-
-            override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
-                if (committed) {
-                    Toast.makeText(requireContext(), "¡Paquete sumado con éxito!", Toast.LENGTH_SHORT).show()
-                    // cargarUsuarios() no hace falta llamarlo aquí,
-                    // el addValueEventListener de cargarUsuarios() se refrescará solo.
-                } else {
-                    Toast.makeText(requireContext(), "Error al sumar puntos", Toast.LENGTH_SHORT).show()
+        if (puntosASumar == 0) {
+            // --- FLUJO DE RECHAZO (0 PUNTOS) ---
+            // No sumamos créditos, únicamente limpiamos los campos para cancelar la solicitud inválida
+            userNodeRef.updateChildren(actualizacionesLimpieza)
+                .addOnSuccessListener {
+                    Toast.makeText(requireContext(), "Comprobante rechazado y solicitud eliminada ❌", Toast.LENGTH_SHORT).show()
                 }
-            }
+                .addOnFailureListener { e ->
+                    Log.e("Usuarios", "Error al eliminar solicitud rechazada", e)
+                    Toast.makeText(requireContext(), "Error al limpiar el registro rechazado", Toast.LENGTH_SHORT).show()
+                }
+        } else {
+            // --- FLUJO DE APROBACIÓN (MÁS DE 0 PUNTOS) ---
+            // Sumamos los créditos correspondientes mediante transacción y luego limpiamos el registro
+            userNodeRef.child("castv").runTransaction(object : Transaction.Handler {
+                override fun doTransaction(mutableData: MutableData): Transaction.Result {
+                    val puntosActuales = mutableData.getValue(Int::class.java) ?: 0
+                    mutableData.value = puntosActuales + puntosASumar
+                    return Transaction.success(mutableData)
+                }
 
-            // Métodos requeridos por ValueEventListener (pueden ir vacíos)
-            override fun onDataChange(snapshot: DataSnapshot) {}
-            override fun onCancelled(error: DatabaseError) {}
-        })
+                override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
+                    if (committed) {
+                        // Transacción de puntos exitosa -> Procedemos a limpiar la base de datos
+                        userNodeRef.updateChildren(actualizacionesLimpieza)
+                            .addOnSuccessListener {
+                                Toast.makeText(requireContext(), "¡Paquete sumado y registro limpio! ✅", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e("Usuarios", "Error al limpiar registro del usuario", e)
+                                Toast.makeText(requireContext(), "Puntos sumados, pero el registro no se pudo limpiar", Toast.LENGTH_LONG).show()
+                            }
+                    } else {
+                        Toast.makeText(requireContext(), "Error al sumar puntos", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            })
+        }
     }
 
-
     private fun deleteUsers(userId: String) {
-        // userId es el correo codificado (ej: usuario_gmail_com)
         val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(userId)
 
-        // Es mejor pedir una confirmación antes de borrar todo
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
             .setTitle("Eliminar permanentemente")
             .setMessage("¿Estás seguro de borrar a este usuario? Se perderán sus puntos y su historial por completo.")
             .setPositiveButton("Borrar Todo") { _, _ ->
-
-                // .removeValue() elimina el nodo completo de ese usuario
                 userRef.removeValue()
                     .addOnSuccessListener {
                         Toast.makeText(requireContext(), "Datos eliminados por completo", Toast.LENGTH_SHORT).show()
-
-                        // Ya no llamamos a Fly.dev porque no funciona
-                        // cargarUsuarios() se activará solo por el ValueEventListener
                     }
                     .addOnFailureListener { e ->
                         Log.e("Usuarios", "Error al borrar nodo", e)
@@ -250,10 +264,8 @@ class CastvFragment : Fragment() {
             .show()
     }
 
-
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
     }
-
 }

@@ -132,6 +132,9 @@ dependencies {
     implementation("com.github.bumptech.glide:glide:4.12.0")
     implementation ("org.json:json:20240303")
 
+    // qr
+    implementation("com.google.zxing:core:3.5.3")
+
 
 
 

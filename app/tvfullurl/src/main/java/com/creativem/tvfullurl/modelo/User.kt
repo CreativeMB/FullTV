@@ -3,6 +3,8 @@ package com.creativem.tvfullurl.modelo
 data class User(
     var userId: String = "",
     var correo: String = "",
+    var urlpagos: String = "",
+    var paquete: String = "",
     var nombre: String = "",
     var estado: String = "activo",
     var isOnline: Boolean = false,
