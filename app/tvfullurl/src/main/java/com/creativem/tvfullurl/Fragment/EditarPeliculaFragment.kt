@@ -1,6 +1,9 @@
 package com.creativem.tvfullurl.Fragment
 
+import android.annotation.SuppressLint
 import android.app.AlertDialog
+import android.app.PendingIntent
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -19,18 +22,27 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-private data class SolicitudInterna(
-    val id: String = "",
-    val email: String = "",
-    val userId: String = "",
-    val timestamp: Long = 0L
-)
+
+
 class EditarPeliculaFragment : Fragment() {
     private lateinit var binding: FragmentPedidosBinding
     private val databaseRef = FirebaseDatabase.getInstance().reference.child("movies")
     private val rootDatabaseRef = FirebaseDatabase.getInstance().reference
     private lateinit var moviesAdapter: MoviesAdapter
     private var movieList: MutableList<Movie> = mutableListOf()
+
+    // 🟢 variables de control para identificar nuevas solicitudes en tiempo real sin duplicados
+    private val solicitudesConocidas = mutableSetOf<String>()
+    private var esPrimeraCarga = true
+
+    // 🟢 Launcher para solicitar permisos de notificación en Android 13+ de forma segura
+    private val requestPermissionLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (!isGranted) {
+            Toast.makeText(requireContext(), "Permiso de notificaciones denegado", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         binding = FragmentPedidosBinding.inflate(inflater, container, false)
@@ -39,6 +51,11 @@ class EditarPeliculaFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Inicializar el canal de alertas y validar permisos del dispositivo
+        crearCanalNotificaciones()
+        validarPermisosNotificacion()
+
         iniciarRecycler()
         escucharPeliculasEnTiempoReal()
 
@@ -51,10 +68,81 @@ class EditarPeliculaFragment : Fragment() {
         })
     }
 
+    // 🟢 Crear canal de notificaciones con importancia alta para mostrar banners interactivos
+    private fun crearCanalNotificaciones() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val name = "Nuevos Pedidos Admin"
+            val descriptionText = "Notificaciones de nuevos pedidos en tiempo real"
+            val importance = android.app.NotificationManager.IMPORTANCE_HIGH
+            val channel = android.app.NotificationChannel("CANAL_ADMIN_PEDIDOS", name, importance).apply {
+                description = descriptionText
+            }
+            val notificationManager = requireContext().getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    // 🟢 Solicitar permisos de envío de notificaciones
+    private fun validarPermisosNotificacion() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    requireContext(),
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
+    // 🟢 Disparar la notificación con PendingIntent interactivo para abrir la aplicación al tocarla
+    @SuppressLint("MissingPermission")
+    private fun mostrarNotificacionAdmin(tituloPelicula: String) {
+        val intent = Intent(requireContext(), requireActivity()::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+
+        val flagsPendingIntent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            requireContext(),
+            0,
+            intent,
+            flagsPendingIntent
+        )
+
+        val builder = androidx.core.app.NotificationCompat.Builder(requireContext(), "CANAL_ADMIN_PEDIDOS")
+            .setSmallIcon(R.drawable.baseline_people_alt_24) // Asegúrate de que el icono exista en tus recursos drawable
+            .setContentTitle("🔔 ¡Nuevo Pedido Recibido!")
+            .setContentText("Se ha solicitado la película: '$tituloPelicula'")
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+
+        try {
+            with(androidx.core.app.NotificationManagerCompat.from(requireContext())) {
+                if (androidx.core.content.ContextCompat.checkSelfPermission(
+                        requireContext(),
+                        android.Manifest.permission.POST_NOTIFICATIONS
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU
+                ) {
+                    notify(System.currentTimeMillis().toInt(), builder.build())
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("NOTIFICACION_ADMIN", "Error al lanzar la notificación: ${e.message}")
+        }
+    }
+
     private fun escucharPeliculasEnTiempoReal() {
         databaseRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val listaDesglosada = mutableListOf<Movie>()
+                val solicitudesCargaActual = mutableListOf<Pair<String, String>>()
 
                 for (child in snapshot.children) {
                     val originalMovie = child.getValue(Movie::class.java)
@@ -63,12 +151,14 @@ class EditarPeliculaFragment : Fragment() {
 
                         val solicitudesNode = child.child("solicitudes")
                         if (solicitudesNode.exists() && solicitudesNode.hasChildren()) {
-                            // 🟢 DESGLOSE: Si la película tiene múltiples solicitudes, creamos una tarjeta para cada una
+                            // DESGLOSE: Si la película tiene múltiples solicitudes, creamos una tarjeta para cada una
                             for (solicitudChild in solicitudesNode.children) {
                                 val solId = solicitudChild.child("id").getValue(String::class.java) ?: solicitudChild.key ?: ""
                                 val solEmail = solicitudChild.child("email").getValue(String::class.java) ?: ""
                                 val solName = solicitudChild.child("userId").getValue(String::class.java) ?: ""
                                 val solTime = solicitudChild.child("timestamp").getValue(Long::class.java) ?: 0L
+
+                                solicitudesCargaActual.add(Pair(solId, movie.title ?: "Sin título"))
 
                                 // Obtenemos una nueva instancia para cada solicitante
                                 val movieCopy = child.getValue(Movie::class.java)!!
@@ -91,9 +181,21 @@ class EditarPeliculaFragment : Fragment() {
                     }
                 }
 
-                // 🟢 ORDENACIÓN GLOBAL:
-                // 1. Las solicitudes pendientes van de primeras, ordenadas de la más antigua a la más reciente (Cola de espera justa).
-                // 2. Las películas sin solicitudes van al final, ordenadas por su fecha de creación (createdAt) de forma descendente.
+                // 🟢 IDENTIFICACIÓN DE NUEVOS PEDIDOS EN TIEMPO REAL:
+                if (!esPrimeraCarga) {
+                    val nuevasSolicitudes = solicitudesCargaActual.filter { it.first !in solicitudesConocidas }
+                    for (nueva in nuevasSolicitudes) {
+                        mostrarNotificacionAdmin(nueva.second)
+                    }
+                } else {
+                    esPrimeraCarga = false
+                }
+
+                // Actualizamos las solicitudes conocidas para la próxima lectura
+                solicitudesConocidas.clear()
+                solicitudesConocidas.addAll(solicitudesCargaActual.map { it.first })
+
+                // ORDENACIÓN GLOBAL:
                 val listaOrdenada = listaDesglosada.sortedWith(
                     compareByDescending<Movie> { it.requestTimestamp > 0 }
                         .thenBy { if (it.requestTimestamp > 0) it.requestTimestamp else Long.MAX_VALUE }
@@ -127,12 +229,10 @@ class EditarPeliculaFragment : Fragment() {
 
     private fun asignarPeliculaAUsuario(movie: Movie) {
         if (!movie.email.isNullOrBlank()) {
-            // 🟢 ACCESO DIRECTO: El usuario ya la solicitó, generamos su clave y abrimos confirmación de inmediato
             val usuarioKey = movie.email.replace(".", "_").replace("@", "_")
             val usuarioSeleccion = UsuarioSeleccion(usuarioKey, movie.userId, movie.email)
             mostrarDialogoConfirmacion(usuarioSeleccion, movie)
         } else {
-            // No tiene solicitante, abrimos el buscador de usuarios para asignación manual
             rootDatabaseRef.child("usuarios").addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val listaUsuarios = mutableListOf<UsuarioSeleccion>()
@@ -243,12 +343,10 @@ class EditarPeliculaFragment : Fragment() {
         }
     }
 
-    // NUEVO: Método corregido para extraer dinámicamente el año de la película mediante inspección segura
     private fun obtenerAnioPelicula(movie: Movie): String {
         return try {
             val fields = movie.javaClass.declaredFields
 
-            // 1. Intenta buscar un campo directo llamado "year" (año)
             val campoAnio = fields.firstOrNull { it.name.equals("year", ignoreCase = true) }
             if (campoAnio != null) {
                 campoAnio.isAccessible = true
@@ -256,7 +354,6 @@ class EditarPeliculaFragment : Fragment() {
                 if (!valorAnio.isNullOrEmpty()) return valorAnio
             }
 
-            // 2. Si no lo encuentra, busca campos comunes de fecha completa (ej: releaseDate, release_date)
             val campoFecha = fields.firstOrNull {
                 it.name.equals("releaseDate", ignoreCase = true) ||
                         it.name.equals("release_date", ignoreCase = true) ||
@@ -266,7 +363,7 @@ class EditarPeliculaFragment : Fragment() {
                 campoFecha.isAccessible = true
                 val valorFecha = campoFecha.get(movie)?.toString()
                 if (!valorFecha.isNullOrEmpty() && valorFecha.length >= 4) {
-                    return valorFecha.substring(0, 4) // Extrae los primeros 4 dígitos (ej: "2026")
+                    return valorFecha.substring(0, 4)
                 }
             }
             ""
@@ -274,6 +371,7 @@ class EditarPeliculaFragment : Fragment() {
             ""
         }
     }
+
     private fun guardarAlquilerEnUsuario(usuarioKey: String, nombrePeliculaFormateado: String, minutos: Int, movieId: String, activeRequestId: String) {
         val datosAlquiler = mapOf(
             "countdownMinutes" to minutos,
@@ -288,7 +386,6 @@ class EditarPeliculaFragment : Fragment() {
             .addOnSuccessListener {
 
                 if (activeRequestId.isNotEmpty()) {
-                    // 🟢 ELIMINACIÓN DE SOLICITUD ATENDIDA: Removemos solo la solicitud procesada de la cola
                     databaseRef.child(movieId).child("solicitudes").child(activeRequestId).removeValue()
                         .addOnSuccessListener {
                             Toast.makeText(requireContext(), "Película asignada y cola de espera actualizada", Toast.LENGTH_SHORT).show()
@@ -297,7 +394,6 @@ class EditarPeliculaFragment : Fragment() {
                             Toast.makeText(requireContext(), "Asignada, pero error al actualizar cola: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
                 } else {
-                    // En caso de que no tuviera solicitudes en cola, limpiamos campos planos antiguos
                     val liberacionMap = mapOf<String, Any>(
                         "email" to "",
                         "userId" to ""
@@ -312,7 +408,7 @@ class EditarPeliculaFragment : Fragment() {
                 Toast.makeText(requireContext(), "Error al guardar: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
-    // Diálogo 2: Confirmación con Diseño Estructurado (Corregido)
+
     private fun mostrarDialogoConfirmacion(usuario: UsuarioSeleccion, movie: Movie) {
         val tiempoAsignadoMinutos = 300
         val tiempoLegible = "$tiempoAsignadoMinutos minutos (${tiempoAsignadoMinutos / 60} horas)"
@@ -343,7 +439,6 @@ class EditarPeliculaFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setView(dialogView)
             .setPositiveButton("Sí, Asignar") { _, _ ->
-                // Enviamos el ID de la película y el ID de la solicitud activa que se está resolviendo
                 guardarAlquilerEnUsuario(usuario.key, tituloConAnio, tiempoAsignadoMinutos, movie.id, movie.activeRequestId)
             }
             .setNegativeButton("No", null)
@@ -376,3 +471,4 @@ private data class UsuarioSeleccion(
     val nombre: String,
     val correo: String
 )
+

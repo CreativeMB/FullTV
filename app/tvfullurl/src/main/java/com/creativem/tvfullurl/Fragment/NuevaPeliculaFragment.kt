@@ -1,22 +1,32 @@
 package com.creativem.tvfullurl.Fragment
 
+import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
-import androidx.fragment.app.Fragment
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.creativem.cineflexurl.modelo.Movie
 import com.creativem.tvfullurl.BrowserActivity
 import com.creativem.tvfullurl.MovieResponse
+import com.creativem.tvfullurl.NotificationMonitorService
 import com.creativem.tvfullurl.R
 import com.creativem.tvfullurl.SugerenciaAdapter
 import com.creativem.tvfullurl.TMDbApiService
@@ -55,6 +65,18 @@ class NuevaPeliculaFragment : Fragment() {
         }
     }
 
+    // 🟢 CORREGIDO: Adaptado para fragmentos (se usa requireContext() en el Toast)
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            verificarYPedirExcepcionBateria()
+        } else {
+            Toast.makeText(requireContext(), "Las alertas de nuevos pedidos no sonarán sin este permiso", Toast.LENGTH_LONG).show()
+            verificarYPedirExcepcionBateria()
+        }
+    }
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         binding = FragmentNuevaEditarBinding.inflate(inflater, container, false)
         movieId = arguments?.getString("movieId")
@@ -63,15 +85,67 @@ class NuevaPeliculaFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // 🟢 CORREGIDO: Iniciamos la verificación de permisos en el hilo de vista adecuado
+        verificarYPedirPermisos()
+
         setupRecyclerView()
         setupListeners()
 
-        // MODIFICADO: Si es una creación nueva, pre-cargamos 10 y 0 por defecto en los campos correspondientes
+        // Si es una creación nueva, pre-cargamos 10 y 0 por defecto en los campos correspondientes
         if (movieId != null) {
             loadMovieData(movieId!!)
         } else {
             binding.validEditText.setText("0")   // Contador por defecto
             binding.castvEditText.setText("10")   // Castv por defecto
+        }
+    }
+
+    // 🟢 CORREGIDO: Validación de permisos adaptada para fragmentos
+    private fun verificarYPedirPermisos() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val permisoNotif = android.Manifest.permission.POST_NOTIFICATIONS
+            if (ContextCompat.checkSelfPermission(requireContext(), permisoNotif) != PackageManager.PERMISSION_GRANTED) {
+                requestNotificationPermissionLauncher.launch(permisoNotif)
+            } else {
+                verificarYPedirExcepcionBateria()
+            }
+        } else {
+            verificarYPedirExcepcionBateria()
+        }
+    }
+
+    // 🟢 CORREGIDO: Solicitud de batería adaptada con requireContext() y requireContext().packageName
+    @SuppressLint("BatteryLife")
+    private fun verificarYPedirExcepcionBateria() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val context = requireContext()
+            val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            val pName = context.packageName
+
+            if (!pm.isIgnoringBatteryOptimizations(pName)) {
+                try {
+                    val intent = Intent().apply {
+                        action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                        data = Uri.parse("package:$pName")
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    Log.e("PERMISOS", "No se pudo abrir la solicitud de batería: ${e.message}")
+                }
+            }
+        }
+
+        arrancarServicioMonitoreo()
+    }
+
+    // 🟢 CORREGIDO: Inicio de servicios en primer plano adaptado utilizando ContextCompat
+    private fun arrancarServicioMonitoreo() {
+        val serviceIntent = Intent(requireContext(), NotificationMonitorService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ContextCompat.startForegroundService(requireContext(), serviceIntent)
+        } else {
+            requireContext().startService(serviceIntent)
         }
     }
 
@@ -162,9 +236,6 @@ class NuevaPeliculaFragment : Fragment() {
         val id = movieId ?: databaseRef.push().key ?: return
 
         if (movieId != null) {
-            // 🟢 ESCENARIO DE EDICIÓN:
-            // Usamos updateChildren para actualizar únicamente los campos modificables.
-            // Esto conserva intacta la cola de "solicitudes" y el "createdAt" original de la película.
             val camposEditados = mapOf<String, Any>(
                 "title" to title,
                 "originalTitle" to binding.originalTitleEditText.text.toString().trim(),
@@ -184,8 +255,6 @@ class NuevaPeliculaFragment : Fragment() {
             }
 
         } else {
-            // 🟢 ESCENARIO DE CREACIÓN NUEVA:
-            // Creamos el modelo completo con la fecha de registro actual (System.currentTimeMillis())
             val movie = Movie().apply {
                 this.id = id
                 this.title = title
@@ -208,7 +277,6 @@ class NuevaPeliculaFragment : Fragment() {
         }
     }
 
-    // MODIFICADO: Al limpiar campos, restablece los valores predeterminados de contador a 0 y castv a 10
     private fun clearFields() {
         binding.titleEditText.text.clear()
         binding.originalTitleEditText.text.clear()
@@ -216,8 +284,8 @@ class NuevaPeliculaFragment : Fragment() {
         binding.streamUrlEditText.text.clear()
         binding.previewImageView.setImageResource(R.drawable.icono)
 
-        binding.validEditText.setText("0")   // Restablece a 0
-        binding.castvEditText.setText("10")   // Restablece a 10
+        binding.validEditText.setText("0")
+        binding.castvEditText.setText("10")
 
         selectedYear = ""
     }
