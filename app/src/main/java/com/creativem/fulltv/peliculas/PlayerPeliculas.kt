@@ -66,6 +66,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.Tracks
 
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.CaptionStyleCompat
 import androidx.recyclerview.widget.RecyclerView
 import java.util.concurrent.TimeUnit
 import com.creativem.fulltv.peliculasvalidas.PelisCarteleraAdapter
@@ -579,9 +580,9 @@ class PlayerPeliculas : AppCompatActivity() {
             // 6. LOAD CONTROL OPTIMIZADO (Evita desbordamiento de memoria - OOM en TV)
             val loadControl = DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
-                    30_000,   // Mínimo buffer inicial (30s)
+                    15_000,   // Mínimo buffer inicial (30s)
                     300_000,  // Máximo buffer acumulado (5 min - Estilo YouTube)
-                    3_000,    // Buffer rápido de arranque (3s)
+                    1_000,    // Buffer rápido de arranque (3s)
                     4_500     // Buffer de reanudación (4.5s)
                 )
                 .setTargetBufferBytes(androidx.media3.common.C.LENGTH_UNSET)
@@ -595,9 +596,24 @@ class PlayerPeliculas : AppCompatActivity() {
                 .build()
 
             binding.reproductor.player = player
+            // --- BLINDAJE DE SUBTÍTULOS ESTILO VLC (SIN FONDO NEGRO) ---
+            val estiloSubtitulos = CaptionStyleCompat(
+                Color.WHITE,                                // Color de la letra (Blanco)
+                Color.TRANSPARENT,                          // Color de fondo (Transparente - Elimina el cuadro negro)
+                Color.TRANSPARENT,                          // Color de la ventana del subtítulo (Transparente)
+                CaptionStyleCompat.EDGE_TYPE_OUTLINE,       // Tipo de borde (Borde exterior/Contorno)
+                Color.BLACK,                                // Color del borde (Negro para que se lea en fondos blancos)
+                null                                        // Fuente por defecto
+            )
 
-            // 8. PROCESAMIENTO SEGURO DEL MEDIA ITEM Y FORZADO DE MIME TYPE
-            val uriLimpia = urlLimpia.trim() // IMPORTANTE: Usamos la URL limpia sin el sufijo de las cabeceras "|"
+// Aplicamos el estilo personalizado a la vista de subtítulos
+            binding.reproductor.subtitleView?.setStyle(estiloSubtitulos)
+
+// Opcional: Ajustamos el tamaño del texto para pantallas de TV (ej: 20sp)
+            binding.reproductor.subtitleView?.setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+
+            // 8. PROCESAMIENTO SEGURO DEL MEDIA ITEM Y FORZADO DE MIME TYPE UNIVERSAL
+            val uriLimpia = urlLimpia.trim() // Usamos la URL limpia sin el sufijo de las cabeceras "|"
             if (uriLimpia.isEmpty()) {
                 mostrarCargando(false)
                 return
@@ -605,11 +621,10 @@ class PlayerPeliculas : AppCompatActivity() {
 
             val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(uriLimpia))
 
-            // BLINDAJE: Si la URL contiene .m3u o .m3u8, le forzamos a ExoPlayer el decodificador HLS
-            if (uriLimpia.lowercase().contains(".m3u8") || uriLimpia.lowercase().contains(".m3u")) {
-                mediaItemBuilder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
-            } else if (uriLimpia.lowercase().contains(".mp4")) {
-                mediaItemBuilder.setMimeType(androidx.media3.common.MimeTypes.VIDEO_MP4)
+            // Aplicamos el resolvedor universal de formatos
+            val mimeTypeDetectado = obtenerMimeTypeSegunExtension(uriLimpia)
+            if (mimeTypeDetectado != null) {
+                mediaItemBuilder.setMimeType(mimeTypeDetectado)
             }
 
             val mediaItem = mediaItemBuilder.build()
@@ -670,6 +685,58 @@ class PlayerPeliculas : AppCompatActivity() {
             mostrarCargando(false)
         }
     }
+
+    @OptIn(UnstableApi::class)
+    private fun obtenerMimeTypeSegunExtension(url: String): String? {
+        val urlLower = url.lowercase().trim()
+
+        // Limpiamos la URL de parámetros (como ?token=... o |User-Agent=...) para obtener la extensión limpia
+        val urlLimpiaParaFiltro = urlLower.split("?")[0].split("|")[0]
+
+        return when {
+            // --- 1. STREAMING EN VIVO Y ADAPTATIVO ---
+            urlLimpiaParaFiltro.endsWith(".m3u8") || urlLimpiaParaFiltro.endsWith(".m3u") ->
+                androidx.media3.common.MimeTypes.APPLICATION_M3U8 // HLS
+            urlLimpiaParaFiltro.endsWith(".mpd") ->
+                androidx.media3.common.MimeTypes.APPLICATION_MPD // DASH
+            urlLimpiaParaFiltro.contains(".ism") ->
+                androidx.media3.common.MimeTypes.APPLICATION_SS // SmoothStreaming
+
+            // --- 2. CONTENEDORES DE VIDEO COMUNES ---
+            urlLimpiaParaFiltro.endsWith(".mp4") || urlLimpiaParaFiltro.endsWith(".m4v") ->
+                androidx.media3.common.MimeTypes.VIDEO_MP4
+            urlLimpiaParaFiltro.endsWith(".mkv") || urlLimpiaParaFiltro.endsWith(".mka") ->
+                androidx.media3.common.MimeTypes.VIDEO_MATROSKA
+            urlLimpiaParaFiltro.endsWith(".webm") ->
+                androidx.media3.common.MimeTypes.VIDEO_WEBM
+            urlLimpiaParaFiltro.endsWith(".ts") || urlLimpiaParaFiltro.endsWith(".tsv") ->
+                androidx.media3.common.MimeTypes.VIDEO_MP2T // Canales de TV / MPEG-TS
+            urlLimpiaParaFiltro.endsWith(".mov") || urlLimpiaParaFiltro.endsWith(".qt") ->
+                "video/quicktime" // Apple QuickTime
+            urlLimpiaParaFiltro.endsWith(".avi") ->
+                "video/x-msvideo" // AVI estándar
+            urlLimpiaParaFiltro.endsWith(".mpg") || urlLimpiaParaFiltro.endsWith(".mpeg") ->
+                "video/mpeg"
+            urlLimpiaParaFiltro.endsWith(".flv") ->
+                "video/x-flv"
+            urlLimpiaParaFiltro.endsWith(".3gp") || urlLimpiaParaFiltro.endsWith(".3gpp") ->
+                "video/3gpp"
+
+            // --- 3. CONTENEDORES DE AUDIO COMUNES (Por si se reproducen canciones) ---
+            urlLimpiaParaFiltro.endsWith(".mp3") ->
+                androidx.media3.common.MimeTypes.AUDIO_MPEG
+            urlLimpiaParaFiltro.endsWith(".aac") ->
+                androidx.media3.common.MimeTypes.AUDIO_AAC
+            urlLimpiaParaFiltro.endsWith(".wav") ->
+                androidx.media3.common.MimeTypes.AUDIO_WAV
+            urlLimpiaParaFiltro.endsWith(".flac") ->
+                androidx.media3.common.MimeTypes.AUDIO_FLAC
+            urlLimpiaParaFiltro.endsWith(".ogg") || urlLimpiaParaFiltro.endsWith(".oga") ->
+                androidx.media3.common.MimeTypes.AUDIO_OGG
+
+            else -> null // Deja que ExoPlayer intente analizar la cabecera (sniffing) de forma automática si no hay extensión
+        }
+    }
     private fun procesarPistasDisponibles(tracks: Tracks) {
         val listaAudios = mutableListOf<PistaAudio>()
         val listaSubtitulos = mutableListOf<PistaSubtitulo>()
@@ -681,11 +748,13 @@ class PlayerPeliculas : AppCompatActivity() {
             val tipoPista = group.type
 
             for (trackIndex in 0 until group.length) {
-                if (!group.isTrackSupported(trackIndex)) continue
+                // ELIMINADO: 'if (!group.isTrackSupported(trackIndex)) continue'
+                // Quitamos esta línea para que los audios AC3 se muestren siempre,
+                // permitiendo decodificación por software o passthrough en TVs sin licencia Dolby.
 
                 val format = group.getTrackFormat(trackIndex)
 
-                // 1. BLINDAJE: Omitir subtítulos "fantasma" CEA-608 y CEA-708 (siempre vienen vacíos)
+                // 1. BLINDAJE: Omitir subtítulos "fantasma" CEA-608 y CEA-708
                 val mimeType = format.sampleMimeType ?: ""
                 if (mimeType.contains("cea-608") || mimeType.contains("cea-708")) {
                     continue
@@ -732,7 +801,6 @@ class PlayerPeliculas : AppCompatActivity() {
         }
 
         // 2. EVITAR ELIMINACIÓN DE PISTAS REALES (Numeración inteligente)
-        // Agrupamos los subtítulos por nombre. Si hay más de uno con el mismo nombre, los numeramos (ej: Español 1, Español 2)
         val listaSubtitulosFinal = mutableListOf<PistaSubtitulo>()
         val subtitulosAgrupados = listaSubtitulos.groupBy { it.nombre }
 
@@ -746,7 +814,6 @@ class PlayerPeliculas : AppCompatActivity() {
             }
         }
 
-        // Hacemos lo mismo con el audio por seguridad
         val listaAudiosFinal = mutableListOf<PistaAudio>()
         val audiosAgrupados = listaAudios.groupBy { it.nombre }
 
@@ -760,7 +827,7 @@ class PlayerPeliculas : AppCompatActivity() {
             }
         }
 
-        // Enviamos las listas limpias y numeradas a la UI sin haber perdido ninguna pista real
+        // Enviamos las listas completas de audio y video
         actualizarInterfazDePistas(listaAudiosFinal, listaSubtitulosFinal)
     }
 

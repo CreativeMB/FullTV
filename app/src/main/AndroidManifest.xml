@@ -75,6 +75,7 @@
             android:name=".peliculas.PlayerPeliculas"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:screenOrientation="landscape"
+            android:hardwareAccelerated="true"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".tv.PlayerTv"
