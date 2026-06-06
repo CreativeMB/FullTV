@@ -51,8 +51,10 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup
 import android.view.animation.AnimationUtils
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.activity.addCallback
 import com.bumptech.glide.Glide
 
@@ -61,6 +63,7 @@ import com.creativem.fulltv.databinding.PlayerBinding
 
 import androidx.annotation.OptIn
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.Tracks
 
 import androidx.media3.common.util.UnstableApi
 import androidx.recyclerview.widget.RecyclerView
@@ -69,6 +72,8 @@ import com.creativem.fulltv.peliculasvalidas.PelisCarteleraAdapter
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
 import com.creativem.fulltv.principal.Modelo
 import com.creativem.fulltv.principal.Perfil
+import com.creativem.fulltv.principal.PistaAudio
+import com.creativem.fulltv.principal.PistaSubtitulo
 
 
 import com.google.firebase.database.FirebaseDatabase
@@ -77,6 +82,8 @@ import kotlinx.coroutines.isActive
 
 @Suppress("DEPRECATION")
 class PlayerPeliculas : AppCompatActivity() {
+    private var pistasAudioDisponibles: List<PistaAudio> = emptyList()
+    private var pistasSubtulosDisponibles: List<PistaSubtitulo> = emptyList()
     private var userAgent: String? = null
     private var referer: String? = null
     private var cookie: String? = null
@@ -197,6 +204,11 @@ class PlayerPeliculas : AppCompatActivity() {
         // Referencias a los botones
 
         // Botón Play/Pause
+        val btnAudioSub: ImageButton = findViewById(R.id.btn_audio_sub)
+        btnAudioSub.setOnClickListener {
+            mostrarDialogoOpcionesPistas()
+        }
+
         val playPauseButton: ImageButton = findViewById(R.id.play_pause)
         playPauseButton.setOnClickListener {
             togglePlayPause()
@@ -270,7 +282,6 @@ class PlayerPeliculas : AppCompatActivity() {
                 }
             }
         }
-
 // Listeners para reiniciar el temporizador con cualquier interacción
         binding.reproductor.setOnTouchListener { _, _ ->
             showControlsAndResetTimer()
@@ -604,7 +615,14 @@ class PlayerPeliculas : AppCompatActivity() {
             val mediaItem = mediaItemBuilder.build()
 
             // 9. ASIGNACIÓN DE LISTENERS
+
             player?.addListener(object : Player.Listener {
+
+                override fun onTracksChanged(tracks: Tracks) {
+                    super.onTracksChanged(tracks)
+                    procesarPistasDisponibles(tracks)
+                }
+
                 override fun onPlayerError(error: PlaybackException) {
                     Log.e("TV_ERROR", "Error detectado en reproducción: ${error.errorCodeName}")
                     mostrarCargando(false)
@@ -651,6 +669,321 @@ class PlayerPeliculas : AppCompatActivity() {
             Log.e("TV_ERROR", "Error crítico en la inicialización: ${e.message}")
             mostrarCargando(false)
         }
+    }
+    private fun procesarPistasDisponibles(tracks: Tracks) {
+        val listaAudios = mutableListOf<PistaAudio>()
+        val listaSubtitulos = mutableListOf<PistaSubtitulo>()
+
+        val groups = tracks.groups
+
+        for (groupIndex in groups.indices) {
+            val group = groups[groupIndex]
+            val tipoPista = group.type
+
+            for (trackIndex in 0 until group.length) {
+                if (!group.isTrackSupported(trackIndex)) continue
+
+                val format = group.getTrackFormat(trackIndex)
+
+                // 1. BLINDAJE: Omitir subtítulos "fantasma" CEA-608 y CEA-708 (siempre vienen vacíos)
+                val mimeType = format.sampleMimeType ?: ""
+                if (mimeType.contains("cea-608") || mimeType.contains("cea-708")) {
+                    continue
+                }
+
+                val idiomaCodigo = format.language ?: "und"
+
+                // Obtener nombre completo legible
+                val idiomaCompleto = obtenerNombreCompletoIdioma(idiomaCodigo)
+                var nombrePista = format.label ?: idiomaCompleto
+
+                // Detectar si es pista forzada
+                val esForzado = (format.selectionFlags and androidx.media3.common.C.SELECTION_FLAG_FORCED) != 0
+                if (esForzado) {
+                    nombrePista += " (Forzado)"
+                }
+
+                val estaSeleccionada = group.isTrackSelected(trackIndex)
+
+                if (tipoPista == androidx.media3.common.C.TRACK_TYPE_AUDIO) {
+                    listaAudios.add(
+                        PistaAudio(
+                            indexGrupo = groupIndex,
+                            indexPista = trackIndex,
+                            nombre = nombrePista,
+                            idioma = idiomaCodigo,
+                            estaSeleccionada = estaSeleccionada,
+                            trackGroup = group
+                        )
+                    )
+                } else if (tipoPista == androidx.media3.common.C.TRACK_TYPE_TEXT) {
+                    listaSubtitulos.add(
+                        PistaSubtitulo(
+                            indexGrupo = groupIndex,
+                            indexPista = trackIndex,
+                            nombre = nombrePista,
+                            idioma = idiomaCodigo,
+                            estaSeleccionada = estaSeleccionada,
+                            trackGroup = group
+                        )
+                    )
+                }
+            }
+        }
+
+        // 2. EVITAR ELIMINACIÓN DE PISTAS REALES (Numeración inteligente)
+        // Agrupamos los subtítulos por nombre. Si hay más de uno con el mismo nombre, los numeramos (ej: Español 1, Español 2)
+        val listaSubtitulosFinal = mutableListOf<PistaSubtitulo>()
+        val subtitulosAgrupados = listaSubtitulos.groupBy { it.nombre }
+
+        subtitulosAgrupados.forEach { (nombreBase, pistas) ->
+            if (pistas.size > 1) {
+                pistas.forEachIndexed { index, pista ->
+                    listaSubtitulosFinal.add(pista.copy(nombre = "$nombreBase ${index + 1}"))
+                }
+            } else {
+                listaSubtitulosFinal.addAll(pistas)
+            }
+        }
+
+        // Hacemos lo mismo con el audio por seguridad
+        val listaAudiosFinal = mutableListOf<PistaAudio>()
+        val audiosAgrupados = listaAudios.groupBy { it.nombre }
+
+        audiosAgrupados.forEach { (nombreBase, pistas) ->
+            if (pistas.size > 1) {
+                pistas.forEachIndexed { index, pista ->
+                    listaAudiosFinal.add(pista.copy(nombre = "$nombreBase ${index + 1}"))
+                }
+            } else {
+                listaAudiosFinal.addAll(pistas)
+            }
+        }
+
+        // Enviamos las listas limpias y numeradas a la UI sin haber perdido ninguna pista real
+        actualizarInterfazDePistas(listaAudiosFinal, listaSubtitulosFinal)
+    }
+
+    private fun actualizarInterfazDePistas(audios: List<PistaAudio>, subtitulos: List<PistaSubtitulo>) {
+        this.pistasAudioDisponibles = audios
+        this.pistasSubtulosDisponibles = subtitulos
+
+        Log.d("PlayerTracks", "Audios: ${audios.size}, Subtítulos: ${subtitulos.size}")
+
+        runOnUiThread {
+            val btnAudioSub = findViewById<ImageButton>(R.id.btn_audio_sub)
+
+            // El botón se deshabilita si solo hay 1 audio (o menos) y no hay subtítulos
+            val tieneOpcionesDeCambio = audios.size > 1 || subtitulos.isNotEmpty()
+            btnAudioSub?.isEnabled = tieneOpcionesDeCambio
+
+            // Opcional: Cambia la opacidad del botón para indicar visualmente si está deshabilitado
+            btnAudioSub?.alpha = if (tieneOpcionesDeCambio) 1.0f else 0.3f
+        }
+    }
+
+    private fun mostrarDialogoOpcionesPistas() {
+        val builder = android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+        val vistaDialogo = layoutInflater.inflate(R.layout.dialog_track_selector, null)
+        builder.setView(vistaDialogo)
+
+        val alerta = builder.create()
+        alerta.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        val contenedorAudio = vistaDialogo.findViewById<LinearLayout>(R.id.contenedor_audio)
+        val contenedorSubtitulos = vistaDialogo.findViewById<LinearLayout>(R.id.contenedor_subtitulos)
+
+        fun renderizarPistas() {
+            contenedorAudio?.removeAllViews()
+            contenedorSubtitulos?.removeAllViews()
+
+            // 1. RENDERIZAR AUDIOS
+            pistasAudioDisponibles.forEach { pista ->
+                val textView = TextView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { setMargins(0, 2, 0, 2) }
+
+                    if (pista.estaSeleccionada) {
+                        text = "➤  ${pista.nombre}"
+                        setTextColor(android.graphics.Color.parseColor("#C5A059"))
+                    } else {
+                        text = "    ${pista.nombre}"
+                        setTextColor(android.graphics.Color.parseColor("#FFFFFF"))
+                    }
+
+                    textSize = 13f
+                    setPadding(6, 6, 6, 6)
+                    isFocusable = true
+                    isClickable = true
+
+                    setOnFocusChangeListener { _, hasFocus ->
+                        if (hasFocus) {
+                            setBackgroundColor(android.graphics.Color.parseColor("#2C2214"))
+                            if (!pista.estaSeleccionada) setTextColor(android.graphics.Color.parseColor("#C5A059"))
+                        } else {
+                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                            if (!pista.estaSeleccionada) setTextColor(android.graphics.Color.parseColor("#FFFFFF"))
+                        }
+                    }
+
+                    setOnClickListener {
+                        seleccionarPistaAudio(pista)
+                        pistasAudioDisponibles = pistasAudioDisponibles.map {
+                            it.copy(estaSeleccionada = (it.indexGrupo == pista.indexGrupo && it.indexPista == pista.indexPista))
+                        }
+                        renderizarPistas()
+                    }
+                }
+                contenedorAudio?.addView(textView)
+            }
+
+            // LÓGICA DE SUBTÍTULOS DESACTIVADOS POR DEFECTO
+            val subtitulosDeshabilitadosSistema = player?.trackSelectionParameters?.disabledTrackTypes?.contains(
+                androidx.media3.common.C.TRACK_TYPE_TEXT
+            ) == true
+
+            val ningunaPistaActiva = pistasSubtulosDisponibles.none { it.estaSeleccionada }
+            val subtitulosEstanApagados = subtitulosDeshabilitadosSistema || ningunaPistaActiva
+
+            // Botón Desactivar Subtítulos
+            val textDesactivar = TextView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(0, 2, 0, 2) }
+
+                if (subtitulosEstanApagados) {
+                    text = "➤  Desactivar Subtítulos"
+                    setTextColor(android.graphics.Color.parseColor("#C5A059"))
+                } else {
+                    text = "    Desactivar Subtítulos"
+                    setTextColor(android.graphics.Color.parseColor("#FFFFFF"))
+                }
+
+                textSize = 13f
+                setPadding(6, 6, 6, 6)
+                isFocusable = true
+                isClickable = true
+
+                setOnFocusChangeListener { _, hasFocus ->
+                    if (hasFocus) {
+                        setBackgroundColor(android.graphics.Color.parseColor("#2C2214"))
+                        if (!subtitulosEstanApagados) setTextColor(android.graphics.Color.parseColor("#C5A059"))
+                    } else {
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        if (!subtitulosEstanApagados) setTextColor(android.graphics.Color.parseColor("#FFFFFF"))
+                    }
+                }
+
+                setOnClickListener {
+                    desactivarSubtitulos()
+                    pistasSubtulosDisponibles = pistasSubtulosDisponibles.map { it.copy(estaSeleccionada = false) }
+                    renderizarPistas()
+                }
+            }
+            contenedorSubtitulos?.addView(textDesactivar)
+
+            // Lista de subtítulos disponibles
+            pistasSubtulosDisponibles.forEach { pista ->
+                val textView = TextView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { setMargins(0, 2, 0, 2) }
+
+                    val mostrarFlechaActiva = pista.estaSeleccionada && !subtitulosEstanApagados
+
+                    if (mostrarFlechaActiva) {
+                        text = "➤  ${pista.nombre}"
+                        setTextColor(android.graphics.Color.parseColor("#C5A059"))
+                    } else {
+                        text = "    ${pista.nombre}"
+                        setTextColor(android.graphics.Color.parseColor("#FFFFFF"))
+                    }
+
+                    textSize = 13f
+                    setPadding(6, 6, 6, 6)
+                    isFocusable = true
+                    isClickable = true
+
+                    setOnFocusChangeListener { _, hasFocus ->
+                        if (hasFocus) {
+                            setBackgroundColor(android.graphics.Color.parseColor("#2C2214"))
+                            if (!mostrarFlechaActiva) setTextColor(android.graphics.Color.parseColor("#C5A059"))
+                        } else {
+                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                            if (!mostrarFlechaActiva) setTextColor(android.graphics.Color.parseColor("#FFFFFF"))
+                        }
+                    }
+
+                    setOnClickListener {
+                        seleccionarPistaSubtitulo(pista)
+                        pistasSubtulosDisponibles = pistasSubtulosDisponibles.map {
+                            it.copy(estaSeleccionada = (it.indexGrupo == pista.indexGrupo && it.indexPista == pista.indexPista))
+                        }
+                        renderizarPistas()
+                    }
+                }
+                contenedorSubtitulos?.addView(textView)
+            }
+        }
+
+        renderizarPistas()
+        alerta.show()
+    }
+    private fun obtenerNombreCompletoIdioma(codigo: String): String {
+        if (codigo.isEmpty() || codigo == "und") return "Desconocido"
+        return try {
+            val locale = java.util.Locale(codigo)
+            // Forzamos a que el nombre del idioma siempre se devuelva en español
+            val nombre = locale.getDisplayLanguage(java.util.Locale("es"))
+            // Capitalizamos la primera letra (ej: "español" -> "Español")
+            nombre.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
+        } catch (e: Exception) {
+            codigo.uppercase()
+        }
+    }
+
+      fun seleccionarPistaAudio(pista: PistaAudio) {
+        val reproductorActivo = player ?: return
+
+        reproductorActivo.trackSelectionParameters = reproductorActivo.trackSelectionParameters
+            .buildUpon()
+            .clearOverridesOfType(androidx.media3.common.C.TRACK_TYPE_AUDIO)
+            .addOverride(
+                androidx.media3.common.TrackSelectionOverride(
+                    pista.trackGroup.mediaTrackGroup,
+                    pista.indexPista
+                )
+            )
+            .build()
+    }
+
+    fun seleccionarPistaSubtitulo(pista: PistaSubtitulo) {
+        val reproductorActivo = player ?: return
+
+        reproductorActivo.trackSelectionParameters = reproductorActivo.trackSelectionParameters
+            .buildUpon()
+            .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, false)
+            .clearOverridesOfType(androidx.media3.common.C.TRACK_TYPE_TEXT)
+            .addOverride(
+                androidx.media3.common.TrackSelectionOverride(
+                    pista.trackGroup.mediaTrackGroup,
+                    pista.indexPista
+                )
+            )
+            .build()
+    }
+
+    fun desactivarSubtitulos() {
+        val reproductorActivo = player ?: return
+
+        reproductorActivo.trackSelectionParameters = reproductorActivo.trackSelectionParameters
+            .buildUpon()
+            .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true)
+            .build()
     }
 //    @OptIn(UnstableApi::class)
 //    private fun prepararReproductor(posicionInicial: Long) {

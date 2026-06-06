@@ -78,3 +78,21 @@ data class Modelo(
         val countdownMinutes: Int
     )
 }
+
+data class PistaAudio(
+    val indexGrupo: Int,
+    val indexPista: Int,
+    val nombre: String,
+    val idioma: String,
+    val estaSeleccionada: Boolean,
+    val trackGroup: androidx.media3.common.Tracks.Group
+)
+
+data class PistaSubtitulo(
+    val indexGrupo: Int,
+    val indexPista: Int,
+    val nombre: String,
+    val idioma: String,
+    val estaSeleccionada: Boolean,
+    val trackGroup: androidx.media3.common.Tracks.Group
+)

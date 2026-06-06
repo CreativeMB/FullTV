@@ -213,6 +213,17 @@
                         android:focusable="true"
                         android:focusableInTouchMode="true" />
                     <ImageButton
+                        android:id="@+id/btn_audio_sub"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="10dp"
+                        android:background="@drawable/card_focused_background"
+                        android:scaleType="fitCenter"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:src="@drawable/sub"
+                        android:contentDescription="Audio y Subtítulos" />
+                    <ImageButton
                         android:id="@+id/play_pause"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
