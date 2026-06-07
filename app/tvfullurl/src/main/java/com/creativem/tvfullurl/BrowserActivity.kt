@@ -101,9 +101,7 @@ class BrowserActivity : AppCompatActivity() {
     private var exoPlayer: androidx.media3.exoplayer.ExoPlayer? = null
     private val capturedLinksList = LinkedHashSet<CapturedLink>()
     private var captureDialog: AlertDialog? = null
-
     private var btnFloatingCapture: View? = null
-
     private var popupContainer: FrameLayout? = null
     private var popupWebView: WebView? = null
     private var isPopupMinimized = false
