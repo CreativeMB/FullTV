@@ -36,7 +36,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
-import android.view.inputmethod.EditorInfo
+import android.widget.AbsListView
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageView
@@ -47,7 +47,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
@@ -58,7 +57,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.BannerPromosAdapter
-//import com.creativem.fulltv.BuildConfig
 import com.creativem.fulltv.R
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.api.MovieDetailResponse
@@ -114,16 +112,16 @@ class PeliculasActivity : AppCompatActivity() {
     private lateinit var binding: ActivityPeliculasBinding
     private lateinit var movieAdapter: MoviesAdapter
     private val modeloList = mutableListOf<Modelo>()
-    private var esModoGratis = false // Para saber si estamos filtrando por validación o no
-    // --- Firebase & Listeners ---
+    private var esModoGratis = false
+
     private val auth by lazy { FirebaseAuth.getInstance() }
     private val databaseRef: DatabaseReference = FirebaseDatabase.getInstance().reference
     private var peliculasListener: ValueEventListener? = null
     private var userStatusListener: ValueEventListener? = null
     private var downloadId: Long = -1
-    // --- Estado y Control ---
+
     private var haProcesadoEliminacion = false
-    private var isRotationRunning = false // Candado para evitar saltos locos al mover el control
+    private var isRotationRunning = false
     private var publicidadDialog: Dialog? = null
     private var lastFocusedMovie: View? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -138,14 +136,11 @@ class PeliculasActivity : AppCompatActivity() {
     private val peliculasPromoList = mutableListOf<Modelo>()
     private var currentPromoIndex = 0
 
-    // Handler y Runnable para detectar inactividad del usuario y retomar la rotación
     private var isUserInteractingWithPromo = false
     private val inactivityHandler = Handler(Looper.getMainLooper())
 
-    // 🟢 ASÍ SE DECLARA PARA EVITAR EL ERROR "Val cannot be reassigned"
     private val inactivityRunnable = Runnable {
         isUserInteractingWithPromo = false
-
     }
 
     private val onDownloadComplete = object : BroadcastReceiver() {
@@ -172,13 +167,13 @@ class PeliculasActivity : AppCompatActivity() {
             }
         }
     }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_FullTV_tv)
         overridePendingTransition(0, 0)
         super.onCreate(savedInstanceState)
         window.setBackgroundDrawableResource(android.R.color.black)
 
-        // 2. CONFIGURACIÓN VISUAL PARA TV (Pantalla Completa e Inmersiva)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setFlags(
@@ -189,28 +184,21 @@ class PeliculasActivity : AppCompatActivity() {
         binding = ActivityPeliculasBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 3. CARGA DE DATOS DESDE LA RAM (Rápido y Seguro)
         val peliculasYaCargadas = Validacioneslista.obtenerPeliculasValidas()
         if (peliculasYaCargadas.isNotEmpty()) {
             modeloList.clear()
             modeloList.addAll(peliculasYaCargadas)
         }
 
-        // 4. INICIALIZACIÓN DE COMPONENTES UI
         setupMenuHorizontal()
         setupMovieGrid()
 
-        // --- NOTA: HEMOS ELIMINADO EL BLOQUE SplashActivity.instance?.finish() ---
-        // Al usar las FLAGS en el Login, esto ya no es necesario y evita el CRASH.
-
-        // 5. GESTIÓN DE FOCO (Crucial para el control remoto de TV)
         binding.root.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
             if (newFocus != null && isViewDescendantOf(newFocus, binding.rvPeliculas)) {
                 lastFocusedMovie = newFocus
             }
         }
 
-        // 6. LISTENERS Y SEGURIDAD (En segundo plano)
         onBackPressedDispatcher.addCallback(this) {
             mostrarConfirmacionSalida()
         }
@@ -219,25 +207,20 @@ class PeliculasActivity : AppCompatActivity() {
         iniciarVerificacionDeEstadoDeCuenta()
         obtenerNoticiaYActualizaciones()
 
-        // 7. REGISTRO DE USUARIO (Si aplica)
         val currentUser = auth.currentUser
         if (currentUser != null && !currentUser.email.isNullOrBlank()) {
-            // Verificamos si es el invitado para poner el nombre manual
             val nombreAMostrar = if (currentUser.email == "invitado@fulltv.com") {
                 "Estas En Invitado"
             } else {
                 currentUser.displayName ?: "Usuario"
             }
-
             CastvHelper.nuevosusuarios(this, nombreAMostrar, currentUser.email!!)
         }
         escucharSaldoUsuario()
 
         configurarAnimacionDelBanner()
-        // 🟢 Ejecutamos la carga del banner de Netflix
         cargarBannerPromocional()
 
-// Configurar cliente Retrofit para TMDB dentro de onCreate de PeliculasActivity
         val client = OkHttpClient.Builder().hostnameVerifier { _, _ -> true }.build()
         val retrofit = Retrofit.Builder()
             .baseUrl("https://api.themoviedb.org/3/")
@@ -245,7 +228,6 @@ class PeliculasActivity : AppCompatActivity() {
             .client(client)
             .build()
         apiService = retrofit.create(TMDbApiService::class.java)
-
     }
 
     private fun configurarAnimacionDelBanner() {
@@ -258,25 +240,21 @@ class PeliculasActivity : AppCompatActivity() {
             val focoEnGuiones = rvBannerPromos?.findContainingItemView(newFocus) != null || newFocus == rvBannerPromos
 
             if (focoEnPeliculas) {
-                // Caso 1: Bajó a las películas → Ocultar banner y DETENER rotación
                 if (layoutBannerNetflix?.visibility == View.VISIBLE) {
                     layoutBannerNetflix.visibility = View.GONE
-                    detenerRotacionAutomatica() // ⭐ Cancela el job
+                    detenerRotacionAutomatica()
                 }
             } else {
-                // Caso 2: El foco está en la zona superior
                 if (layoutBannerNetflix?.visibility == View.GONE && peliculasPromoList.isNotEmpty()) {
                     layoutBannerNetflix.visibility = View.VISIBLE
                 }
 
                 if (focoEnGuiones) {
-                    // ⭐ CLAVE: Si el foco ESTÁ en los guiones, DETENER la rotación completamente
                     detenerRotacionAutomatica()
-                    isUserInteractingWithPromo = true // Por seguridad
+                    isUserInteractingWithPromo = true
                 } else {
-                    // ⭐ Si el foco SALIÓ de los guiones (hacia el menú), REANUDAR la rotación
                     isUserInteractingWithPromo = false
-                    iniciarRotacionAutomaticaDesde() // Reinicia desde la posición actual
+                    iniciarRotacionAutomaticaDesde()
                 }
             }
         }
@@ -286,7 +264,6 @@ class PeliculasActivity : AppCompatActivity() {
         val bannerContainer = findViewById<View>(R.id.layoutBannerNetflix)
         val rvBannerPromos = findViewById<RecyclerView>(R.id.rvBannerPromos)
 
-        // Ocultar el contenedor inmediatamente al iniciar la carga para prevenir el parpadeo
         bannerContainer.visibility = View.GONE
 
         databaseRef.child("movies").get().addOnSuccessListener { snapshot ->
@@ -312,20 +289,15 @@ class PeliculasActivity : AppCompatActivity() {
                 }
 
                 if (peliculasPromoList.isNotEmpty()) {
-                    // Seleccionar índice aleatorio al inicio
                     val indiceInicialAleatorio = (0 until peliculasPromoList.size).random()
                     val peliculaInicial = peliculasPromoList[indiceInicialAleatorio]
 
                     currentPromoIndex = indiceInicialAleatorio
                     isUserInteractingWithPromo = false
 
-                    // Pre-cargar los datos en el banner antes de hacerlo visible
                     mostrarDatosPeliculaEnBanner(peliculaInicial)
-
-                    // Una vez cargados los datos, se hace visible el contenedor
                     bannerContainer.visibility = View.VISIBLE
 
-                    // Configurar RecyclerView
                     rvBannerPromos.layoutManager = LinearLayoutManager(
                         this,
                         LinearLayoutManager.HORIZONTAL,
@@ -362,9 +334,7 @@ class PeliculasActivity : AppCompatActivity() {
                     }
 
                     iniciarRotacionAutomaticaDesde(indiceInicialAleatorio)
-
                 } else {
-                    // Si la lista está vacía, nos aseguramos de que siga oculto
                     bannerContainer.visibility = View.GONE
                 }
             } else {
@@ -374,10 +344,9 @@ class PeliculasActivity : AppCompatActivity() {
             bannerContainer.visibility = View.GONE
         }
     }
-    private fun iniciarRotacionAutomaticaDesde(inicio: Int = currentPromoIndex) {
-        detenerRotacionAutomatica() // Cancela cualquier job previo
 
-        // ⭐ Si no hay promos, no tiene sentido iniciar
+    private fun iniciarRotacionAutomaticaDesde(inicio: Int = currentPromoIndex) {
+        detenerRotacionAutomatica()
         if (peliculasPromoList.isEmpty()) return
 
         jobRotacion = lifecycleScope.launch {
@@ -386,7 +355,6 @@ class PeliculasActivity : AppCompatActivity() {
             while (isActive) {
                 delay(6000)
 
-                // Doble verificación: flag + lista no vacía
                 if (!isUserInteractingWithPromo && peliculasPromoList.isNotEmpty()) {
                     indiceActual = (indiceActual + 1) % peliculasPromoList.size
                     currentPromoIndex = indiceActual
@@ -407,25 +375,19 @@ class PeliculasActivity : AppCompatActivity() {
             }
         }
     }
+
     private fun detenerRotacionAutomatica() {
         isRotationRunning = false
-
-        // ⭐ CLAVE: Cancelar el Job de la corrutina
         jobRotacion?.cancel()
         jobRotacion = null
 
-        // Limpiar el handler legacy (por si acaso)
         promoRotationRunnable?.let {
             promoRotationHandler.removeCallbacks(it)
         }
-
-        // También limpiar el runnable de inactividad
         inactivityHandler.removeCallbacks(inactivityRunnable)
     }
 
     private fun registrarActividadUsuario() {
-        // Solo detenemos la rotación cuando el usuario interactúa
-        // La reanudación la maneja configurarAnimacionDelBanner() al detectar que salió el foco
         isUserInteractingWithPromo = true
         detenerRotacionAutomatica()
     }
@@ -442,16 +404,13 @@ class PeliculasActivity : AppCompatActivity() {
 
         if (isFinishing || isDestroyed) return
 
-        // ⭐ CLAVE: Si es la primera vez, NO hacemos fade-out (evita el "vacío")
         if (primeraCargaBanner) {
             primeraCargaBanner = false
-            // Cargamos los datos DIRECTAMENTE sin animación
             cargarDatosEnBanner(
                 movie, tvTitulo, tvSinopsis, tvCalificacion,
                 tvBannerInfoAdicional, tvContador, ivBackdrop, ivPoster, layoutInfo
             )
         } else {
-            // Las siguientes veces sí usamos la animación bonita de fade
             layoutInfo.animate().alpha(0f).setDuration(400).withEndAction {
                 if (isFinishing || isDestroyed) return@withEndAction
                 cargarDatosEnBanner(
@@ -462,10 +421,6 @@ class PeliculasActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Función auxiliar que contiene toda la lógica de carga de datos
-     * (La sacamos del withEndAction para reutilizarla)
-     */
     private fun cargarDatosEnBanner(
         movie: Modelo,
         tvTitulo: TextView,
@@ -477,20 +432,17 @@ class PeliculasActivity : AppCompatActivity() {
         ivPoster: ImageView,
         layoutInfo: LinearLayout
     ) {
-        // Datos básicos inmediatos
         tvTitulo.text = movie.title
         tvSinopsis.text = movie.overview.ifBlank { "Estreno exclusivo." }
         tvCalificacion.text = "⭐ 8.5"
         tvBannerInfoAdicional.text = movie.genres.ifBlank { "Acción • Aventura • Cine" }
 
-        // ⭐ IMPORTANTE: Si es primera carga, mostramos el layout YA (sin esperar animación)
         if (layoutInfo.alpha == 0f) {
             layoutInfo.alpha = 1f
         } else {
             layoutInfo.animate().alpha(1f).setDuration(500).start()
         }
 
-        // Cargar imágenes con Glide (con placeholder para evitar "flash blanco")
         val queryBusqueda = movie.originalTitle.ifBlank { movie.title }
         apiService.searchMovie(apiKey, "es-MX", queryBusqueda).enqueue(object : retrofit2.Callback<MovieResponse> {
             override fun onResponse(call: retrofit2.Call<MovieResponse>, response: retrofit2.Response<MovieResponse>) {
@@ -541,7 +493,6 @@ class PeliculasActivity : AppCompatActivity() {
             }
         })
 
-        // Contador
         val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
         val createdAtMillis = if (movie.createdAt > 0 && movie.createdAt < 1000000000000L) movie.createdAt * 1000 else movie.createdAt
         val elapsed = System.currentTimeMillis() - createdAtMillis
@@ -549,13 +500,13 @@ class PeliculasActivity : AppCompatActivity() {
     }
 
     private fun cargarImagenSuave(url: String, imageView: ImageView) {
-            if (isFinishing || isDestroyed) return
-            Glide.with(this)
-                .load(url)
-                .placeholder(imageView.drawable) // ⭐ Mantiene la imagen anterior mientras carga la nueva
-                .dontAnimate() // ⭐ Evita el fade de Glide que causa "parpadeo"
-                .into(imageView)
-        }
+        if (isFinishing || isDestroyed) return
+        Glide.with(this)
+            .load(url)
+            .placeholder(imageView.drawable)
+            .dontAnimate()
+            .into(imageView)
+    }
 
     private fun iniciarContadorBanner(textView: TextView, remainingTime: Long) {
         bannerTimer?.cancel()
@@ -581,18 +532,13 @@ class PeliculasActivity : AppCompatActivity() {
         userRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
-                    // 1. Obtenemos el valor del saldo
                     val saldo = snapshot.child("castv").value?.toString() ?: "0"
-
-                    // 2. CONSTRUIR TEXTO: 🪙 CasTV: [VALOR]
-                    // Usamos el emoji directamente en el string
                     val emoji = "🪙 "
                     val etiqueta = "CasTV: "
                     val textoCompleto = "$emoji$etiqueta$saldo"
 
                     val spannable = SpannableStringBuilder(textoCompleto)
 
-                    // Color Blanco para la palabra "CasTV: "
                     spannable.setSpan(
                         ForegroundColorSpan(Color.WHITE),
                         emoji.length,
@@ -600,7 +546,6 @@ class PeliculasActivity : AppCompatActivity() {
                         Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                     )
 
-                    // Color Dorado (#C5A059) para el número del saldo
                     spannable.setSpan(
                         ForegroundColorSpan(Color.parseColor("#C5A059")),
                         emoji.length + etiqueta.length,
@@ -608,10 +553,8 @@ class PeliculasActivity : AppCompatActivity() {
                         Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                     )
 
-                    // Aplicamos todo al TextView
                     binding.tvSaldoValue.text = spannable
 
-                    // 3. ANIMACIÓN DE "LATIDO" (Feedback visual al cambiar saldo)
                     binding.layoutSaldo.animate()
                         .scaleX(1.1f)
                         .scaleY(1.1f)
@@ -631,7 +574,7 @@ class PeliculasActivity : AppCompatActivity() {
             }
         })
     }
-    // Función auxiliar para saber si una vista está dentro del RecyclerView
+
     private fun isViewDescendantOf(view: View, parent: ViewGroup): Boolean {
         var current = view.parent
         while (current != null) {
@@ -641,9 +584,6 @@ class PeliculasActivity : AppCompatActivity() {
         return false
     }
 
-    // ==========================================
-    // 1. CONFIGURACIÓN DE UI
-    // ==========================================
     private fun setupMenuHorizontal() {
         val menuItems = listOf(
             "Perfil", "Activar", "Alquila", "Buscar",
@@ -655,15 +595,13 @@ class PeliculasActivity : AppCompatActivity() {
             R.drawable.activacion, R.drawable.tv, R.drawable.cerrrarp
         )
 
-
-        // Asegúrate de usar los R.drawable correspondientes (aquí puse IDs de ejemplo)
         val menuList = menuItems.mapIndexed { i, name ->
             MenuPrincipalItem(name, menuIcons[i])
         }
 
         val adapter = MenuPrincipalAdapter(menuList) { item ->
             when (item.name) {
-                "Activar" -> navegarGratis() // En esta pantalla, Inicio y Gratis suelen ser lo mismo
+                "Activar" -> navegarGratis()
                 "Buscar" -> buscarPeliculaDialogo()
                 "Pedir" -> mostrarDialogoPedido()
                 "Paquete" -> activarpaquete()
@@ -672,7 +610,6 @@ class PeliculasActivity : AppCompatActivity() {
                     val intent = Intent(this, Perfil::class.java)
                     startActivity(intent)
                 }
-
                 "TV" -> navegarATv()
                 "Cerrar" -> cerrarSesion()
                 else -> Toast.makeText(this, "${item.name} seleccionado", Toast.LENGTH_SHORT).show()
@@ -684,26 +621,22 @@ class PeliculasActivity : AppCompatActivity() {
         binding.menuPrincipal.adapter = adapter
         binding.menuPrincipal.isFocusable = true
     }
-      // 2. Funciones de Navegación corregidas para Actividades
+
     fun navegarGratis() {
-        // Aquí abres la actividad de peliculas validas/gratis
         val intent = Intent(this, PeliculasValidasActivity::class.java)
         startActivity(intent)
     }
 
     fun navegarATv() {
-
         val intent = Intent(this, TvActivity::class.java)
         startActivity(intent)
     }
 
     fun navegarAPeliculasApi() {
-
         val intent = Intent(this, PeliculasApiActivity::class.java)
         startActivity(intent)
     }
 
-    // 3. Configuración de la Grilla Adaptable
     private fun setupMovieGrid() {
         val columnas = ViewUtils.calcularColumnas(this)
 
@@ -715,8 +648,6 @@ class PeliculasActivity : AppCompatActivity() {
         binding.rvPeliculas.layoutManager = layoutManager
         binding.rvPeliculas.setHasFixedSize(true)
         binding.rvPeliculas.itemAnimator = null
-
-        // 🟢 OBLIGATORIO: Desactivar scroll interno para funcionar en sincronía con el NestedScrollView
         binding.rvPeliculas.isNestedScrollingEnabled = false
 
         movieAdapter = MoviesAdapter(
@@ -724,25 +655,8 @@ class PeliculasActivity : AppCompatActivity() {
             onItemClick = { movie -> irAlReproductor(movie) },
             onFocusChange = { movie -> (movie.imageUrl) }
         )
-
         binding.rvPeliculas.adapter = movieAdapter
     }
-//    private fun actualizarImagenDeFondo(url: String?) {
-//        if (!url.isNullOrEmpty()) {
-//            Glide.with(this)
-//                .load(url)
-//                .centerCrop() // Asegura que llene toda la pantalla
-//                .error(R.drawable.pelifondo) // Imagen por defecto si falla
-//                .into(binding.imgFondo)
-//
-//            // Opcional: ajustar la transparencia si se ve muy fuerte
-//            binding.imgFondo.alpha = 0.3f
-//        }
-//    }
-
-    // ==========================================
-    // 2. SEGURIDAD: CUENTA ELIMINADA
-    // ==========================================
 
     private fun iniciarVerificacionDeEstadoDeCuenta() {
         val email = auth.currentUser?.email ?: return
@@ -754,29 +668,20 @@ class PeliculasActivity : AppCompatActivity() {
         userStatusListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (haProcesadoEliminacion) return
-
-
             }
             override fun onCancelled(error: DatabaseError) {}
         }
         userRef.addValueEventListener(userStatusListener!!)
     }
 
-
-    // ==========================================
-    // 3. ACTUALIZACIONES
-    // ==========================================
-
     private fun obtenerNoticiaYActualizaciones() {
         val versionLocal = BuildConfig.VERSION_NAME
-        // Apuntamos al nodo noticia en Realtime Database
         val ref = FirebaseDatabase.getInstance().getReference("noticia").child("us4vaaf0VPezu9vuc4ns")
 
         ref.addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
                     val versionRemota = snapshot.child("versionapk").getValue(String::class.java) ?: ""
-
                     if (versionRemota.isNotEmpty() && esNuevaVersion(versionRemota, versionLocal)) {
                         mostrarAlertaActualizacion(versionRemota)
                     }
@@ -800,17 +705,14 @@ class PeliculasActivity : AppCompatActivity() {
     }
 
     private fun mostrarAlertaActualizacion(version: String) {
-
         val colorDorado = Color.parseColor("#C5A059")
         val colorFondo = Color.parseColor("#0A122A")
         val fondoBoton = Color.parseColor("#1A1A1A")
 
-        // Crear diálogo base
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setCancelable(false)
 
-        // Contenedor principal
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(50, 40, 50, 40)
@@ -820,7 +722,6 @@ class PeliculasActivity : AppCompatActivity() {
             }
         }
 
-        // TÍTULO
         val titulo = TextView(this).apply {
             text = "🚀 Nueva Versión $version"
             setTextColor(colorDorado)
@@ -829,7 +730,6 @@ class PeliculasActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
         }
 
-        // MENSAJE
         val mensaje = TextView(this).apply {
             text = "Hemos mejorado CineParche para ti. Actualiza ahora para disfrutar de la mejor experiencia."
             setTextColor(Color.WHITE)
@@ -838,13 +738,11 @@ class PeliculasActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
         }
 
-        // Contenedor de botones
         val botones = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
 
-        // Función para crear fondo
         fun fondo(color: Int): GradientDrawable {
             return GradientDrawable().apply {
                 setColor(color)
@@ -852,7 +750,6 @@ class PeliculasActivity : AppCompatActivity() {
             }
         }
 
-        // BOTÓN ACTUALIZAR
         val btnActualizar = TextView(this).apply {
             text = "ACTUALIZAR"
             setTextColor(Color.WHITE)
@@ -871,7 +768,6 @@ class PeliculasActivity : AppCompatActivity() {
             }
         }
 
-        // BOTÓN LUEGO
         val btnLuego = TextView(this).apply {
             text = "LUEGO"
             setTextColor(Color.LTGRAY)
@@ -888,7 +784,6 @@ class PeliculasActivity : AppCompatActivity() {
             }
         }
 
-        // Layout params para separar botones
         val params = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -899,7 +794,6 @@ class PeliculasActivity : AppCompatActivity() {
         btnActualizar.layoutParams = params
         btnLuego.layoutParams = params
 
-        // --- EFECTO FOCO (clave para TV) ---
         fun aplicarFoco(view: TextView, colorTextoNormal: Int) {
             view.setOnFocusChangeListener { v, hasFocus ->
                 if (hasFocus) {
@@ -921,7 +815,6 @@ class PeliculasActivity : AppCompatActivity() {
         aplicarFoco(btnActualizar, Color.WHITE)
         aplicarFoco(btnLuego, Color.LTGRAY)
 
-        // Agregar vistas
         botones.addView(btnActualizar)
         botones.addView(btnLuego)
 
@@ -930,18 +823,14 @@ class PeliculasActivity : AppCompatActivity() {
         container.addView(botones)
 
         dialog.setContentView(container)
-
-        // Fondo transparente del diálogo (para bordes redondeados)
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-
         dialog.show()
 
-        // Foco inicial (muy importante en TV)
         btnActualizar.requestFocus()
     }
+
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private fun descargarAPK(version: String) {
-        // Colores de identidad CineParche
         val colorDorado = Color.parseColor("#C5A059")
         val colorFondo = Color.parseColor("#0A122A")
 
@@ -949,19 +838,17 @@ class PeliculasActivity : AppCompatActivity() {
         val file = File(getExternalFilesDir(null), "CineParcheApp-debug.apk")
         if (file.exists()) file.delete()
 
-        // --- DISEÑO PROFESIONAL CINEPARCHE ---
         val progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             isIndeterminate = false
             max = 100
             progress = 0
-            // Cambiamos el tinte de la barra de Rojo a Dorado
             progressTintList = ColorStateList.valueOf(colorDorado)
             progressBackgroundTintList = ColorStateList.valueOf(Color.GRAY)
         }
 
         val textoProgreso = TextView(this).apply {
             text = "Iniciando descarga segura..."
-            setTextColor(Color.WHITE) // Blanco para legibilidad sobre azul
+            setTextColor(Color.WHITE)
             textSize = 16f
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(0, 30, 0, 0)
@@ -970,12 +857,11 @@ class PeliculasActivity : AppCompatActivity() {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(60, 60, 60, 60)
-            setBackgroundColor(colorFondo) // Fondo azul noche
+            setBackgroundColor(colorFondo)
             addView(progressBar)
             addView(textoProgreso)
         }
 
-        // Título con estilo dorado
         val title = SpannableString("📥 Actualizando CineParche v$version")
         title.setSpan(ForegroundColorSpan(colorDorado), 0, title.length, 0)
         title.setSpan(StyleSpan(Typeface.BOLD), 0, title.length, 0)
@@ -993,8 +879,6 @@ class PeliculasActivity : AppCompatActivity() {
             .create()
 
         progressDialog?.show()
-
-        // Eliminamos bordes del sistema
         progressDialog?.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
 
         val request = DownloadManager.Request(Uri.parse(url))
@@ -1020,7 +904,6 @@ class PeliculasActivity : AppCompatActivity() {
                         val progress = ((downloaded * 100) / total).toInt()
                         progressBar.progress = progress
                         textoProgreso.text = "Descargando... $progress%"
-                        // El texto de porcentaje también puede resaltar en dorado
                         if (progress > 0) textoProgreso.setTextColor(colorDorado)
                     }
 
@@ -1060,7 +943,6 @@ class PeliculasActivity : AppCompatActivity() {
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             if (!packageManager.canRequestPackageInstalls()) {
-                // No tiene permiso, lo enviamos a configuración
                 startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
                 Toast.makeText(this, "Autoriza la instalación y vuelve a intentarlo", Toast.LENGTH_LONG).show()
                 return
@@ -1074,10 +956,6 @@ class PeliculasActivity : AppCompatActivity() {
         }
     }
 
-    // ==========================================
-    // 5. BUSCADOR TMDB
-    // ==========================================
-    // ==========================================
     private fun buscarPeliculaDialogo() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.buscador, null)
         val searchEditText = dialogView.findViewById<EditText>(R.id.search_edit_text)
@@ -1087,22 +965,81 @@ class PeliculasActivity : AppCompatActivity() {
         progressBar.visibility = View.GONE
 
         val filteredModeloList = mutableListOf<Modelo>()
-        val allFirebaseModelos = mutableListOf<Modelo>() // Cache local de Firebase
+        val allFirebaseModelos = mutableListOf<Modelo>()
 
-        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, mutableListOf<String>())
+        // 🟢 ADAPTADOR PERSONALIZADO: Crea filas horizontales con [Póster | Nombre] para la TV
+        // Casteamos la expresión completa a LinearLayout para que Kotlin reconozca sus métodos internos
+        val adapter = object : ArrayAdapter<Modelo>(this, 0, filteredModeloList) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val density = context.resources.displayMetrics.density
+                val dpToPx = { dp: Int -> (dp * density).toInt() }
+
+                val rowView = (convertView ?: LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(dpToPx(12), dpToPx(8), dpToPx(12), dpToPx(8))
+                    layoutParams = android.widget.AbsListView.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+                    isFocusable = false
+                    isFocusableInTouchMode = false
+
+                    // Vista de la portada
+                    val iv = ImageView(context).apply {
+                        layoutParams = LinearLayout.LayoutParams(dpToPx(45), dpToPx(68)).apply {
+                            rightMargin = dpToPx(12)
+                        }
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                    }
+
+                    // Vista del título de la película
+                    val tv = TextView(context).apply {
+                        setTextColor(Color.WHITE)
+                        textSize = 15f
+                        gravity = Gravity.CENTER_VERTICAL
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                    }
+                    addView(iv)
+                    addView(tv)
+                }) as LinearLayout
+
+                // Asignamos la información de la película en la posición correspondiente
+                val item = getItem(position)
+                if (item != null) {
+                    val ivPoster = rowView.getChildAt(0) as ImageView
+                    val tvTitle = rowView.getChildAt(1) as TextView
+
+                    tvTitle.text = item.title
+
+                    if (!item.imageUrl.isNullOrBlank()) {
+                        Glide.with(context)
+                            .load(item.imageUrl)
+                            .placeholder(R.drawable.cine)
+                            .into(ivPoster)
+                    } else {
+                        ivPoster.setImageResource(R.drawable.cine)
+                    }
+                }
+
+                return rowView
+            }
+        }
+
         searchResultsView.adapter = adapter
 
         val dialog = AlertDialog.Builder(this).setView(dialogView).create()
         dialog.show()
 
-        // --- FUNCIÓN PARA QUITAR TILDES Y MAYÚSCULAS ---
         fun String.normalizar(): String {
             val diacritics = Regex("\\p{InCombiningDiacriticalMarks}+")
             val temp = java.text.Normalizer.normalize(this, java.text.Normalizer.Form.NFD)
             return diacritics.replace(temp, "").lowercase()
         }
 
-        // 1. CARGAMOS TODOS LOS DATOS DE FIREBASE UNA SOLA VEZ AL ABRIR EL DIÁLOGO
+        // Cargamos los datos de Firebase una única vez en segundo plano
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val snapshot = FirebaseDatabase.getInstance().getReference("movies").get().await()
@@ -1132,13 +1069,10 @@ class PeliculasActivity : AppCompatActivity() {
 
                 searchJob?.cancel()
                 searchJob = CoroutineScope(Dispatchers.IO).launch {
-                    // --- A. FILTRADO EN FIREBASE (LOCAL) ---
-                    // Buscamos cualquier coincidencia en el título (infalible)
                     val firebaseMatches = allFirebaseModelos.filter {
                         it.title.normalizar().contains(queryNormalizada)
                     }.map { it.copy(title = "${it.title}") }
 
-                    // --- B. BÚSQUEDA EN API ---
                     val apiResults = try {
                         val response = TMDbApiClient.service.searchMovies(
                             apiKey = "678193d2c735c6f37840cee035f4d69a",
@@ -1148,9 +1082,12 @@ class PeliculasActivity : AppCompatActivity() {
 
                         if (response.isSuccessful) {
                             response.body()?.results?.map {
+                                // 🟢 CAMBIO: Extraemos la fecha completa (YYYY-MM-DD) sin recortar
+                                val fechaCompleta = it.release_date ?: "2026-01-01"
+
                                 Modelo(
                                     id = it.id.toString(),
-                                    title = "${it.title} (${it.release_date?.take(4) ?: "N/A"})",
+                                    title = "${it.title} ($fechaCompleta)", // 📅 Concatena la fecha completa
                                     originalTitle = it.original_title,
                                     imageUrl = "https://image.tmdb.org/t/p/w500${it.poster_path}",
                                     streamUrl = "https://tuservidor.com/stream/${it.id}",
@@ -1162,14 +1099,13 @@ class PeliculasActivity : AppCompatActivity() {
                         } else emptyList()
                     } catch (e: Exception) { emptyList() }
 
-                    // --- C. COMBINAR ---
                     val combined = firebaseMatches + apiResults
 
                     withContext(Dispatchers.Main) {
                         filteredModeloList.clear()
                         filteredModeloList.addAll(combined)
-                        adapter.clear()
-                        adapter.addAll(filteredModeloList.map { it.title })
+
+                        // Notificamos los cambios al adaptador para actualizar la lista de forma fluida
                         adapter.notifyDataSetChanged()
                     }
                 }
@@ -1184,92 +1120,405 @@ class PeliculasActivity : AppCompatActivity() {
             dialog.dismiss()
         }
     }
-
     // ==========================================
-    // 6. PEDIDOS Y CasTV
+    // 6. MEJORADO: PEDIDOS INTERACTIVOS (TMDB INTEGRADO)
     // ==========================================
+    private fun mostrarDialogoPedido(
+        prefilledTitle: String = "",
+        prefilledOriginalTitle: String = "",
+        prefilledImageUrl: String = "",
+        prefilledAnio: String = "",
+        prefilledSipnosis: String = "",
+        prefilledCalificacion: String = ""
+    ) {
+        val colorTextoLogo = Color.parseColor("#C5A059") // Dorado
+        val colorFondoPrincipal = Color.parseColor("#2A2A2A") // Fondo oscuro
+        val density = resources.displayMetrics.density
 
-    private fun mostrarDialogoPedido() {
-        // 🎨 Tus colores exactos
-        val colorTextoLogo = Color.parseColor("#C5A059") // El dorado
-        val colorFondoPrincipal = Color.parseColor("#2A2A2A") // El azul con transparencia
+        val dpToPx = { dp: Int -> (dp * density).toInt() }
 
-        // 1. Contenedor Principal
-        val layout = LinearLayout(this).apply {
+        // 🟢 CLAVE: Declaramos el diálogo al inicio para poder referenciarlo desde los listeners de clic
+        var dialog: AlertDialog? = null
+
+        val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(60, 50, 60, 50)
-            // Aplicamos tu color de fondo principal
+            setPadding(dpToPx(24), dpToPx(20), dpToPx(24), dpToPx(20))
             setBackgroundColor(colorFondoPrincipal)
         }
 
-        // 2. Título con el dorado del logo
+        val scrollView = ScrollView(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            addView(container)
+        }
+
         val titulo = TextView(this).apply {
             text = "SOLICITAR PELÍCULA"
-            textSize = 22f
+            textSize = 20f
             setTextColor(colorTextoLogo)
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
-            setPadding(0, 0, 0, 40)
+            setPadding(0, 0, 0, dpToPx(15))
         }
 
-        // 3. Campo de entrada (EditText)
         val input = EditText(this).apply {
-            hint = "Ej: Moana 2 (2024)"
-            setHintTextColor(Color.parseColor("#BDBDBD")) // Gris claro para que sea legible
+            hint = "Escribe para buscar (Ej: Moana 2)"
+            setHintTextColor(Color.parseColor("#BDBDBD"))
             setTextColor(Color.WHITE)
-            textSize = 18f
-            // La línea inferior del EditText en dorado
+            textSize = 16f
             background.setColorFilter(colorTextoLogo, PorterDuff.Mode.SRC_ATOP)
-            setPadding(10, 25, 10, 25)
+            setPadding(dpToPx(8), dpToPx(12), dpToPx(8), dpToPx(12))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
         }
 
-        layout.addView(titulo)
-        layout.addView(input)
+        val resultsContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dpToPx(8), 0, dpToPx(8))
+        }
 
-        // 4. Crear el diálogo
-        val dialog = AlertDialog.Builder(this)
-            .setView(layout)
+        val previewCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dpToPx(12), dpToPx(12), dpToPx(12), dpToPx(12))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(15)
+            }
+            background = GradientDrawable().apply {
+                cornerRadius = dpToPx(8).toFloat()
+                setColor(Color.parseColor("#1F1F1F"))
+                setStroke(2, colorTextoLogo)
+            }
+            visibility = View.GONE
+        }
+
+        val ivPoster = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dpToPx(90), dpToPx(135)).apply {
+                rightMargin = dpToPx(12)
+            }
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }
+
+        val infoPeliLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val tvTitlePreview = TextView(this).apply {
+            setTextColor(Color.WHITE)
+            textSize = 15f
+            setTypeface(null, Typeface.BOLD)
+        }
+
+        val tvRatingPreview = TextView(this).apply {
+            setTextColor(colorTextoLogo)
+            textSize = 13f
+            setPadding(0, dpToPx(4), 0, dpToPx(4))
+        }
+
+        val tvSipnosisPreview = TextView(this).apply {
+            setTextColor(Color.LTGRAY)
+            textSize = 12f
+            maxLines = 4
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+
+        infoPeliLayout.addView(tvTitlePreview)
+        infoPeliLayout.addView(tvRatingPreview)
+        infoPeliLayout.addView(tvSipnosisPreview)
+
+        previewCard.addView(ivPoster)
+        previewCard.addView(infoPeliLayout)
+
+        container.addView(titulo)
+        container.addView(input)
+        container.addView(resultsContainer)
+        container.addView(previewCard)
+
+        var selectedTitle = prefilledTitle
+        var selectedOriginalTitle = prefilledOriginalTitle
+        var selectedImageUrl = prefilledImageUrl
+        var selectedAnio = prefilledAnio
+        var selectedSipnosis = prefilledSipnosis
+        var selectedCalificacion = prefilledCalificacion
+
+        if (prefilledTitle.isNotEmpty()) {
+            input.setText(prefilledTitle)
+
+            if (prefilledSipnosis.isNotEmpty()) {
+                tvTitlePreview.text = prefilledTitle
+                tvRatingPreview.text = if (prefilledCalificacion == "N/A") "⭐ N/A   |   Personalizado" else "⭐ $prefilledCalificacion   |   $prefilledAnio"
+                tvSipnosisPreview.text = prefilledSipnosis
+
+                if (prefilledImageUrl.isNotEmpty()) {
+                    Glide.with(this)
+                        .load(prefilledImageUrl)
+                        .placeholder(R.drawable.cine)
+                        .into(ivPoster)
+                } else {
+                    ivPoster.setImageResource(R.drawable.cine)
+                }
+                previewCard.visibility = View.VISIBLE
+            }
+        }
+
+        input.setOnKeyListener { _, keyCode, event ->
+            if (event.action == android.view.KeyEvent.ACTION_DOWN && keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN) {
+                if (resultsContainer.childCount > 0) {
+                    resultsContainer.getChildAt(0).requestFocus()
+                    return@setOnKeyListener true
+                }
+            }
+            false
+        }
+
+        input.addTextChangedListener(object : TextWatcher {
+            private var searchJob: Job? = null
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val query = s.toString().trim()
+
+                if (query == selectedTitle) {
+                    return
+                }
+
+                if (selectedTitle.isNotEmpty() && query != selectedTitle) {
+                    selectedTitle = ""
+                    previewCard.visibility = View.GONE
+                }
+
+                if (query.length < 2) {
+                    resultsContainer.removeAllViews()
+                    return
+                }
+
+                searchJob?.cancel()
+                searchJob = lifecycleScope.launch {
+                    delay(400)
+                    try {
+                        val response = withContext(Dispatchers.IO) {
+                            TMDbApiClient.service.searchMovies(apiKey, "es-MX", query).execute()
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            resultsContainer.removeAllViews()
+
+                            if (response.isSuccessful) {
+                                val results = response.body()?.results ?: emptyList()
+                                for (movie in results) {
+                                    val itemTextView = TextView(this@PeliculasActivity).apply {
+                                        val fechaCompleta = movie.release_date ?: "2026-01-01"
+                                        text = "🎬 ${movie.title} ($fechaCompleta)"
+                                        setTextColor(Color.WHITE)
+                                        textSize = 14f
+                                        setPadding(dpToPx(10), dpToPx(12), dpToPx(10), dpToPx(12))
+                                        isFocusable = true
+                                        isFocusableInTouchMode = true
+
+                                        val normalBg = ColorDrawable(Color.TRANSPARENT)
+                                        val focusBg = GradientDrawable().apply {
+                                            setColor(Color.parseColor("#3A3A3A"))
+                                            cornerRadius = dpToPx(6).toFloat()
+                                            setStroke(dpToPx(2), colorTextoLogo)
+                                        }
+
+                                        setOnFocusChangeListener { _, hasFocus ->
+                                            background = if (hasFocus) focusBg else normalBg
+                                            setTypeface(null, if (hasFocus) Typeface.BOLD else Typeface.NORMAL)
+                                        }
+
+                                        setOnKeyListener { _, keyCode, keyEvent ->
+                                            if (keyEvent.action == android.view.KeyEvent.ACTION_DOWN && keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP) {
+                                                val index = resultsContainer.indexOfChild(this)
+                                                if (index == 0) {
+                                                    input.requestFocus()
+                                                    return@setOnKeyListener true
+                                                }
+                                            }
+                                            false
+                                        }
+
+                                        setOnClickListener {
+                                            val rawTitle = movie.title ?: ""
+                                            selectedAnio = movie.release_date ?: "2026-01-01"
+
+                                            selectedTitle = if (rawTitle.endsWith(")") && rawTitle.contains("(")) {
+                                                rawTitle
+                                            } else {
+                                                "$rawTitle ($selectedAnio)"
+                                            }
+
+                                            selectedOriginalTitle = movie.original_title ?: rawTitle
+                                            selectedImageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}"
+                                            selectedSipnosis = movie.overview ?: "Sin sinopsis disponible."
+                                            selectedCalificacion = if (movie.vote_average > 0.0) "${movie.vote_average}" else "N/A"
+
+                                            tvTitlePreview.text = selectedTitle
+                                            tvRatingPreview.text = "⭐ $selectedCalificacion   |   $selectedAnio"
+                                            tvSipnosisPreview.text = selectedSipnosis
+
+                                            Glide.with(this@PeliculasActivity)
+                                                .load(selectedImageUrl)
+                                                .placeholder(R.drawable.cine)
+                                                .into(ivPoster)
+
+                                            previewCard.visibility = View.VISIBLE
+                                            resultsContainer.removeAllViews()
+                                            input.setText(selectedTitle)
+                                            input.clearFocus()
+
+                                            // 🟢 ENFOQUE AUTOMÁTICO EN EL BOTÓN "SIGUIENTE"
+                                            dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.requestFocus()
+                                        }
+                                    }
+                                    resultsContainer.addView(itemTextView)
+                                }
+                            }
+
+                            val customItemView = TextView(this@PeliculasActivity).apply {
+                                text = "➕ Pedir: \"$query\" (Pedido Personalizado)"
+                                setTextColor(colorTextoLogo)
+                                textSize = 14f
+                                setTypeface(null, Typeface.BOLD)
+                                setPadding(dpToPx(10), dpToPx(12), dpToPx(10), dpToPx(12))
+                                isFocusable = true
+                                isFocusableInTouchMode = true
+
+                                val normalBg = ColorDrawable(Color.TRANSPARENT)
+                                val focusBg = GradientDrawable().apply {
+                                    setColor(Color.parseColor("#3A3A3A"))
+                                    cornerRadius = dpToPx(6).toFloat()
+                                    setStroke(dpToPx(2), colorTextoLogo)
+                                }
+
+                                setOnFocusChangeListener { _, hasFocus ->
+                                    background = if (hasFocus) focusBg else normalBg
+                                }
+
+                                setOnKeyListener { _, keyCode, keyEvent ->
+                                    if (keyEvent.action == android.view.KeyEvent.ACTION_DOWN && keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP) {
+                                        val index = resultsContainer.indexOfChild(this)
+                                        if (index == 0) {
+                                            input.requestFocus()
+                                            return@setOnKeyListener true
+                                        }
+                                    }
+                                    false
+                                }
+
+                                setOnClickListener {
+                                    selectedTitle = query
+                                    selectedOriginalTitle = query
+                                    selectedImageUrl = ""
+                                    selectedAnio = "Personalizado"
+                                    selectedSipnosis = "Película personalizada no encontrada en el catálogo de TMDB."
+                                    selectedCalificacion = "N/A"
+
+                                    tvTitlePreview.text = selectedTitle
+                                    tvRatingPreview.text = "⭐ N/A   |   Personalizado"
+                                    tvSipnosisPreview.text = selectedSipnosis
+                                    ivPoster.setImageResource(R.drawable.cine)
+
+                                    previewCard.visibility = View.VISIBLE
+                                    resultsContainer.removeAllViews()
+                                    input.setText(selectedTitle)
+                                    input.clearFocus()
+
+                                    // 🟢 ENFOQUE AUTOMÁTICO EN EL BOTÓN "SIGUIENTE"
+                                    dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.requestFocus()
+                                }
+                            }
+                            resultsContainer.addView(customItemView)
+                        }
+                    } catch (e: Exception) {
+                        Log.e("TMDB_Pedido", "Error al buscar: ${e.message}")
+                    }
+                }
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        // 🟢 Creamos el diálogo utilizando la variable local para capturar su referencia
+        dialog = AlertDialog.Builder(this)
+            .setView(scrollView)
             .setPositiveButton("SIGUIENTE", null)
             .setNegativeButton("CANCELAR", null)
             .create()
 
         dialog.show()
 
-        // 5. Estilizar los botones
-
-        // Botón SIGUIENTE en Dorado
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
             setTextColor(colorTextoLogo)
-            textSize = 17f
+            textSize = 16f
             setTypeface(null, Typeface.BOLD)
 
             setOnClickListener {
-                val nombrePeli = input.text.toString().trim()
-                if (nombrePeli.isNotEmpty()) {
-                    comprobantepago(nombrePeli)
-                    dialog.dismiss()
-                } else {
-                    input.error = "Escribe el nombre"
+                val typedText = input.text.toString().trim()
+
+                if (typedText.isEmpty()) {
+                    input.error = "Escribe el nombre de la película"
+                    return@setOnClickListener
                 }
+
+                // 🛑 VALIDACIÓN ESTRICTA: Si no seleccionó de la lista, no le permite continuar
+                if (selectedTitle.isEmpty() || typedText != selectedTitle) {
+                    input.error = "Selecciona una opción de la lista de abajo"
+
+                    // Alerta visual de advertencia para guiar al usuario del control de TV
+                    CineAlert.show(
+                        this@PeliculasActivity,
+                        "Por favor, selecciona una opción de la lista sugerida de abajo antes de continuar 🎬",
+                        CineAlert.Tipo.ERROR,
+                        dialog?.window?.decorView as? ViewGroup
+                    )
+                    return@setOnClickListener
+                }
+
+                // Si pasó la validación (porque sí seleccionó una opción), procedemos al pago
+                comprobantepago(
+                    selectedTitle,
+                    selectedOriginalTitle,
+                    selectedImageUrl,
+                    selectedAnio,
+                    selectedSipnosis,
+                    selectedCalificacion
+                )
+                    dialog?.dismiss()
             }
         }
 
-        // Botón CANCELAR en Blanco
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE).apply {
             setTextColor(Color.WHITE)
-            textSize = 15f
+            textSize = 14f
         }
     }
-    private fun comprobantepago(pedido: String) {
+
+
+    private fun comprobantepago(
+        titulo: String,
+        originalTitle: String,
+        imageUrl: String,
+        anio: String,
+        sipnosis: String,
+        calificacion: String
+    ) {
         val user = auth.currentUser ?: return
         val email = user.email ?: return
         val correoKey = email.replace(".", "_").replace("@", "_")
 
-        // Colores de tu identidad
         val colorTextoLogo = Color.parseColor("#C5A059") // Dorado
-        val colorFondoPrincipal = Color.parseColor("#2A2A2A") // Tu fondo oscuro
+        val colorFondoPrincipal = Color.parseColor("#2A2A2A") // Fondo oscuro
+        val density = resources.displayMetrics.density
 
+        val dpToPx = { dp: Int -> (dp * density).toInt() }
+
+        // 🔄 Mantenemos la consulta a "usuarios" para calcular el saldo de CasTV
         databaseRef.child("usuarios").child(correoKey).get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
                 val nombreUsuario = snapshot.child("nombre").value?.toString() ?: "Usuario"
@@ -1277,69 +1526,138 @@ class PeliculasActivity : AppCompatActivity() {
                 val costo = 20
                 val saldoFinal = saldoActual - costo
 
-                // 1. Contenedor Principal
-                val layout = LinearLayout(this).apply {
+                val container = LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL
-                    setPadding(60, 50, 60, 50)
+                    setPadding(dpToPx(24), dpToPx(20), dpToPx(24), dpToPx(20))
                     setBackgroundColor(colorFondoPrincipal)
                 }
 
-                // 2. Título "Resumen de Pedido"
-                val titulo = TextView(this).apply {
+                val scrollView = ScrollView(this).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+                    addView(container)
+                }
+
+                val tituloLabel = TextView(this).apply {
                     text = "CONFIRMAR PEDIDO"
-                    textSize = 20f
+                    textSize = 18f
                     setTextColor(colorTextoLogo)
                     gravity = Gravity.CENTER
                     setTypeface(null, Typeface.BOLD)
-                    setPadding(0, 0, 0, 40)
+                    setPadding(0, 0, 0, dpToPx(15))
                 }
 
-                // 3. Bloque de Datos (Información del pedido)
+                val fichaPeliculaLayout = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(dpToPx(10), dpToPx(10), dpToPx(10), dpToPx(10))
+                    background = GradientDrawable().apply {
+                        cornerRadius = dpToPx(8).toFloat()
+                        setColor(Color.parseColor("#1F1F1F"))
+                        setStroke(1, Color.parseColor("#444444"))
+                    }
+                }
+
+                val ivPoster = ImageView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(dpToPx(70), dpToPx(105)).apply {
+                        rightMargin = dpToPx(12)
+                    }
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                }
+
+                if (imageUrl.isNotEmpty()) {
+                    Glide.with(this@PeliculasActivity)
+                        .load(imageUrl)
+                        .placeholder(R.drawable.cine)
+                        .into(ivPoster)
+                } else {
+                    ivPoster.setImageResource(R.drawable.cine)
+                }
+
+                val infoMetaLayout = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                }
+
+                val tvTitleMeta = TextView(this).apply {
+                    text = titulo
+                    setTextColor(Color.WHITE)
+                    textSize = 14f
+                    setTypeface(null, Typeface.BOLD)
+                }
+
+                val tvRatingMeta = TextView(this).apply {
+                    text = "⭐ $calificacion   |   📅 $anio"
+                    setTextColor(colorTextoLogo)
+                    textSize = 12f
+                    setPadding(0, dpToPx(4), 0, dpToPx(4))
+                }
+
+                val tvOverviewMeta = TextView(this).apply {
+                    text = sipnosis
+                    setTextColor(Color.LTGRAY)
+                    textSize = 11f
+                    maxLines = 3
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }
+
+                infoMetaLayout.addView(tvTitleMeta)
+                infoMetaLayout.addView(tvRatingMeta)
+                infoMetaLayout.addView(tvOverviewMeta)
+
+                fichaPeliculaLayout.addView(ivPoster)
+                fichaPeliculaLayout.addView(infoMetaLayout)
+
                 val infoLayout = LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL
-                    setPadding(30, 30, 30, 30)
-                    // Le damos un borde sutil para que parezca una ficha
-                    val shape = GradientDrawable().apply {
-                        cornerRadius = 10f
+                    setPadding(dpToPx(15), dpToPx(15), dpToPx(15), dpToPx(15))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        topMargin = dpToPx(15)
+                    }
+                    background = GradientDrawable().apply {
+                        cornerRadius = dpToPx(8).toFloat()
                         setStroke(2, Color.parseColor("#444444"))
                     }
-                    background = shape
                 }
 
                 val crearFila = { label: String, valor: String, resaltado: Boolean ->
                     TextView(this).apply {
                         text = "$label $valor"
-                        textSize = if (resaltado) 17f else 15f
+                        textSize = if (resaltado) 15f else 13f
                         setTextColor(if (resaltado) colorTextoLogo else Color.WHITE)
-                        setPadding(0, 8, 0, 8)
+                        setPadding(0, dpToPx(4), 0, dpToPx(4))
                     }
                 }
 
-                infoLayout.addView(crearFila("🎬 Película:", pedido, true))
-                infoLayout.addView(crearFila("👤 Usuario:", nombreUsuario, false))
-                infoLayout.addView(crearFila("💰 Saldo:", "$saldoActual CasTV", false))
-                infoLayout.addView(crearFila("📉 Costo:", "$costo CasTV", false))
+                infoLayout.addView(crearFila("👤 Solicitante:", nombreUsuario, false))
+                infoLayout.addView(crearFila("💰 Saldo Actual:", "$saldoActual CasTV", false))
+                infoLayout.addView(crearFila("📉 Costo Pedido:", "$costo CasTV", false))
 
-                // Separador sutil
                 val linea = View(this).apply {
-                    // Usamos ViewGroup.LayoutParams para acceder a MATCH_PARENT
                     layoutParams = LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         2
                     ).apply {
-                        setMargins(0, 20, 0, 20)
+                        setMargins(0, dpToPx(10), 0, dpToPx(10))
                     }
                     setBackgroundColor(Color.parseColor("#444444"))
                 }
                 infoLayout.addView(linea)
                 infoLayout.addView(crearFila("✅ Saldo Final:", "$saldoFinal CasTV", true))
 
-                layout.addView(titulo)
-                layout.addView(infoLayout)
+                container.addView(tituloLabel)
+                container.addView(fichaPeliculaLayout)
+                container.addView(infoLayout)
 
-                // 4. Crear el Alert Dialog
                 val dialog = AlertDialog.Builder(this)
-                    .setView(layout)
+                    .setView(scrollView)
                     .setCancelable(false)
                     .setPositiveButton("CONFIRMAR Y ENVIAR", null)
                     .setNegativeButton("CORREGIR", null)
@@ -1347,19 +1665,16 @@ class PeliculasActivity : AppCompatActivity() {
 
                 dialog.show()
 
-                // 5. Estilo de Botones
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
                     setTextColor(colorTextoLogo)
-                    textSize = 16f
+                    textSize = 15f
                     setTypeface(null, Typeface.BOLD)
                     setOnClickListener {
                         if (saldoActual >= costo) {
-                            ejecutarProcesoFinal(correoKey, pedido, costo, nombreUsuario, email, dialog)
-
+                            ejecutarProcesoFinal(correoKey, titulo, originalTitle, imageUrl, anio, costo, nombreUsuario, email, dialog)
                         } else {
-                            // 🟢 REEMPLAZO DEL TOAST POR CINEALERT PREMIUM
                             CineAlert.show(
-                                this@PeliculasActivity, // O la actividad donde estés
+                                this@PeliculasActivity,
                                 "Saldo insuficiente en CasTV ❌",
                                 CineAlert.Tipo.ERROR,
                                 dialog.window?.decorView as? ViewGroup
@@ -1373,36 +1688,114 @@ class PeliculasActivity : AppCompatActivity() {
                     textSize = 14f
                     setOnClickListener {
                         dialog.dismiss()
-                        mostrarDialogoPedido() // Regresa al anterior
+                        // Al corregir, se devuelve toda la información al buscador
+                        mostrarDialogoPedido(
+                            titulo,
+                            originalTitle,
+                            imageUrl,
+                            anio,
+                            sipnosis,
+                            calificacion
+                        )
                     }
                 }
             }
         }
     }
-    private fun ejecutarProcesoFinal(correoKey: String, titulo: String, costo: Int, nombre: String, email: String, dialog: AlertDialog) {
-        val data = hashMapOf(
-            "title" to titulo,
-            "castv" to costo,
-            "nombre" to nombre,
-            "email" to email,
-            "timestamp" to ServerValue.TIMESTAMP
-        )
+    private fun ejecutarProcesoFinal(
+        correoKey: String,
+        titulo: String,
+        originalTitle: String,
+        imageUrl: String,
+        anio: String,
+        costo: Int,
+        nombre: String,
+        email: String,
+        dialog: AlertDialog
+    ) {
+        // 🟢 1. Sincroniza y crea/actualiza la película directamente en la grilla principal "movies"
+        verificarYCrearPeliculaDesdePedido(titulo, originalTitle, imageUrl, anio, email, nombre)
 
-        // 1. Guardamos el pedido
-        databaseRef.child("pedidosmovies").push().setValue(data).addOnSuccessListener {
+        // 🟢 2. Ejecuta el descuento de puntos del saldo de CasTV de forma directa y cierra el diálogo
+        descontarPuntos(correoKey, costo, titulo, dialog)
+    }
 
-            // 2. Descontamos los puntos y pasamos el dialog para que se cierre después
-            descontarPuntos(correoKey, costo, titulo, dialog)
+    private fun verificarYCrearPeliculaDesdePedido(
+        tituloMovie: String,
+        originalTitleMovie: String,
+        imageUrlMovie: String,
+        anio: String,
+        userEmail: String,
+        userName: String
+    ) {
+        val moviesRef = databaseRef.child("movies")
 
-        }.addOnFailureListener {
-            // 🔴 ERROR: Si falla el guardado, avisamos al usuario sin cerrar el diálogo
-            CineAlert.show(
-                this@PeliculasActivity,
-                "Error al registrar pedido ❌",
-                CineAlert.Tipo.ERROR,
-                dialog.window?.decorView as? ViewGroup
-            )
-        }
+        moviesRef.orderByChild("originalTitle").equalTo(originalTitleMovie)
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (snapshot.exists()) {
+                        // ESCENARIO A: La película YA existe -> Actualizamos su fecha de creación (createdAt)
+                        val existingId = snapshot.children.firstOrNull()?.key ?: ""
+                        if (existingId.isNotEmpty()) {
+                            val tiempoActual = System.currentTimeMillis()
+                            moviesRef.child(existingId).child("createdAt").setValue(tiempoActual)
+                                .addOnSuccessListener {
+                                    Log.d("FirebaseTV", "📅 Fecha 'createdAt' actualizada para la película existente: $existingId")
+                                }
+
+                            // Añadimos la solicitud del usuario a la lista de espera de la película existente
+                            val solicitudesRef = moviesRef.child(existingId).child("solicitudes").push()
+                            val idSolicitud = solicitudesRef.key ?: ""
+                            val datosSolicitud = mapOf(
+                                "id" to idSolicitud,
+                                "email" to userEmail,
+                                "userId" to userName,
+                                "timestamp" to ServerValue.TIMESTAMP
+                            )
+                            solicitudesRef.setValue(datosSolicitud)
+                        }
+                    } else {
+                        // ESCENARIO B: La película NO existe -> Procedemos a crearla desde cero
+                        val newId = moviesRef.push().key ?: return
+                        val nombreFormateado = "$tituloMovie ($anio)".trim()
+
+                        val nuevaPeliculaMap = hashMapOf(
+                            "id" to newId,
+                            "title" to tituloMovie,
+                            "originalTitle" to originalTitleMovie,
+                            "nombre" to nombreFormateado,
+                            "imageUrl" to imageUrlMovie,
+                            "streamUrl" to "", // Queda sin enlace de reproducción (rota) para que el admin la asigne
+                            "castv" to 10,
+                            "countdownMinutes" to 0,
+                            "createdAt" to System.currentTimeMillis(),
+                            "email" to "",
+                            "trailerUrl" to "",
+                            "userId" to ""
+                        )
+
+                        moviesRef.child(newId).setValue(nuevaPeliculaMap)
+                            .addOnSuccessListener {
+                                Log.d("FirebaseTV", "🟢 Nueva película de pedido registrada: $newId")
+
+                                // Registramos la solicitud inicial dentro de la película creada
+                                val solicitudesRef = moviesRef.child(newId).child("solicitudes").push()
+                                val idSolicitud = solicitudesRef.key ?: ""
+                                val datosSolicitud = mapOf(
+                                    "id" to idSolicitud,
+                                    "email" to userEmail,
+                                    "userId" to userName,
+                                    "timestamp" to ServerValue.TIMESTAMP
+                                )
+                                solicitudesRef.setValue(datosSolicitud)
+                            }
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("FirebaseTV", "Error al verificar duplicado de pedido: ${error.message}")
+                }
+            })
     }
 
     private fun descontarPuntos(correoKey: String, puntosADescontar: Int, tituloPelicula: String, dialog: AlertDialog) {
@@ -1418,24 +1811,21 @@ class PeliculasActivity : AppCompatActivity() {
                     val email = correoKey.replace("_", ".")
                     CastvHelper.registrarConsumo(email, "PEDIDO: $tituloPelicula", puntosADescontar)
 
-                    // 🟢 AVISO FINAL DE ÉXITO (Único y claro)
                     CineAlert.show(
                         this@PeliculasActivity,
                         "¡Pedido realizado con éxito! 🎬",
                         CineAlert.Tipo.EXITO,
                         dialog.window?.decorView as? ViewGroup
                     ) {
-                        // 🕒 TRAS 2.5 SEGUNDOS, CERRAMOS EL DIÁLOGO
                         dialog.dismiss()
                     }
                 }
             } else {
-                // Error de saldo
                 CineAlert.show(this@PeliculasActivity, "Saldo insuficiente 💰", CineAlert.Tipo.ERROR, dialog.window?.decorView as? ViewGroup)
             }
         }
     }
-    // 1. PUNTO DE ENTRADA: Decide qué pantalla mostrar según Firebase
+
     private fun activarpaquete() {
         val user = auth.currentUser ?: return
         val email = user.email ?: return
@@ -1443,7 +1833,6 @@ class PeliculasActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                // Buscamos si ya tiene un pedido en la base de datos
                 val snapshot = withContext(Dispatchers.IO) {
                     databaseRef.child("usuarios").child(correoKey).get().await()
                 }
@@ -1452,7 +1841,6 @@ class PeliculasActivity : AppCompatActivity() {
                 val paqueteGuardado = snapshot.child("paquete").value?.toString() ?: ""
                 val pedidoIdGuardado = snapshot.child("pedidoId").value?.toString() ?: ""
 
-                // 1. SI TIENE UN PEDIDO PENDIENTE -> Va directo al diálogo informativo del QR (con sus 4 parámetros)
                 if (estado.equals("pendiente", ignoreCase = true) && paqueteGuardado.isNotEmpty() && pedidoIdGuardado.isNotEmpty()) {
                     val monto = when (paqueteGuardado) {
                         "Bronce" -> "10000"
@@ -1460,20 +1848,16 @@ class PeliculasActivity : AppCompatActivity() {
                         "Oro" -> "45000"
                         else -> "0"
                     }
-
-                    // Llamamos al diálogo informativo con los 4 parámetros que requiere
                     mostrarDialogoPagoInformativo(correoKey, paqueteGuardado, monto, pedidoIdGuardado)
-
                 } else {
-                    // 2. SI NO TIENE PEDIDOS PENDIENTES -> Muestra tu diseño de selección normal (con solo 1 parámetro)
                     mostrarDialogoSeleccion(correoKey)
                 }
             } catch (e: Exception) {
-                // En caso de cualquier error de conexión, por seguridad abrimos el de selección
                 mostrarDialogoSeleccion(correoKey)
             }
         }
     }
+
     private fun mostrarDialogoSeleccion(correoKey: String) {
         val colorTextoLogo = Color.parseColor("#C5A059")
         val colorFondoPrincipal = Color.parseColor("#2A2A2A")
@@ -1575,10 +1959,7 @@ class PeliculasActivity : AppCompatActivity() {
                         }
 
                         dialog1.dismiss()
-
-                        // Abrimos el diálogo informativo con el QR pasando los 4 parámetros correctos
                         mostrarDialogoPagoInformativo(correoKey, paqueteNombre, monto, pedidoIdGenerico)
-
                     } catch (e: Exception) {
                         isEnabled = true
                         CineAlert.show(this@PeliculasActivity, "❌ Error al registrar", CineAlert.Tipo.ERROR,
@@ -1593,21 +1974,19 @@ class PeliculasActivity : AppCompatActivity() {
             textSize = 14f
         }
     }
-    // 2. DIÁLOGO DE SELECCIÓN (Conserva tu diseño exacto y la acción de guardar al dar Siguiente)
+
     private fun mostrarDialogoPagoInformativo(correoKey: String, paquete: String, monto: String, pedidoId: String) {
         val colorTextoLogo = Color.parseColor("#C5A059")
         val colorFondoPrincipal = Color.parseColor("#2A2A2A")
 
         val urlSubidaImagen = "https://onnline.web.app/CineParche/public/pagos/index.html?user=$correoKey&pedido=$pedidoId&paquete=$paquete&monto=$monto"
 
-        // 1. Contenedor del contenido (Layout interno)
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(40, 30, 40, 20)
             setBackgroundColor(colorFondoPrincipal)
         }
 
-        // 2. ScrollView envolvente para hacerlo responsivo
         val scrollView = ScrollView(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -1633,7 +2012,6 @@ class PeliculasActivity : AppCompatActivity() {
             setPadding(0, 0, 0, 15)
         }
 
-        // Escalado responsivo del QR (180dp convertido a píxeles de acuerdo a la densidad)
         val scale = resources.displayMetrics.density
         val qrSizePx = (180 * scale + 0.5f).toInt()
 
@@ -1655,15 +2033,14 @@ class PeliculasActivity : AppCompatActivity() {
 
         val indicaciones = TextView(this).apply {
             val textoHtml = """
-            <b>Bre-Be:</b> Código <b>@TMB833</b><br>
-            ✔ Soporte activo 24/7<br><br>
-            <i>Toca o escanea el QR para subir tu comprobante</i>
-        """.trimIndent()
+                <b>Bre-Be:</b> Código <b>@TMB833</b><br>
+                ✔ Soporte activo 24/7<br><br>
+                <i>Toca o escanea el QR para subir tu comprobante</i>
+            """.trimIndent()
 
             text = androidx.core.text.HtmlCompat.fromHtml(textoHtml, androidx.core.text.HtmlCompat.FROM_HTML_MODE_LEGACY)
             textSize = 14f
             setTextColor(Color.WHITE)
-
             gravity = Gravity.CENTER
             setPadding(40, 15, 40, 15)
         }
@@ -1671,13 +2048,11 @@ class PeliculasActivity : AppCompatActivity() {
         val mensajeInformativo = TextView(this).apply {
             textSize = 14f
             setTextColor(Color.WHITE)
-
             gravity = Gravity.CENTER
             setPadding(40, 25, 40, 25)
             visibility = View.GONE
         }
 
-        // Escuchador dinámico de estado en tiempo real
         val estadoListener = object : com.google.firebase.database.ValueEventListener {
             override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
                 val estado = snapshot.child("estado").value?.toString() ?: "pendiente"
@@ -1692,10 +2067,10 @@ class PeliculasActivity : AppCompatActivity() {
                 }
 
                 val htmlTexto = """
-                ID Pedido: $pedidoId<br>
-                Paquete: $paquete ($$monto)<br>
-                Estado actual: <b><font color='$colorHex'>$estadoVisual</font></b>
-            """.trimIndent()
+                    ID Pedido: $pedidoId<br>
+                    Paquete: $paquete ($$monto)<br>
+                    Estado actual: <b><font color='$colorHex'>$estadoVisual</font></b>
+                """.trimIndent()
 
                 infoPaquete.text = androidx.core.text.HtmlCompat.fromHtml(
                     htmlTexto,
@@ -1712,10 +2087,10 @@ class PeliculasActivity : AppCompatActivity() {
                         mensajeInformativo.visibility = View.VISIBLE
 
                         val textoActivo = """
-                        <font color='#34D399'><b>✅ ¡PAQUETE ACTIVADO!</b></font><br><br>
-                        Tu pago fue aprobado con éxito y tu saldo de créditos <b>CasTV</b> ya ha sido abonado a tu cuenta.<br><br>
-                        <i>¡Gracias por preferir CineParche!</i>
-                    """.trimIndent()
+                            <font color='#34D399'><b>✅ ¡PAQUETE ACTIVADO!</b></font><br><br>
+                            Tu pago fue aprobado con éxito y tu saldo de créditos <b>CasTV</b> ya ha sido abonado a tu cuenta.<br><br>
+                            <i>¡Gracias por preferir CineParche!</i>
+                        """.trimIndent()
                         mensajeInformativo.text = androidx.core.text.HtmlCompat.fromHtml(textoActivo, androidx.core.text.HtmlCompat.FROM_HTML_MODE_LEGACY)
                     }
                     esRevision -> {
@@ -1724,11 +2099,11 @@ class PeliculasActivity : AppCompatActivity() {
                         mensajeInformativo.visibility = View.VISIBLE
 
                         val textoRevision = """
-                        <font color='#34D399'><b>🔍 COMPROBANTE EN REVISIÓN</b></font><br><br>
-                        Nuestro equipo está verificando tu comprobante de pago.<br>
-                        Una vez finalizada la revisión, tu saldo de <b>CasTV</b> se abonará de inmediato a tu cuenta.<br><br>
-                        <i>¡Gracias por tu paciencia!</i>
-                    """.trimIndent()
+                            <font color='#34D399'><b>🔍 COMPROBANTE EN REVISIÓN</b></font><br><br>
+                            Nuestro equipo está verificando tu comprobante de pago.<br>
+                            Una vez finalizada la revisión, tu saldo de <b>CasTV</b> se abonará de inmediato a tu cuenta.<br><br>
+                            <i>¡Gracias por tu paciencia!</i>
+                        """.trimIndent()
                         mensajeInformativo.text = androidx.core.text.HtmlCompat.fromHtml(textoRevision, androidx.core.text.HtmlCompat.FROM_HTML_MODE_LEGACY)
                     }
                     else -> {
@@ -1758,7 +2133,6 @@ class PeliculasActivity : AppCompatActivity() {
         dialog2.setOnDismissListener {
             databaseRef.child("usuarios").child(correoKey).removeEventListener(estadoListener)
         }
-
         dialog2.show()
 
         dialog2.getButton(AlertDialog.BUTTON_POSITIVE).apply {
@@ -1768,10 +2142,9 @@ class PeliculasActivity : AppCompatActivity() {
         }
     }
 
-    // Función auxiliar para codificar un enlace de texto en un Bitmap de código QR
     private fun generarCodigoQR(texto: String): Bitmap? {
         return try {
-            val size = 500 // Dimensiones de la imagen QR en píxeles
+            val size = 500
             val bitMatrix: BitMatrix = MultiFormatWriter().encode(texto, BarcodeFormat.QR_CODE, size, size)
             val width = bitMatrix.width
             val height = bitMatrix.height
@@ -1787,30 +2160,21 @@ class PeliculasActivity : AppCompatActivity() {
             null
         }
     }
-    // ==========================================
-    // 7. LISTA Y REPRODUCTOR
-    // ==========================================
 
     private fun escucharCambiosEnPeliculas() {
-        if (yaTieneListener) return // Evitamos duplicar el listener
+        if (yaTieneListener) return
 
         val moviesRef = databaseRef.child("movies")
         peliculasListener = moviesRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
                     val nuevasPeliculasRaw = mutableListOf<Modelo>()
-
-                    // 1. Mapeamos los IDs de las películas ya validadas para compararlas rápido
                     val yaValidadas = Validacioneslista.obtenerPeliculasValidas().map { it.id }.toSet()
 
-                    // 2. Extraemos los datos de Firebase
                     for (child in snapshot.children) {
                         val modelo = child.getValue(Modelo::class.java)
                         if (modelo != null) {
-                            // Copiamos el objeto incluyendo el ID del nodo de Firebase
                             val movieConId = modelo.copy(id = child.key ?: "")
-
-                            // Si ya está validada, marcamos el flag para que el adapter lo sepa
                             if (yaValidadas.contains(movieConId.id)) {
                                 movieConId.isValid = true
                             }
@@ -1818,17 +2182,13 @@ class PeliculasActivity : AppCompatActivity() {
                         }
                     }
 
-                    // 3. Ordenamos por fecha de creación (de más nueva a más vieja)
                     val listaNuevaOrdenada = nuevasPeliculasRaw.sortedByDescending { it.createdAt }
 
-                    // 4. Lógica de actualización Inteligente (Premium)
                     if (modeloList.isEmpty()) {
-                        // Primera carga: Llenamos y notificamos todo de golpe para rapidez
                         modeloList.addAll(listaNuevaOrdenada)
                         movieAdapter.notifyDataSetChanged()
                     } else {
-                        // Cargas posteriores o cambios en vivo: Usamos DiffUtil para evitar parpadeos
-                        val listaVieja = ArrayList(modeloList) // Copia de seguridad de la lista actual
+                        val listaVieja = ArrayList(modeloList)
 
                         val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
                             override fun getOldListSize(): Int = listaVieja.size
@@ -1839,25 +2199,20 @@ class PeliculasActivity : AppCompatActivity() {
                             }
 
                             override fun areContentsTheSame(oldPos: Int, newPos: Int): Boolean {
-                                // Esto compara todos los campos de la data class Modelo
                                 return listaVieja[oldPos] == listaNuevaOrdenada[newPos]
                             }
                         })
 
-                        // Actualizamos la lista principal y aplicamos los cambios quirúrgicos
                         modeloList.clear()
                         modeloList.addAll(listaNuevaOrdenada)
                         diffResult.dispatchUpdatesTo(movieAdapter)
                     }
 
-                    // 5. Verificamos si hay que validar contenido nuevo
                     if (!Validacioneslista.yaCargado()) {
                         validarYActualizarVistasEnVivo()
                     }
-
                     yaTieneListener = true
                 } else {
-                    // Si el nodo "movies" está vacío
                     modeloList.clear()
                     movieAdapter.notifyDataSetChanged()
                 }
@@ -1865,43 +2220,32 @@ class PeliculasActivity : AppCompatActivity() {
 
             override fun onCancelled(error: DatabaseError) {
                 yaTieneListener = false
-                // Aquí podrías agregar un Log para debuggear fallos de conexión
             }
         })
     }
+
     private fun validarYActualizarVistasEnVivo() {
-        // No borramos nombres, usamos la lógica masiva local
         CoroutineScope(Dispatchers.Main).launch {
             val validador = Validaciones()
-
-            // Hacemos una copia para no tener errores de concurrencia
             val listaActual = ArrayList(modeloList)
 
-            // Lanzamos la validación de cada película INDEPENDIENTEMENTE
             listaActual.forEach { movie ->
                 launch(Dispatchers.Main) {
-                    // Cada película se valida en su propio "hilo" de corrutina
                     val esValida = withContext(Dispatchers.IO) {
                         validador.isUrlValid(movie.streamUrl)
                     }
 
-                    // Buscamos la posición por si la lista se movió (scroll)
                     val posicionActual = modeloList.indexOfFirst { it.id == movie.id }
                     if (posicionActual != -1) {
                         modeloList[posicionActual].isValid = esValida
-                        // 🔄 ACTUALIZA LA VISTA AL INSTANTE (una por una)
                         movieAdapter.notifyItemChanged(posicionActual)
                     }
                 }
             }
-
-            // Al final, guardamos en el objeto para que otras actividades lo usen
-            // Pero el usuario ya vio los resultados uno por uno antes de que esto termine
             Validacioneslista.cargarPeliculas()
         }
     }
 
-    // Nueva función de apoyo para refrescar etiquetas rápido
     private fun sincronizarConCacheLocal() {
         val validadas = Validacioneslista.obtenerPeliculasValidas().map { it.id }.toSet()
 
@@ -1913,20 +2257,15 @@ class PeliculasActivity : AppCompatActivity() {
             }
         }
     }
+
     private fun irAlReproductor(modelo: Modelo) {
-        // 1. Verificación de seguridad: No iniciar si el link es nulo
         if (modelo.streamUrl.isNullOrBlank()) {
             Toast.makeText(this, "El enlace de reproducción no es válido", Toast.LENGTH_SHORT).show()
             return
         }
 
         val intent = Intent(this, ApiPeliculaActivity::class.java).apply {
-            // 2. Flags de optimización:
-            // CLEAR_TOP: Si la actividad ya existe, cierra las que están encima y la trae al frente.
-            // SINGLE_TOP: Evita crear una copia nueva si ya estás en ella (usa onNewIntent).
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-
-            // 3. Empaquetado limpio de datos
             putExtra("EXTRA_MOVIE_DATA", modelo)
             putExtra("EXTRA_STREAM_URL", modelo.streamUrl)
             putExtra("EXTRA_MOVIE_TITLE", modelo.title)
@@ -1934,34 +2273,22 @@ class PeliculasActivity : AppCompatActivity() {
             putExtra("EXTRA_MOVIE_IMAGE_URL", modelo.imageUrl)
             putExtra("EXTRA_ORIGINAL_TITLE", modelo.originalTitle)
             putExtra("EXTRA_COUNTDOWN", modelo.countdownMinutes)
-
-            // Evitamos errores de precisión enviando el Long directamente si es necesario
             putExtra("EXTRA_CREATED_AT", modelo.createdAt / 1000)
         }
-
-        // 4. Ejecución
         startActivity(intent)
-
-        // Opcional: Quitar animación para que el cambio de link sea instantáneo
         overridePendingTransition(0, 0)
     }
 
-    // --- En PeliculasActivity.kt ---
-
     private fun cerrarSesion() {
-        // 1. Cerrar sesión en Firebase (Fundamental)
         auth.signOut()
 
-        // 2. Configurar y cerrar Google
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
             .build()
         val googleSignInClient = GoogleSignIn.getClient(this, gso)
 
         googleSignInClient.signOut().addOnCompleteListener {
-            // Opcional: Revocar acceso limpia el rastro de la cuenta de Google en el selector
             googleSignInClient.revokeAccess().addOnCompleteListener {
-                // 3. Navegar al Login limpiando el historial de actividades
                 val intent = Intent(this, Login::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 }
@@ -1970,7 +2297,6 @@ class PeliculasActivity : AppCompatActivity() {
             }
         }
     }
-
 
     private fun mostrarConfirmacionSalida() {
         val colorDorado = Color.parseColor("#C5A059")
@@ -1987,12 +2313,10 @@ class PeliculasActivity : AppCompatActivity() {
                 finishAffinity()
                 System.exit(0)
             }
-            .setNegativeButton("VOLVER (5s)", null) // Texto inicial
+            .setNegativeButton("VOLVER (5s)", null)
             .create()
 
         dialog.show()
-
-        // Estética del fondo y mensaje
         dialog.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
         dialog.findViewById<TextView>(android.R.id.message)?.setTextColor(Color.WHITE)
 
@@ -2002,7 +2326,6 @@ class PeliculasActivity : AppCompatActivity() {
         btnNegativo.setTextColor(colorDorado)
         btnPositivo.setTextColor(Color.WHITE)
 
-        // --- Lógica del Contador ---
         val timer = object : CountDownTimer(5000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 val segundosRestantes = millisUntilFinished / 1000
@@ -2011,28 +2334,21 @@ class PeliculasActivity : AppCompatActivity() {
 
             override fun onFinish() {
                 if (dialog.isShowing) {
-                    dialog.dismiss() // Se cierra sin hacer nada
+                    dialog.dismiss()
                 }
             }
         }
-
         timer.start()
-
-        // Si el usuario presiona un botón manualmente, detenemos el timer
         dialog.setOnDismissListener { timer.cancel() }
     }
 
     override fun onStart() {
         super.onStart()
-
-        // Solo iniciamos el listener si la lista está vacía
         if (modeloList.isEmpty()) {
             escucharCambiosEnPeliculas()
         } else {
-            // Si ya hay películas, solo asegúrate de que las etiquetas estén al día
             sincronizarConCacheLocal()
         }
-
         val am = getSystemService(AUDIO_SERVICE) as AudioManager
         am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
     }
@@ -2046,31 +2362,22 @@ class PeliculasActivity : AppCompatActivity() {
         bannerTimer?.cancel()
         promoRotationRunnable?.let { promoRotationHandler.removeCallbacks(it) }
 
-        // 1. Limpiar el Receptor de Descargas (APK)
         try {
             unregisterReceiver(onDownloadComplete)
-        } catch (e: Exception) {
-            // Ya estaba desregistrado o nunca se activó
-        }
+        } catch (e: Exception) {}
 
-        // 2. Limpiar Listener de Películas (Realtime Database)
         peliculasListener?.let {
             databaseRef.child("movies").removeEventListener(it)
         }
 
-        // 3. Limpiar Listener de Seguridad (Estado de cuenta)
-        // Es vital quitarlo de la ruta exacta del usuario
         val email = auth.currentUser?.email
         if (email != null && userStatusListener != null) {
             val correoKey = email.replace(".", "_").replace("@", "_")
             databaseRef.child("usuarios").child(correoKey).removeEventListener(userStatusListener!!)
         }
 
-        // 4. Cerrar todos los diálogos abiertos para evitar error "WindowLeaked"
         publicidadDialog?.let { if (it.isShowing) it.dismiss() }
-        progressDialog?.let { if (it.isShowing) it.dismiss() } // El de la descarga roja
-
-        // 5. Limpiar el Handler (Detiene el monitor de progreso de descarga)
+        progressDialog?.let { if (it.isShowing) it.dismiss() }
         handler.removeCallbacksAndMessages(null)
 
         Log.d("PeliculasActivity", "Limpieza de onDestroy completada")

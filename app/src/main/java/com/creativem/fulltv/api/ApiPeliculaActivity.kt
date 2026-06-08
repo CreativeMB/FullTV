@@ -243,9 +243,9 @@ class ApiPeliculaActivity : AppCompatActivity() {
         originalTitleMovie: String,
         imageUrlMovie: String,
         urlRota: String,
-        anio: String,
-        userEmail: String, // 🟢 NUEVO: Recibe el correo del solicitante
-        userName: String   // 🟢 NUEVO: Recibe el nombre del solicitante
+        anio: String, // 🟢 Recibe la fecha completa (Ej: "2024-10-16")
+        userEmail: String,
+        userName: String
     ) {
         if (isFinishing || isDestroyed) return
 
@@ -271,7 +271,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
                         val existingId = snapshot.children.firstOrNull()?.key ?: ""
                         if (existingId.isNotEmpty()) {
 
-                            // 🔄 NUEVO: Actualizamos la fecha de creación (createdAt) al tiempo actual
+                            // Actualizamos la fecha de creación (createdAt) al tiempo actual en milisegundos
                             val tiempoActual = System.currentTimeMillis()
                             databaseRef.child(existingId).child("createdAt").setValue(tiempoActual)
                                 .addOnSuccessListener {
@@ -296,20 +296,25 @@ class ApiPeliculaActivity : AppCompatActivity() {
                         return
                     }
 
-                    // 🟢 ESCENARIO B: La película NO existe -> Procedemos a crearla
                     val newId = databaseRef.push().key ?: return
-                    val nombreFormateado = "$tituloMovie ($anio)".trim()
+
+
+                    val nombreFormateado = if (tituloMovie.contains("($anio)")) {
+                        tituloMovie.trim()
+                    } else {
+                        "$tituloMovie ($anio)".trim()
+                    }
 
                     val nuevaPeliculaMap = hashMapOf(
                         "id" to newId,
                         "title" to tituloMovie,
                         "originalTitle" to originalTitleMovie,
-                        "nombre" to nombreFormateado,
+                        "nombre" to nombreFormateado, // 📅 Se guarda con la fecha completa
                         "imageUrl" to imageUrlMovie,
                         "streamUrl" to urlRota,
                         "castv" to 10,
                         "countdownMinutes" to 0,
-                        "createdAt" to System.currentTimeMillis(),
+                        "createdAt" to System.currentTimeMillis(), // Mantiene milisegundos para ordenamientos y temporizadores
                         "email" to "",
                         "trailerUrl" to "",
                         "userId" to ""
@@ -343,7 +348,6 @@ class ApiPeliculaActivity : AppCompatActivity() {
                 }
             })
     }
-
     private suspend fun verificarAlquilerVigenteSincrono(correoKey: String, tituloPelicula: String): Boolean =
         kotlin.coroutines.suspendCoroutine { continuation ->
             // Limpiamos caracteres que no se permiten en claves de Firebase
