@@ -58,7 +58,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.BannerPromosAdapter
-import com.creativem.fulltv.BuildConfig
+//import com.creativem.fulltv.BuildConfig
 import com.creativem.fulltv.R
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.api.MovieDetailResponse
@@ -82,6 +82,7 @@ import com.creativem.fulltv.tv.TvActivity
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.BuildConfig
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
@@ -1135,7 +1136,7 @@ class PeliculasActivity : AppCompatActivity() {
                     // Buscamos cualquier coincidencia en el título (infalible)
                     val firebaseMatches = allFirebaseModelos.filter {
                         it.title.normalizar().contains(queryNormalizada)
-                    }.map { it.copy(title = "💿 ${it.title}") }
+                    }.map { it.copy(title = "${it.title}") }
 
                     // --- B. BÚSQUEDA EN API ---
                     val apiResults = try {
@@ -1149,7 +1150,7 @@ class PeliculasActivity : AppCompatActivity() {
                             response.body()?.results?.map {
                                 Modelo(
                                     id = it.id.toString(),
-                                    title = "🌐 ${it.title} (${it.release_date?.take(4) ?: "N/A"})",
+                                    title = "${it.title} (${it.release_date?.take(4) ?: "N/A"})",
                                     originalTitle = it.original_title,
                                     imageUrl = "https://image.tmdb.org/t/p/w500${it.poster_path}",
                                     streamUrl = "https://tuservidor.com/stream/${it.id}",
