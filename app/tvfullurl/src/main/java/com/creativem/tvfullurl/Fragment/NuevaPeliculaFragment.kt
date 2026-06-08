@@ -65,7 +65,6 @@ class NuevaPeliculaFragment : Fragment() {
         }
     }
 
-    // 🟢 CORREGIDO: Adaptado para fragmentos (se usa requireContext() en el Toast)
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -86,9 +85,7 @@ class NuevaPeliculaFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 🟢 CORREGIDO: Iniciamos la verificación de permisos en el hilo de vista adecuado
         verificarYPedirPermisos()
-
         setupRecyclerView()
         setupListeners()
 
@@ -101,7 +98,6 @@ class NuevaPeliculaFragment : Fragment() {
         }
     }
 
-    // 🟢 CORREGIDO: Validación de permisos adaptada para fragmentos
     private fun verificarYPedirPermisos() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val permisoNotif = android.Manifest.permission.POST_NOTIFICATIONS
@@ -115,7 +111,6 @@ class NuevaPeliculaFragment : Fragment() {
         }
     }
 
-    // 🟢 CORREGIDO: Solicitud de batería adaptada con requireContext() y requireContext().packageName
     @SuppressLint("BatteryLife")
     private fun verificarYPedirExcepcionBateria() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -139,7 +134,6 @@ class NuevaPeliculaFragment : Fragment() {
         arrancarServicioMonitoreo()
     }
 
-    // 🟢 CORREGIDO: Inicio de servicios en primer plano adaptado utilizando ContextCompat
     private fun arrancarServicioMonitoreo() {
         val serviceIntent = Intent(requireContext(), NotificationMonitorService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -194,7 +188,6 @@ class NuevaPeliculaFragment : Fragment() {
         binding.originalTitleEditText.setText(movie.original_title)
 
         val fechaOriginal = movie.release_date ?: ""
-
         selectedYear = fechaOriginal
 
         val tituloFormateado = if (fechaOriginal.isNotEmpty()) {
@@ -236,6 +229,7 @@ class NuevaPeliculaFragment : Fragment() {
         val id = movieId ?: databaseRef.push().key ?: return
 
         if (movieId != null) {
+            // 🟢 MODIFICADO: Agregamos "createdAt" para restablecer la fecha al tiempo actual de la edición
             val camposEditados = mapOf<String, Any>(
                 "title" to title,
                 "originalTitle" to binding.originalTitleEditText.text.toString().trim(),
@@ -244,7 +238,8 @@ class NuevaPeliculaFragment : Fragment() {
                 "streamUrl" to binding.streamUrlEditText.text.toString().trim(),
                 "trailerUrl" to binding.trailerUrlEditText.text.toString().trim(),
                 "countdownMinutes" to (binding.validEditText.text.toString().toIntOrNull() ?: 0),
-                "year" to selectedYear
+                "year" to selectedYear,
+                "createdAt" to System.currentTimeMillis() // 🟢 Este valor sobrescribe la fecha vieja de creación con la fecha de la edición
             )
 
             databaseRef.child(id).updateChildren(camposEditados).addOnSuccessListener {
@@ -264,7 +259,7 @@ class NuevaPeliculaFragment : Fragment() {
                 this.streamUrl = binding.streamUrlEditText.text.toString().trim()
                 this.trailerUrl = binding.trailerUrlEditText.text.toString().trim()
                 this.countdownMinutes = binding.validEditText.text.toString().toIntOrNull() ?: 0
-                this.createdAt = System.currentTimeMillis()
+                this.createdAt = System.currentTimeMillis() // Al crear por primera vez, asigna la fecha inicial
                 this.year = selectedYear
             }
 

@@ -196,10 +196,11 @@ class EditarPeliculaFragment : Fragment() {
                 solicitudesConocidas.addAll(solicitudesCargaActual.map { it.first })
 
                 // ORDENACIÓN GLOBAL:
+                // Cambia la sección de ORDENACIÓN GLOBAL por esta:
                 val listaOrdenada = listaDesglosada.sortedWith(
-                    compareByDescending<Movie> { it.requestTimestamp > 0 }
+                    compareByDescending<Movie> { it.createdAt as? Long ?: 0L } // 🟢 Prioridad 1: Lo más reciente/recién editado va primero
+                        .thenByDescending { it.requestTimestamp > 0 }          // Prioridad 2: Si coinciden, los que tengan solicitudes
                         .thenBy { if (it.requestTimestamp > 0) it.requestTimestamp else Long.MAX_VALUE }
-                        .thenByDescending { it.createdAt as? Long ?: 0L }
                 )
 
                 moviesAdapter.updateMovieList(listaOrdenada)
@@ -373,9 +374,12 @@ class EditarPeliculaFragment : Fragment() {
     }
 
     private fun guardarAlquilerEnUsuario(usuarioKey: String, nombrePeliculaFormateado: String, minutos: Int, movieId: String, activeRequestId: String) {
+        // Usamos el servidor de Firebase para la fecha exacta sincronizada
+        val timestampServidor = com.google.firebase.database.ServerValue.TIMESTAMP
+
         val datosAlquiler = mapOf(
             "countdownMinutes" to minutos,
-            "createdAt" to System.currentTimeMillis()
+            "createdAt" to timestampServidor
         )
 
         rootDatabaseRef.child("usuarios")
@@ -385,27 +389,34 @@ class EditarPeliculaFragment : Fragment() {
             .setValue(datosAlquiler)
             .addOnSuccessListener {
 
+                val updatesPelicula = mutableMapOf<String, Any?>()
+                updatesPelicula["createdAt"] = timestampServidor // Sincroniza la película con la hora del servidor
+
                 if (activeRequestId.isNotEmpty()) {
-                    databaseRef.child(movieId).child("solicitudes").child(activeRequestId).removeValue()
+                    updatesPelicula["solicitudes/$activeRequestId"] = null
+
+                    databaseRef.child(movieId).updateChildren(updatesPelicula)
                         .addOnSuccessListener {
-                            Toast.makeText(requireContext(), "Película asignada y cola de espera actualizada", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(requireContext(), "Película asignada y tiempo iniciado", Toast.LENGTH_SHORT).show()
                         }
                         .addOnFailureListener { e ->
-                            Toast.makeText(requireContext(), "Asignada, pero error al actualizar cola: ${e.message}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(requireContext(), "Error al actualizar película: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
                 } else {
-                    val liberacionMap = mapOf<String, Any>(
-                        "email" to "",
-                        "userId" to ""
-                    )
-                    databaseRef.child(movieId).updateChildren(liberacionMap)
+                    updatesPelicula["email"] = ""
+                    updatesPelicula["userId"] = ""
+
+                    databaseRef.child(movieId).updateChildren(updatesPelicula)
                         .addOnSuccessListener {
                             Toast.makeText(requireContext(), "Película asignada correctamente", Toast.LENGTH_SHORT).show()
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(requireContext(), "Error al actualizar película: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
                 }
             }
             .addOnFailureListener { e ->
-                Toast.makeText(requireContext(), "Error al guardar: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Error al guardar alquiler: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
 
