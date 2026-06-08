@@ -447,15 +447,81 @@ class EditarPeliculaFragment : Fragment() {
         txtUserEmail.text = usuario.correo
         txtTime.text = tiempoLegible
 
-        AlertDialog.Builder(requireContext())
+        // 1. Construimos el diálogo usando .create() en lugar de .show() directo
+        val dialog = AlertDialog.Builder(requireContext())
             .setView(dialogView)
-            .setPositiveButton("Sí, Asignar") { _, _ ->
+            .setPositiveButton("Asignar al Cliente") { _, _ ->
                 guardarAlquilerEnUsuario(usuario.key, tituloConAnio, tiempoAsignadoMinutos, movie.id, movie.activeRequestId)
             }
-            .setNegativeButton("No", null)
-            .show()
+            .setNeutralButton("Rechazar y Devolver CasTV") { _, _ ->
+                val costoPuntos = movie.castv ?: 10
+                rechazarYDevolverPuntos(usuario.key, movie.id, movie.activeRequestId, costoPuntos)
+            }
+            .setNegativeButton("Cerrar", null)
+            .create()
+
+        // 2. Personalizamos los botones cuando el diálogo sea presentado en pantalla
+        dialog.setOnShowListener {
+            val context = requireContext()
+
+            // Botón Positivo: "Sí, Asignar" -> Color Verde y Negrita
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
+                setTextColor(androidx.core.content.ContextCompat.getColor(context, android.R.color.holo_green_dark))
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+            }
+
+            // Botón Neutral: "Rechazar y Devolver" -> Color Rojo y Negrita
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.apply {
+                setTextColor(androidx.core.content.ContextCompat.getColor(context, android.R.color.holo_red_dark))
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+            }
+
+            // Botón Negativo: "No" -> Color Gris
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
+                setTextColor(androidx.core.content.ContextCompat.getColor(context, android.R.color.darker_gray))
+            }
+        }
+
+        // 3. Mostramos el diálogo ya configurado
+        dialog.show()
     }
 
+    private fun rechazarYDevolverPuntos(
+        usuarioKey: String,
+        movieId: String,
+        activeRequestId: String,
+        puntosADevolver: Int
+    ) {
+        // 1. Devolvemos los puntos al usuario de forma segura
+        val usuarioRef = rootDatabaseRef.child("usuarios").child(usuarioKey)
+
+        usuarioRef.child("castv").setValue(com.google.firebase.database.ServerValue.increment(puntosADevolver.toLong()))
+            .addOnSuccessListener {
+
+                // 2. Una vez devueltos los puntos, limpiamos la información de la película
+                val updatesPelicula = mutableMapOf<String, Any?>()
+
+                // Eliminamos la solicitud de la lista de espera
+                if (activeRequestId.isNotEmpty()) {
+                    updatesPelicula["solicitudes/$activeRequestId"] = null
+                }
+
+                // Limpiamos los datos del usuario asignado en la película
+                updatesPelicula["email"] = ""
+                updatesPelicula["userId"] = ""
+
+                databaseRef.child(movieId).updateChildren(updatesPelicula)
+                    .addOnSuccessListener {
+                        Toast.makeText(requireContext(), "Pedido rechazado. Puntos devueltos al usuario ($puntosADevolver CasTV).", Toast.LENGTH_LONG).show()
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(requireContext(), "Puntos devueltos, pero error al limpiar película: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(requireContext(), "Error al devolver puntos: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
     private fun deleteMovie(movieId: String) {
         AlertDialog.Builder(requireContext())
             .setTitle("⚠️ Confirmar Eliminación")

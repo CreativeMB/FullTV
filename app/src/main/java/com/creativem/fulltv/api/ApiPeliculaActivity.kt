@@ -266,10 +266,21 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
                     // 🟢 ESCENARIO A: La película YA existe en la base de datos
                     if (snapshot.exists()) {
-                        android.util.Log.d("FirebaseTV", "✅ La película '$originalTitleMovie' YA existe en 'movies'. Agregando solicitud al ID existente.")
+                        android.util.Log.d("FirebaseTV", "✅ La película '$originalTitleMovie' YA existe en 'movies'. Actualizando fecha y agregando solicitud.")
 
                         val existingId = snapshot.children.firstOrNull()?.key ?: ""
                         if (existingId.isNotEmpty()) {
+
+                            // 🔄 NUEVO: Actualizamos la fecha de creación (createdAt) al tiempo actual
+                            val tiempoActual = System.currentTimeMillis()
+                            databaseRef.child(existingId).child("createdAt").setValue(tiempoActual)
+                                .addOnSuccessListener {
+                                    android.util.Log.d("FirebaseTV", "📅 'createdAt' actualizado para la película: $existingId")
+                                }
+                                .addOnFailureListener { e ->
+                                    android.util.Log.e("FirebaseTV", "❌ Error al actualizar 'createdAt'", e)
+                                }
+
                             // Añadimos la solicitud al listado de espera de la película existente
                             val solicitudesRef = databaseRef.child(existingId).child("solicitudes").push()
                             val idSolicitud = solicitudesRef.key ?: ""
