@@ -81,7 +81,6 @@ import com.creativem.fulltv.tv.TvActivity
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.BuildConfig
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
@@ -104,7 +103,7 @@ import java.util.concurrent.TimeUnit
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
-
+import com.creativem.fulltv.BuildConfig
 
 class PeliculasActivity : AppCompatActivity() {
 
