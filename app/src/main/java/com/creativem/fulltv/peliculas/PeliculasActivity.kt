@@ -106,24 +106,24 @@ import com.google.zxing.common.BitMatrix
 import com.creativem.fulltv.BuildConfig
 
 class PeliculasActivity : AppCompatActivity() {
-
     companion object {
-        // Esta variable persiste en memoria durante toda la sesión de la app
+        // 🍿 Variable estática: Asegura que solo se valide una única vez por inicio de app
         private var haVerificadoAlquileresEnEstaSesion = false
 
-        // Método para restablecer el estado si el usuario decide cerrar sesión
         fun restablecerEstadoSesion() {
             haVerificadoAlquileresEnEstaSesion = false
         }
     }
-    private var alquileresDialog: Dialog? = null
+
+    private var haVerificadoAlquileresEnEstaSesion = false
+
     private var primeraCargaBanner = true
+
     private var jobRotacion: Job? = null
     private var yaTieneListener = false
     private lateinit var binding: ActivityPeliculasBinding
     private lateinit var movieAdapter: MoviesAdapter
     private val modeloList = mutableListOf<Modelo>()
-    private var esModoGratis = false
 
     private val auth by lazy { FirebaseAuth.getInstance() }
     private val databaseRef: DatabaseReference = FirebaseDatabase.getInstance().reference
@@ -247,18 +247,16 @@ class PeliculasActivity : AppCompatActivity() {
     private fun intentarVerificacionAlquileres() {
         val currentUser = auth.currentUser
         if (currentUser != null && !currentUser.email.isNullOrBlank()) {
-            // La sesión de Firebase ya se encuentra totalmente activa y cargada
             if (!haVerificadoAlquileresEnEstaSesion) {
                 haVerificadoAlquileresEnEstaSesion = true
                 verificarAlquileresActivos()
             }
         } else {
-            // Si la sesión de Firebase no está lista (Arranque frío desde Splash), reintentamos en 500ms
             Handler(Looper.getMainLooper()).postDelayed({
                 if (!isFinishing && !isDestroyed) {
                     intentarVerificacionAlquileres()
                 }
-            }, 500)
+            }, 1500)
         }
     }
 
@@ -2209,20 +2207,22 @@ class PeliculasActivity : AppCompatActivity() {
         val email = user.email ?: return
         if (email == "invitado@fulltv.com") return
 
+        // 1. Evitar ejecuciones si la actividad se está cerrando antes de la consulta
+        if (isFinishing || isDestroyed || supportFragmentManager.isStateSaved) return
+
         val correoKey = email.replace(".", "_").replace("@", "_")
 
-        // 1. Consultamos los alquileres del usuario (Una sola lectura directa)
         databaseRef.child("usuarios").child(correoKey).child("alquileres")
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(rentalsSnapshot: DataSnapshot) {
-                    if (!rentalsSnapshot.exists()) return
+                    // 2. Control de seguridad post-primer callback
+                    if (isFinishing || isDestroyed || !rentalsSnapshot.exists()) return
 
-                    // 2. Consultamos la lista global de películas del servidor para asegurar datos frescos
                     databaseRef.child("movies").addListenerForSingleValueEvent(object : ValueEventListener {
                         override fun onDataChange(moviesSnapshot: DataSnapshot) {
-                            if (!moviesSnapshot.exists()) return
+                            // 3. Control de seguridad crítico pre-renderizado del fragmento
+                            if (isFinishing || isDestroyed || !moviesSnapshot.exists()) return
 
-                            // Generamos una caché local temporal y segura con datos limpios
                             val freshMoviesCache = mutableMapOf<String, Modelo>()
                             for (child in moviesSnapshot.children) {
                                 val movie = child.getValue(Modelo::class.java) ?: continue
@@ -2253,19 +2253,19 @@ class PeliculasActivity : AppCompatActivity() {
                                         )
                                     }
                                 } else {
-                                    // Limpieza pasiva de alquileres expirados
                                     child.ref.removeValue()
                                 }
                             }
 
-                            // ... (Dentro de verificarAlquileresActivos -> moviesSnapshot success listener)
-                            // Si hay alquileres vigentes confirmados, mostramos el diálogo fragmento
-                            if (alquileresVigentes.isNotEmpty()) {
-                                // 👇 LLAMADA CON DIALOGFRAGMENT: Seguro contra recreaciones y rediseños de fondo
-                                val dialogFragment = AlquileresDialogFragment.newInstance(alquileresVigentes, correoKey)
-                                dialogFragment.show(supportFragmentManager, "AlquileresDialog")
+                            // 4. Mostrar el diálogo de forma 100% segura
+                            if (alquileresVigentes.isNotEmpty() && !supportFragmentManager.isStateSaved) {
+                                val yaExiste = supportFragmentManager.findFragmentByTag("AlquileresDialog")
+                                // Solo se muestra si el fragment manager sigue activo y no está duplicado
+                                if (yaExiste == null && !isFinishing && !isDestroyed) {
+                                    val dialogFragment = AlquileresDialogFragment.newInstance(alquileresVigentes, correoKey)
+                                    dialogFragment.show(supportFragmentManager, "AlquileresDialog")
+                                }
                             }
-// ...
                         }
 
                         override fun onCancelled(error: DatabaseError) {
@@ -2421,7 +2421,7 @@ class PeliculasActivity : AppCompatActivity() {
     }
 
     private fun cerrarSesion() {
-        // 👇 Restablece la variable estática al cerrar sesión
+        // 👇 Restablecemos la sesión de alquileres para el próximo inicio
         restablecerEstadoSesion()
 
         auth.signOut()

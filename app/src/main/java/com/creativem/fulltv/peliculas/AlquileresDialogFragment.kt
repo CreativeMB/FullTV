@@ -23,16 +23,31 @@ import com.creativem.fulltv.principal.Modelo
 import com.google.firebase.database.FirebaseDatabase
 
 class AlquileresDialogFragment : DialogFragment() {
-
     companion object {
         private const val ARG_CORREO_KEY = "correo_key"
-        private var alquileresList: List<Modelo.AlquilerItem> = emptyList()
+        private const val ARG_MOVIES_LIST = "movies_list"
+        private const val ARG_CREATED_ATS = "created_ats"
+        private const val ARG_COUNTDOWNS = "countdowns"
 
         fun newInstance(alquileres: List<Modelo.AlquilerItem>, correoKey: String): AlquileresDialogFragment {
-            alquileresList = alquileres
             val fragment = AlquileresDialogFragment()
+
+            // Descomponemos la lista en tipos de datos primitivos serializables para guardarlos en el Bundle
+            val movies = ArrayList<Modelo>()
+            val createdAts = LongArray(alquileres.size)
+            val countdowns = IntArray(alquileres.size)
+
+            alquileres.forEachIndexed { index, item ->
+                movies.add(item.movie)
+                createdAts[index] = item.createdAt
+                countdowns[index] = item.countdownMinutes
+            }
+
             val args = Bundle().apply {
                 putString(ARG_CORREO_KEY, correoKey)
+                putSerializable(ARG_MOVIES_LIST, movies)
+                putLongArray(ARG_CREATED_ATS, createdAts)
+                putIntArray(ARG_COUNTDOWNS, countdowns)
             }
             fragment.arguments = args
             return fragment
@@ -42,6 +57,19 @@ class AlquileresDialogFragment : DialogFragment() {
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val parentActivity = requireActivity() as PeliculasActivity
         val correoKey = arguments?.getString(ARG_CORREO_KEY) ?: ""
+
+        // Reconstruimos la lista de AlquilerItem de forma segura desde el Bundle guardado
+        val movies = arguments?.getSerializable(ARG_MOVIES_LIST) as? ArrayList<Modelo> ?: ArrayList()
+        val createdAts = arguments?.getLongArray(ARG_CREATED_ATS) ?: LongArray(0)
+        val countdowns = arguments?.getIntArray(ARG_COUNTDOWNS) ?: IntArray(0)
+
+        val alquileresReconstruidos = movies.mapIndexed { index, movie ->
+            Modelo.AlquilerItem(
+                movie = movie,
+                createdAt = createdAts.getOrElse(index) { 0L },
+                countdownMinutes = countdowns.getOrElse(index) { 0 }
+            )
+        }
 
         val colorDorado = Color.parseColor("#C5A059")
         val colorFondo = Color.parseColor("#0A122A")
@@ -93,7 +121,7 @@ class AlquileresDialogFragment : DialogFragment() {
         }
 
         val mensaje = TextView(parentActivity).apply {
-            text = "Tienes películas listas con tiempo de visualización activo: (ver en Perfil)"
+            text = "Tienes películas listas con tiempo de visualización activo:"
             textSize = 13f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
@@ -116,14 +144,13 @@ class AlquileresDialogFragment : DialogFragment() {
             clipToPadding = true
             clipChildren = true
 
-            layoutManager =
-                LinearLayoutManager(parentActivity, LinearLayoutManager.HORIZONTAL, false)
+            layoutManager = LinearLayoutManager(parentActivity, LinearLayoutManager.HORIZONTAL, false)
             isFocusable = true
             isFocusableInTouchMode = true
         }
 
         val adapter = AlquileresAdapter(
-            items = alquileresList.toMutableList(),
+            items = alquileresReconstruidos.toMutableList(),
             onListEmpty = {
                 dismiss()
             },
@@ -212,7 +239,7 @@ class AlquileresDialogFragment : DialogFragment() {
 
         Handler(Looper.getMainLooper()).postDelayed({
             if (dialog.isShowing) {
-                if (alquileresList.isNotEmpty()) {
+                if (alquileresReconstruidos.isNotEmpty()) {
                     val primerElemento = rvAlquileres.layoutManager?.findViewByPosition(0)
                     primerElemento?.requestFocus() ?: btnCerrar.requestFocus()
                 } else {
