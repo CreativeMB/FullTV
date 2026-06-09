@@ -121,7 +121,7 @@ class AlquileresDialogFragment : DialogFragment() {
         }
 
         val mensaje = TextView(parentActivity).apply {
-            text = "Tienes películas listas con tiempo de visualización activo:"
+            text = "Tienes películas listas con tiempo de visualización activo:(contenido en Perfil)"
             textSize = 13f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
