@@ -1765,7 +1765,7 @@ class PeliculasActivity : AppCompatActivity() {
                             "originalTitle" to originalTitleMovie,
                             "nombre" to nombreFormateado,
                             "imageUrl" to imageUrlMovie,
-                            "streamUrl" to "", // Queda sin enlace de reproducción (rota) para que el admin la asigne
+                            "streamUrl" to "https://tuservidor.com/stream/", // Queda sin enlace de reproducción (rota) para que el admin la asigne
                             "castv" to 10,
                             "countdownMinutes" to 0,
                             "createdAt" to System.currentTimeMillis(),
