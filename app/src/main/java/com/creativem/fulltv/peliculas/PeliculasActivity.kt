@@ -67,6 +67,7 @@ import com.creativem.fulltv.api.TMDbApiService
 import com.creativem.fulltv.databinding.ActivityPeliculasBinding
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
 import com.creativem.fulltv.menu.MenuPrincipalItem
+import com.creativem.fulltv.peliculasvalidas.AlquileresAdapter
 import com.creativem.fulltv.peliculasvalidas.PeliculasValidasActivity
 import com.creativem.fulltv.peliculasvalidas.Validaciones
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
@@ -104,8 +105,19 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
 
+
 class PeliculasActivity : AppCompatActivity() {
 
+    companion object {
+        // Esta variable persiste en memoria durante toda la sesión de la app
+        private var haVerificadoAlquileresEnEstaSesion = false
+
+        // Método para restablecer el estado si el usuario decide cerrar sesión
+        fun restablecerEstadoSesion() {
+            haVerificadoAlquileresEnEstaSesion = false
+        }
+    }
+    private var alquileresDialog: Dialog? = null
     private var primeraCargaBanner = true
     private var jobRotacion: Job? = null
     private var yaTieneListener = false
@@ -138,7 +150,6 @@ class PeliculasActivity : AppCompatActivity() {
 
     private var isUserInteractingWithPromo = false
     private val inactivityHandler = Handler(Looper.getMainLooper())
-
     private val inactivityRunnable = Runnable {
         isUserInteractingWithPromo = false
     }
@@ -228,6 +239,28 @@ class PeliculasActivity : AppCompatActivity() {
             .client(client)
             .build()
         apiService = retrofit.create(TMDbApiService::class.java)
+
+        // 👇 CORRECCIÓN: Llamamos al verificador inteligente
+        intentarVerificacionAlquileres()
+
+
+    }
+    private fun intentarVerificacionAlquileres() {
+        val currentUser = auth.currentUser
+        if (currentUser != null && !currentUser.email.isNullOrBlank()) {
+            // La sesión de Firebase ya se encuentra totalmente activa y cargada
+            if (!haVerificadoAlquileresEnEstaSesion) {
+                haVerificadoAlquileresEnEstaSesion = true
+                verificarAlquileresActivos()
+            }
+        } else {
+            // Si la sesión de Firebase no está lista (Arranque frío desde Splash), reintentamos en 500ms
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (!isFinishing && !isDestroyed) {
+                    intentarVerificacionAlquileres()
+                }
+            }, 500)
+        }
     }
 
     private fun configurarAnimacionDelBanner() {
@@ -348,6 +381,10 @@ class PeliculasActivity : AppCompatActivity() {
     private fun iniciarRotacionAutomaticaDesde(inicio: Int = currentPromoIndex) {
         detenerRotacionAutomatica()
         if (peliculasPromoList.isEmpty()) return
+
+        // 👇 CORRECCIÓN: Comprobamos de manera segura si el DialogFragment está activo en la jerarquía
+        val isDialogShowing = supportFragmentManager.findFragmentByTag("AlquileresDialog") != null
+        if (isDialogShowing) return
 
         jobRotacion = lifecycleScope.launch {
             var indiceActual = inicio
@@ -2160,6 +2197,89 @@ class PeliculasActivity : AppCompatActivity() {
             null
         }
     }
+    private fun normalizarClave(texto: String): String {
+        return texto.replace(".", "_")
+            .replace("$", "_")
+            .replace("#", "_")
+            .replace("[", "_")
+            .replace("]", "_")
+    }
+
+    private fun verificarAlquileresActivos() {
+        val user = auth.currentUser ?: return
+        val email = user.email ?: return
+        if (email == "invitado@fulltv.com") return
+
+        val correoKey = email.replace(".", "_").replace("@", "_")
+
+        // 1. Consultamos los alquileres del usuario (Una sola lectura directa)
+        databaseRef.child("usuarios").child(correoKey).child("alquileres")
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(rentalsSnapshot: DataSnapshot) {
+                    if (!rentalsSnapshot.exists()) return
+
+                    // 2. Consultamos la lista global de películas del servidor para asegurar datos frescos
+                    databaseRef.child("movies").addListenerForSingleValueEvent(object : ValueEventListener {
+                        override fun onDataChange(moviesSnapshot: DataSnapshot) {
+                            if (!moviesSnapshot.exists()) return
+
+                            // Generamos una caché local temporal y segura con datos limpios
+                            val freshMoviesCache = mutableMapOf<String, Modelo>()
+                            for (child in moviesSnapshot.children) {
+                                val movie = child.getValue(Modelo::class.java) ?: continue
+                                movie.id = child.key ?: ""
+                                freshMoviesCache[normalizarClave(movie.title)] = movie
+                            }
+
+                            val alquileresVigentes = mutableListOf<Modelo.AlquilerItem>()
+                            val ahora = System.currentTimeMillis()
+
+                            for (child in rentalsSnapshot.children) {
+                                val tituloKey = child.key ?: continue
+                                val createdAt = (child.child("createdAt").value as? Number)?.toLong() ?: 0L
+                                val countdownMinutes = (child.child("countdownMinutes").value as? Number)?.toInt() ?: 0
+
+                                val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownMinutes.toLong())
+                                val tiempoRestante = durationMillis - (ahora - createdAt)
+
+                                if (tiempoRestante > 0) {
+                                    val movie = freshMoviesCache[tituloKey]
+                                    if (movie != null) {
+                                        alquileresVigentes.add(
+                                            Modelo.AlquilerItem(
+                                                movie = movie,
+                                                createdAt = createdAt,
+                                                countdownMinutes = countdownMinutes
+                                            )
+                                        )
+                                    }
+                                } else {
+                                    // Limpieza pasiva de alquileres expirados
+                                    child.ref.removeValue()
+                                }
+                            }
+
+                            // ... (Dentro de verificarAlquileresActivos -> moviesSnapshot success listener)
+                            // Si hay alquileres vigentes confirmados, mostramos el diálogo fragmento
+                            if (alquileresVigentes.isNotEmpty()) {
+                                // 👇 LLAMADA CON DIALOGFRAGMENT: Seguro contra recreaciones y rediseños de fondo
+                                val dialogFragment = AlquileresDialogFragment.newInstance(alquileresVigentes, correoKey)
+                                dialogFragment.show(supportFragmentManager, "AlquileresDialog")
+                            }
+// ...
+                        }
+
+                        override fun onCancelled(error: DatabaseError) {
+                            Log.e("ALQUILERES_DB", "Error al leer películas: ${error.message}")
+                        }
+                    })
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("ALQUILERES_DB", "Error al leer alquileres: ${error.message}")
+                }
+            })
+    }
 
     private fun escucharCambiosEnPeliculas() {
         if (yaTieneListener) return
@@ -2182,34 +2302,56 @@ class PeliculasActivity : AppCompatActivity() {
                         }
                     }
 
-                    val listaNuevaOrdenada = nuevasPeliculasRaw.sortedByDescending { it.createdAt }
+                    // ⚡ OPTIMIZACIÓN CLAVE: Corremos el cálculo pesado (DiffUtil) en segundo plano
+                    lifecycleScope.launch(Dispatchers.Default) {
+                        val listaNuevaOrdenada = nuevasPeliculasRaw.sortedByDescending { it.createdAt }
 
-                    if (modeloList.isEmpty()) {
-                        modeloList.addAll(listaNuevaOrdenada)
-                        movieAdapter.notifyDataSetChanged()
-                    } else {
-                        val listaVieja = ArrayList(modeloList)
+                        if (modeloList.isEmpty()) {
+                            withContext(Dispatchers.Main) {
+                                modeloList.addAll(listaNuevaOrdenada)
+                                movieAdapter.notifyDataSetChanged()
 
-                        val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-                            override fun getOldListSize(): Int = listaVieja.size
-                            override fun getNewListSize(): Int = listaNuevaOrdenada.size
-
-                            override fun areItemsTheSame(oldPos: Int, newPos: Int): Boolean {
-                                return listaVieja[oldPos].id == listaNuevaOrdenada[newPos].id
+                                // Primera validación de alquileres una vez cargadas las películas
+                                if (!haVerificadoAlquileresEnEstaSesion) {
+                                    haVerificadoAlquileresEnEstaSesion = true
+                                    verificarAlquileresActivos()
+                                }
                             }
+                        } else {
+                            val listaVieja = ArrayList(modeloList)
 
-                            override fun areContentsTheSame(oldPos: Int, newPos: Int): Boolean {
-                                return listaVieja[oldPos] == listaNuevaOrdenada[newPos]
+                            // Cálculo asíncrono que libera por completo la UI del TV o emulador
+                            val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                                override fun getOldListSize(): Int = listaVieja.size
+                                override fun getNewListSize(): Int = listaNuevaOrdenada.size
+
+                                override fun areItemsTheSame(oldPos: Int, newPos: Int): Boolean {
+                                    return listaVieja[oldPos].id == listaNuevaOrdenada[newPos].id
+                                }
+
+                                override fun areContentsTheSame(oldPos: Int, newPos: Int): Boolean {
+                                    return listaVieja[oldPos] == listaNuevaOrdenada[newPos]
+                                }
+                            })
+
+                            withContext(Dispatchers.Main) {
+                                modeloList.clear()
+                                modeloList.addAll(listaNuevaOrdenada)
+                                diffResult.dispatchUpdatesTo(movieAdapter)
+
+                                // Validación preventiva por si la primera carga tardó
+                                if (!haVerificadoAlquileresEnEstaSesion) {
+                                    haVerificadoAlquileresEnEstaSesion = true
+                                    verificarAlquileresActivos()
+                                }
                             }
-                        })
+                        }
 
-                        modeloList.clear()
-                        modeloList.addAll(listaNuevaOrdenada)
-                        diffResult.dispatchUpdatesTo(movieAdapter)
-                    }
-
-                    if (!Validacioneslista.yaCargado()) {
-                        validarYActualizarVistasEnVivo()
+                        withContext(Dispatchers.Main) {
+                            if (!Validacioneslista.yaCargado()) {
+                                validarYActualizarVistasEnVivo()
+                            }
+                        }
                     }
                     yaTieneListener = true
                 } else {
@@ -2258,7 +2400,7 @@ class PeliculasActivity : AppCompatActivity() {
         }
     }
 
-    private fun irAlReproductor(modelo: Modelo) {
+    fun irAlReproductor(modelo: Modelo) {
         if (modelo.streamUrl.isNullOrBlank()) {
             Toast.makeText(this, "El enlace de reproducción no es válido", Toast.LENGTH_SHORT).show()
             return
@@ -2280,8 +2422,10 @@ class PeliculasActivity : AppCompatActivity() {
     }
 
     private fun cerrarSesion() {
-        auth.signOut()
+        // 👇 Restablece la variable estática al cerrar sesión
+        restablecerEstadoSesion()
 
+        auth.signOut()
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
             .build()
@@ -2383,3 +2527,4 @@ class PeliculasActivity : AppCompatActivity() {
         Log.d("PeliculasActivity", "Limpieza de onDestroy completada")
     }
 }
+
