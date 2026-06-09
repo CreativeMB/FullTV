@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Color del texto cuando tiene el FOCO (Oscuro para contrastar sobre fondo blanco) -->
+    <item android:state_focused="true" android:color="#000000" />
+
+    <!-- Color del texto cuando NO tiene el foco -->
+    <item android:state_focused="false" android:color="#FFFFFF" />
+</selector>

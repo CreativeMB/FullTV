@@ -32,7 +32,6 @@ class AlquileresDialogFragment : DialogFragment() {
         fun newInstance(alquileres: List<Modelo.AlquilerItem>, correoKey: String): AlquileresDialogFragment {
             val fragment = AlquileresDialogFragment()
 
-            // Descomponemos la lista en tipos de datos primitivos serializables para guardarlos en el Bundle
             val movies = ArrayList<Modelo>()
             val createdAts = LongArray(alquileres.size)
             val countdowns = IntArray(alquileres.size)
@@ -58,7 +57,6 @@ class AlquileresDialogFragment : DialogFragment() {
         val parentActivity = requireActivity() as PeliculasActivity
         val correoKey = arguments?.getString(ARG_CORREO_KEY) ?: ""
 
-        // Reconstruimos la lista de AlquilerItem de forma segura desde el Bundle guardado
         val movies = arguments?.getSerializable(ARG_MOVIES_LIST) as? ArrayList<Modelo> ?: ArrayList()
         val createdAts = arguments?.getLongArray(ARG_CREATED_ATS) ?: LongArray(0)
         val countdowns = arguments?.getIntArray(ARG_COUNTDOWNS) ?: IntArray(0)
@@ -80,14 +78,15 @@ class AlquileresDialogFragment : DialogFragment() {
         val maxDialogWidth = dpToPx(520)
         val targetWidth = minOf((displayMetrics.widthPixels * 0.9f).toInt(), maxDialogWidth)
 
+        // OPTIMIZACIÓN: Se desactivó clipChildren y clipToPadding para evitar recortes al escalar
         val scrollView = ScrollView(parentActivity).apply {
             layoutParams = ViewGroup.LayoutParams(
                 targetWidth,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
             isFillViewport = true
-            clipChildren = true
-            clipToPadding = true
+            clipChildren = false // PERMITIR DIBUJADO FUERA DE LÍMITES
+            clipToPadding = false // PERMITIR DIBUJADO EN EL PADDING
             background = GradientDrawable().apply {
                 setColor(colorFondo)
                 cornerRadius = dpToPx(16).toFloat()
@@ -95,11 +94,12 @@ class AlquileresDialogFragment : DialogFragment() {
             }
         }
 
+        // OPTIMIZACIÓN: Se desactivó clipChildren y clipToPadding
         val container = LinearLayout(parentActivity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dpToPx(20), dpToPx(20), dpToPx(20), dpToPx(20))
-            clipChildren = true
-            clipToPadding = true
+            clipChildren = false // PERMITIR DIBUJADO FUERA DE LÍMITES
+            clipToPadding = false // PERMITIR DIBUJADO EN EL PADDING
             layoutParams = android.widget.FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -133,6 +133,7 @@ class AlquileresDialogFragment : DialogFragment() {
             }
         }
 
+        // OPTIMIZACIÓN: Aumento de padding vertical (de 6dp a 16dp) y eliminación de recorte de bordes
         val rvAlquileres = RecyclerView(parentActivity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -140,9 +141,10 @@ class AlquileresDialogFragment : DialogFragment() {
             ).apply {
                 bottomMargin = dpToPx(20)
             }
-            setPadding(0, dpToPx(6), 0, dpToPx(6))
-            clipToPadding = true
-            clipChildren = true
+            // Añadimos más espacio vertical (16dp) para el crecimiento visual de las tarjetas con foco
+            setPadding(0, dpToPx(16), 0, dpToPx(16))
+            clipToPadding = false // IMPORTANTE: Desactivado para que no se corte dentro del padding
+            clipChildren = false  // IMPORTANTE: Desactivado para que no se corte fuera del RecyclerView
 
             layoutManager = LinearLayoutManager(parentActivity, LinearLayoutManager.HORIZONTAL, false)
             isFocusable = true

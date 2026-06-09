@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Estado: CON FOCO (Seleccionado con el control) -->
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFF" /> <!-- Fondo blanco brillante con foco -->
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+
+    <!-- Estado: SIN FOCO (Normal - Súper Oscuro) -->
+    <item android:state_focused="false">
+        <shape android:shape="rectangle">
+            <solid android:color="#99000000" /> <!-- Negro translúcido al 60% para máxima oscuridad -->
+            <corners android:radius="8dp" />
+            <!-- Borde muy discreto para delimitar el botón en pantallas oscuras -->
+            <stroke android:width="1dp" android:color="#26FFFFFF" />
+        </shape>
+    </item>
+</selector>

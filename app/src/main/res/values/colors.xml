@@ -27,7 +27,7 @@
     <color name="backgroundColor">#525252</color> <!-- Color de fondo -->
     <color name="textColorPrimary">#FFFFFF</color> <!-- Color de texto principal -->
     <color name="textColorSecondary">#BB86FC</color> <!-- Color de texto secundario -->
-
+    <color name="fondoTexto">#96000000</color>
     <!-- Colores principales de la aplicación -->
     <color name="exo_bottom_bar_background">#212121</color> <!-- Fondo oscuro de la barra inferior -->
     <color name="exo_button_highlight">#FFEB3B</color> <!-- Color de resaltado cuando se selecciona un botón (amarillo) -->
