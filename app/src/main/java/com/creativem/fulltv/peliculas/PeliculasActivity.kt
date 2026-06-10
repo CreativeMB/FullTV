@@ -1171,7 +1171,6 @@ class PeliculasActivity : AppCompatActivity() {
 
         val dpToPx = { dp: Int -> (dp * density).toInt() }
 
-        // 🟢 CLAVE: Declaramos el diálogo al inicio para poder referenciarlo desde los listeners de clic
         var dialog: AlertDialog? = null
 
         val container = LinearLayout(this).apply {
@@ -1346,12 +1345,17 @@ class PeliculasActivity : AppCompatActivity() {
                             if (response.isSuccessful) {
                                 val results = response.body()?.results ?: emptyList()
                                 for (movie in results) {
-                                    val itemTextView = TextView(this@PeliculasActivity).apply {
-                                        val fechaCompleta = movie.release_date ?: "2026-01-01"
-                                        text = "🎬 ${movie.title} ($fechaCompleta)"
-                                        setTextColor(Color.WHITE)
-                                        textSize = 14f
-                                        setPadding(dpToPx(10), dpToPx(12), dpToPx(10), dpToPx(12))
+
+                                    // 🟢 DISEÑO MEJORADO: Fila horizontal para [Miniatura Póster | Nombre]
+                                    val itemRow = LinearLayout(this@PeliculasActivity).apply {
+                                        orientation = LinearLayout.HORIZONTAL
+                                        setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
+                                        layoutParams = LinearLayout.LayoutParams(
+                                            LinearLayout.LayoutParams.MATCH_PARENT,
+                                            LinearLayout.LayoutParams.WRAP_CONTENT
+                                        ).apply {
+                                            bottomMargin = dpToPx(4)
+                                        }
                                         isFocusable = true
                                         isFocusableInTouchMode = true
 
@@ -1362,9 +1366,11 @@ class PeliculasActivity : AppCompatActivity() {
                                             setStroke(dpToPx(2), colorTextoLogo)
                                         }
 
+                                        // Controles del textview para aplicar negrita al enfocar
                                         setOnFocusChangeListener { _, hasFocus ->
                                             background = if (hasFocus) focusBg else normalBg
-                                            setTypeface(null, if (hasFocus) Typeface.BOLD else Typeface.NORMAL)
+                                            val tvChild = getChildAt(1) as? TextView
+                                            tvChild?.setTypeface(null, if (hasFocus) Typeface.BOLD else Typeface.NORMAL)
                                         }
 
                                         setOnKeyListener { _, keyCode, keyEvent ->
@@ -1407,20 +1413,58 @@ class PeliculasActivity : AppCompatActivity() {
                                             input.setText(selectedTitle)
                                             input.clearFocus()
 
-                                            // 🟢 ENFOQUE AUTOMÁTICO EN EL BOTÓN "SIGUIENTE"
                                             dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.requestFocus()
                                         }
                                     }
-                                    resultsContainer.addView(itemTextView)
+
+                                    // Imagen de portada dentro de la sugerencia
+                                    val ivSugerenciaPoster = ImageView(this@PeliculasActivity).apply {
+                                        layoutParams = LinearLayout.LayoutParams(dpToPx(40), dpToPx(60)).apply {
+                                            rightMargin = dpToPx(12)
+                                        }
+                                        scaleType = ImageView.ScaleType.CENTER_CROP
+                                    }
+
+                                    // Título dentro de la sugerencia
+                                    val tvSugerenciaTitulo = TextView(this@PeliculasActivity).apply {
+                                        val fechaCompleta = movie.release_date ?: "2026-01-01"
+                                        text = "${movie.title} ($fechaCompleta)"
+                                        setTextColor(Color.WHITE)
+                                        textSize = 14f
+                                        gravity = Gravity.CENTER_VERTICAL
+                                        layoutParams = LinearLayout.LayoutParams(
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
+                                            ViewGroup.LayoutParams.MATCH_PARENT
+                                        )
+                                    }
+
+                                    // Carga asíncrona de la miniatura de póster sugerida (w154 para optimizar consumo)
+                                    if (!movie.poster_path.isNullOrBlank()) {
+                                        Glide.with(this@PeliculasActivity)
+                                            .load("https://image.tmdb.org/t/p/w154${movie.poster_path}")
+                                            .placeholder(R.drawable.cine)
+                                            .into(ivSugerenciaPoster)
+                                    } else {
+                                        ivSugerenciaPoster.setImageResource(R.drawable.cine)
+                                    }
+
+                                    itemRow.addView(ivSugerenciaPoster)
+                                    itemRow.addView(tvSugerenciaTitulo)
+
+                                    resultsContainer.addView(itemRow)
                                 }
                             }
 
-                            val customItemView = TextView(this@PeliculasActivity).apply {
-                                text = "➕ Pedir: \"$query\" (Pedido Personalizado)"
-                                setTextColor(colorTextoLogo)
-                                textSize = 14f
-                                setTypeface(null, Typeface.BOLD)
-                                setPadding(dpToPx(10), dpToPx(12), dpToPx(10), dpToPx(12))
+                            // 🟢 DISEÑO MEJORADO PARA PEDIDO PERSONALIZADO: Conserva la misma alineación de filas
+                            val customItemRow = LinearLayout(this@PeliculasActivity).apply {
+                                orientation = LinearLayout.HORIZONTAL
+                                setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
+                                layoutParams = LinearLayout.LayoutParams(
+                                    LinearLayout.LayoutParams.MATCH_PARENT,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT
+                                ).apply {
+                                    bottomMargin = dpToPx(4)
+                                }
                                 isFocusable = true
                                 isFocusableInTouchMode = true
 
@@ -1464,11 +1508,35 @@ class PeliculasActivity : AppCompatActivity() {
                                     input.setText(selectedTitle)
                                     input.clearFocus()
 
-                                    // 🟢 ENFOQUE AUTOMÁTICO EN EL BOTÓN "SIGUIENTE"
                                     dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.requestFocus()
                                 }
                             }
-                            resultsContainer.addView(customItemView)
+
+                            // Ícono por defecto para pedido personalizado
+                            val ivCustomIcon = ImageView(this@PeliculasActivity).apply {
+                                layoutParams = LinearLayout.LayoutParams(dpToPx(40), dpToPx(60)).apply {
+                                    rightMargin = dpToPx(12)
+                                }
+                                scaleType = ImageView.ScaleType.CENTER_CROP
+                                setImageResource(R.drawable.cine)
+                            }
+
+                            val tvCustomRow = TextView(this@PeliculasActivity).apply {
+                                text = "➕ Pedir: \"$query\" (Pedido Personalizado)"
+                                setTextColor(colorTextoLogo)
+                                textSize = 14f
+                                setTypeface(null, Typeface.BOLD)
+                                gravity = Gravity.CENTER_VERTICAL
+                                layoutParams = LinearLayout.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT
+                                )
+                            }
+
+                            customItemRow.addView(ivCustomIcon)
+                            customItemRow.addView(tvCustomRow)
+
+                            resultsContainer.addView(customItemRow)
                         }
                     } catch (e: Exception) {
                         Log.e("TMDB_Pedido", "Error al buscar: ${e.message}")
@@ -1478,7 +1546,6 @@ class PeliculasActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {}
         })
 
-        // 🟢 Creamos el diálogo utilizando la variable local para capturar su referencia
         dialog = AlertDialog.Builder(this)
             .setView(scrollView)
             .setPositiveButton("SIGUIENTE", null)
@@ -1500,11 +1567,9 @@ class PeliculasActivity : AppCompatActivity() {
                     return@setOnClickListener
                 }
 
-                // 🛑 VALIDACIÓN ESTRICTA: Si no seleccionó de la lista, no le permite continuar
                 if (selectedTitle.isEmpty() || typedText != selectedTitle) {
                     input.error = "Selecciona una opción de la lista de abajo"
 
-                    // Alerta visual de advertencia para guiar al usuario del control de TV
                     CineAlert.show(
                         this@PeliculasActivity,
                         "Por favor, selecciona una opción de la lista sugerida de abajo antes de continuar 🎬",
@@ -1514,7 +1579,6 @@ class PeliculasActivity : AppCompatActivity() {
                     return@setOnClickListener
                 }
 
-                // Si pasó la validación (porque sí seleccionó una opción), procedemos al pago
                 comprobantepago(
                     selectedTitle,
                     selectedOriginalTitle,
@@ -1523,7 +1587,7 @@ class PeliculasActivity : AppCompatActivity() {
                     selectedSipnosis,
                     selectedCalificacion
                 )
-                    dialog?.dismiss()
+                dialog?.dismiss()
             }
         }
 
@@ -1532,7 +1596,6 @@ class PeliculasActivity : AppCompatActivity() {
             textSize = 14f
         }
     }
-
 
     private fun comprobantepago(
         titulo: String,

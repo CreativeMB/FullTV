@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -12,7 +13,9 @@ import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
 import android.util.Log
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -606,49 +609,91 @@ class ApiPeliculaActivity : AppCompatActivity() {
         showErrorDialog(tituloUsado, costo, correoUsuario)
     }
 
-    // --- DIALOGO DE ENLACE ROTO Y PEDIDO ---
-    // --- DIALOGO DE ENLACE ROTO Y PEDIDO CON DISEÑO PREMIUM UNIFICADO ---
     @SuppressLint("SetTextI18n")
     private fun showErrorDialog(movieTitle: String, movieCastv: Int, correoUsuario: String) {
         val colorFondoPrincipal = Color.parseColor("#2A2A2A") // Gris Oscuro Premium
         val colorDorado = Color.parseColor("#C5A059") // Dorado elegante
         val colorRojoSuave = Color.parseColor("#F87171") // Rojo suave para el botón de volver
 
-        val dialogView = layoutInflater.inflate(R.layout.player_alerdialogo, null)
+        val displayMetrics = resources.displayMetrics
+        val density = displayMetrics.density
+        val dpToPx = { dp: Int -> (dp * density).toInt() }
+
+        // 🟢 ANCHO ADAPTABLE: 75% de la pantalla del TV, con un límite máximo de 640dp para conservar simetría
+        val maxDialogWidth = dpToPx(640)
+        val targetWidth = minOf((displayMetrics.widthPixels * 0.75).toInt(), maxDialogWidth)
+
+        // 1. Inflar el diseño del mensaje informativo
+        val dialogView = layoutInflater.inflate(R.layout.player_alerdialogo, null).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            setBackgroundColor(Color.TRANSPARENT) // Fondo transparente para heredar el del contenedor
+        }
         val messageText = dialogView.findViewById<TextView>(R.id.messageText)
         val linkNosotros = dialogView.findViewById<TextView>(R.id.linkNosotros)
-        val imageView = dialogView.findViewById<ImageView>(R.id.dialogImage)
 
-        imageView.setImageResource(R.drawable.canal)
+        messageText.setLineSpacing(0f, 1.25f)
 
-        // Configuración de textos informativos (Spannable)
+        // --- CONFIGURACIÓN DE TEXTOS INFORMATIVOS PREMIUM ---
         val spannable = SpannableStringBuilder()
-        val movieInfo = "Película: $movieTitle\n"
-        spannable.append(movieInfo)
-        val peliculaTexto = "Película:"
-        val peliculaIndex = spannable.indexOf(peliculaTexto)
-        spannable.setSpan(ForegroundColorSpan(colorRojoSuave), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-        spannable.setSpan(RelativeSizeSpan(1.3f), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-        val tituloIndex = peliculaIndex + peliculaTexto.length + 1
-        spannable.setSpan(ForegroundColorSpan(Color.GREEN), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-        spannable.setSpan(RelativeSizeSpan(1.4f), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        val colorVerdeSuave = Color.parseColor("#4ADE80") // Verde claro para precios
+        val colorGrisTexto = Color.parseColor("#B0BEC5") // Gris suave para textos secundarios y restricciones
+        val colorLineaSeparadora = Color.parseColor("#444444") // Gris oscuro para la línea divisoria
 
-        val precioInfo = "Precio CasTV: $$movieCastv\n"
-        spannable.append(precioInfo)
-        val precioTexto = "Precio CasTV:"
-        val precioIndex = spannable.indexOf(precioTexto)
-        spannable.setSpan(ForegroundColorSpan(colorRojoSuave), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-        spannable.setSpan(RelativeSizeSpan(1.3f), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-        val precioValorIndex = precioIndex + precioTexto.length + 2
-        spannable.setSpan(ForegroundColorSpan(Color.GREEN), precioValorIndex, precioValorIndex + movieCastv.toString().length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-        spannable.setSpan(RelativeSizeSpan(1.4f), precioValorIndex, precioValorIndex + movieCastv.toString().length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        // 1. Línea de Película (Dorado y Negrita)
+        val startPeli = spannable.length
+        spannable.append("🎬 Película: ")
+        val endLabelPeli = spannable.length
+        spannable.append("$movieTitle\n")
+        val endPeli = spannable.length
 
-        // Línea temporal mientras se obtiene usuario y saldo
-        spannable.append("\nUsuario: Consultando...\n")
-        spannable.append("Saldo actual: Consultando...\n")
-        spannable.append("\n⚠️ RESTRICCIONES")
-        spannable.append("\nSi la película tiene menos de un mes de estreno, No será procesada. El valor será reembolsado automáticamente como crédito en CasTV.")
-        spannable.append("\nRecuerda mantener saldo en tu cuenta CasTV para disfrutar de tus próximos alquileres.")
+        spannable.setSpan(ForegroundColorSpan(Color.WHITE), startPeli, endLabelPeli, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(StyleSpan(Typeface.BOLD), startPeli, endLabelPeli, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(ForegroundColorSpan(colorDorado), endLabelPeli, endPeli - 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(StyleSpan(Typeface.BOLD), endLabelPeli, endPeli - 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        // 2. Línea de Costo (Verde y Negrita)
+        val startCosto = spannable.length
+        spannable.append("🪙 Costo: ")
+        val endLabelCosto = spannable.length
+        spannable.append("$movieCastv CasTV\n")
+        val endCosto = spannable.length
+
+        spannable.setSpan(ForegroundColorSpan(Color.WHITE), startCosto, endLabelCosto, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(StyleSpan(Typeface.BOLD), startCosto, endLabelCosto, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(ForegroundColorSpan(colorVerdeSuave), endLabelCosto, endCosto - 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(StyleSpan(Typeface.BOLD), endLabelCosto, endCosto - 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        // 3. Fila Única y Compacta: Usuario y Saldo (Se conservan placeholders para tu callback)
+        val startInfoUsuario = spannable.length
+        spannable.append("👤 Usuario: Consultando...   |   💎 Saldo actual: Consultando...\n\n")
+        val endInfoUsuario = spannable.length
+        spannable.setSpan(ForegroundColorSpan(colorGrisTexto), startInfoUsuario, endInfoUsuario, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        // 4. Línea Divisoria Decorativa
+        val startLinea = spannable.length
+        spannable.append("──────────────────────────────────────────\n\n")
+        val endLinea = spannable.length
+        spannable.setSpan(ForegroundColorSpan(colorLineaSeparadora), startLinea, endLinea, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        // 5. Encabezado de Restricciones
+        val startRestricciones = spannable.length
+        spannable.append("⚠️ RESTRICCIONES IMPORTANTES\n")
+        val endLabelRestricciones = spannable.length
+        spannable.setSpan(ForegroundColorSpan(colorRojoSuave), startRestricciones, endLabelRestricciones, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(StyleSpan(Typeface.BOLD), startRestricciones, endLabelRestricciones, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        // 6. Texto descriptivo en tamaño reducido (0.85f)
+        spannable.append("• Películas con menos de un mes de estreno en cines no serán procesadas.\n")
+        spannable.append("• El valor del pedido será reembolsado automáticamente como crédito en CasTV.\n")
+        spannable.append("• Recuerda mantener saldo en tu cuenta para tus próximos alquileres.")
+        val endAll = spannable.length
+
+        // Aplicamos el tamaño reducido y el color gris suave a toda la sección de restricciones
+        spannable.setSpan(RelativeSizeSpan(0.85f), startRestricciones, endAll, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(ForegroundColorSpan(colorGrisTexto), endLabelRestricciones, endAll, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
 
         messageText.text = spannable
 
@@ -677,53 +722,115 @@ class ApiPeliculaActivity : AppCompatActivity() {
             startActivity(Intent(this, Perfil::class.java))
         }
 
-        // Construcción del AlertDialog con el fondo gris oscuro unificado
-        val alertDialog = AlertDialog.Builder(this)
-            .setView(dialogView)
-            .setCancelable(false)
-            .setNegativeButton("Volver al contenido") { dialog, _ ->
-                dialog.dismiss()
-                volverAlContenido()
+        // 2. ScrollView de contenido (Evita desbordamientos verticales si la pantalla de la TV es chica)
+        val dialogScrollView = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1.0f // Consume el espacio disponible empujando los botones hacia el extremo inferior
+            )
+            isFillViewport = true
+            clipChildren = false
+            clipToPadding = false
+            addView(dialogView)
+        }
+
+        // 3. Creación de botones integrados (Alineados dentro de la tarjeta perimetral)
+        val layoutBotones = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(20)
             }
-            .setNeutralButton("Alquilar Película", null)
+        }
+
+        val btnVolver = TextView(this).apply {
+            text = "Volver al contenido"
+            setTextColor(colorRojoSuave)
+            textSize = 14f
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(dpToPx(30), dpToPx(12), dpToPx(30), dpToPx(12))
+            isFocusable = true
+            isFocusableInTouchMode = true
+            background = androidx.core.content.ContextCompat.getDrawable(this@ApiPeliculaActivity, R.drawable.focus_selector)
+
+            setOnFocusChangeListener { v, hasFocus ->
+                v.scaleX = if (hasFocus) 1.05f else 1f
+                v.scaleY = if (hasFocus) 1.05f else 1f
+            }
+        }
+
+        val btnAlquilar = TextView(this).apply {
+            text = "Alquilar Película"
+            setTextColor(colorDorado)
+            textSize = 14f
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(dpToPx(30), dpToPx(12), dpToPx(30), dpToPx(12))
+            isFocusable = true
+            isFocusableInTouchMode = true
+            background = androidx.core.content.ContextCompat.getDrawable(this@ApiPeliculaActivity, R.drawable.focus_selector)
+
+            setOnFocusChangeListener { v, hasFocus ->
+                v.scaleX = if (hasFocus) 1.05f else 1f
+                v.scaleY = if (hasFocus) 1.05f else 1f
+            }
+        }
+
+        val paramsBoton = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            setMargins(dpToPx(12), 0, dpToPx(12), 0)
+        }
+
+        layoutBotones.addView(btnVolver, paramsBoton)
+        layoutBotones.addView(btnAlquilar, paramsBoton)
+
+        // 4. Contenedor global de diseño (Une el ScrollView y los Botones dentro del recuadro dorado)
+        val dialogWrapper = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(28), dpToPx(28), dpToPx(28), dpToPx(28))
+            background = GradientDrawable().apply {
+                setColor(colorFondoPrincipal)
+                cornerRadius = dpToPx(16).toFloat()
+                setStroke(dpToPx(2), colorDorado) // Borde perimetral dorado
+            }
+            addView(dialogScrollView)
+            addView(layoutBotones)
+        }
+
+        val alertDialog = AlertDialog.Builder(this)
+            .setView(dialogWrapper)
+            .setCancelable(false)
             .create()
 
         alertDialog.setCanceledOnTouchOutside(false)
-        dialogView.setBackgroundColor(colorFondoPrincipal)
 
-        alertDialog.setOnShowListener {
-            val btnAlquilar = alertDialog.getButton(AlertDialog.BUTTON_NEUTRAL)
-            val btnVolver = alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+        btnVolver.setOnClickListener {
+            alertDialog.dismiss()
+            volverAlContenido()
+        }
 
-            // Aplicación de los colores unificados a los botones
-            btnAlquilar.setTextColor(colorDorado)
-            btnAlquilar.setTypeface(Typeface.DEFAULT_BOLD)
-
-            btnVolver.setTextColor(colorRojoSuave)
-            btnVolver.setTypeface(Typeface.DEFAULT_BOLD)
-
-            // Selector para Android TV y Padding del control de enfoque
-            val focusSelector = R.drawable.focus_selector
-            listOf(btnAlquilar, btnVolver).forEach { button ->
-                button.setBackgroundResource(focusSelector)
-                button.isFocusable = true
-                button.isFocusableInTouchMode = true
-                button.setPadding(28, 14, 28, 14)
+        btnAlquilar.setOnClickListener {
+            CastvHelper.mostrarSelectorFechaHora(this@ApiPeliculaActivity) { fechaSeleccionada, horaSeleccionada ->
+                enviarPedido(alertDialog, fechaSeleccionada, horaSeleccionada)
             }
-            (btnAlquilar.parent as? View)?.setBackgroundColor(colorFondoPrincipal)
-
-            // Acción del botón principal
-            btnAlquilar.setOnClickListener {
-                // Abrimos el selector con diseño de 12 horas AM/PM y pesos correctos
-                CastvHelper.mostrarSelectorFechaHora(this@ApiPeliculaActivity) { fechaSeleccionada, horaSeleccionada ->
-                    enviarPedido(alertDialog, fechaSeleccionada, horaSeleccionada)
-                }
-            }
-            btnAlquilar.requestFocus() // Foco automático en el botón de confirmación
         }
 
         alertDialog.show()
-        alertDialog.window?.setBackgroundDrawable(ColorDrawable(colorFondoPrincipal))
+
+        // 5. Configurar el tamaño simétrico de la ventana emergente transparente
+        alertDialog.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            setLayout(targetWidth, WindowManager.LayoutParams.WRAP_CONTENT)
+        }
+
+        btnAlquilar.requestFocus() // Foco predeterminado listo para el control remoto
     }
 
 

@@ -41,6 +41,8 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 class NuevaPeliculaFragment : Fragment() {
+    private var originalCreatedAt: Long = 0L
+
     private val apiKey = "678193d2c735c6f37840cee035f4d69a"
     private var isAutoFilling = false
     private lateinit var binding: FragmentNuevaEditarBinding
@@ -218,6 +220,9 @@ class NuevaPeliculaFragment : Fragment() {
                 Glide.with(this).load(it.imageUrl).into(binding.previewImageView)
 
                 selectedYear = it.year
+
+                // 🟢 CAPTURAMOS LA FECHA ORIGINAL
+                originalCreatedAt = it.createdAt
             }
         }
     }
@@ -229,7 +234,7 @@ class NuevaPeliculaFragment : Fragment() {
         val id = movieId ?: databaseRef.push().key ?: return
 
         if (movieId != null) {
-            // 🟢 MODIFICADO: Agregamos "createdAt" para restablecer la fecha al tiempo actual de la edición
+            // 🟢 MODIFICADO: Conservamos la fecha original si existe para no alterar la cola de pedidos
             val camposEditados = mapOf<String, Any>(
                 "title" to title,
                 "originalTitle" to binding.originalTitleEditText.text.toString().trim(),
@@ -239,7 +244,7 @@ class NuevaPeliculaFragment : Fragment() {
                 "trailerUrl" to binding.trailerUrlEditText.text.toString().trim(),
                 "countdownMinutes" to (binding.validEditText.text.toString().toIntOrNull() ?: 0),
                 "year" to selectedYear,
-                "createdAt" to System.currentTimeMillis() // 🟢 Este valor sobrescribe la fecha vieja de creación con la fecha de la edición
+                "createdAt" to if (originalCreatedAt > 0L) originalCreatedAt else System.currentTimeMillis()
             )
 
             databaseRef.child(id).updateChildren(camposEditados).addOnSuccessListener {
@@ -283,5 +288,6 @@ class NuevaPeliculaFragment : Fragment() {
         binding.castvEditText.setText("10")
 
         selectedYear = ""
+        originalCreatedAt = 0L // 🟢 Reiniciar fecha
     }
 }

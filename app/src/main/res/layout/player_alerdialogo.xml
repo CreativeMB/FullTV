@@ -1,57 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  Estructura vertical limpia. El banner promocional se traslada al final,
+  permitiendo que la información de texto y botones fluya sin restricciones.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:gravity="start">
 
-    <LinearLayout
-        android:orientation="horizontal"
+    <!-- 1. Detalle informativo del pedido -->
+    <TextView
+        android:id="@+id/messageText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Cargando información detallada..."
+        android:textColor="#E0E0E0"
+        android:textSize="15sp"
+        android:lineSpacingMultiplier="1.25"
+        android:paddingBottom="12dp" />
+
+    <!-- 2. Botón de enlace interactivo -->
+    <TextView
+        android:id="@+id/linkNosotros"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:padding="16dp">
+        android:text="Más información aquí"
+        android:textSize="14sp"
+        android:textColor="#C5A059"
+        android:textStyle="bold"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:background="@drawable/focus_selector"
+        android:gravity="center"
+        android:layout_gravity="start"
+        android:layout_marginBottom="20dp" />
 
-        <!-- Imagen a la izquierda -->
-        <ImageView
-            android:id="@+id/dialogImage"
-            android:layout_width="220dp"
-            android:layout_height="220dp"
-            android:layout_marginEnd="12dp"
-            android:src="@drawable/icono"
-            android:scaleType="fitCenter"
-            android:contentDescription="Imagen de la película" />
 
-        <!-- Contenido a la derecha -->
-        <LinearLayout
-            android:orientation="vertical"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center_horizontal">
-
-            <!-- Texto mensaje -->
-            <TextView
-                android:id="@+id/messageText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Aquí va el contenido de texto"
-                android:textColor="@color/textColorPrimary"
-                android:textSize="18sp"
-                android:paddingBottom="8dp" />
-
-            <!-- Enlace -->
-            <TextView
-                android:id="@+id/linkNosotros"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Más información aquí"
-                android:textSize="18sp"
-                android:textColor="@color/textColorPrimary"
-                android:textStyle="bold"
-                android:padding="8dp"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:background="@drawable/focus_selector" />
-
-        </LinearLayout>
-
-    </LinearLayout>
-</ScrollView>
+</LinearLayout>
