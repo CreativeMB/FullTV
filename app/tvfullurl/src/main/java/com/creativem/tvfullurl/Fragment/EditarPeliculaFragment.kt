@@ -151,37 +151,43 @@ class EditarPeliculaFragment : Fragment() {
 
                         val solicitudesNode = child.child("solicitudes")
                         if (solicitudesNode.exists() && solicitudesNode.hasChildren()) {
-                            // DESGLOSE: Si la película tiene múltiples solicitudes, creamos una tarjeta para cada una
                             for (solicitudChild in solicitudesNode.children) {
                                 val solId = solicitudChild.child("id").getValue(String::class.java) ?: solicitudChild.key ?: ""
                                 val solEmail = solicitudChild.child("email").getValue(String::class.java) ?: ""
                                 val solName = solicitudChild.child("userId").getValue(String::class.java) ?: ""
                                 val solTime = solicitudChild.child("timestamp").getValue(Long::class.java) ?: 0L
 
+                                // 🟢 CAPTURAMOS LA FECHA Y HORA PROGRAMADAS POR EL CLIENTE
+                                val solFecha = solicitudChild.child("fechaActivacion").getValue(String::class.java) ?: ""
+                                val solHora = (solicitudChild.child("horaActivacion").value as? Number)?.toInt() ?: -1
+
                                 solicitudesCargaActual.add(Pair(solId, movie.title ?: "Sin título"))
 
-                                // Obtenemos una nueva instancia para cada solicitante
                                 val movieCopy = child.getValue(Movie::class.java)!!
                                 movieCopy.id = child.key ?: ""
                                 movieCopy.email = solEmail
-                                movieCopy.userId = solName // Nombre del solicitante
+                                movieCopy.userId = solName
                                 movieCopy.activeRequestId = solId
                                 movieCopy.requestTimestamp = solTime
+
+                                // 🟢 ASIGNAMOS AL CLON DE LA PELÍCULA
+                                movieCopy.fechaActivacion = solFecha
+                                movieCopy.horaActivacion = solHora
 
                                 listaDesglosada.add(movieCopy)
                             }
                         } else {
-                            // Si la película no tiene solicitudes, se añade una sola vez vacía
                             movie.email = ""
                             movie.userId = ""
                             movie.activeRequestId = ""
                             movie.requestTimestamp = 0L
+                            movie.fechaActivacion = ""
+                            movie.horaActivacion = -1
                             listaDesglosada.add(movie)
                         }
                     }
                 }
 
-                // 🟢 IDENTIFICACIÓN DE NUEVOS PEDIDOS EN TIEMPO REAL:
                 if (!esPrimeraCarga) {
                     val nuevasSolicitudes = solicitudesCargaActual.filter { it.first !in solicitudesConocidas }
                     for (nueva in nuevasSolicitudes) {
@@ -191,15 +197,12 @@ class EditarPeliculaFragment : Fragment() {
                     esPrimeraCarga = false
                 }
 
-                // Actualizamos las solicitudes conocidas para la próxima lectura
                 solicitudesConocidas.clear()
                 solicitudesConocidas.addAll(solicitudesCargaActual.map { it.first })
 
-                // ORDENACIÓN GLOBAL:
-                // Cambia la sección de ORDENACIÓN GLOBAL por esta:
                 val listaOrdenada = listaDesglosada.sortedWith(
-                    compareByDescending<Movie> { it.createdAt as? Long ?: 0L } // 🟢 Prioridad 1: Lo más reciente/recién editado va primero
-                        .thenByDescending { it.requestTimestamp > 0 }          // Prioridad 2: Si coinciden, los que tengan solicitudes
+                    compareByDescending<Movie> { it.createdAt as? Long ?: 0L }
+                        .thenByDescending { it.requestTimestamp > 0 }
                         .thenBy { if (it.requestTimestamp > 0) it.requestTimestamp else Long.MAX_VALUE }
                 )
 
@@ -210,6 +213,33 @@ class EditarPeliculaFragment : Fragment() {
                 Toast.makeText(requireContext(), "Error de conexión", Toast.LENGTH_SHORT).show()
             }
         })
+    }
+    private fun calcularCreatedAtProgramado(fecha: String, hora: Int): Long {
+        if (fecha.isEmpty() || hora == -1) {
+            return System.currentTimeMillis()
+        }
+        return try {
+            val parts = fecha.split("-") // Separa "YYYY-MM-DD"
+            val anio = parts[0].toInt()
+            val mes = parts[1].toInt() - 1 // Calendar maneja los meses de 0 a 11
+            val dia = parts[2].toInt()
+
+            val calendar = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.YEAR, anio)
+                set(java.util.Calendar.MONTH, mes)
+                set(java.util.Calendar.DAY_OF_MONTH, dia)
+                set(java.util.Calendar.HOUR_OF_DAY, hora)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+
+            // Restamos exactamente 1 hora (60 minutos)
+            calendar.add(java.util.Calendar.HOUR, -1)
+            calendar.timeInMillis
+        } catch (e: Exception) {
+            System.currentTimeMillis()
+        }
     }
 
     private fun iniciarRecycler() {
@@ -373,12 +403,29 @@ class EditarPeliculaFragment : Fragment() {
         }
     }
 
-    private fun guardarAlquilerEnUsuario(usuarioKey: String, nombrePeliculaFormateado: String, minutos: Int, movieId: String, activeRequestId: String) {
-        // Usamos el servidor de Firebase para la fecha exacta sincronizada
-        val timestampServidor = com.google.firebase.database.ServerValue.TIMESTAMP
+    private fun guardarAlquilerEnUsuario(
+        usuarioKey: String,
+        nombrePeliculaFormateado: String,
+        movieId: String,
+        activeRequestId: String,
+        fechaActivacion: String?,
+        horaActivacion: Int
+    ) {
+        val timestampServidor: Any
+        val minutosTotales: Int
+
+        if (!fechaActivacion.isNullOrBlank() && horaActivacion != -1) {
+            // Si hay horario programado, se inicia el contador 1 hora antes del objetivo (360 min en total)
+            timestampServidor = calcularCreatedAtProgramado(fechaActivacion, horaActivacion)
+            minutosTotales = 360
+        } else {
+            // Alquiler normal inmediato: 300 minutos (5 horas) a partir de este instante
+            timestampServidor = com.google.firebase.database.ServerValue.TIMESTAMP
+            minutosTotales = 300
+        }
 
         val datosAlquiler = mapOf(
-            "countdownMinutes" to minutos,
+            "countdownMinutes" to minutosTotales,
             "createdAt" to timestampServidor
         )
 
@@ -388,9 +435,8 @@ class EditarPeliculaFragment : Fragment() {
             .child(nombrePeliculaFormateado)
             .setValue(datosAlquiler)
             .addOnSuccessListener {
-
                 val updatesPelicula = mutableMapOf<String, Any?>()
-                updatesPelicula["createdAt"] = timestampServidor // Sincroniza la película con la hora del servidor
+                updatesPelicula["createdAt"] = com.google.firebase.database.ServerValue.TIMESTAMP
 
                 if (activeRequestId.isNotEmpty()) {
                     updatesPelicula["solicitudes/$activeRequestId"] = null
@@ -421,19 +467,20 @@ class EditarPeliculaFragment : Fragment() {
     }
 
     private fun mostrarDialogoConfirmacion(usuario: UsuarioSeleccion, movie: Movie) {
-        val tiempoAsignadoMinutos = 300
-        val tiempoLegible = "$tiempoAsignadoMinutos minutos (${tiempoAsignadoMinutos / 60} horas)"
+        // Definimos el tiempo legible de cara a la interfaz del administrador
+        val tiempoLegible = if (!movie.fechaActivacion.isNullOrBlank() && movie.horaActivacion != -1) {
+            val horaAmPm = if (movie.horaActivacion >= 12) "PM" else "AM"
+            val hora12 = if (movie.horaActivacion % 12 == 0) 12 else movie.horaActivacion % 12
+            "Programada para: ${movie.fechaActivacion} a las $hora12:00 $horaAmPm"
+        } else {
+            "Inmediato: 300 minutos (5 horas)"
+        }
 
         val tituloOriginal = movie.title ?: "Película sin título"
         val anio = obtenerAnioPelicula(movie)
 
         val yaTieneAnio = tituloOriginal.trim().endsWith(")") && tituloOriginal.contains("(")
-
-        val tituloConAnio = if (yaTieneAnio || anio.isEmpty()) {
-            tituloOriginal
-        } else {
-            "$tituloOriginal ($anio)"
-        }
+        val tituloConAnio = if (yaTieneAnio || anio.isEmpty()) tituloOriginal else "$tituloOriginal ($anio)"
 
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_confirm_assignment, null)
 
@@ -447,11 +494,18 @@ class EditarPeliculaFragment : Fragment() {
         txtUserEmail.text = usuario.correo
         txtTime.text = tiempoLegible
 
-        // 1. Construimos el diálogo usando .create() en lugar de .show() directo
         val dialog = AlertDialog.Builder(requireContext())
             .setView(dialogView)
             .setPositiveButton("Asignar al Cliente") { _, _ ->
-                guardarAlquilerEnUsuario(usuario.key, tituloConAnio, tiempoAsignadoMinutos, movie.id, movie.activeRequestId)
+                // 🟢 Pasamos la programación recolectada a la base de datos
+                guardarAlquilerEnUsuario(
+                    usuario.key,
+                    tituloConAnio,
+                    movie.id,
+                    movie.activeRequestId,
+                    movie.fechaActivacion,
+                    movie.horaActivacion
+                )
             }
             .setNeutralButton("Rechazar y Devolver CasTV") { _, _ ->
                 val costoPuntos = movie.castv ?: 10
@@ -460,32 +514,23 @@ class EditarPeliculaFragment : Fragment() {
             .setNegativeButton("Cerrar", null)
             .create()
 
-        // 2. Personalizamos los botones cuando el diálogo sea presentado en pantalla
         dialog.setOnShowListener {
             val context = requireContext()
-
-            // Botón Positivo: "Sí, Asignar" -> Color Verde y Negrita
             dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
                 setTextColor(androidx.core.content.ContextCompat.getColor(context, android.R.color.holo_green_dark))
                 setTypeface(typeface, android.graphics.Typeface.BOLD)
             }
-
-            // Botón Neutral: "Rechazar y Devolver" -> Color Rojo y Negrita
             dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.apply {
                 setTextColor(androidx.core.content.ContextCompat.getColor(context, android.R.color.holo_red_dark))
                 setTypeface(typeface, android.graphics.Typeface.BOLD)
             }
-
-            // Botón Negativo: "No" -> Color Gris
             dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
                 setTextColor(androidx.core.content.ContextCompat.getColor(context, android.R.color.darker_gray))
             }
         }
 
-        // 3. Mostramos el diálogo ya configurado
         dialog.show()
     }
-
     private fun rechazarYDevolverPuntos(
         usuarioKey: String,
         movieId: String,

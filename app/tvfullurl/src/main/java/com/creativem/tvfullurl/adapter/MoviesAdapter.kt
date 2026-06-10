@@ -37,15 +37,23 @@ class MoviesAdapter(
         // Asigna los datos a las vistas
         holder.titleTextView.text = movie.title
 // Configurar visibilidad, datos del solicitante y fecha formateada
+        // Modifica la sección de bindeo de datos dentro de onBindViewHolder en MoviesAdapter.kt:
         if (!movie.email.isNullOrBlank()) {
             holder.requesterInfoTextView.visibility = View.VISIBLE
 
-            // Formateamos la marca de tiempo de la solicitud
             val fechaHoraFormateada = formatearFecha(movie.requestTimestamp)
 
-            // Concatenamos el nombre, correo y la fecha legible
+            // 🟢 Agregamos etiqueta informativa de programación si existe
+            val programacionTexto = if (!movie.fechaActivacion.isNullOrBlank() && movie.horaActivacion != -1) {
+                val horaAmPm = if (movie.horaActivacion >= 12) "PM" else "AM"
+                val hora12 = if (movie.horaActivacion % 12 == 0) 12 else movie.horaActivacion % 12
+                "\n📅 Programación: ${movie.fechaActivacion} a las $hora12:00 $horaAmPm ⚠️"
+            } else {
+                "\n📅 Programación: Inmediato"
+            }
+
             holder.requesterInfoTextView.text =
-                "Pedido por: ${movie.userId} (${movie.email})\n📅 Fecha: $fechaHoraFormateada"
+                "Pedido por: ${movie.userId} (${movie.email})$programacionTexto\n📝 Solicitud: $fechaHoraFormateada"
         } else {
             holder.requesterInfoTextView.visibility = View.GONE
         }

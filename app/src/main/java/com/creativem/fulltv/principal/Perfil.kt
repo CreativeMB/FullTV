@@ -181,6 +181,10 @@ class Perfil : AppCompatActivity() {
     /**
      * Procesa los alquileres usando la caché local (sin segunda consulta a Firebase)
      */
+    /**
+     * Procesa los alquileres usando la caché local (sin segunda consulta a Firebase)
+     * Filtra los alquileres futuros para que solo aparezcan 1 hora antes de la transmisión.
+     */
     private fun procesarAlquileres(snapshot: DataSnapshot, correoKey: String) {
         if (!snapshot.exists()) {
             mostrarCarga(false)
@@ -197,27 +201,36 @@ class Perfil : AppCompatActivity() {
             val createdAt = (child.child("createdAt").value as? Number)?.toLong() ?: 0L
             val countdownMinutes = (child.child("countdownMinutes").value as? Number)?.toInt() ?: 0
 
-            val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownMinutes.toLong())
-            val tiempoRestante = durationMillis - (ahora - createdAt)
+            val tiempoTranscurrido = ahora - createdAt
 
-            if (tiempoRestante > 0) {
-                // ⭐ BÚSQUEDA EN CACHÉ (O(1)) en vez de recorrer todas las películas
-                val movie = cachePeliculas[tituloKey]
-                if (movie != null) {
-                    alquileresVigentes.add(
-                        Modelo.AlquilerItem(
-                            movie = movie,
-                            createdAt = createdAt,
-                            countdownMinutes = countdownMinutes
+            // 🟢 CLAVE: El alquiler solo se muestra en el perfil si ya inició su hora de activación (tiempoTranscurrido >= 0)
+            if (tiempoTranscurrido >= 0) {
+                val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownMinutes.toLong())
+                val tiempoRestante = durationMillis - tiempoTranscurrido
+
+                if (tiempoRestante > 0) {
+                    // BÚSQUEDA EN CACHÉ (O(1))
+                    val movie = cachePeliculas[tituloKey]
+                    if (movie != null) {
+                        alquileresVigentes.add(
+                            Modelo.AlquilerItem(
+                                movie = movie,
+                                createdAt = createdAt,
+                                countdownMinutes = countdownMinutes
+                            )
                         )
-                    )
+                    }
+                } else {
+                    // 🧹 Limpieza pasiva: borrar expirados
+                    child.ref.removeValue()
+                        .addOnSuccessListener {
+                            Log.d("CLEANUP", "🗑️ Alquiler expirado eliminado: $tituloKey")
+                        }
                 }
             } else {
-                // 🧹 Limpieza pasiva: borrar expirados
-                child.ref.removeValue()
-                    .addOnSuccessListener {
-                        Log.d("CLEANUP", "🗑️ Alquiler expirado eliminado: $tituloKey")
-                    }
+                // ⏳ El alquiler está programado para el futuro.
+                // Se mantiene oculto en el perfil del usuario hasta que falte exactamente 1 hora para su inicio.
+                Log.d("PROGRAMADO", "📅 El alquiler de $tituloKey está programado para más adelante. No se muestra todavía.")
             }
         }
 

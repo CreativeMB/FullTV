@@ -61,12 +61,26 @@ class AlquileresDialogFragment : DialogFragment() {
         val createdAts = arguments?.getLongArray(ARG_CREATED_ATS) ?: LongArray(0)
         val countdowns = arguments?.getIntArray(ARG_COUNTDOWNS) ?: IntArray(0)
 
+        // --- RECONSTRUCCIÓN Y FILTRADO SEGURO DE ALQUILERES ---
+        val ahora = System.currentTimeMillis()
+
         val alquileresReconstruidos = movies.mapIndexed { index, movie ->
             Modelo.AlquilerItem(
                 movie = movie,
                 createdAt = createdAts.getOrElse(index) { 0L },
                 countdownMinutes = countdowns.getOrElse(index) { 0 }
             )
+        }.filter { item ->
+            // 🟢 CLAVE: Solo se incluyen en la ventana emergente si ya inició su hora de activación
+            val tiempoTranscurrido = ahora - item.createdAt
+            tiempoTranscurrido >= 0
+        }
+
+        // 🧹 Si tras el filtro no hay alquileres verdaderamente activos, se cancela el diálogo de inmediato
+        if (alquileresReconstruidos.isEmpty()) {
+            Handler(Looper.getMainLooper()).post {
+                dismiss()
+            }
         }
 
         val colorDorado = Color.parseColor("#C5A059")

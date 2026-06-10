@@ -19,7 +19,8 @@ class Movie {
     var activeRequestId: String = "" // Almacena el ID de la solicitud actual que se va a procesar
     var createdAt: Long = System.currentTimeMillis()
     var countdownMinutes: Int = 0
-
+    var fechaActivacion: String? = null
+    var horaActivacion: Int = -1
     // NUEVO CAMPO: Agregado para almacenar el año de la película
     var year: String = ""
 
