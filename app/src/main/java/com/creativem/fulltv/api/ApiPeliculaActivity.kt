@@ -245,7 +245,9 @@ class ApiPeliculaActivity : AppCompatActivity() {
         urlRota: String,
         anio: String, // 🟢 Recibe la fecha completa (Ej: "2024-10-16")
         userEmail: String,
-        userName: String
+        userName: String,
+        fechaActivacion: String, // 📅 Nueva variable
+        horaActivacion: Int      // ⏱ Nueva variable
     ) {
         if (isFinishing || isDestroyed) return
 
@@ -289,6 +291,8 @@ class ApiPeliculaActivity : AppCompatActivity() {
                                 "id" to idSolicitud,
                                 "email" to userEmail,
                                 "userId" to userName,
+                                "fechaActivacion" to fechaActivacion,
+                                "horaActivacion" to horaActivacion,
                                 "timestamp" to com.google.firebase.database.ServerValue.TIMESTAMP
                             )
                             solicitudesRef.setValue(datosSolicitud)
@@ -603,20 +607,27 @@ class ApiPeliculaActivity : AppCompatActivity() {
     }
 
     // --- DIALOGO DE ENLACE ROTO Y PEDIDO ---
+    // --- DIALOGO DE ENLACE ROTO Y PEDIDO CON DISEÑO PREMIUM UNIFICADO ---
     @SuppressLint("SetTextI18n")
     private fun showErrorDialog(movieTitle: String, movieCastv: Int, correoUsuario: String) {
+        val colorFondoPrincipal = Color.parseColor("#2A2A2A") // Gris Oscuro Premium
+        val colorDorado = Color.parseColor("#C5A059") // Dorado elegante
+        val colorRojoSuave = Color.parseColor("#F87171") // Rojo suave para el botón de volver
+
         val dialogView = layoutInflater.inflate(R.layout.player_alerdialogo, null)
         val messageText = dialogView.findViewById<TextView>(R.id.messageText)
         val linkNosotros = dialogView.findViewById<TextView>(R.id.linkNosotros)
         val imageView = dialogView.findViewById<ImageView>(R.id.dialogImage)
+
         imageView.setImageResource(R.drawable.canal)
 
+        // Configuración de textos informativos (Spannable)
         val spannable = SpannableStringBuilder()
         val movieInfo = "Película: $movieTitle\n"
         spannable.append(movieInfo)
         val peliculaTexto = "Película:"
         val peliculaIndex = spannable.indexOf(peliculaTexto)
-        spannable.setSpan(ForegroundColorSpan(Color.RED), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(ForegroundColorSpan(colorRojoSuave), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         spannable.setSpan(RelativeSizeSpan(1.3f), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         val tituloIndex = peliculaIndex + peliculaTexto.length + 1
         spannable.setSpan(ForegroundColorSpan(Color.GREEN), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
@@ -626,7 +637,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
         spannable.append(precioInfo)
         val precioTexto = "Precio CasTV:"
         val precioIndex = spannable.indexOf(precioTexto)
-        spannable.setSpan(ForegroundColorSpan(Color.RED), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        spannable.setSpan(ForegroundColorSpan(colorRojoSuave), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         spannable.setSpan(RelativeSizeSpan(1.3f), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         val precioValorIndex = precioIndex + precioTexto.length + 2
         spannable.setSpan(ForegroundColorSpan(Color.GREEN), precioValorIndex, precioValorIndex + movieCastv.toString().length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
@@ -635,16 +646,11 @@ class ApiPeliculaActivity : AppCompatActivity() {
         // Línea temporal mientras se obtiene usuario y saldo
         spannable.append("\nUsuario: Consultando...\n")
         spannable.append("Saldo actual: Consultando...\n")
-        spannable.append("\nℹ️ INFORMACIÓN IMPORTANTE") // Añadir un ícono ayuda visualmente
-        spannable.append("\nAl enviar su solicitud, el contenido será procesado por nuestro equipo de moderación.")
-        spannable.append("\nEl tiempo estimado de gestión es lo mas pronto posible; Notificacion por canal oficial de telegram.")
         spannable.append("\n⚠️ RESTRICCIONES")
         spannable.append("\nSi la película tiene menos de un mes de estreno, No será procesada. El valor será reembolsado automáticamente como crédito en CasTV.")
         spannable.append("\nRecuerda mantener saldo en tu cuenta CasTV para disfrutar de tus próximos alquileres.")
 
         messageText.text = spannable
-
-        // Asegúrate de tener la clase CastvHelper importada si usas esto
 
         if (correoUsuario.isNotEmpty()) {
             CastvHelper.obtenerDatosUsuario(
@@ -664,58 +670,63 @@ class ApiPeliculaActivity : AppCompatActivity() {
             )
         }
 
-
         linkNosotros.text = "Más información aquí"
-        linkNosotros.setTextColor(Color.RED)
+        linkNosotros.setTextColor(colorRojoSuave)
         linkNosotros.paintFlags = linkNosotros.paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
         linkNosotros.setOnClickListener {
             startActivity(Intent(this, Perfil::class.java))
         }
 
-        val colorDorado = Color.parseColor("#C5A059")
-        val colorFondo = Color.parseColor("#0A122A")
-
+        // Construcción del AlertDialog con el fondo gris oscuro unificado
         val alertDialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .setCancelable(false)
-
             .setNegativeButton("Volver al contenido") { dialog, _ ->
                 dialog.dismiss()
                 volverAlContenido()
             }
-
             .setNeutralButton("Alquilar Película", null)
             .create()
 
         alertDialog.setCanceledOnTouchOutside(false)
-        dialogView.setBackgroundColor(colorFondo)
+        dialogView.setBackgroundColor(colorFondoPrincipal)
 
         alertDialog.setOnShowListener {
             val btnAlquilar = alertDialog.getButton(AlertDialog.BUTTON_NEUTRAL)
             val btnVolver = alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
 
+            // Aplicación de los colores unificados a los botones
             btnAlquilar.setTextColor(colorDorado)
             btnAlquilar.setTypeface(Typeface.DEFAULT_BOLD)
-            btnVolver.setTextColor(colorDorado)
 
+            btnVolver.setTextColor(colorRojoSuave)
+            btnVolver.setTypeface(Typeface.DEFAULT_BOLD)
+
+            // Selector para Android TV y Padding del control de enfoque
             val focusSelector = R.drawable.focus_selector
             listOf(btnAlquilar, btnVolver).forEach { button ->
                 button.setBackgroundResource(focusSelector)
                 button.isFocusable = true
                 button.isFocusableInTouchMode = true
-                button.setPadding(24, 12, 24, 12)
+                button.setPadding(28, 14, 28, 14)
             }
-            (btnAlquilar.parent as? View)?.setBackgroundColor(colorFondo)
+            (btnAlquilar.parent as? View)?.setBackgroundColor(colorFondoPrincipal)
 
-            // ⚠️ ACÁ CONECTAMOS EL BOTÓN CON LA LÓGICA DE PEDIDO ⚠️
+            // Acción del botón principal
             btnAlquilar.setOnClickListener {
-                enviarPedido(alertDialog)
+                // Abrimos el selector con diseño de 12 horas AM/PM y pesos correctos
+                CastvHelper.mostrarSelectorFechaHora(this@ApiPeliculaActivity) { fechaSeleccionada, horaSeleccionada ->
+                    enviarPedido(alertDialog, fechaSeleccionada, horaSeleccionada)
+                }
             }
-            btnAlquilar.requestFocus()
+            btnAlquilar.requestFocus() // Foco automático en el botón de confirmación
         }
+
         alertDialog.show()
-        alertDialog.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
+        alertDialog.window?.setBackgroundDrawable(ColorDrawable(colorFondoPrincipal))
     }
+
+
     // 🟢 ESTA FUNCIÓN ES LA QUE HACE EL REGRESO LIMPIO
     private fun volverAlContenido() {
         val intent = Intent(this@ApiPeliculaActivity, PeliculasActivity::class.java).apply {
@@ -731,7 +742,7 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
         finish()
     }
-    private fun enviarPedido(dialog: AlertDialog) {
+    private fun enviarPedido(dialog: AlertDialog, fechaActivacion: String, horaActivacion: Int) {
         if (isProcessingOrder) return
         isProcessingOrder = true
 
@@ -763,7 +774,9 @@ class ApiPeliculaActivity : AppCompatActivity() {
                                         urlRota = streamUrlGuardado,
                                         anio = anioEstreno,
                                         userEmail = userEmail,
-                                        userName = userName
+                                        userName = userName,
+                                        fechaActivacion = fechaActivacion,
+                                        horaActivacion = horaActivacion
                                     )
 
                                     CineAlert.show(this, "Pedido enviado. Puntos descontados.", CineAlert.Tipo.EXITO, dialog.window?.decorView as? ViewGroup)

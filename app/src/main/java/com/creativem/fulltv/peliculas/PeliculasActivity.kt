@@ -1699,13 +1699,30 @@ class PeliculasActivity : AppCompatActivity() {
 
                 dialog.show()
 
+                // Cambiar dentro de comprobantepago:
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
                     setTextColor(colorTextoLogo)
                     textSize = 15f
                     setTypeface(null, Typeface.BOLD)
                     setOnClickListener {
                         if (saldoActual >= costo) {
-                            ejecutarProcesoFinal(correoKey, titulo, originalTitle, imageUrl, anio, costo, nombreUsuario, email, dialog)
+                            // 🟢 Llama al helper para que el usuario seleccione la fecha y hora
+                            CastvHelper.mostrarSelectorFechaHora(this@PeliculasActivity) { fechaSeleccionada, horaSeleccionada ->
+                                // 🟢 Envía los parámetros de programación de la activación al proceso final
+                                ejecutarProcesoFinal(
+                                    correoKey = correoKey,
+                                    titulo = titulo,
+                                    originalTitle = originalTitle,
+                                    imageUrl = imageUrl,
+                                    anio = anio,
+                                    costo = costo,
+                                    nombre = nombreUsuario,
+                                    email = email,
+                                    dialog = dialog,
+                                    fechaActivacion = fechaSeleccionada, // Pasamos la fecha elegida
+                                    horaActivacion = horaSeleccionada   // Pasamos la hora elegida
+                                )
+                            }
                         } else {
                             CineAlert.show(
                                 this@PeliculasActivity,
@@ -1745,10 +1762,12 @@ class PeliculasActivity : AppCompatActivity() {
         costo: Int,
         nombre: String,
         email: String,
-        dialog: AlertDialog
+        dialog: AlertDialog,
+        fechaActivacion: String, // 📅 Nuevo parámetro
+        horaActivacion: Int      // ⏱ Nuevo parámetro
     ) {
         // 🟢 1. Sincroniza y crea/actualiza la película directamente en la grilla principal "movies"
-        verificarYCrearPeliculaDesdePedido(titulo, originalTitle, imageUrl, anio, email, nombre)
+        verificarYCrearPeliculaDesdePedido(titulo, originalTitle, imageUrl, anio, email, nombre, fechaActivacion, horaActivacion)
 
         // 🟢 2. Ejecuta el descuento de puntos del saldo de CasTV de forma directa y cierra el diálogo
         descontarPuntos(correoKey, costo, titulo, dialog)
@@ -1760,7 +1779,9 @@ class PeliculasActivity : AppCompatActivity() {
         imageUrlMovie: String,
         anio: String,
         userEmail: String,
-        userName: String
+        userName: String,
+        fechaActivacion: String, // 📅 Nuevo parámetro
+        horaActivacion: Int      // ⏱ Nuevo parámetro
     ) {
         val moviesRef = databaseRef.child("movies")
 
@@ -1784,6 +1805,8 @@ class PeliculasActivity : AppCompatActivity() {
                                 "id" to idSolicitud,
                                 "email" to userEmail,
                                 "userId" to userName,
+                                "fechaActivacion" to fechaActivacion, // 🟢 Se guarda la fecha
+                                "horaActivacion" to horaActivacion,   // 🟢 Se guarda la hora
                                 "timestamp" to ServerValue.TIMESTAMP
                             )
                             solicitudesRef.setValue(datosSolicitud)
@@ -1819,6 +1842,8 @@ class PeliculasActivity : AppCompatActivity() {
                                     "id" to idSolicitud,
                                     "email" to userEmail,
                                     "userId" to userName,
+                                    "fechaActivacion" to fechaActivacion, // 🟢 Se guarda la fecha
+                                    "horaActivacion" to horaActivacion,   // 🟢 Se guarda la hora
                                     "timestamp" to ServerValue.TIMESTAMP
                                 )
                                 solicitudesRef.setValue(datosSolicitud)
