@@ -72,32 +72,36 @@ class Perfil : AppCompatActivity() {
     // ==========================================
 
     private fun configurarLayout() {
-        val container = findViewById<LinearLayout>(R.id.containerLayout)
+        val layoutColumnasExplicativas = findViewById<LinearLayout>(R.id.layoutColumnasExplicativas)
+
         val cards = listOf(
             findViewById<View>(R.id.cardSoporte),
             findViewById<View>(R.id.cardColumna2),
-            findViewById<View>(R.id.cardNotificacion)
+            findViewById<View>(R.id.cardColumna3)
         )
 
         val esHorizontal = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-        container.orientation = if (esHorizontal) {
+        layoutColumnasExplicativas.orientation = if (esHorizontal) {
             LinearLayout.HORIZONTAL
         } else {
             LinearLayout.VERTICAL
         }
 
         cards.forEach { card ->
-            card.layoutParams = if (esHorizontal) {
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f).apply {
-                    setMargins(10, 10, 10, 10)
-                }
-            } else {
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    setMargins(0, 10, 0, 10)
+            if (card != null) {
+                card.layoutParams = if (esHorizontal) {
+                    // 🟢 Usamos MATCH_PARENT para obligar a que todas se alineen a la altura de la más larga
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1.0f).apply {
+                        setMargins(8, 8, 8, 8)
+                    }
+                } else {
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        setMargins(0, 10, 0, 10)
+                    }
                 }
             }
         }

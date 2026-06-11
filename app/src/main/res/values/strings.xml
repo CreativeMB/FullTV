@@ -20,27 +20,29 @@
 
     <string name="columna_1">
     <![CDATA[
-      💎 <b>Ventajas CineParche:</b>
-    🎬 <b>¡El parche se armó!</b> Disfruta las mejores películas en casa con amigos y familia. Comparte la app y disfruten juntos, sin importar la distancia.<br><br>
-    ✔ <b>Acceso Libre:</b> Contenido "ONLINE" es gratis para toda la comunidad.<br>
-    ✔ <b>Tu Pedido cuenta:</b> Tú eliges qué contenido PEDIR puedes verlo en tu perfil.<br>
-🌟 <b>¡Invita a tus amigos al parche!</b><br>
+        💎 <b>BENEFICIOS:</b><br><br>
+        🌐 <b>Contenido Gratis:</b> Películas "ONLINE" sin costo para todos.<br>
+        🍿 <b>Cine en Casa:</b> Los mejores estrenos para disfrutar en familia.<br>
+        👥 <b>Únete al Parche:</b> Comparte la app y disfruten juntos.<br>
     ]]>
-</string>
+    </string>
 
     <string name="columna_2">
     <![CDATA[
-🎬 <b>Gratis:</b> Películas con <b>contador azul</b> ya están activas. ¡Dale a reproducir sin costo!(Barner)<br>
-    ⚡ <b>Activación Inmediata:</b> Películas con etiqueta "ACTIVAR" se activan al instante.<br>
+        🎬 <b>REPRODUCCIÓN:</b><br><br>
+        🔵 <b>Banners Gratis:</b> Películas activas sin costo en la cartelera.<br>
+        ⚡ <b>Activar:</b> Activación inmediata de estrenos desde tu perfil.<br>
     ]]>
-</string>
+    </string>
 
     <string name="columna_3">
     <![CDATA[
-     📦 <b>Contenido bajo Pedido:</b> Solicita películas con etiqueta "ALQUILAR"; las gestionamos para ti, Notificacion canal oficial.<br>
-    📦 <b>Contenido bajo Pedido especial:</b> Solicita películas en la pestaña "Pedir"; las gestionamos para ti, Notificacion canal oficial.</b><br>
+        📦 <b>PROGRAMACIÓN:</b><br><br>
+        📅 <b>Bajo Pedido:</b> Elige el día y la hora para activar tu película.<br>
+        ➕ <b>Pedidos Especiales:</b> Solicita estrenos en la pestaña "Pedir".<br>
+        ⏱ <b>Anticipación:</b> Programa tu pedido mínimo 12 horas antes.<br>
     ]]>
-</string>
+    </string>
 
 
 </resources>
