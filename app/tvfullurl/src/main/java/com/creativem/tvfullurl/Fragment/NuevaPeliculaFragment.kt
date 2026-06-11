@@ -42,6 +42,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 class NuevaPeliculaFragment : Fragment() {
     private var originalCreatedAt: Long = 0L
+    private var tieneSolicitudesPendientes: Boolean = false
 
     private val apiKey = "678193d2c735c6f37840cee035f4d69a"
     private var isAutoFilling = false
@@ -91,7 +92,6 @@ class NuevaPeliculaFragment : Fragment() {
         setupRecyclerView()
         setupListeners()
 
-        // Si es una creación nueva, pre-cargamos 10 y 0 por defecto en los campos correspondientes
         if (movieId != null) {
             loadMovieData(movieId!!)
         } else {
@@ -220,9 +220,10 @@ class NuevaPeliculaFragment : Fragment() {
                 Glide.with(this).load(it.imageUrl).into(binding.previewImageView)
 
                 selectedYear = it.year
-
-                // 🟢 CAPTURAMOS LA FECHA ORIGINAL
                 originalCreatedAt = it.createdAt
+
+                val solicitudesNode = snapshot.child("solicitudes")
+                tieneSolicitudesPendientes = solicitudesNode.exists() && solicitudesNode.hasChildren()
             }
         }
     }
@@ -234,7 +235,8 @@ class NuevaPeliculaFragment : Fragment() {
         val id = movieId ?: databaseRef.push().key ?: return
 
         if (movieId != null) {
-            // 🟢 MODIFICADO: Conservamos la fecha original si existe para no alterar la cola de pedidos
+            // 🟢 SOLUCIÓN: Al editar, actualizamos "createdAt" al tiempo actual de forma incondicional.
+            // Esto garantiza que aparezca siempre como recién creado/colocado en el catálogo de los clientes.
             val camposEditados = mapOf<String, Any>(
                 "title" to title,
                 "originalTitle" to binding.originalTitleEditText.text.toString().trim(),
@@ -244,7 +246,7 @@ class NuevaPeliculaFragment : Fragment() {
                 "trailerUrl" to binding.trailerUrlEditText.text.toString().trim(),
                 "countdownMinutes" to (binding.validEditText.text.toString().toIntOrNull() ?: 0),
                 "year" to selectedYear,
-                "createdAt" to if (originalCreatedAt > 0L) originalCreatedAt else System.currentTimeMillis()
+                "createdAt" to System.currentTimeMillis() // Fecha actualizada directamente al editar
             )
 
             databaseRef.child(id).updateChildren(camposEditados).addOnSuccessListener {
@@ -255,6 +257,7 @@ class NuevaPeliculaFragment : Fragment() {
             }
 
         } else {
+            // Creación por primera vez
             val movie = Movie().apply {
                 this.id = id
                 this.title = title
@@ -264,7 +267,7 @@ class NuevaPeliculaFragment : Fragment() {
                 this.streamUrl = binding.streamUrlEditText.text.toString().trim()
                 this.trailerUrl = binding.trailerUrlEditText.text.toString().trim()
                 this.countdownMinutes = binding.validEditText.text.toString().toIntOrNull() ?: 0
-                this.createdAt = System.currentTimeMillis() // Al crear por primera vez, asigna la fecha inicial
+                this.createdAt = System.currentTimeMillis()
                 this.year = selectedYear
             }
 
@@ -288,6 +291,7 @@ class NuevaPeliculaFragment : Fragment() {
         binding.castvEditText.setText("10")
 
         selectedYear = ""
-        originalCreatedAt = 0L // 🟢 Reiniciar fecha
+        originalCreatedAt = 0L
+        tieneSolicitudesPendientes = false
     }
 }

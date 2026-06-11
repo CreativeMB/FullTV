@@ -29,7 +29,6 @@ class PeliculasApiActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1. Configuración de pantalla completa
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
         supportActionBar?.hide()
         setContentView(R.layout.fragment_peliculasapi)
@@ -38,7 +37,6 @@ class PeliculasApiActivity : AppCompatActivity() {
         setupMenu()
         setupRecyclerView()
 
-        // Carga inicial
         cargarCategoria("Populares")
     }
 
@@ -70,11 +68,9 @@ class PeliculasApiActivity : AppCompatActivity() {
     private fun setupRecyclerView() {
         recyclerView = findViewById(R.id.recycler_populares)
 
-        // USO DEL OBJETO GLOBAL PARA COLUMNAS
         val columnas = ViewUtils.calcularColumnas(this)
         recyclerView.layoutManager = GridLayoutManager(this, columnas)
 
-        // Optimización de rendimiento
         recyclerView.setHasFixedSize(true)
         recyclerView.itemAnimator = null
 
@@ -86,6 +82,9 @@ class PeliculasApiActivity : AppCompatActivity() {
                 putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
                 putExtra("EXTRA_ORIGINAL_TITLE", movie.originalTitle)
                 putExtra("EXTRA_COUNTDOWN", movie.countdownMinutes)
+                // 🟢 SOLUCIÓN: Pasamos también la fecha de creación y el modelo completo serializado
+                putExtra("EXTRA_CREATED_AT", movie.createdAt)
+                putExtra("EXTRA_MOVIE_DATA", movie)
             }
             startActivity(intent)
             overridePendingTransition(0, 0)
@@ -93,7 +92,6 @@ class PeliculasApiActivity : AppCompatActivity() {
         recyclerView.adapter = adapter
     }
 
-    // FUNCIÓN ÚNICA PARA CARGAR CATEGORÍAS (Evita repetir código)
     private fun cargarCategoria(categoria: String) {
         lifecycleScope.launch(Dispatchers.IO) {
             val allModelos = mutableListOf<Modelo>()
@@ -106,13 +104,14 @@ class PeliculasApiActivity : AppCompatActivity() {
                         val mapped = response.body()?.results?.map { movie ->
                             Modelo(
                                 id = movie.id.toString(),
-                                title = "${movie.title} (${movie.release_date})",// El año se puede añadir en el adapter si prefieres
+                                title = movie.title,
                                 originalTitle = movie.original_title,
                                 imageUrl = "https://image.tmdb.org/t/p/w500${movie.poster_path}",
                                 streamUrl = "https://tuservidor.com/stream/${movie.id}",
                                 castv = 10,
                                 countdownMinutes = 0,
-                                createdAt = 0L
+                                createdAt = 0L,
+                                releaseDate = movie.release_date ?: ""
                             )
                         } ?: emptyList()
                         allModelos.addAll(mapped)
@@ -121,7 +120,7 @@ class PeliculasApiActivity : AppCompatActivity() {
 
                 withContext(Dispatchers.Main) {
                     adapter.updateMovies(allModelos)
-                    recyclerView.scrollToPosition(0) // Regresa al inicio al cambiar categoría
+                    recyclerView.scrollToPosition(0)
                 }
 
             } catch (e: Exception) {
@@ -130,7 +129,6 @@ class PeliculasApiActivity : AppCompatActivity() {
         }
     }
 
-    // Helper para decidir qué endpoint llamar
     private fun obtenerLlamadaApi(categoria: String, page: Int): Call<MovieResponse> {
         return when (categoria) {
             "Populares" -> apiService.getPopularMovies(apiKey, "es-MX", page)

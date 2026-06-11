@@ -23,7 +23,6 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 
-
 class EditarPeliculaFragment : Fragment() {
     private lateinit var binding: FragmentPedidosBinding
     private val databaseRef = FirebaseDatabase.getInstance().reference.child("movies")
@@ -31,11 +30,9 @@ class EditarPeliculaFragment : Fragment() {
     private lateinit var moviesAdapter: MoviesAdapter
     private var movieList: MutableList<Movie> = mutableListOf()
 
-    // 🟢 variables de control para identificar nuevas solicitudes en tiempo real sin duplicados
     private val solicitudesConocidas = mutableSetOf<String>()
     private var esPrimeraCarga = true
 
-    // 🟢 Launcher para solicitar permisos de notificación en Android 13+ de forma segura
     private val requestPermissionLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -52,7 +49,6 @@ class EditarPeliculaFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Inicializar el canal de alertas y validar permisos del dispositivo
         crearCanalNotificaciones()
         validarPermisosNotificacion()
 
@@ -68,7 +64,6 @@ class EditarPeliculaFragment : Fragment() {
         })
     }
 
-    // 🟢 Crear canal de notificaciones con importancia alta para mostrar banners interactivos
     private fun crearCanalNotificaciones() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             val name = "Nuevos Pedidos Admin"
@@ -82,7 +77,6 @@ class EditarPeliculaFragment : Fragment() {
         }
     }
 
-    // 🟢 Solicitar permisos de envío de notificaciones
     private fun validarPermisosNotificacion() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             if (androidx.core.content.ContextCompat.checkSelfPermission(
@@ -95,7 +89,6 @@ class EditarPeliculaFragment : Fragment() {
         }
     }
 
-    // 🟢 Disparar la notificación con PendingIntent interactivo para abrir la aplicación al tocarla
     @SuppressLint("MissingPermission")
     private fun mostrarNotificacionAdmin(tituloPelicula: String) {
         val intent = Intent(requireContext(), requireActivity()::class.java).apply {
@@ -116,7 +109,7 @@ class EditarPeliculaFragment : Fragment() {
         )
 
         val builder = androidx.core.app.NotificationCompat.Builder(requireContext(), "CANAL_ADMIN_PEDIDOS")
-            .setSmallIcon(R.drawable.baseline_people_alt_24) // Asegúrate de que el icono exista en tus recursos drawable
+            .setSmallIcon(R.drawable.baseline_people_alt_24)
             .setContentTitle("🔔 ¡Nuevo Pedido Recibido!")
             .setContentText("Se ha solicitado la película: '$tituloPelicula'")
             .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
@@ -157,9 +150,24 @@ class EditarPeliculaFragment : Fragment() {
                                 val solName = solicitudChild.child("userId").getValue(String::class.java) ?: ""
                                 val solTime = solicitudChild.child("timestamp").getValue(Long::class.java) ?: 0L
 
-                                // 🟢 CAPTURAMOS LA FECHA Y HORA PROGRAMADAS POR EL CLIENTE
-                                val solFecha = solicitudChild.child("fechaActivacion").getValue(String::class.java) ?: ""
-                                val solHora = (solicitudChild.child("horaActivacion").value as? Number)?.toInt() ?: -1
+                                // LECTURA SEGURA: Fecha en diferentes variables posibles de respaldo
+                                val rawFecha = solicitudChild.child("fechaActivacion").value
+                                    ?: solicitudChild.child("fecha").value
+                                    ?: solicitudChild.child("fechaProgramada").value
+                                    ?: solicitudChild.child("fechaProgramacion").value
+                                val solFecha = rawFecha?.toString() ?: ""
+
+                                // LECTURA SEGURA: Hora en diferentes variables y soporta texto o números
+                                val rawHora = solicitudChild.child("horaActivacion").value
+                                    ?: solicitudChild.child("hora").value
+                                    ?: solicitudChild.child("horaProgramada").value
+                                    ?: solicitudChild.child("horaProgramacion").value
+
+                                val solHora = when (rawHora) {
+                                    is Number -> rawHora.toInt()
+                                    is String -> rawHora.toIntOrNull() ?: -1
+                                    else -> -1
+                                }
 
                                 solicitudesCargaActual.add(Pair(solId, movie.title ?: "Sin título"))
 
@@ -170,7 +178,6 @@ class EditarPeliculaFragment : Fragment() {
                                 movieCopy.activeRequestId = solId
                                 movieCopy.requestTimestamp = solTime
 
-                                // 🟢 ASIGNAMOS AL CLON DE LA PELÍCULA
                                 movieCopy.fechaActivacion = solFecha
                                 movieCopy.horaActivacion = solHora
 
@@ -200,10 +207,11 @@ class EditarPeliculaFragment : Fragment() {
                 solicitudesConocidas.clear()
                 solicitudesConocidas.addAll(solicitudesCargaActual.map { it.first })
 
+                // Ordenamos por pedidos pendientes primero, y luego por fecha de creación (createdAt)
                 val listaOrdenada = listaDesglosada.sortedWith(
-                    compareByDescending<Movie> { it.createdAt as? Long ?: 0L }
-                        .thenByDescending { it.requestTimestamp > 0 }
+                    compareByDescending<Movie> { it.requestTimestamp > 0 }
                         .thenBy { if (it.requestTimestamp > 0) it.requestTimestamp else Long.MAX_VALUE }
+                        .thenByDescending { it.createdAt as? Long ?: 0L }
                 )
 
                 moviesAdapter.updateMovieList(listaOrdenada)
@@ -214,15 +222,38 @@ class EditarPeliculaFragment : Fragment() {
             }
         })
     }
+
     private fun calcularCreatedAtProgramado(fecha: String, hora: Int): Long {
         if (fecha.isEmpty() || hora == -1) {
             return System.currentTimeMillis()
         }
         return try {
-            val parts = fecha.split("-") // Separa "YYYY-MM-DD"
-            val anio = parts[0].toInt()
-            val mes = parts[1].toInt() - 1 // Calendar maneja los meses de 0 a 11
-            val dia = parts[2].toInt()
+            val cleanFecha = fecha.trim()
+            val separators = listOf("-", "/", ".")
+            var parts = listOf<String>()
+
+            for (sep in separators) {
+                if (cleanFecha.contains(sep)) {
+                    parts = cleanFecha.split(sep)
+                    break
+                }
+            }
+
+            if (parts.size < 3) return System.currentTimeMillis()
+
+            val anio: Int
+            val mes: Int
+            val dia: Int
+
+            if (parts[0].length == 4) {
+                anio = parts[0].toInt()
+                mes = parts[1].toInt() - 1
+                dia = parts[2].toInt()
+            } else {
+                dia = parts[0].toInt()
+                mes = parts[1].toInt() - 1
+                anio = parts[2].toInt()
+            }
 
             val calendar = java.util.Calendar.getInstance().apply {
                 set(java.util.Calendar.YEAR, anio)
@@ -234,7 +265,6 @@ class EditarPeliculaFragment : Fragment() {
                 set(java.util.Calendar.MILLISECOND, 0)
             }
 
-            // Restamos exactamente 1 hora (60 minutos)
             calendar.add(java.util.Calendar.HOUR, -1)
             calendar.timeInMillis
         } catch (e: Exception) {
@@ -415,11 +445,9 @@ class EditarPeliculaFragment : Fragment() {
         val minutosTotales: Int
 
         if (!fechaActivacion.isNullOrBlank() && horaActivacion != -1) {
-            // Si hay horario programado, se inicia el contador 1 hora antes del objetivo (360 min en total)
             timestampServidor = calcularCreatedAtProgramado(fechaActivacion, horaActivacion)
             minutosTotales = 360
         } else {
-            // Alquiler normal inmediato: 300 minutos (5 horas) a partir de este instante
             timestampServidor = com.google.firebase.database.ServerValue.TIMESTAMP
             minutosTotales = 300
         }
@@ -436,7 +464,9 @@ class EditarPeliculaFragment : Fragment() {
             .setValue(datosAlquiler)
             .addOnSuccessListener {
                 val updatesPelicula = mutableMapOf<String, Any?>()
-                updatesPelicula["createdAt"] = com.google.firebase.database.ServerValue.TIMESTAMP
+                // 🟢 SOLUCIÓN CLAVE: Sincronizamos la fecha de la película con el valor de timestampServidor
+                // de modo que si es programado, no se fuerce a "ahora" y no rompa la activación de 24 horas.
+                updatesPelicula["createdAt"] = timestampServidor
 
                 if (activeRequestId.isNotEmpty()) {
                     updatesPelicula["solicitudes/$activeRequestId"] = null
@@ -467,7 +497,6 @@ class EditarPeliculaFragment : Fragment() {
     }
 
     private fun mostrarDialogoConfirmacion(usuario: UsuarioSeleccion, movie: Movie) {
-        // Definimos el tiempo legible de cara a la interfaz del administrador
         val tiempoLegible = if (!movie.fechaActivacion.isNullOrBlank() && movie.horaActivacion != -1) {
             val horaAmPm = if (movie.horaActivacion >= 12) "PM" else "AM"
             val hora12 = if (movie.horaActivacion % 12 == 0) 12 else movie.horaActivacion % 12
@@ -497,7 +526,6 @@ class EditarPeliculaFragment : Fragment() {
         val dialog = AlertDialog.Builder(requireContext())
             .setView(dialogView)
             .setPositiveButton("Asignar al Cliente") { _, _ ->
-                // 🟢 Pasamos la programación recolectada a la base de datos
                 guardarAlquilerEnUsuario(
                     usuario.key,
                     tituloConAnio,
@@ -531,27 +559,23 @@ class EditarPeliculaFragment : Fragment() {
 
         dialog.show()
     }
+
     private fun rechazarYDevolverPuntos(
         usuarioKey: String,
         movieId: String,
         activeRequestId: String,
         puntosADevolver: Int
     ) {
-        // 1. Devolvemos los puntos al usuario de forma segura
         val usuarioRef = rootDatabaseRef.child("usuarios").child(usuarioKey)
 
         usuarioRef.child("castv").setValue(com.google.firebase.database.ServerValue.increment(puntosADevolver.toLong()))
             .addOnSuccessListener {
-
-                // 2. Una vez devueltos los puntos, limpiamos la información de la película
                 val updatesPelicula = mutableMapOf<String, Any?>()
 
-                // Eliminamos la solicitud de la lista de espera
                 if (activeRequestId.isNotEmpty()) {
                     updatesPelicula["solicitudes/$activeRequestId"] = null
                 }
 
-                // Limpiamos los datos del usuario asignado en la película
                 updatesPelicula["email"] = ""
                 updatesPelicula["userId"] = ""
 
@@ -567,6 +591,7 @@ class EditarPeliculaFragment : Fragment() {
                 Toast.makeText(requireContext(), "Error al devolver puntos: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
+
     private fun deleteMovie(movieId: String) {
         AlertDialog.Builder(requireContext())
             .setTitle("⚠️ Confirmar Eliminación")
@@ -593,4 +618,3 @@ private data class UsuarioSeleccion(
     val nombre: String,
     val correo: String
 )
-

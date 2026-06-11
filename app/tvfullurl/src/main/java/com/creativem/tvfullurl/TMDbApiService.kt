@@ -2,7 +2,6 @@ package com.creativem.tvfullurl
 
 import retrofit2.Call
 import retrofit2.http.GET
-import retrofit2.http.Path
 import retrofit2.http.Query
 interface TMDbApiService {
     @GET("search/movie")

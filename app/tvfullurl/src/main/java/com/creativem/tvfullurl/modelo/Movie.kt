@@ -9,6 +9,7 @@ class Movie {
     var requestTimestamp: Long = 0L // Almacena la fecha exacta de la solicitud
     var userId: String = ""
     var nombre: String = ""
+
     var title: String = ""
     var originalTitle: String = ""
     var castv: Int = 0
