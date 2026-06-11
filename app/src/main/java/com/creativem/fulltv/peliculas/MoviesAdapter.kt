@@ -20,7 +20,8 @@ import java.util.concurrent.TimeUnit
 class MoviesAdapter(
     private var modeloList: MutableList<Modelo>,
     private val onItemClick: (Modelo) -> Unit,
-    private val onFocusChange: (Modelo) -> Unit
+    private val onFocusChange: (Modelo) -> Unit,
+    private val onLoadMoreClick: () -> Unit = {}
 ) : RecyclerView.Adapter<MoviesAdapter.MovieViewHolder>() {
 
     private val timers = mutableMapOf<String, CountDownTimer>()
@@ -31,19 +32,22 @@ class MoviesAdapter(
         .diskCacheStrategy(DiskCacheStrategy.ALL)
         .override(200, 300)
         .centerCrop()
-        .placeholder(R.drawable.pelifondo) // Placeholder estático fijo
+        .placeholder(R.drawable.pelifondo)
         .error(R.drawable.pelifondo)
-        .dontAnimate() // Las animaciones causan parpadeos en el reciclaje
+        .dontAnimate()
         .dontTransform()
 
     init {
-        // Crucial: indica que cada ítem tiene un ID único basado en su origen (Firebase ID)
         setHasStableIds(true)
     }
 
     override fun getItemId(position: Int): Long {
-        // Retorna el hash del ID de Firebase para que el RecyclerView reconozca el ítem siempre
         return modeloList[position].id.hashCode().toLong()
+    }
+
+    fun updateMovieList(newMovieList: List<Modelo>) {
+        this.modeloList = newMovieList.toMutableList()
+        notifyDataSetChanged()
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MovieViewHolder {
@@ -53,8 +57,10 @@ class MoviesAdapter(
 
     override fun onBindViewHolder(holder: MovieViewHolder, position: Int) {
         val movie = modeloList[position]
-
-        // 1. Reset visual básico (sin limpiar imágenes para evitar parpadeo blanco)
+        if (position >= modeloList.size - 6) {
+            onLoadMoreClick()
+        }
+        // 1. Reset visual básico
         holder.txtStatus.text = ""
         holder.txtTitle.text = movie.title
         holder.txtTitle.isSelected = false
@@ -63,8 +69,8 @@ class MoviesAdapter(
         Glide.with(holder.itemView.context)
             .load(movie.imageUrl)
             .apply(glideOptions)
-            .priority(Priority.IMMEDIATE) // 👈 Carga inmediata
-            .thumbnail(0.2f) // Muestra una versión rápida mientras carga la original
+            .priority(Priority.IMMEDIATE)
+            .thumbnail(0.2f)
             .into(holder.imgMovie)
 
         // 3. Timers
@@ -180,7 +186,6 @@ class MoviesAdapter(
 
     override fun onViewRecycled(holder: MovieViewHolder) {
         super.onViewRecycled(holder)
-        // No limpiamos Glide aquí para evitar parpadeos en scroll rápido en TV
         val movieKey = holder.txtTitle.text.toString()
         timers[movieKey]?.cancel()
         timers.remove(movieKey)

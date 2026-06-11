@@ -104,17 +104,33 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
 import com.creativem.fulltv.BuildConfig
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 
 class PeliculasActivity : AppCompatActivity() {
     companion object {
-        // 🍿 Variable estática: Asegura que solo se valide una única vez por inicio de app
         private var haVerificadoAlquileresEnEstaSesion = false
+
+        // 🟢 CACHÉ GLOBAL: Recibe las primeras 24 películas pre-validadas de la SplashActivity
+        val primeraPaginaPrecalculada = mutableListOf<Modelo>()
 
         fun restablecerEstadoSesion() {
             haVerificadoAlquileresEnEstaSesion = false
+            primeraPaginaPrecalculada.clear()
         }
     }
 
+//    import com.creativem.fulltv.BuildConfig
+private var usuarioEsperandoMas = false
+    private val modeloList = mutableListOf<Modelo>() // Lista visible en pantalla
+    private val peliculasCompletas = mutableListOf<Modelo>() // Caché del catálogo completo de Firebase
+    private val siguientePaginaCache = mutableListOf<Modelo>() // Caché de la página pre-validada lista para insertar
+
+    private val ITEMS_POR_PAGINA = 24 // Subimos el tamaño a 24 como propuso
+    private var paginasCargadas = 1
+    private var cargandoSiguientePagina = false
+
+    private var cargandoPagina = false
     private var haVerificadoAlquileresEnEstaSesion = false
 
     private var primeraCargaBanner = true
@@ -123,9 +139,7 @@ class PeliculasActivity : AppCompatActivity() {
     private var yaTieneListener = false
     private lateinit var binding: ActivityPeliculasBinding
     private lateinit var movieAdapter: MoviesAdapter
-    private val modeloList = mutableListOf<Modelo>()
-
-    private val auth by lazy { FirebaseAuth.getInstance() }
+     private val auth by lazy { FirebaseAuth.getInstance() }
     private val databaseRef: DatabaseReference = FirebaseDatabase.getInstance().reference
     private var peliculasListener: ValueEventListener? = null
     private var userStatusListener: ValueEventListener? = null
@@ -195,9 +209,16 @@ class PeliculasActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         val peliculasYaCargadas = Validacioneslista.obtenerPeliculasValidas()
-        if (peliculasYaCargadas.isNotEmpty()) {
+        // 🟢 CARGA INMEDIATA DE PÁGINA 1 COMPLETA Y PRE-VALIDADA (Sin parpadeos)
+        if (primeraPaginaPrecalculada.isNotEmpty()) {
             modeloList.clear()
-            modeloList.addAll(peliculasYaCargadas)
+            modeloList.addAll(primeraPaginaPrecalculada)
+        } else {
+            val peliculasYaCargadas = Validacioneslista.obtenerPeliculasValidas()
+            if (peliculasYaCargadas.isNotEmpty()) {
+                modeloList.clear()
+                modeloList.addAll(peliculasYaCargadas.take(ITEMS_POR_PAGINA))
+            }
         }
 
         setupMenuHorizontal()
@@ -266,6 +287,11 @@ class PeliculasActivity : AppCompatActivity() {
         val rvBannerPromos = findViewById<RecyclerView>(R.id.rvBannerPromos)
 
         window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
+            // 🟢 SOLUCIÓN AL CRASH (NullPointerException):
+            // Si el foco sale de la pantalla o cambia la actividad, newFocus es null.
+            // Validamos que no sea nulo antes de ejecutar findContainingItemView.
+            if (newFocus == null) return@addOnGlobalFocusChangeListener
+
             val focoEnPeliculas = rvPeliculas?.findContainingItemView(newFocus) != null
             val focoEnGuiones = rvBannerPromos?.findContainingItemView(newFocus) != null || newFocus == rvBannerPromos
 
@@ -674,10 +700,19 @@ class PeliculasActivity : AppCompatActivity() {
     private fun setupMovieGrid() {
         val columnas = ViewUtils.calcularColumnas(this)
 
+        // 🟢 GRID_LAYOUT_MANAGER SEGURO:
+        // Captura y previene por completo los cierres por desincronización nativa (GapWorker) de Android
         val layoutManager = object : GridLayoutManager(this, columnas) {
+            override fun onLayoutChildren(recycler: RecyclerView.Recycler?, state: RecyclerView.State?) {
+                try {
+                    super.onLayoutChildren(recycler, state)
+                } catch (e: IndexOutOfBoundsException) {
+                    Log.e("RECYCLER_SAFE", "Inconsistencia de red prevenida en el RecyclerView.")
+                }
+            }
             override fun isAutoMeasureEnabled(): Boolean = false
         }
-        layoutManager.initialPrefetchItemCount = 25
+        layoutManager.initialPrefetchItemCount = ITEMS_POR_PAGINA
 
         binding.rvPeliculas.layoutManager = layoutManager
         binding.rvPeliculas.setHasFixedSize(true)
@@ -690,8 +725,20 @@ class PeliculasActivity : AppCompatActivity() {
             onFocusChange = { movie -> (movie.imageUrl) }
         )
         binding.rvPeliculas.adapter = movieAdapter
-    }
 
+        binding.rvPeliculas.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+                val lm = recyclerView.layoutManager as? GridLayoutManager ?: return
+                val totalItemCount = lm.itemCount
+                val lastVisibleItemPosition = lm.findLastVisibleItemPosition()
+
+                if (lastVisibleItemPosition + 8 >= totalItemCount) {
+                    insertarSiguientePagina()
+                }
+            }
+        })
+    }
     private fun iniciarVerificacionDeEstadoDeCuenta() {
         val email = auth.currentUser?.email ?: return
         if (email == "invitado@fulltv.com") return
@@ -2376,72 +2423,33 @@ class PeliculasActivity : AppCompatActivity() {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
                     val nuevasPeliculasRaw = mutableListOf<Modelo>()
-                    val yaValidadas = Validacioneslista.obtenerPeliculasValidas().map { it.id }.toSet()
 
                     for (child in snapshot.children) {
                         val modelo = child.getValue(Modelo::class.java)
                         if (modelo != null) {
                             val movieConId = modelo.copy(id = child.key ?: "")
-                            if (yaValidadas.contains(movieConId.id)) {
-                                movieConId.isValid = true
-                            }
                             nuevasPeliculasRaw.add(movieConId)
                         }
                     }
 
-                    // ⚡ OPTIMIZACIÓN CLAVE: Corremos el cálculo pesado (DiffUtil) en segundo plano
                     lifecycleScope.launch(Dispatchers.Default) {
                         val listaNuevaOrdenada = nuevasPeliculasRaw.sortedByDescending { it.createdAt }
 
-                        if (modeloList.isEmpty()) {
-                            withContext(Dispatchers.Main) {
-                                modeloList.addAll(listaNuevaOrdenada)
-                                movieAdapter.notifyDataSetChanged()
-
-                                // Primera validación de alquileres una vez cargadas las películas
-                                if (!haVerificadoAlquileresEnEstaSesion) {
-                                    haVerificadoAlquileresEnEstaSesion = true
-                                    verificarAlquileresActivos()
-                                }
-                            }
-                        } else {
-                            val listaVieja = ArrayList(modeloList)
-
-                            // Cálculo asíncrono que libera por completo la UI del TV o emulador
-                            val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-                                override fun getOldListSize(): Int = listaVieja.size
-                                override fun getNewListSize(): Int = listaNuevaOrdenada.size
-
-                                override fun areItemsTheSame(oldPos: Int, newPos: Int): Boolean {
-                                    return listaVieja[oldPos].id == listaNuevaOrdenada[newPos].id
-                                }
-
-                                override fun areContentsTheSame(oldPos: Int, newPos: Int): Boolean {
-                                    return listaVieja[oldPos] == listaNuevaOrdenada[newPos]
-                                }
-                            })
-
-                            withContext(Dispatchers.Main) {
-                                modeloList.clear()
-                                modeloList.addAll(listaNuevaOrdenada)
-                                diffResult.dispatchUpdatesTo(movieAdapter)
-
-                                // Validación preventiva por si la primera carga tardó
-                                if (!haVerificadoAlquileresEnEstaSesion) {
-                                    haVerificadoAlquileresEnEstaSesion = true
-                                    verificarAlquileresActivos()
-                                }
-                            }
-                        }
-
                         withContext(Dispatchers.Main) {
-                            if (!Validacioneslista.yaCargado()) {
-                                validarYActualizarVistasEnVivo()
-                            }
+                            peliculasCompletas.clear()
+                            peliculasCompletas.addAll(listaNuevaOrdenada)
+
+                            // 🟢 ELIMINAMOS "modeloList.clear()" de aquí para mantener sincronizado al adaptador
+                            // mientras se ejecuta la validación asíncrona de cargarPrimeraPagina()
+                            paginasCargadas = 1
+                            siguientePaginaCache.clear()
+
+                            cargarPrimeraPagina()
                         }
                     }
                     yaTieneListener = true
                 } else {
+                    peliculasCompletas.clear()
                     modeloList.clear()
                     movieAdapter.notifyDataSetChanged()
                 }
@@ -2453,27 +2461,111 @@ class PeliculasActivity : AppCompatActivity() {
         })
     }
 
-    private fun validarYActualizarVistasEnVivo() {
-        CoroutineScope(Dispatchers.Main).launch {
+    private fun cargarPrimeraPagina() {
+        val total = peliculasCompletas.size
+        val fin = minOf(ITEMS_POR_PAGINA, total)
+        val subLista = ArrayList(peliculasCompletas.subList(0, fin))
+
+        lifecycleScope.launch {
             val validador = Validaciones()
-            val listaActual = ArrayList(modeloList)
 
-            listaActual.forEach { movie ->
-                launch(Dispatchers.Main) {
-                    val esValida = withContext(Dispatchers.IO) {
-                        validador.isUrlValid(movie.streamUrl)
+            val subListaValidada = withContext(Dispatchers.Default) {
+                subLista.map { movie ->
+                    async(Dispatchers.IO) {
+                        val esValida = validador.isUrlValid(movie.streamUrl)
+                        movie.copy(isValid = esValida)
                     }
-
-                    val posicionActual = modeloList.indexOfFirst { it.id == movie.id }
-                    if (posicionActual != -1) {
-                        modeloList[posicionActual].isValid = esValida
-                        movieAdapter.notifyItemChanged(posicionActual)
-                    }
-                }
+                }.awaitAll()
             }
-            Validacioneslista.cargarPeliculas()
+
+            val listaVieja = ArrayList(modeloList)
+            val diffResult = withContext(Dispatchers.Default) {
+                DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                    override fun getOldListSize(): Int = listaVieja.size
+                    override fun getNewListSize(): Int = subListaValidada.size
+
+                    override fun areItemsTheSame(oldPos: Int, newPos: Int): Boolean {
+                        return listaVieja[oldPos].id == subListaValidada[newPos].id
+                    }
+
+                    override fun areContentsTheSame(oldPos: Int, newPos: Int): Boolean {
+                        return listaVieja[oldPos] == subListaValidada[newPos]
+                    }
+                })
+            }
+
+            modeloList.clear()
+            modeloList.addAll(subListaValidada)
+
+            // 🟢 SÓLO DESPACHAMOS LAS ACTUALIZACIONES DEL DIFFUTIL:
+            // Esto elimina por completo el parpadeo o salto visual al iniciar.
+            diffResult.dispatchUpdatesTo(movieAdapter)
+
+            val tieneMas = total > ITEMS_POR_PAGINA
+            if (tieneMas) {
+                precargarSiguientePagina()
+            }
         }
     }
+
+    private fun insertarSiguientePagina() {
+        if (siguientePaginaCache.isEmpty()) {
+            usuarioEsperandoMas = true
+            return
+        }
+
+        usuarioEsperandoMas = false
+
+        val indiceInsertar = modeloList.size
+        modeloList.addAll(siguientePaginaCache)
+
+        // 🟢 SOLUCIÓN: Usamos notifyItemRangeInserted para que la inserción sea animada y limpia.
+        // No llamamos a updateMovieList para evitar un refresco completo innecesario.
+        movieAdapter.notifyItemRangeInserted(indiceInsertar, siguientePaginaCache.size)
+
+        siguientePaginaCache.clear()
+        paginasCargadas++
+
+        val tieneMas = peliculasCompletas.size > (paginasCargadas * ITEMS_POR_PAGINA)
+        if (tieneMas) {
+            precargarSiguientePagina()
+        }
+    }
+    private fun precargarSiguientePagina() {
+        if (cargandoSiguientePagina) return
+        val inicio = paginasCargadas * ITEMS_POR_PAGINA
+        val total = peliculasCompletas.size
+        if (inicio >= total) return
+
+        cargandoSiguientePagina = true
+
+        val fin = minOf(inicio + ITEMS_POR_PAGINA, total)
+        val subLista = ArrayList(peliculasCompletas.subList(inicio, fin))
+
+        lifecycleScope.launch {
+            val validador = Validaciones()
+
+            val subListaValidada = withContext(Dispatchers.Default) {
+                subLista.map { movie ->
+                    async(Dispatchers.IO) {
+                        val esValida = validador.isUrlValid(movie.streamUrl)
+                        movie.copy(isValid = esValida)
+                    }
+                }.awaitAll()
+            }
+
+            siguientePaginaCache.clear()
+            siguientePaginaCache.addAll(subListaValidada)
+            cargandoSiguientePagina = false
+
+            // Si el usuario ya estaba esperando al final de la pantalla,
+            // insertamos el lote inmediatamente ahora que terminó de procesarse.
+            if (usuarioEsperandoMas) {
+                insertarSiguientePagina()
+            }
+        }
+    }
+
 
     private fun sincronizarConCacheLocal() {
         val validadas = Validacioneslista.obtenerPeliculasValidas().map { it.id }.toSet()

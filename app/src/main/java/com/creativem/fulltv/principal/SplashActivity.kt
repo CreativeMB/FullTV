@@ -30,13 +30,23 @@ import com.creativem.fulltv.R
 import com.creativem.fulltv.peliculas.PeliculasActivity
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.net.InetSocketAddress
 import java.net.Socket
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {
@@ -340,48 +350,76 @@ class SplashActivity : AppCompatActivity() {
     private fun iniciarCargaDeDatos() {
         lifecycleScope.launch {
             // --- PASO 1: EL ESCUDO PARA EL PRIMER ARRANQUE ---
-            // Esperamos hasta 5 segundos a que el sistema Android active la red
             var redLista = false
             for (i in 1..5) {
                 if (isNetworkAvailable()) {
                     redLista = true
                     break
                 }
-                delay(1000) // Espera 1 segundo y vuelve a preguntar
+                delay(1000)
                 Log.d("SPLASH", "Esperando hardware de red... Intento $i")
             }
 
             if (!redLista) {
-                // Si después de 5 segundos de verdad no hay red, recién ahí mostramos el error
                 mostrarErrorConexion()
                 return@launch
             }
 
-            // --- PASO 2: CARGA DE DATOS CON MANEJO DE ERRORES MEJORADO ---
-            val cargaExitosa = withTimeoutOrNull(20000) { // Aumentamos a 20 seg para el primer inicio
+            // 🟢 SOLUCIÓN: Lanzamos la validación del catálogo completo de forma silenciosa
+            // al iniciar la Splash. Al estar en su propia CoroutineScope, NO bloquea el arranque
+            // ni causa el error "Job was cancelled". Trabaja de fondo para PeliculasValidasActivity.
+            CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    // Usamos withContext(Dispatchers.IO) para no congelar la pantalla
-                    withContext(Dispatchers.IO) {
-                        // Cargar lista de películas del servidor
-                        Validacioneslista.cargarPeliculas()
+                    Validacioneslista.cargarPeliculas()
+                } catch (e: Exception) {
+                    Log.e("SPLASH_BACKGROUND", "Error no crítico cargando cache global: ${e.message}")
+                }
+            }
 
-                        val lasPrimeras = Validacioneslista.obtenerPeliculasValidas().take(15)
-                        lasPrimeras.forEach { movie ->
+            // --- PASO 2: CARGA RÁPIDA DE PÁGINA 1 EN LA SPLASH ---
+            val cargaExitosa = withTimeoutOrNull(15000) { // 15 segundos es más que suficiente
+                try {
+                    withContext(Dispatchers.IO) {
+                        // A. Descargamos la lista completa de metadatos de Firebase (Operación muy ligera de pocos KB)
+                        val snapshot = FirebaseDatabase.getInstance().reference.child("movies").get().await()
+                        val todasLasPeliculas = snapshot.children.mapNotNull { doc ->
+                            val m = doc.getValue(Modelo::class.java)
+                            m?.copy(id = doc.key ?: "")
+                        }.sortedByDescending { it.createdAt }
+
+                        // B. Tomamos exactamente las primeras 24 películas (Página 1 completa: válidas e inválidas)
+                        val total = todasLasPeliculas.size
+                        val limite = minOf(24, total)
+                        val primeras24 = todasLasPeliculas.subList(0, limite)
+
+                        // C. Las validamos todas EN PARALELO por red aquí mismo de forma asíncrona
+                        val validador = com.creativem.fulltv.peliculasvalidas.Validaciones()
+                        val primeras24Validadas = primeras24.map { movie ->
+                            async {
+                                val esValida = validador.isUrlValid(movie.streamUrl)
+                                movie.copy(isValid = esValida)
+                            }
+                        }.awaitAll()
+
+                        // D. Las guardamos en el caché global de PeliculasActivity
+                        PeliculasActivity.primeraPaginaPrecalculada.clear()
+                        PeliculasActivity.primeraPaginaPrecalculada.addAll(primeras24Validadas)
+
+                        // E. Pre-carga de imágenes de portada en disco (evita destellos blancos en la TV)
+                        primeras24Validadas.forEach { movie ->
                             try {
-                                // Pre-carga de imágenes (esto evita destellos de imágenes blancas luego)
                                 Glide.with(applicationContext)
                                     .asBitmap()
                                     .load(movie.imageUrl)
                                     .diskCacheStrategy(DiskCacheStrategy.ALL)
                                     .submit()
-                                    .get() // Espera a que la imagen baje
+                                    .get()
                             } catch (e: Exception) {
-                                // Si una imagen falla (como el error 403 que vimos), que no detenga la app
                                 Log.w("SPLASH", "No se pudo pre-cargar imagen: ${movie.imageUrl}")
                             }
                         }
                     }
-                    true // Retornamos true si terminó el bloque Dispatchers.IO
+                    true
                 } catch (e: Exception) {
                     Log.e("SPLASH", "Error fatal en carga: ${e.message}")
                     null
@@ -392,12 +430,10 @@ class SplashActivity : AppCompatActivity() {
             if (cargaExitosa == true) {
                 navegarSiguientePantalla()
             } else {
-                // Si hubo Timeout (servidor lento) o error de servidor
                 mostrarErrorConexion()
             }
         }
     }
-
     private fun navegarSiguientePantalla() {
         val auth = FirebaseAuth.getInstance()
         val currentUser = auth.currentUser
