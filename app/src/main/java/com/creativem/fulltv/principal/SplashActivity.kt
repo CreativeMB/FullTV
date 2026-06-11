@@ -133,11 +133,6 @@ class SplashActivity : AppCompatActivity() {
         // 7. Iniciar Ciclo de Frases Cinematográficas y Carga de Datos
         iniciarCicloFrases(txtCargando)
         iniciarCargaDeDatos()
-        // ⭐ Registrar listener para detectar cambios de red automáticamente
-        registrarListenerDeRed()
-
-        // Verificar conexión inicial
-        checkConexionYProcesar()
     }
 
     private fun checkConexionYProcesar() {
@@ -181,81 +176,59 @@ class SplashActivity : AppCompatActivity() {
      * Y confirma que la red tenga INTERNET REAL (no solo red local)
      */
     private fun isNetworkAvailable(): Boolean {
-        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
 
-        // Método 1: Verificación rápida con activeNetwork
-        if (verificarRedActiva(connectivityManager)) {
-            return true
-        }
-
-        // Método 2: Verificación exhaustiva de todas las redes registradas
-        // (útil cuando activeNetwork es null en el arranque)
-        return verificarTodasLasRedes(connectivityManager)
-    }
-
-    /**
-     * Verifica la red activa con validación de internet real
-     */
-    private fun verificarRedActiva(cm: ConnectivityManager): Boolean {
-        val network = cm.activeNetwork ?: return false
-        val capabilities = cm.getNetworkCapabilities(network) ?: return false
-        return validarCapacidades(capabilities)
-    }
-
-    /**
-     * Recorre todas las redes registradas (fallback cuando activeNetwork falla)
-     */
-    private fun verificarTodasLasRedes(cm: ConnectivityManager): Boolean {
-        val networks = cm.allNetworks ?: return false
-        for (network in networks) {
-            val capabilities = cm.getNetworkCapabilities(network) ?: continue
-            if (validarCapacidades(capabilities)) {
+        // Método 1: Verificación rápida de la red activa reportada por el sistema
+        val activeNetwork = connectivityManager.activeNetwork
+        if (activeNetwork != null) {
+            val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
+            if (capabilities != null && validarCapacidades(capabilities)) {
                 return true
             }
         }
-        return false
+
+        // Método 2: Escaneo de todas las interfaces de red (Útil al encender el TV)
+        val networks = connectivityManager.allNetworks
+        if (networks != null) {
+            for (network in networks) {
+                val capabilities = connectivityManager.getNetworkCapabilities(network) ?: continue
+                if (validarCapacidades(capabilities)) {
+                    return true
+                }
+            }
+        }
+
+        // Método 3: Validación definitiva por Socket real (Ignora errores de firmware del TV)
+        return probarConexionReal()
     }
 
-    /**
-     * Valida que la red tenga:
-     * 1. Un transporte válido (WiFi, Ethernet, Cellular, VPN)
-     * 2. Capacidad de internet
-     * 3. Internet VALIDADO (confirma que realmente hay salida a internet)
-     */
     private fun validarCapacidades(capabilities: NetworkCapabilities): Boolean {
-        // Primero verificar que tenga algún transporte válido
         val tieneTransporteValido = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) || // ⭐ CABLE/FIBRA
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) || // Cable de red / Fibra
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH)
 
         if (!tieneTransporteValido) return false
 
-        // Verificar que tenga capacidad de internet
-        if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-            return false
+        // Si tiene transporte e internet básico, validamos
+        if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+            // Si el SO ya lo validó, retornamos positivo de inmediato
+            if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                return true
+            }
+            // Si la TV está encendiendo y el SO aún no completa la validación nativa,
+            // forzamos la prueba de socket real para no detener al usuario.
+            return probarConexionReal()
         }
 
-        // ⭐ CLAVE: Verificar que el internet esté VALIDADO
-        // Esto confirma que la red realmente puede salir a internet
-        // (no es solo una red local sin salida)
-        if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
-            return true
-        }
-
-        // Si no está validado, hacer una prueba rápida de conectividad real
-        return probarConexionReal()
+        return false
     }
 
-    /**
-     * Prueba real de conexión haciendo un socket a un servidor público
-     * (Último recurso cuando el sistema no valida la red)
-     */
     private fun probarConexionReal(): Boolean {
         return try {
             val socket = Socket()
-            // Conectar a DNS de Google (8.8.8.8) puerto 53
+            // Conexión rápida por socket a los DNS públicos de Google en el puerto 53 (DNS)
             socket.connect(InetSocketAddress("8.8.8.8", 53), 1500)
             socket.close()
             true
@@ -278,36 +251,6 @@ class SplashActivity : AppCompatActivity() {
         btnReintentar.requestFocus()
     }
 
-    /**
-     * Registra un listener para detectar cambios de red en tiempo real
-     * (Opcional pero recomendado para Android TV)
-     */
-    private fun registrarListenerDeRed() {
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-            .build()
-
-        networkCallback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                // Red disponible con internet
-                handler.post {
-                    findViewById<View>(R.id.layoutNoInternet).visibility = View.GONE
-                    iniciarCargaDeDatos()
-                }
-            }
-
-            override fun onLost(network: Network) {
-                // Se perdió la conexión
-                handler.post {
-                    checkConexionYProcesar()
-                }
-            }
-        }
-
-        cm.registerNetworkCallback(request, networkCallback!!)
-    }
 
     /**
      * Llamar en onDestroy() para liberar recursos
@@ -349,18 +292,26 @@ class SplashActivity : AppCompatActivity() {
     }
     private fun iniciarCargaDeDatos() {
         lifecycleScope.launch {
-            // --- PASO 1: EL ESCUDO PARA EL PRIMER ARRANQUE ---
+            findViewById<View>(R.id.layoutNoInternet).visibility = View.GONE
+
+            // --- PASO 1: EL ESCUDO SILENCIOSO DE CONEXIÓN (12 Intentos) ---
+            // Damos un margen silencioso de hasta 12 segundos (ideal para arranque en frío de Ethernet/DHCP)
+            // Mientras tanto, el usuario solo ve las frases de cine animadas de forma elegante.
             var redLista = false
-            for (i in 1..5) {
-                if (isNetworkAvailable()) {
+            for (i in 1..12) {
+                val tieneConexion = withContext(Dispatchers.IO) {
+                    isNetworkAvailable()
+                }
+                if (tieneConexion) {
                     redLista = true
                     break
                 }
-                delay(1000)
-                Log.d("SPLASH", "Esperando hardware de red... Intento $i")
+                delay(1000) // Esperamos 1 segundo antes de reintentar
+                Log.d("SPLASH_NET", "Esperando hardware de red/cable... Intento $i/12")
             }
 
             if (!redLista) {
+                // Solo si después de 12 segundos de intentos reales no hay conexión, mostramos el error
                 mostrarErrorConexion()
                 return@launch
             }
