@@ -1,14 +1,19 @@
 package com.creativem.tvfullurl.Fragment
 
+import android.R.attr.orientation
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.PendingIntent
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
@@ -44,6 +49,8 @@ class EditarPeliculaFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         binding = FragmentPedidosBinding.inflate(inflater, container, false)
         return binding.root
+
+
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -55,6 +62,10 @@ class EditarPeliculaFragment : Fragment() {
         iniciarRecycler()
         escucharPeliculasEnTiempoReal()
 
+        binding.useryoutube.setOnClickListener {
+            useryoutube()
+        }
+
         binding.searchView.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean = false
             override fun onQueryTextChange(newText: String?): Boolean {
@@ -64,6 +75,187 @@ class EditarPeliculaFragment : Fragment() {
         })
     }
 
+    private fun obtenerHistorialUrls(): MutableList<String> {
+        val prefs = requireContext().getSharedPreferences("tv_url_cache", android.content.Context.MODE_PRIVATE)
+        val savedString = prefs.getString("url_history", "") ?: ""
+        if (savedString.isEmpty()) return mutableListOf()
+        return savedString.split("|||").toMutableList()
+    }
+
+    private fun guardarUrlEnHistorial(url: String) {
+        val historial = obtenerHistorialUrls()
+        // Si la URL ya existe en el historial, la quitamos para volver a ponerla de primera
+        if (historial.contains(url)) {
+            historial.remove(url)
+        }
+        historial.add(0, url)
+
+        // Guardamos solo las últimas 6 URLs para no hacer la lista infinita
+        if (historial.size > 6) {
+            historial.removeAt(historial.size - 1)
+        }
+
+        val prefs = requireContext().getSharedPreferences("tv_url_cache", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putString("url_history", historial.joinToString("|||")).apply()
+    }
+
+    private fun useryoutube() {
+        val builder = AlertDialog.Builder(requireContext())
+        builder.setTitle("Actualizar Canal en Vivo")
+
+        // 👉 MEJORA TV: Usamos un ScrollView por si el teclado tapa la pantalla
+        val scrollView = ScrollView(requireContext())
+        val mainContainer = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 20, 50, 20)
+        }
+        scrollView.addView(mainContainer)
+
+        // 1. El campo donde se escribe o aparece la URL
+        val input = EditText(requireContext()).apply {
+            hint = "Ej: https://www.youtube.com/@noticiascaracol"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 40
+            }
+        }
+        mainContainer.addView(input)
+
+        // 2. Cargamos el historial guardado en el TV
+        val historialUrls = obtenerHistorialUrls()
+
+        if (historialUrls.isNotEmpty()) {
+            val tvTituloHistorial = TextView(requireContext()).apply {
+                text = "👇 Historial (Toca para reutilizar):"
+                setTextColor(Color.parseColor("#C5A059")) // Dorado
+                textSize = 15f
+                setPadding(0, 0, 0, 15)
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            mainContainer.addView(tvTituloHistorial)
+            // 3. Dibujamos cada URL vieja hacia abajo
+            // 3. Dibujamos cada URL vieja hacia abajo
+            for (urlPast in historialUrls) {
+                val tvUrlItem = TextView(requireContext()).apply {
+                    text = urlPast
+                    setTextColor(Color.WHITE)
+                    textSize = 14f
+                    setPadding(25, 25, 25, 25)
+
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        bottomMargin = 16
+                    }
+
+                    isFocusable = true
+                    isLongClickable = true
+
+                    // 👉 FONDO MÁS SUAVE: Un gris medio agradable a la vista
+                    val normalBg = android.graphics.drawable.GradientDrawable().apply {
+                        setColor(Color.parseColor("#555555"))
+                        cornerRadius = 12f
+                    }
+
+                    // Gris un poco más claro para notar el cambio al pasar con el control
+                    val focusBg = android.graphics.drawable.GradientDrawable().apply {
+                        setColor(Color.parseColor("#777777"))
+                        cornerRadius = 12f
+                        setStroke(3, Color.parseColor("#C5A059"))
+                    }
+
+                    background = normalBg
+
+                    setOnFocusChangeListener { _, hasFocus ->
+                        background = if (hasFocus) focusBg else normalBg
+                    }
+
+                    // Clic normal: Llena el buscador superior
+                    setOnClickListener {
+                        input.setText(urlPast)
+                        input.setSelection(urlPast.length)
+                        input.requestFocus()
+                    }
+
+                    // 👉 Clic sostenido: MUESTRA DIÁLOGO DE CONFIRMACIÓN
+                    setOnLongClickListener { view ->
+
+                        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                            .setTitle("Eliminar URL")
+                            .setMessage("¿Estás seguro de que deseas quitar este enlace de tu historial?")
+                            .setPositiveButton("Sí, eliminar") { _, _ ->
+                                // Si acepta, se borra de la memoria y de la pantalla
+                                eliminarUrlDeHistorial(urlPast)
+                                mainContainer.removeView(view)
+                                Toast.makeText(requireContext(), "🗑️ URL eliminada", Toast.LENGTH_SHORT).show()
+                            }
+                            .setNegativeButton("Cancelar", null) // Si cancela, no hace nada
+                            .show()
+
+                        true
+                    }
+                }
+                mainContainer.addView(tvUrlItem)
+            }
+        }
+
+        builder.setView(scrollView)
+
+        val urlRef = FirebaseDatabase.getInstance().getReference("noticia/us4vaaf0VPezu9vuc4ns/urlyoutube")
+
+        // Llenamos con lo que hay actualmente en Firebase
+        urlRef.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                val urlActual = snapshot.value.toString()
+                // Solo lo llenamos si el input está vacío para no borrar si el usuario ya estaba escribiendo
+                if (input.text.isEmpty()) {
+                    input.setText(urlActual)
+                    if (urlActual.isNotEmpty()) {
+                        input.setSelection(urlActual.length)
+                    }
+                }
+            }
+        }
+
+        builder.setPositiveButton("Guardar") { dialog, _ ->
+            val nuevaUrl = input.text.toString().trim()
+
+            if (nuevaUrl.isNotEmpty() && (nuevaUrl.contains("youtube.com") || nuevaUrl.contains("youtu.be"))) {
+
+                // Guardamos la URL en la memoria caché del TV
+                guardarUrlEnHistorial(nuevaUrl)
+
+                // Subimos a Firebase
+                urlRef.setValue(nuevaUrl)
+                    .addOnSuccessListener {
+                        Toast.makeText(requireContext(), "✅ URL actualizada", Toast.LENGTH_SHORT).show()
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(requireContext(), "❌ Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+            } else {
+                Toast.makeText(requireContext(), "⚠️ Ingresa una URL válida", Toast.LENGTH_SHORT).show()
+            }
+            dialog.dismiss()
+        }
+
+        builder.setNegativeButton("Cancelar") { dialog, _ ->
+            dialog.cancel()
+        }
+
+        builder.show()
+    }
+    private fun eliminarUrlDeHistorial(url: String) {
+        val historial = obtenerHistorialUrls()
+        if (historial.remove(url)) { // Si la encuentra y la borra, actualizamos la caché
+            val prefs = requireContext().getSharedPreferences("tv_url_cache", android.content.Context.MODE_PRIVATE)
+            prefs.edit().putString("url_history", historial.joinToString("|||")).apply()
+        }
+    }
     private fun crearCanalNotificaciones() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             val name = "Nuevos Pedidos Admin"

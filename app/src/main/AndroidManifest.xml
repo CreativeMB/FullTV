@@ -27,6 +27,7 @@
     <application
         android:name=".enlinea.FullTVApp"
         android:allowBackup="true"
+        android:extractNativeLibs="true"
         android:banner="@mipmap/ic_banner"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_channel"
@@ -36,11 +37,20 @@
         android:theme="@style/Theme.FullTV.tv"
         android:usesCleartextTraffic="true"
         tools:ignore="UnusedAttribute">
+
+
         <activity
             android:name=".peliculas.PeliculasActivity"
             android:theme="@style/Theme.FullTV.tv">
 
         </activity>
+
+        <activity
+            android:name=".LivePlayerActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:screenOrientation="landscape"
+            android:hardwareAccelerated="true"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
         <activity
             android:name=".api.ApiPeliculaActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"

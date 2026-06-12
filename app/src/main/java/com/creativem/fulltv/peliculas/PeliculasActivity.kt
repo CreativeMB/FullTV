@@ -104,6 +104,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
 import com.creativem.fulltv.BuildConfig
+import com.creativem.fulltv.LivePlayerActivity
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 
@@ -264,6 +265,34 @@ private var usuarioEsperandoMas = false
         intentarVerificacionAlquileres()
 
 
+    }
+
+
+    private fun useryoutube() {
+        // 1. Apuntar exactamente a la ruta en la base de datos
+        val ref = FirebaseDatabase.getInstance().getReference("noticia/us4vaaf0VPezu9vuc4ns/urlyoutube")
+
+        // 2. Leer la URL de Youtube
+        ref.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                var urlYoutube = snapshot.value.toString().trim()
+
+                // Si la URL es de canal pero le falta el "live", se lo agregamos automáticamente
+                if (urlYoutube.contains("/@") && !urlYoutube.endsWith("/live")) {
+                    urlYoutube += "/live"
+                }
+
+                // 3. Lanzar el reproductor con la URL obtenida
+                val intent = Intent(this, LivePlayerActivity::class.java)
+                intent.putExtra("YOUTUBE_URL_OR_ID", urlYoutube)
+                startActivity(intent)
+
+            } else {
+                Toast.makeText(this, "No hay partido en vivo revisa la tabla.", Toast.LENGTH_SHORT).show()
+            }
+        }.addOnFailureListener {
+            Toast.makeText(this, "Error de red al conectar con el servidor.", Toast.LENGTH_SHORT).show()
+        }
     }
     private fun intentarVerificacionAlquileres() {
         val currentUser = auth.currentUser
@@ -646,11 +675,11 @@ private var usuarioEsperandoMas = false
 
     private fun setupMenuHorizontal() {
         val menuItems = listOf(
-            "Perfil", "Activar", "Alquila", "Buscar",
+            "Mundial", "Perfil", "Activar", "Alquila", "Buscar",
             "Pedir", "Paquete",  "TV", "Cerrar"
         )
         val menuIcons = listOf(
-            R.drawable.home, R.drawable.cartelera,
+            R.drawable.youtube, R.drawable.home, R.drawable.cartelera,
             R.drawable.cine, R.drawable.buscar, R.drawable.pedido,
             R.drawable.activacion, R.drawable.tv, R.drawable.cerrrarp
         )
@@ -661,6 +690,7 @@ private var usuarioEsperandoMas = false
 
         val adapter = MenuPrincipalAdapter(menuList) { item ->
             when (item.name) {
+                "Mundial" -> useryoutube()
                 "Activar" -> navegarGratis()
                 "Buscar" -> buscarPeliculaDialogo()
                 "Pedir" -> mostrarDialogoPedido()

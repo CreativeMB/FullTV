@@ -11,10 +11,10 @@ android {
 
     defaultConfig {
         applicationId = "com.creativem.fulltv"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 34
         versionCode = 10
-        versionName = "1.0.40"
+        versionName = "1.0.41"
     }
 
     buildFeatures {
@@ -135,7 +135,6 @@ dependencies {
     // qr
     implementation("com.google.zxing:core:3.5.3")
 
-
-
-
+    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
 }
