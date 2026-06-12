@@ -133,6 +133,14 @@ class MoviesAdapter(
         val movieKey = modelo.title
         timers[movieKey]?.cancel()
 
+        // 🟢 ESTE ES EL CAMBIO CLAVE:
+        // Si countdownMinutes es 0, significa que NO debe haber contador.
+        // Saltamos directamente a mostrar el botón de ACTIVAR/ALQUILAR.
+        if (modelo.countdownMinutes <= 0) {
+            actualizarInterfazFinal(holder, modelo)
+            return
+        }
+
         val countdownDurationMillis = TimeUnit.MINUTES.toMillis(modelo.countdownMinutes.toLong())
         val timeElapsed = System.currentTimeMillis() - modelo.createdAt
         val remainingTimeMillis = countdownDurationMillis - timeElapsed
@@ -140,6 +148,7 @@ class MoviesAdapter(
         if (remainingTimeMillis <= 0) {
             actualizarInterfazFinal(holder, modelo)
         } else {
+            // ... resto de tu código del timer igual
             val timer = object : CountDownTimer(remainingTimeMillis, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
                     if (holder.txtTitle.text == modelo.title) {
