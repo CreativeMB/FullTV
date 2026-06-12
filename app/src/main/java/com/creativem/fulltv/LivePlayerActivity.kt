@@ -38,6 +38,11 @@ class LivePlayerActivity : AppCompatActivity() {
 
     private val TAG = "FullTV_Player"
 
+    // 👉 RECONEXIÓN: Variables para controlar la url original y los intentos
+    private var originalYoutubeUrl: String = ""
+    private var intentosReconexion = 0
+    private val MAX_INTENTOS = 3
+
     @OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -54,8 +59,8 @@ class LivePlayerActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
         }
-// 👉 AÑADE ESTA LÍNEA: Mantener la pantalla siempre encendida
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         playerView = PlayerView(this).apply {
             useController = false
             resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
@@ -63,7 +68,6 @@ class LivePlayerActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
-            // 👉 FOCO TV: El video DEBE ser enfocable para no atrapar el control arriba
             isFocusable = true
             isFocusableInTouchMode = true
         }
@@ -150,8 +154,6 @@ class LivePlayerActivity : AppCompatActivity() {
         setContentView(rootLayout)
 
         playerView.setOnClickListener { togglePlayPause() }
-
-        // 👉 FOCO TV: Forzamos que el foco arranque en el video (centro), no en el botón salir.
         playerView.requestFocus()
 
         try {
@@ -159,25 +161,22 @@ class LivePlayerActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "Fallo al inicializar el motor yt-dlp", e)
         }
-        val youtubeUrlOrId = intent.getStringExtra("YOUTUBE_URL_OR_ID") ?: ""
-        Log.i(TAG, "Procesando URL/ID con YoutubeDL: $youtubeUrlOrId")
+
+        // 👉 RECONEXIÓN: Guardamos la URL original para poder usarla si se cae
+        originalYoutubeUrl = intent.getStringExtra("YOUTUBE_URL_OR_ID") ?: ""
+        Log.i(TAG, "Procesando URL/ID con YoutubeDL: $originalYoutubeUrl")
 
         inicializarExoPlayer()
-        extraerYReproducir(youtubeUrlOrId)
+        extraerYReproducir(originalYoutubeUrl)
     }
 
-    // 👉 LÓGICA ANDROID TV: Control manual absoluto del control remoto
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-
-        // 1. Si presionan la flecha ARRIBA: Forzamos el foco hacia el botón "CineParche"
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
             if (playerView.hasFocus() || btnPlayPause.hasFocus()) {
                 btnBack.requestFocus()
-                return true // Consumimos la acción
+                return true
             }
         }
-
-        // 2. Si presionan la flecha ABAJO estando en "CineParche": Volvemos al video o al botón Play
         if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
             if (btnBack.hasFocus()) {
                 if (btnPlayPause.visibility == View.VISIBLE) {
@@ -188,22 +187,16 @@ class LivePlayerActivity : AppCompatActivity() {
                 return true
             }
         }
-
-        // 3. Si presionan OK / ENTER / PLAY:
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
             keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
             keyCode == KeyEvent.KEYCODE_ENTER) {
 
-            // Si el foco está en el botón de retroceso, salimos de la app
             if (btnBack.hasFocus()) {
                 return super.onKeyDown(keyCode, event)
             }
-
-            // De lo contrario, pausamos o reproducimos el video
             togglePlayPause()
             return true
         }
-
         return super.onKeyDown(keyCode, event)
     }
 
@@ -218,7 +211,6 @@ class LivePlayerActivity : AppCompatActivity() {
                 player.pause()
                 btnPlayPause.text = "▶"
                 btnPlayPause.visibility = View.VISIBLE
-                // 👉 FOCO TV: Le pasamos el foco al botón Play para que se ilumine
                 btnPlayPause.requestFocus()
             } else {
                 player.play()
@@ -226,7 +218,6 @@ class LivePlayerActivity : AppCompatActivity() {
                 btnPlayPause.postDelayed({
                     if (player.isPlaying) {
                         btnPlayPause.visibility = View.GONE
-                        // 👉 FOCO TV: Aquí rompemos la trampa. Le devolvemos el foco invisible al video
                         playerView.requestFocus()
                     }
                 }, 500)
@@ -253,12 +244,12 @@ class LivePlayerActivity : AppCompatActivity() {
                     }
                 } else {
                     Log.e(TAG, "La URL devuelta por YoutubeDL es nula o vacía.")
-                    lanzarErrorYSalir("No se pudo obtener el stream de video.")
+                    if (intentosReconexion == 0) lanzarErrorYSalir("No se pudo obtener el stream de video.")
                 }
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error crítico durante la extracción con YoutubeDL: ${e.message}", e)
-                lanzarErrorYSalir("El video está restringido o el canal está desconectado.")
+                if (intentosReconexion == 0) lanzarErrorYSalir("El video está restringido o el canal está desconectado.")
             }
         }
     }
@@ -293,6 +284,8 @@ class LivePlayerActivity : AppCompatActivity() {
                     when (playbackState) {
                         androidx.media3.common.Player.STATE_READY -> {
                             Log.i(TAG, "ExoPlayer: ¡Reproduciendo el Stream!")
+                            // 👉 RECONEXIÓN: Si conectó con éxito, reseteamos el contador de fallos a 0
+                            intentosReconexion = 0
                         }
                         androidx.media3.common.Player.STATE_ENDED -> Log.i(TAG, "ExoPlayer: Stream finalizado.")
                     }
@@ -300,13 +293,28 @@ class LivePlayerActivity : AppCompatActivity() {
 
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                     Log.e(TAG, "Error nativo de ExoPlayer: ${error.message}", error)
-                    lanzarErrorYSalir("El servidor cortó la conexión del stream.")
+
+                    // 👉 RECONEXIÓN LÓGICA PRINCIPAL: Si hay un error, intentamos reconectar en lugar de salir
+                    if (intentosReconexion < MAX_INTENTOS) {
+                        intentosReconexion++
+                        Log.w(TAG, "El token caducó o falló la red. Reconectando... (Intento $intentosReconexion de $MAX_INTENTOS)")
+
+                        runOnUiThread {
+                            progressBar.visibility = View.VISIBLE
+                            Toast.makeText(this@LivePlayerActivity, "Reconectando señal en vivo...", Toast.LENGTH_SHORT).show()
+                        }
+
+                        // Volvemos a llamar a yt-dlp para obtener una URL fresca
+                        extraerYReproducir(originalYoutubeUrl)
+                    } else {
+                        lanzarErrorYSalir("La señal en vivo se ha interrumpido de forma permanente.")
+                    }
                 }
             })
 
         } catch (e: Exception) {
             Log.e(TAG, "Excepción al preparar ExoPlayer: ${e.message}")
-            lanzarErrorYSalir("Fallo al iniciar el reproductor multimedia.")
+            if (intentosReconexion == 0) lanzarErrorYSalir("Fallo al iniciar el reproductor multimedia.")
         }
     }
 
