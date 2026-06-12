@@ -201,6 +201,7 @@ class LivePlayerActivity : AppCompatActivity() {
     }
 
     private fun inicializarExoPlayer() {
+        // 👉 Volvemos al constructor por defecto, que es más rápido y ligero
         exoPlayer = ExoPlayer.Builder(this).build()
         playerView.player = exoPlayer
     }
@@ -309,6 +310,15 @@ class LivePlayerActivity : AppCompatActivity() {
             val mediaItem = MediaItem.Builder()
                 .setUri(Uri.parse(urlReal))
                 .setMimeType(mimeType)
+                // 👉 LÓGICA ESTABLE PARA EN VIVO:
+                // Le decimos a ExoPlayer cómo comportarse sin congelarse
+                .setLiveConfiguration(
+                    MediaItem.LiveConfiguration.Builder()
+                        .setTargetOffsetMs(18000) // 👉 18 segundos. Le da margen a YouTube para renderizar el video sin forzar tu reproductor
+                        .setMaxPlaybackSpeed(1.02f)
+                        .setMinPlaybackSpeed(0.98f)
+                        .build()
+                )
                 .build()
 
             val mediaSource = DefaultMediaSourceFactory(this)
@@ -322,32 +332,44 @@ class LivePlayerActivity : AppCompatActivity() {
             exoPlayer?.addListener(object : androidx.media3.common.Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     when (playbackState) {
+                        androidx.media3.common.Player.STATE_BUFFERING -> {
+                            // 👉 MEJORA: Si el internet se pone lento en pleno partido, muestra la ruedita
+                            progressBar.visibility = View.VISIBLE
+                        }
                         androidx.media3.common.Player.STATE_READY -> {
                             Log.i(TAG, "ExoPlayer: ¡Reproduciendo el Stream!")
-                            // 👉 RECONEXIÓN: Si conectó con éxito, reseteamos el contador de fallos a 0
-                            intentosReconexion = 0
+                            progressBar.visibility = View.GONE
+                            intentosReconexion = 0 // El stream es estable, reiniciamos el contador
                         }
-                        androidx.media3.common.Player.STATE_ENDED -> Log.i(TAG, "ExoPlayer: Stream finalizado.")
+                        androidx.media3.common.Player.STATE_ENDED -> {
+                            Log.i(TAG, "ExoPlayer: Stream finalizado.")
+                            progressBar.visibility = View.GONE
+                        }
                     }
                 }
 
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                    Log.e(TAG, "Error nativo de ExoPlayer: ${error.message}", error)
+                    Log.e(TAG, "Error nativo de ExoPlayer: ${error.errorCodeName} - ${error.message}")
 
-                    // 👉 RECONEXIÓN LÓGICA PRINCIPAL: Si hay un error, intentamos reconectar en lugar de salir
+                    // 1. Si simplemente se desfasó por un micro-corte, lo reenganchamos sin volver a extraer
+                    if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                        Log.w(TAG, "Re-sincronizando stream en vivo...")
+                        exoPlayer?.seekToDefaultPosition()
+                        exoPlayer?.prepare()
+                        return
+                    }
+
+                    // 2. Si el enlace caducó (Error de red grave), intentamos yt-dlp otra vez
                     if (intentosReconexion < MAX_INTENTOS) {
                         intentosReconexion++
-                        Log.w(TAG, "El token caducó o falló la red. Reconectando... (Intento $intentosReconexion de $MAX_INTENTOS)")
-
                         runOnUiThread {
                             progressBar.visibility = View.VISIBLE
-                            Toast.makeText(this@LivePlayerActivity, "Reconectando señal en vivo...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@LivePlayerActivity, "Recuperando señal...", Toast.LENGTH_SHORT).show()
                         }
-
-                        // Volvemos a llamar a yt-dlp para obtener una URL fresca
+                        // Lanzamos la reconexión de inmediato
                         extraerYReproducir(originalYoutubeUrl)
                     } else {
-                        lanzarErrorYSalir("La señal en vivo se ha interrumpido de forma permanente.")
+                        mostrarImagenEsperaYSalir()
                     }
                 }
             })
@@ -373,7 +395,13 @@ class LivePlayerActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        exoPlayer?.playWhenReady = true
+        exoPlayer?.let { player ->
+            // 👉 Si el usuario minimizó la app y volvió, lo forzamos a saltar al "Vivo" actual
+            if (player.isCurrentMediaItemLive) {
+                player.seekToDefaultPosition()
+            }
+            player.playWhenReady = true
+        }
     }
 
     override fun onDestroy() {
