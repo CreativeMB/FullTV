@@ -244,13 +244,53 @@ class LivePlayerActivity : AppCompatActivity() {
                     }
                 } else {
                     Log.e(TAG, "La URL devuelta por YoutubeDL es nula o vacía.")
-                    if (intentosReconexion == 0) lanzarErrorYSalir("No se pudo obtener el stream de video.")
+                    // 👉 SOLUCIÓN: Si no devuelve enlace de stream, pasamos a la imagen de espera
+                    mostrarImagenEsperaYSalir()
                 }
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error crítico durante la extracción con YoutubeDL: ${e.message}", e)
-                if (intentosReconexion == 0) lanzarErrorYSalir("El video está restringido o el canal está desconectado.")
+                // 👉 SOLUCIÓN: Si el canal está offline o da error por no transmitir, mostramos la imagen
+                mostrarImagenEsperaYSalir()
             }
+        }
+    }
+
+    private fun mostrarImagenEsperaYSalir() {
+        runOnUiThread {
+            progressBar.visibility = View.GONE
+            exoPlayer?.stop() // Detenemos ExoPlayer por completo
+
+            // Creamos un diálogo nativo a pantalla completa sobre la actividad actual
+            val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+
+            val imageView = android.widget.ImageView(this).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                scaleType = android.widget.ImageView.ScaleType.FIT_XY
+
+                // 👉 Usa el nombre exacto de tu imagen guardada en res/drawable
+                setImageResource(R.drawable.fondomundial)
+
+                isFocusable = true
+                isFocusableInTouchMode = true
+
+                // Si el usuario presiona el botón central (OK) del control, cierra el aviso y sale al menú
+                setOnClickListener {
+                    dialog.dismiss()
+                    finish()
+                }
+            }
+
+            // Si el usuario presiona el botón "Atrás" del control remoto, también cierra todo de vuelta al menú
+            dialog.setOnCancelListener { finish() }
+
+            dialog.setContentView(imageView)
+            dialog.show()
+
+            imageView.requestFocus() // Forzamos el foco en la imagen para capturar las pulsaciones del control
         }
     }
 
