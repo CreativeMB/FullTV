@@ -25,21 +25,6 @@
             android:layout_weight="1"
             android:queryHint="Buscar película" />
 
-        <TextView
-            android:id="@+id/useryoutube"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:background="#C5A059"
-            android:paddingStart="16dp"
-            android:paddingTop="10dp"
-            android:paddingEnd="16dp"
-            android:paddingBottom="10dp"
-            android:text="Youtube"
-            android:textColor="@android:color/white"
-            android:textStyle="bold"
-            android:clickable="true"
-            android:focusable="true"/>
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
