@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="120dp"
+    android:layout_margin="4dp"
+    android:focusable="true"
+    android:clickable="true"
+    android:focusableInTouchMode="true"
+    app:cardBackgroundColor="#1A1A1A"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="0dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- CAMBIO: fitCenter para que el logo siempre esté centrado verticalmente -->
+        <ImageView
+            android:id="@+id/imgMovie"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="15dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/pelifondo"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- Cinta negra transparente -->
+        <View
+            android:id="@+id/infoArea"
+            android:layout_width="match_parent"
+            android:layout_height="35dp"
+            android:background="@drawable/bg_degradado_netflix"
+            app:layout_constraintBottom_toBottomOf="parent" />
+
+        <!-- Título centrado verticalmente DENTRO de la cinta negra -->
+        <TextView
+            android:id="@+id/txtMovieTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="4dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:gravity="center"
+            android:text="Canal"
+            android:textColor="#FFFFFF"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="@id/infoArea"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@id/infoArea" />
+
+        <!-- Badge TV arriba -->
+        <TextView
+            android:id="@+id/txtBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="6dp"
+            android:background="@drawable/bg_badge_blue"
+            android:paddingHorizontal="4dp"
+            android:text="TV"
+            android:textColor="#FFFFFF"
+            android:textSize="7sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Status LIVE arriba -->
+        <TextView
+            android:id="@+id/txtStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="6dp"
+            android:background="@drawable/bg_status_red"
+            android:paddingHorizontal="4dp"
+            android:text="LIVE"
+            android:textColor="#FFFFFF"
+            android:textSize="7sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.cardview.widget.CardView>

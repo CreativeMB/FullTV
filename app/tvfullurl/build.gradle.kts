@@ -78,5 +78,6 @@ dependencies {
     implementation ("androidx.media3:media3-datasource-okhttp:1.4.1")
     implementation ("androidx.media3:media3-exoplayer-hls:1.4.1")
     implementation ("androidx.media3:media3-datasource:1.4.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
 }

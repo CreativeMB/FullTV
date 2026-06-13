@@ -15,7 +15,8 @@ import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Modelo
 
 class ChannelsAdapter(
-    private var channelList: MutableList<Modelo>,
+    // Cambiamos a una lista interna que se pueda mutar de forma segura
+    private var channelList: List<Modelo>,
     private val onItemClick: (Modelo) -> Unit,
     private val onFocusChange: (Modelo) -> Unit
 ) : RecyclerView.Adapter<ChannelsAdapter.ChannelViewHolder>() {
@@ -28,7 +29,7 @@ class ChannelsAdapter(
         .dontAnimate()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChannelViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_movie, parent, false)
+        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_tv, parent, false)
         return ChannelViewHolder(view)
     }
 
@@ -36,12 +37,8 @@ class ChannelsAdapter(
         val canal = channelList[position]
 
         holder.txtTitle.text = canal.title
-        holder.txtStatus.text = "LIVE" // Los canales de TV siempre son en vivo
+        holder.txtStatus.text = "GRATIS" // Los canales de TV siempre son en vivo
         holder.txtBadge.text = "TV"
-
-        // Estilo fijo para canales (por ejemplo, azul oscuro para diferenciar de películas)
-        holder.infoArea.setBackgroundColor(Color.parseColor("#0D47A1"))
-        holder.txtBadge.setBackgroundColor(Color.parseColor("#1565C0"))
 
         Glide.with(holder.itemView.context)
             .load(canal.imageUrl)
@@ -70,5 +67,12 @@ class ChannelsAdapter(
         val txtStatus: TextView = view.findViewById(R.id.txtStatus)
         val txtBadge: TextView = view.findViewById(R.id.txtBadge)
         val infoArea: View = view.findViewById(R.id.infoArea)
+    }
+
+    // CORRECCIÓN: Ahora recibe la lista del tipo correcto (Modelo)
+    // y reasigna la lista directamente de forma segura
+    fun updateList(newList: List<Modelo>) {
+        this.channelList = newList
+        notifyDataSetChanged()
     }
 }

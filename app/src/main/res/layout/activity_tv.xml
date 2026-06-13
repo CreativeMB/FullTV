@@ -6,7 +6,6 @@
     android:layout_height="match_parent"
     android:background="#050505">
 
-    <!-- Imagen de fondo que cambia al navegar -->
     <ImageView
         android:id="@+id/imgFondoTv"
         android:layout_width="match_parent"
@@ -14,38 +13,59 @@
         android:scaleType="centerCrop"
         android:alpha="0.3" />
 
-    <!-- TÍTULO CENTRADO -->
     <TextView
         android:id="@+id/txtTituloTv"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="15dp"
+        android:layout_marginEnd="10dp"
         android:text="CANALES DE TELEVISIÓN"
-        android:textColor="@color/texto"
-        android:textSize="16sp"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
         android:textStyle="bold"
-        android:shadowColor="#000000"
-        android:shadowDx="2"
-        android:shadowDy="2"
-        android:shadowRadius="3"
-        app:layout_constraintEnd_toEndOf="parent"
+        android:singleLine="true"
+        android:ellipsize="end"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/searchEditText" />
 
-    <!-- LISTA DE CANALES (UNIFICADA) -->
+    <EditText
+        android:id="@+id/searchEditText"
+        android:layout_width="220dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="20dp"
+        android:background="@drawable/focus_selector"
+        android:drawableStart="@android:drawable/ic_menu_search"
+        android:drawablePadding="10dp"
+        android:hint="Buscar..."
+        android:paddingHorizontal="15dp"
+        android:textColor="#2F2F2F"
+        android:textColorHint="#AA161616"
+        android:textSize="14sp"
+        android:imeOptions="actionSearch"
+        android:inputType="text"
+
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:nextFocusDown="@+id/recyclerViewTV"
+        app:layout_constraintBottom_toBottomOf="@id/txtTituloTv"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/txtTituloTv" />
+
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvCanales"
+        android:id="@+id/recyclerViewTV"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="0dp"
-        android:paddingTop="20dp"
+        android:layout_marginTop="20dp"
         android:paddingHorizontal="10dp"
-        android:paddingBottom="20dp"
         android:clipToPadding="false"
-        android:overScrollMode="never"
+
+        android:focusable="true"
+        android:nextFocusUp="@+id/searchEditText"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/txtTituloTv" />
+        app:layout_constraintTop_toBottomOf="@id/searchEditText" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Log
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
@@ -19,12 +21,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import java.text.Normalizer
 
 class TvActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityTvBinding
     private lateinit var adapter: ChannelsAdapter
-    private val channelList = mutableListOf<Modelo>()
+
+    // SOLUCIÓN: Separamos los datos puros de Firebase de los datos que se muestran filtrados
+    private val channelListMaster = mutableListOf<Modelo>() // Lista original/maestra
+    private val channelList = mutableListOf<Modelo>()       // Lista que usa el Adapter
+
     private val databaseRef = FirebaseDatabase.getInstance().getReference("tv")
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,22 +44,58 @@ class TvActivity : AppCompatActivity() {
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
 
         setupRecyclerView()
+        setupBuscador() // <-- Inicializamos el buscador robusto
         loadTvChannels()
     }
 
     private fun setupRecyclerView() {
         val columnas = ViewUtils.calcularColumnas(this)
-        binding.rvCanales.layoutManager = GridLayoutManager(this, columnas)
+        // CORRECCIÓN: Se cambió el ID al del nuevo XML (recyclerViewTV)
+        binding.recyclerViewTV.layoutManager = GridLayoutManager(this, columnas)
 
-        // QUITA el "val" antes de adapter. Así usas la variable de clase.
         adapter = ChannelsAdapter(
             channelList,
             onItemClick = { canal -> abrirReproductor(canal) },
             onFocusChange = { canal -> actualizarFondo(canal.imageUrl) }
         )
 
-        binding.rvCanales.itemAnimator = null
-        binding.rvCanales.adapter = adapter
+        binding.recyclerViewTV.itemAnimator = null
+        binding.recyclerViewTV.adapter = adapter
+    }
+
+    // --- CONFIGURACIÓN DEL BUSCADOR ROBUSTO ---
+    private fun setupBuscador() {
+        binding.searchEditText.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                filterChannels(s.toString())
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+    }
+
+    // FUNCIÓN DE FILTRADO (Ignora tildes, eñes, espacios y mayúsculas)
+    private fun filterChannels(query: String) {
+        val normalizedQuery = query.flatten()
+
+        val filtered = if (normalizedQuery.isEmpty()) {
+            channelListMaster // Si no hay texto, volvemos a mostrar todo lo de la lista maestra
+        } else {
+            channelListMaster.filter {
+                it.title.flatten().contains(normalizedQuery)
+            }
+        }
+
+        // Pasamos el filtro al adaptador usando su método optimizado
+        if (::adapter.isInitialized) {
+            adapter.updateList(filtered)
+        }
+    }
+
+    // Función de extensión para "limpiar" el texto
+    private fun String.flatten(): String {
+        val temp = Normalizer.normalize(this, Normalizer.Form.NFD)
+        return temp.replace("[\\p{InCombiningDiacriticalMarks}]".toRegex(), "").lowercase().trim()
     }
 
     private fun loadTvChannels() {
@@ -63,11 +106,9 @@ class TvActivity : AppCompatActivity() {
 
                 val canales = mutableListOf<Modelo>()
                 for (child in snapshot.children) {
-                    // Firebase a veces necesita que la clase tenga constructor vacío
                     val canal = child.getValue(Modelo::class.java)
                     canal?.let {
                         it.isValid = true
-                        // Asignamos el ID directamente
                         val canalConId = it.copy(id = child.key ?: "")
                         canales.add(canalConId)
                     }
@@ -77,18 +118,14 @@ class TvActivity : AppCompatActivity() {
                     if (canales.isEmpty()) {
                         Log.d("TV_DEBUG", "La lista de canales está vacía en Firebase.")
                     } else {
-                        // Limpiamos y recargamos la lista ORIGINAL que le pasamos al adaptador
-                        channelList.clear()
-                        channelList.addAll(canales.sortedBy { it.title })
+                        // Guardamos todo ordenado en nuestra lista maestra estática
+                        channelListMaster.clear()
+                        channelListMaster.addAll(canales.sortedBy { it.title })
 
-                        // Si el adaptador ya fue creado, avisarle que los datos cambiaron
-                        if (::adapter.isInitialized) {
-                            adapter.notifyDataSetChanged()
-                        } else {
-                            // Si por alguna razón setupRecyclerView no se llamó aún, llamarlo aquí
-                            setupRecyclerView()
-                        }
-                        Log.d("TV_DEBUG", "Canales cargados: ${channelList.size}")
+                        // Ejecutamos el filtro inicial por si el usuario ya escribió algo antes de cargar
+                        filterChannels(binding.searchEditText.text.toString())
+
+                        Log.d("TV_DEBUG", "Canales cargados en lista maestra: ${channelListMaster.size}")
                     }
                 }
             } catch (e: Exception) {
@@ -111,7 +148,7 @@ class TvActivity : AppCompatActivity() {
             putExtra("EXTRA_STREAM_URL", modelo.streamUrl)
             putExtra("EXTRA_MOVIE_TITLE", modelo.title)
             putExtra("EXTRA_MOVIE_IMAGE_URL", modelo.imageUrl)
-            putExtra("EXTRA_IS_LIVE", true) // Indica que es un canal de TV
+            putExtra("EXTRA_IS_LIVE", true)
         }
         startActivity(intent)
     }

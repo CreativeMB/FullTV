@@ -1,203 +1,200 @@
 package com.creativem.tvfullurl.Fragment
 
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.Button
-import android.widget.EditText
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.*
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.creativem.cineflexurl.modelo.Movie
-import com.creativem.tvfullurl.adapter.MoviesAdapter
+import com.creativem.cineflexurl.modelo.tv
+import com.creativem.tvfullurl.ChannelAdapter
 import com.creativem.tvfullurl.databinding.FragmentTvBinding
-// CAMBIO: Importamos Realtime Database en lugar de Firestore
 import com.google.firebase.database.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.net.URL
 
 class TvFragment : Fragment() {
 
-    // CAMBIO: Usamos DatabaseReference
+    private lateinit var binding: FragmentTvBinding
     private lateinit var database: DatabaseReference
-    private lateinit var titleEditText: EditText
-    private lateinit var imageUrlEditText: EditText
-    private lateinit var streamUrlEditText: EditText
-    private lateinit var createButton: Button
-    private lateinit var recyclerView: RecyclerView
-    private lateinit var moviesAdapter: MoviesAdapter
-    private var movieList: MutableList<Movie> = mutableListOf()
-    private var isEditing = false
-    private var currentEditingMovieId: String? = null
+    private var player: ExoPlayer? = null
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        val binding = FragmentTvBinding.inflate(inflater, container, false)
+    // channelList guarda los datos reales de Firebase
+    private var channelList: MutableList<tv> = mutableListOf()
+    private lateinit var channelAdapter: ChannelAdapter
 
-        // CAMBIO: Inicializamos la referencia a la tabla "tv"
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        binding = FragmentTvBinding.inflate(inflater, container, false)
         database = FirebaseDatabase.getInstance().getReference("tv")
 
-        titleEditText = binding.titleEditText
-        imageUrlEditText = binding.imageUrlEditText
-        streamUrlEditText = binding.streamUrlEditText
-        createButton = binding.createButton
-        recyclerView = binding.recyclerViewTV
+        // 1. Inicializar ExoPlayer
+        player = ExoPlayer.Builder(requireContext()).build()
+        binding.playerView.player = player
 
-        recyclerView.layoutManager = LinearLayoutManager(context)
-
-        moviesAdapter = MoviesAdapter(
-            movieList,
-            onDeleteClick = { id -> deleteMovie(id) },
-            onEditClick = { movie -> editMovie(movie) },
-            onAssignClick = { movie ->(movie) }, // Se muestra el botón
-            isEditable = true
+        // 2. Configurar RecyclerView y Adaptador
+        // Cambia esto en el onCreateView:
+        channelAdapter = ChannelAdapter(channelList,
+            onDeleteClick = { channel -> deleteMovie(channel) }, // Pasamos el objeto completo
+            onItemClick = { channel -> playChannel(channel.streamUrl) }
         )
 
-        recyclerView.adapter = moviesAdapter
+        binding.recyclerViewTV.layoutManager = LinearLayoutManager(context)
+        binding.recyclerViewTV.adapter = channelAdapter
 
-        createButton.setOnClickListener {
-            if (isEditing) {
-                currentEditingMovieId?.let { movieId -> updateMovieInFirebase(movieId) }
+        // 3. Configurar Buscador (Filtro en tiempo real)
+        binding.searchEditText.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val query = s.toString().lowercase().trim()
+                filterChannels(query)
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        // 4. Botón: Cargar lista desde URL (Añadir a lo existente)
+        binding.btnImportM3u.setOnClickListener {
+            val url = binding.urlEditText.text.toString().trim()
+            if (url.isNotEmpty()) {
+                loadM3UFromUrl(url)
             } else {
-                uploadDataToFirebase()
+                Toast.makeText(context, "Por favor pega una URL válida", Toast.LENGTH_SHORT).show()
             }
         }
 
-        loadDataFromFirebase()
+        // 5. Botón: Limpiar todo el nodo de TV (CON CONFIRMACIÓN)
+        binding.btnClearAll.setOnClickListener {
+            val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            builder.setTitle("¡Atención!")
+            builder.setMessage("¿Estás seguro de que quieres borrar TODOS los canales de la lista? Esta acción no se puede deshacer.")
 
+            // Si el moderador confirma
+            builder.setPositiveButton("Sí, borrar todo") { dialog, _ ->
+                database.removeValue().addOnSuccessListener {
+                    Toast.makeText(context, "Lista vaciada completamente", Toast.LENGTH_SHORT).show()
+                }
+                dialog.dismiss()
+            }
+
+            // Si el moderador cancela
+            builder.setNegativeButton("Cancelar") { dialog, _ ->
+                dialog.dismiss()
+            }
+
+            val alert = builder.create()
+            alert.show()
+        }
+
+        loadData()
         return binding.root
     }
 
-    private fun uploadDataToFirebase() {
-        val title = titleEditText.text.toString().trim()
-        val imageUrl = imageUrlEditText.text.toString().trim()
-        val streamUrl = streamUrlEditText.text.toString().trim()
-
-        if (title.isNotEmpty() && imageUrl.isNotEmpty() && streamUrl.isNotEmpty()) {
-            // Generamos un ID único (push)
-            val movieId = database.push().key ?: return
-
-            val tvData = hashMapOf(
-                "id" to movieId,
-                "title" to title,
-                "imageUrl" to imageUrl,
-                "streamUrl" to streamUrl,
-                "createdAt" to ServerValue.TIMESTAMP // Firebase gestiona el tiempo
-            )
-
-            // CAMBIO: .setValue en lugar de .add
-            database.child(movieId).setValue(tvData)
-                .addOnSuccessListener {
-                    val newMovie = Movie(
-                        id = movieId,
-                        title = title,
-                        imageUrl = imageUrl,
-                        streamUrl = streamUrl
-                    )
-                    Toast.makeText(context, "Nuevo Canal Cargado", Toast.LENGTH_SHORT).show()
-                    movieList.add(newMovie)
-                    moviesAdapter.notifyItemInserted(movieList.size - 1)
-                    clearFields()
-                }
-                .addOnFailureListener { e ->
-                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
+    // Función de filtrado optimizada
+    private fun filterChannels(query: String) {
+        val filtered = if (query.isEmpty()) {
+            channelList
         } else {
-            Toast.makeText(context, "Llena todos los campos", Toast.LENGTH_SHORT).show()
+            channelList.filter { it.title.lowercase().contains(query) }
         }
+        channelAdapter.updateList(filtered)
     }
 
-    private fun loadDataFromFirebase() {
-        // CAMBIO: Usamos addValueEventListener o get() para Realtime
-        database.get().addOnSuccessListener { snapshot ->
-            movieList.clear()
-            for (doc in snapshot.children) {
-                // Aquí es donde ocurría el error. Mapeamos manualmente o con getValue
-                val movie = Movie(
-                    id = doc.key ?: "",
-                    title = doc.child("title").value.toString(),
-                    imageUrl = doc.child("imageUrl").value.toString(),
-                    streamUrl = doc.child("streamUrl").value.toString()
-                )
-                movieList.add(movie)
-            }
-            moviesAdapter.notifyDataSetChanged()
-        }.addOnFailureListener { e ->
-            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
+    private fun loadM3UFromUrl(urlString: String) {
+        binding.btnImportM3u.isEnabled = false
+        Toast.makeText(context, "Procesando lista...", Toast.LENGTH_LONG).show()
 
-    private fun deleteMovie(movieId: String) {
-        // CAMBIO: .removeValue() en lugar de .delete()
-        database.child(movieId).removeValue()
-            .addOnSuccessListener {
-                val positionToRemove = movieList.indexOfFirst { it.id == movieId }
-                if (positionToRemove != -1) {
-                    movieList.removeAt(positionToRemove)
-                    moviesAdapter.notifyItemRemoved(positionToRemove)
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val content = URL(urlString).readText()
+                val lines = content.lines()
+
+                lines.forEachIndexed { index, line ->
+                    if (line.startsWith("#EXTINF")) {
+                        val title = line.substringAfterLast(",").trim()
+                        val logoUrl = if (line.contains("tvg-logo=")) {
+                            line.substringAfter("tvg-logo=\"").substringBefore("\"")
+                        } else ""
+
+                        val streamUrl = lines.getOrNull(index + 1)?.trim() ?: ""
+
+                        if (streamUrl.startsWith("http")) {
+                            val id = database.push().key ?: ""
+                            database.child(id).setValue(tv(id, title, logoUrl, streamUrl))
+                        }
+                    }
                 }
+
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Canales añadidos", Toast.LENGTH_SHORT).show()
+                    binding.urlEditText.text?.clear()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Error de red: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                withContext(Dispatchers.Main) { binding.btnImportM3u.isEnabled = true }
+            }
+        }
+    }
+
+    private fun playChannel(url: String) {
+        player?.apply {
+            setMediaItem(MediaItem.fromUri(url))
+            prepare()
+            play()
+        }
+    }
+
+    private fun loadData() {
+        // Usamos addValueEventListener para que la UI se actualice sola al borrar/añadir
+        database.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                channelList.clear()
+                snapshot.children.forEach {
+                    it.getValue(tv::class.java)?.let { channel -> channelList.add(channel) }
+                }
+
+                // Actualizar el adaptador con la nueva lista de Firebase
+                // Si hay algo en el buscador, respetamos el filtro
+                val currentQuery = binding.searchEditText.text.toString()
+                filterChannels(currentQuery)
+            }
+            override fun onCancelled(error: DatabaseError) {
+                Toast.makeText(context, "Error al leer Firebase", Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+
+    private fun deleteMovie(channel: tv) {
+        val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext())
+        builder.setTitle("Eliminar Canal")
+        builder.setMessage("¿Estás seguro de que quieres eliminar \"${channel.title}\"?")
+
+        builder.setPositiveButton("Eliminar") { dialog, _ ->
+            // Aquí es donde realmente se borra de Firebase
+            database.child(channel.id).removeValue().addOnSuccessListener {
                 Toast.makeText(context, "Canal eliminado", Toast.LENGTH_SHORT).show()
             }
-    }
-
-    private fun updateMovieInFirebase(movieId: String) {
-        val updatedTitle = titleEditText.text.toString().trim()
-        val updatedImageUrl = imageUrlEditText.text.toString().trim()
-        val updatedStreamUrl = streamUrlEditText.text.toString().trim()
-
-        if (updatedTitle.isNotEmpty() && updatedImageUrl.isNotEmpty() && updatedStreamUrl.isNotEmpty()) {
-            val updatedMovieData = hashMapOf<String, Any>(
-                "title" to updatedTitle,
-                "imageUrl" to updatedImageUrl,
-                "streamUrl" to updatedStreamUrl
-            )
-
-            // CAMBIO: .updateChildren()
-            database.child(movieId).updateChildren(updatedMovieData)
-                .addOnSuccessListener {
-                    val positionToUpdate = movieList.indexOfFirst { it.id == movieId }
-                    if (positionToUpdate != -1) {
-                        movieList[positionToUpdate] = movieList[positionToUpdate].clona(
-                            title = updatedTitle,
-                            imageUrl = updatedImageUrl,
-                            streamUrl = updatedStreamUrl
-                        )
-                        moviesAdapter.notifyItemChanged(positionToUpdate)
-                    }
-                    resetEditingMode()
-                    Toast.makeText(context, "Canal actualizado", Toast.LENGTH_SHORT).show()
-                }
+            dialog.dismiss()
         }
+
+        builder.setNegativeButton("Cancelar") { dialog, _ ->
+            dialog.dismiss()
+        }
+
+        val alert = builder.create()
+        alert.show()
     }
 
-    private fun editMovie(movie: Movie) {
-        titleEditText.setText(movie.title)
-        imageUrlEditText.setText(movie.imageUrl)
-        streamUrlEditText.setText(movie.streamUrl)
-        createButton.text = "Guardar cambios"
-        isEditing = true
-        currentEditingMovieId = movie.id
-    }
-
-    private fun resetEditingMode() {
-        isEditing = false
-        currentEditingMovieId = null
-        createButton.text = "Crear"
-        clearFields()
-    }
-
-    private fun clearFields() {
-        titleEditText.text?.clear()
-        imageUrlEditText.text?.clear()
-        streamUrlEditText.text?.clear()
-    }
-
-    // Mantengo tus onResume/onStop como los tenías
-    override fun onResume() {
-        super.onResume()
-        clearFields()
-        resetEditingMode()
+    override fun onDestroyView() {
+        super.onDestroyView()
+        player?.release()
+        player = null
     }
 }

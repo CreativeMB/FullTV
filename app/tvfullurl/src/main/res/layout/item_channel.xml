@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="8dp"
+    android:layout_marginVertical="4dp"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="3dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="10dp">
+
+        <!-- Imagen del Canal -->
+        <ImageView
+            android:id="@+id/imageViewChannel"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:layout_marginEnd="12dp"
+            android:scaleType="fitCenter"
+            android:src="@android:drawable/ic_menu_gallery" />
+
+        <!-- Título del Canal -->
+        <TextView
+            android:id="@+id/textViewTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:text="Nombre del Canal"
+            android:textColor="@android:color/black"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <!-- Botón Eliminar -->
+        <Button
+            android:id="@+id/btnDelete"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:layout_marginStart="8dp"
+            android:backgroundTint="#D32F2F"
+            android:text="Eliminar"
+            android:textColor="@android:color/white"
+            android:textSize="11sp" />
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

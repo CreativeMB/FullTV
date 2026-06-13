@@ -57,3 +57,10 @@ class Movie {
         return nuevo
     }
 }
+
+data class tv(
+    val id: String = "",
+    val title: String = "",
+    val imageUrl: String = "",
+    val streamUrl: String = ""
+)
