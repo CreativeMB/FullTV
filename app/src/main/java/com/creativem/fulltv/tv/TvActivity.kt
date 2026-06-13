@@ -22,9 +22,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.text.Normalizer
-
+import android.content.SharedPreferences
+import android.widget.Toast
 class TvActivity : AppCompatActivity() {
-
+    private lateinit var prefs: SharedPreferences
     private lateinit var binding: ActivityTvBinding
     private lateinit var adapter: ChannelsAdapter
 
@@ -38,7 +39,7 @@ class TvActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityTvBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
+        prefs = getSharedPreferences("TV_PREFS", Context.MODE_PRIVATE)
         // Configuración para TV
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
@@ -50,17 +51,61 @@ class TvActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
         val columnas = ViewUtils.calcularColumnas(this)
-        // CORRECCIÓN: Se cambió el ID al del nuevo XML (recyclerViewTV)
         binding.recyclerViewTV.layoutManager = GridLayoutManager(this, columnas)
 
         adapter = ChannelsAdapter(
-            channelList,
+            mutableListOf(),
             onItemClick = { canal -> abrirReproductor(canal) },
-            onFocusChange = { canal -> actualizarFondo(canal.imageUrl) }
+            onFocusChange = { canal -> actualizarFondo(canal.imageUrl) },
+            onLongClick = { canal -> toggleFavorite(canal) } // NUEVO
         )
 
-        binding.recyclerViewTV.itemAnimator = null
         binding.recyclerViewTV.adapter = adapter
+    }
+
+    // --- LÓGICA DE FAVORITOS ---
+    private fun toggleFavorite(canal: Modelo) {
+        val currentFavs = getFavoriteIds().toMutableSet()
+
+        if (currentFavs.contains(canal.id)) {
+            currentFavs.remove(canal.id)
+            Toast.makeText(this, "${canal.title} quitado de favoritos", Toast.LENGTH_SHORT).show()
+        } else {
+            currentFavs.add(canal.id)
+            Toast.makeText(this, "${canal.title} añadido a favoritos", Toast.LENGTH_SHORT).show()
+        }
+
+        // Guardar en cache persistente
+        prefs.edit().putStringSet("fav_ids", currentFavs).apply()
+
+        // Re-filtrar y Re-ordenar la lista inmediatamente
+        filterChannels(binding.searchEditText.text.toString())
+    }
+
+    private fun getFavoriteIds(): Set<String> {
+        return prefs.getStringSet("fav_ids", emptySet()) ?: emptySet()
+    }
+
+    private fun filterChannels(query: String) {
+        val normalizedQuery = query.flatten()
+        val favIds = getFavoriteIds()
+
+        // 1. Filtrar por búsqueda
+        val filtered = if (normalizedQuery.isEmpty()) {
+            channelListMaster
+        } else {
+            channelListMaster.filter { it.title.flatten().contains(normalizedQuery) }
+        }
+
+        // 2. ORDENAR: Favoritos primero, luego alfabético
+        val sortedList = filtered.sortedWith(
+            compareByDescending<Modelo> { favIds.contains(it.id) }
+                .thenBy { it.title }
+        )
+
+        if (::adapter.isInitialized) {
+            adapter.updateList(sortedList, favIds)
+        }
     }
 
     // --- CONFIGURACIÓN DEL BUSCADOR ROBUSTO ---
@@ -73,26 +118,7 @@ class TvActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {}
         })
     }
-
-    // FUNCIÓN DE FILTRADO (Ignora tildes, eñes, espacios y mayúsculas)
-    private fun filterChannels(query: String) {
-        val normalizedQuery = query.flatten()
-
-        val filtered = if (normalizedQuery.isEmpty()) {
-            channelListMaster // Si no hay texto, volvemos a mostrar todo lo de la lista maestra
-        } else {
-            channelListMaster.filter {
-                it.title.flatten().contains(normalizedQuery)
-            }
-        }
-
-        // Pasamos el filtro al adaptador usando su método optimizado
-        if (::adapter.isInitialized) {
-            adapter.updateList(filtered)
-        }
-    }
-
-    // Función de extensión para "limpiar" el texto
+        // Función de extensión para "limpiar" el texto
     private fun String.flatten(): String {
         val temp = Normalizer.normalize(this, Normalizer.Form.NFD)
         return temp.replace("[\\p{InCombiningDiacriticalMarks}]".toRegex(), "").lowercase().trim()
