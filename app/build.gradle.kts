@@ -105,8 +105,6 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-dash:1.4.1")
     implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
-    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
 
     // Lifecycle (Una sola versión de 2.8.1)
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.1")

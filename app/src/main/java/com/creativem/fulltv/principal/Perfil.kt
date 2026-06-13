@@ -55,13 +55,17 @@ class Perfil : AppCompatActivity() {
         recyclerAlquileres = findViewById(R.id.recyclerMisAlquileres)
         progressCarga = findViewById(R.id.progressCargaAlquileres) // ⭐ Agrégalo al XML
 
+
+        // 1. Inicializar el Header mediante el Helper
+        // Pasamos el root view (puedes usar findViewById(android.R.id.content) si no tienes un ID raíz)
+        val rootView = findViewById<View>(android.R.id.content)
+        CastvHelper.inicializarHeader(rootView) { nombre, castv ->
+            Log.d("PERFIL", "Header cargado para: $nombre con $castv créditos")
+        }
         configurarLayout()
         configurarTextos()
-//        setupHeader()
-
         // ⭐ Cargar películas globales UNA SOLA VEZ (caché)
         cargarPeliculasEnCache()
-
         // Luego cargar los alquileres del usuario
         cargarPeliculasAlquiladas()
     }
@@ -121,11 +125,6 @@ class Perfil : AppCompatActivity() {
         }
     }
 
-//    private fun setupHeader() {
-//        val headerView = findViewById<View>(R.id.headerContainer) ?: return
-//        val presenter = HeaderPresenter()
-//        presenter.onBindViewHolder(Presenter.ViewHolder(headerView), null)
-//    }
 
     // ==========================================
     // 2. CACHÉ DE PELÍCULAS (Optimización clave)
@@ -390,6 +389,8 @@ class Perfil : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // Limpiamos los listeners de Firebase y del Header
+        CastvHelper.limpiarListeners()
         // 🧹 Limpieza para evitar fugas de memoria
         adapterAlquileres = null
         cachePeliculas.clear()

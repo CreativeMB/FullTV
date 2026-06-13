@@ -3,189 +3,160 @@ package com.creativem.fulltv.principal
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import android.view.View
+import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
+import com.bumptech.glide.Glide
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import java.text.SimpleDateFormat
 import java.util.*
+import com.creativem.fulltv.R
+
 
 object CastvHelper {
 
     private const val TAG = "CastvHelper"
+    private val activeListeners = mutableMapOf<String, ValueEventListener>()
+    private val databaseRef = FirebaseDatabase.getInstance().reference
 
-    /**
-     * 🔐 Codifica el correo para usarlo como clave en Realtime Database.
-     * Reemplaza caracteres no permitidos (@ y .) por guiones bajos.
-     */
-    private fun codificarCorreo(correo: String): String {
-        return correo.replace(".", "_").replace("@", "_")
+    fun inicializarHeader(
+        rootView: View,
+        onDataLoaded: (nombre: String, castv: Int) -> Unit
+    ) {
+        val auth = FirebaseAuth.getInstance()
+        val user = auth.currentUser
+        val context = rootView.context
+
+        // Referencias visuales (usamos .findViewById sin !! para evitar crash si el ID no existe)
+        val textFecha = rootView.findViewById<TextView>(R.id.textfecha)
+        val textHora = rootView.findViewById<TextView>(R.id.textHora)
+        val textUsuario = rootView.findViewById<TextView>(R.id.textUsuario)
+        val userOnline = rootView.findViewById<TextView>(R.id.useronline)
+        val userOff = rootView.findViewById<TextView>(R.id.useroff)
+        val textCastv = rootView.findViewById<TextView>(R.id.textCastv)
+        val imagenUser = rootView.findViewById<ImageView>(R.id.imagenuser)
+        val txtBanner = rootView.findViewById<TextView>(R.id.txtBanner)
+
+        textFecha?.text = SimpleDateFormat("EEEE dd MM yy", Locale("es", "ES")).format(Date()).replaceFirstChar { it.uppercase() }
+        textHora?.text = SimpleDateFormat("hh:mm aa", Locale.getDefault()).format(Date()).replace("am", "AM").replace("pm", "PM")
+
+        // 1. Escuchar Noticia (Banner)
+        val noticiaRef = databaseRef.child("noticia").child("us4vaaf0VPezu9vuc4ns")
+        val noticiaListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val mensaje = snapshot.child("banner").getValue(String::class.java) ?: ""
+                val version = snapshot.child("versionapk").getValue(String::class.java) ?: ""
+                txtBanner?.text = " 📢 $mensaje | Versión: $version "
+                txtBanner?.isSelected = true
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        noticiaRef.addValueEventListener(noticiaListener)
+        activeListeners["noticia"] = noticiaListener
+
+        // 2. Escuchar Usuarios Online
+        val usuariosRef = databaseRef.child("usuarios")
+        val usersListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                var on = 0; var off = 0
+                snapshot.children.forEach { if (it.child("enlinea").getValue(Boolean::class.java) == true) on++ else off++ }
+                userOnline?.text = "ON-$on"
+                userOff?.text = "OFF-$off"
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        usuariosRef.addValueEventListener(usersListener)
+        activeListeners["usuarios"] = usersListener
+
+        // 3. Cargar datos del usuario actual
+        user?.email?.let { email ->
+            val userListener = obtenerDatosUsuario(email, { nombre, _, castv, enlinea ->
+                textUsuario?.text = "\uD83E\uDDD1 $nombre" + if (enlinea) " 🟢" else " 🔴"
+
+                databaseRef.child("movies").get().addOnSuccessListener { snapshot ->
+                    val totalPeliculas = snapshot.childrenCount
+                    textCastv?.text = "🎬 Películas: $totalPeliculas | ⭐ Castv: $castv"
+                    onDataLoaded(nombre, castv)
+                }
+            }, { e -> Log.e(TAG, "Error cargando usuario", e) })
+
+            activeListeners["usuario_actual"] = userListener
+
+            // Foto de perfil
+            if (imagenUser != null) {
+                user.photoUrl?.let {
+                    Glide.with(context).load(it).placeholder(R.drawable.icono).into(imagenUser)
+                } ?: imagenUser.setImageResource(R.drawable.icono)
+            }
+        }
     }
 
-    /**
-     * ✅ Gestiona el registro y la validación de presencia del usuario.
-     */
-    fun nuevosusuarios(
-        context: Context,
-        nombre: String,
-        email: String?
-    ) {
-        if (email.isNullOrBlank()) {
-            Log.e(TAG, "Correo electrónico nulo o vacío")
-            return
+    fun limpiarListeners() {
+        activeListeners.forEach { (key, listener) ->
+            databaseRef.child(key).removeEventListener(listener)
         }
+        activeListeners.clear()
+    }
 
+    // --- MÉTODOS DE APOYO ---
+    private fun codificarCorreo(correo: String) = correo.replace(".", "_").replace("@", "_")
+
+    fun nuevosusuarios(context: Context, nombre: String, email: String?) {
+        if (email.isNullOrBlank()) return
         val correoKey = codificarCorreo(email)
-        val database = FirebaseDatabase.getInstance()
-        val userRef = database.reference.child("usuarios").child(correoKey)
-
+        val userRef = FirebaseDatabase.getInstance().reference.child("usuarios").child(correoKey)
         userRef.get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
-                val estado = snapshot.child("estado").getValue(String::class.java)
-
-                if (estado == "eliminado") {
-                    manejarUsuarioEliminado(context)
-                } else {
-                    Log.d(TAG, "Usuario existente: Actualizando presencia")
-                    configurarPresencia(userRef)
-                }
-            } else {
-                crearNuevoUsuario(context, userRef, nombre, email)
-            }
-        }.addOnFailureListener { e ->
-            Log.e(TAG, "Error al acceder a la base de datos", e)
+                if (snapshot.child("estado").getValue(String::class.java) == "eliminado") manejarUsuarioEliminado(context)
+                else configurarPresencia(userRef)
+            } else crearNuevoUsuario(context, userRef, nombre, email)
         }
     }
 
-    /**
-     * ✍️ Escribe un nuevo usuario en la base de datos por primera vez.
-     */
-    private fun crearNuevoUsuario(
-        context: Context,
-        userRef: DatabaseReference,
-        nombre: String,
-        email: String
-    ) {
+    private fun crearNuevoUsuario(context: Context, userRef: DatabaseReference, nombre: String, email: String) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-        val fechaFormateada = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
-
-        val user = mapOf(
-            "nombre" to nombre,
-            "correo" to email,
-            "castv" to 250, // Créditos iniciales gratis
-            "userId" to userId,
-            "estado" to "activo",
-            "enlinea" to true,
-            "fechaCreacion" to fechaFormateada
-        )
-
-        userRef.setValue(user)
-            .addOnSuccessListener {
-                Log.d(TAG, "✅ Usuario creado exitosamente")
-                configurarPresencia(userRef)
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "❌ Error al crear nodo de usuario", e)
-            }
+        val user = mapOf("nombre" to nombre, "correo" to email, "castv" to 250, "userId" to userId, "estado" to "activo", "enlinea" to true, "fechaCreacion" to SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date()))
+        userRef.setValue(user).addOnSuccessListener { configurarPresencia(userRef) }
     }
-    /**
-     * 💰 Registra el consumo de créditos de un usuario en Firebase
-     */
+
     fun registrarConsumo(email: String, nombrePelicula: String, costo: Int) {
         val correoKey = codificarCorreo(email)
-        val database = FirebaseDatabase.getInstance()
+        val consumoRef = FirebaseDatabase.getInstance().reference.child("historial_consumos").push()
+        consumoRef.setValue(mapOf("usuarioCorreo" to email, "pelicula" to nombrePelicula, "creditosGastados" to costo, "timestamp" to ServerValue.TIMESTAMP))
 
-        // 1. Creamos una entrada única en la rama "historial_consumos"
-        val consumoRef = database.reference.child("historial_consumos").push()
-
-        val datosConsumo = mapOf(
-            "usuarioCorreo" to email,
-            "pelicula" to nombrePelicula,
-            "creditosGastados" to costo,
-            "timestamp" to ServerValue.TIMESTAMP
-        )
-
-        consumoRef.setValue(datosConsumo).addOnSuccessListener {
-            Log.d(TAG, "Consumo registrado: $costo créditos en $nombrePelicula")
-        }
-
-        // 2. Opcional: Actualizamos también un total acumulado en el nodo del usuario
-        // Esto facilita ver en la otra app cuánto ha gastado un usuario en total
-        val userRef = database.reference.child("usuarios").child(correoKey)
-        userRef.child("totalGastado").runTransaction(object : Transaction.Handler {
+        FirebaseDatabase.getInstance().reference.child("usuarios").child(correoKey).child("totalGastado").runTransaction(object : Transaction.Handler {
             override fun doTransaction(mutableData: MutableData): Transaction.Result {
-                val actual = mutableData.getValue(Int::class.java) ?: 0
-                mutableData.value = actual + costo
+                mutableData.value = (mutableData.getValue(Int::class.java) ?: 0) + costo
                 return Transaction.success(mutableData)
             }
-            override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
-                if (error != null) Log.e(TAG, "Error actualizando totalGastado", error.toException())
-            }
+            override fun onComplete(e: DatabaseError?, c: Boolean, s: DataSnapshot?) {}
         })
     }
-    /**
-     * 🟢 Configura el sistema de presencia (Online/Offline) usando onDisconnect.
-     */
-    private fun configurarPresencia(userRef: DatabaseReference) {
-        // Marcamos como conectado ahora
-        userRef.child("enlinea").setValue(true)
 
-        // Instrucciones para cuando el usuario pierda la conexión o cierre la app
+    private fun configurarPresencia(userRef: DatabaseReference) {
+        userRef.child("enlinea").setValue(true)
         userRef.child("enlinea").onDisconnect().setValue(false)
         userRef.child("ultimaConexion").onDisconnect().setValue(ServerValue.TIMESTAMP)
     }
 
-    /**
-     * 🚫 Cierra la sesión y finaliza la actividad si el usuario está baneado/eliminado.
-     */
     private fun manejarUsuarioEliminado(context: Context) {
         FirebaseAuth.getInstance().signOut()
-        if (context is Activity) {
-            context.runOnUiThread {
-                Toast.makeText(context, "Tu cuenta ha sido inhabilitada.", Toast.LENGTH_LONG).show()
-                context.finish()
-            }
-        }
+        if (context is Activity) { context.runOnUiThread { Toast.makeText(context, "Cuenta inhabilitada.", Toast.LENGTH_LONG).show(); context.finish() } }
     }
 
-    /**
-     * 📡 Escucha cambios en tiempo real de los datos del usuario.
-     * @return ValueEventListener para que pueda ser removido en el onDestroy de la Activity.
-     */
-    fun obtenerDatosUsuario(
-        email: String,
-        onSuccess: (nombre: String, correo: String, castv: Int, enlinea: Boolean) -> Unit,
-        onFailure: (Exception) -> Unit
-    ): ValueEventListener {
-        val correoKey = codificarCorreo(email)
-        val ref = FirebaseDatabase.getInstance().reference.child("usuarios").child(correoKey)
-
+    fun obtenerDatosUsuario(email: String, onSuccess: (String, String, Int, Boolean) -> Unit, onFailure: (Exception) -> Unit): ValueEventListener {
+        val ref = FirebaseDatabase.getInstance().reference.child("usuarios").child(codificarCorreo(email))
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                if (!snapshot.exists()) {
-                    Log.w(TAG, "Los datos del usuario no existen en la ruta")
-                    return
-                }
-
-                val nombre = snapshot.child("nombre").getValue(String::class.java) ?: "Usuario"
-                val correo = snapshot.child("correo").getValue(String::class.java) ?: ""
-                val castv = snapshot.child("castv").getValue(Int::class.java) ?: 0
-                val enlinea = snapshot.child("enlinea").getValue(Boolean::class.java) ?: false
-
-                onSuccess(nombre, correo, castv, enlinea)
+                if (snapshot.exists()) onSuccess(snapshot.child("nombre").getValue(String::class.java) ?: "Usuario", snapshot.child("correo").getValue(String::class.java) ?: "", snapshot.child("castv").getValue(Int::class.java) ?: 0, snapshot.child("enlinea").getValue(Boolean::class.java) ?: false)
             }
-
-            override fun onCancelled(error: DatabaseError) {
-                onFailure(error.toException())
-            }
+            override fun onCancelled(error: DatabaseError) { onFailure(error.toException()) }
         }
-
         ref.addValueEventListener(listener)
         return listener
     }
-    /**
-     * Muestra un diálogo diseñado para Android TV que permite seleccionar una fecha (próximos 7 días)
-     * y una hora exacta de activación usando selectores adaptados al control remoto.
-     */
     fun mostrarSelectorFechaHora(
         context: android.content.Context,
         onDateTimeSelected: (fechaDb: String, horaDb: Int) -> Unit

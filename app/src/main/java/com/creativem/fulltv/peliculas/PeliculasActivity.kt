@@ -269,30 +269,8 @@ private var usuarioEsperandoMas = false
 
 
     private fun useryoutube() {
-        // 1. Apuntar exactamente a la ruta en la base de datos
-        val ref = FirebaseDatabase.getInstance().getReference("noticia/us4vaaf0VPezu9vuc4ns/urlyoutube")
-
-        // 2. Leer la URL de Youtube
-        ref.get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                var urlYoutube = snapshot.value.toString().trim()
-
-                // Si la URL es de canal pero le falta el "live", se lo agregamos automáticamente
-                if (urlYoutube.contains("/@") && !urlYoutube.endsWith("/live")) {
-                    urlYoutube += "/live"
-                }
-
-                // 3. Lanzar el reproductor con la URL obtenida
-                val intent = Intent(this, LivePlayerActivity::class.java)
-                intent.putExtra("YOUTUBE_URL_OR_ID", urlYoutube)
-                startActivity(intent)
-
-            } else {
-                Toast.makeText(this, "No hay partido en vivo revisa la tabla.", Toast.LENGTH_SHORT).show()
-            }
-        }.addOnFailureListener {
-            Toast.makeText(this, "Error de red al conectar con el servidor.", Toast.LENGTH_SHORT).show()
-        }
+        val intent = Intent(this, LivePlayerActivity::class.java)
+        startActivity(intent)
     }
     private fun intentarVerificacionAlquileres() {
         val currentUser = auth.currentUser
