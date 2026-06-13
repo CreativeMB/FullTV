@@ -1,6 +1,6 @@
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.jetbrains.kotlin.android)
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
     id("com.google.gms.google-services")
     id("kotlin-kapt")
 }
@@ -15,6 +15,12 @@ android {
         targetSdk = 34
         versionCode = 10
         versionName = "1.0.41"
+        ndk {
+            // Solo incluye las arquitecturas más comunes para bajar el peso
+            abiFilters.add("armeabi-v7a")
+            abiFilters.add("arm64-v8a")
+        }
+
     }
 
     buildFeatures {
@@ -24,7 +30,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -42,7 +49,13 @@ android {
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
+        kotlinCompilerExtensionVersion = "1.5.13"
+    }
+    kotlin {
+        compilerOptions {
+            freeCompilerArgs.add("-P")
+            freeCompilerArgs.add("plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true")
+        }
     }
     packaging {
         resources {
@@ -54,96 +67,49 @@ android {
     }
 
 }
-
 dependencies {
-
-    implementation(libs.androidx.activity.ktx)
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.tv.foundation)
-    implementation(libs.androidx.tv.material)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.leanback)
-    implementation(libs.androidx.activity)
-    implementation(libs.androidx.constraintlayout)
-    implementation(libs.firebase.storage.ktx)
-    implementation(libs.androidx.lifecycle.process)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.ui.test.junit4)
-    debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
-
-    //firebase
+    // Firebase (BOM)
     implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
-    implementation ("com.google.firebase:firebase-messaging-ktx")
-    implementation("com.google.firebase:firebase-messaging-ktx:23.2.1")
-    implementation("com.google.firebase:firebase-analytics")
-    implementation ("com.google.firebase:firebase-analytics-ktx")
-    implementation ("com.google.firebase:firebase-config:21.0.2")
-    implementation ("com.google.firebase:firebase-firestore-ktx:24.5.0")
-    // Firebase Authentication
-    implementation ("com.google.firebase:firebase-auth:21.0.3")
-    // Google Sign-In
-    implementation ("com.google.android.gms:play-services-auth:20.0.0")
-    //appcompat
-    implementation ("androidx.appcompat:appcompat:1.6.1")
-    //recyclerview
-    implementation ("androidx.recyclerview:recyclerview:1.3.1")
-    //material
-    implementation ("com.google.android.material:material:1.9.0")
-    //glide
-    implementation ("com.github.bumptech.glide:glide:4.15.1")
-    annotationProcessor ("com.github.bumptech.glide:compiler:4.14.2")
-    implementation ("jp.wasabeef:glide-transformations:4.3.0")
-    //media3
-    implementation("androidx.media3:media3-exoplayer:1.4.1")
-    implementation("androidx.media3:media3-exoplayer-dash:1.4.1")
-    implementation("androidx.media3:media3-ui:1.4.1")
-    implementation ("androidx.media3:media3-exoplayer-hls:1.4.1")
-    implementation ("androidx.media3:media3-datasource-okhttp:1.4.1")
-    implementation ("androidx.media3:media3-exoplayer-hls:1.4.1")
-    implementation ("androidx.media3:media3-datasource:1.4.1")
-    //core
-    implementation ("androidx.core:core-ktx:1.8.0")
-    //coroutines
-    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    implementation("com.github.kittinunf.fuel:fuel-coroutines:2.3.1")
-    //fuel
-    implementation("com.github.kittinunf.fuel:fuel:2.3.1")
-    implementation ("com.github.kittinunf.fuel:fuel-gson:2.3.1")
-    implementation ("com.squareup.okhttp3:okhttp:4.9.3")
-    //viewmodel
-    implementation ("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
-    //work
-    implementation ("androidx.work:work-runtime-ktx:2.8.1")
-//leanback
-    implementation ("androidx.leanback:leanback:1.2.0")
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-config-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-database-ktx")
+    implementation("com.google.firebase:firebase-messaging-ktx")
 
-    implementation ("com.android.volley:volley:1.2.1")
-    implementation ("com.google.firebase:firebase-core:21.0.0")
-    implementation ("com.google.firebase:firebase-database:20.0.3")
-//apimovie
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("com.github.bumptech.glide:glide:4.12.0")
-    implementation ("org.json:json:20240303")
-
-    // qr
+    // Google Auth y QR
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation("com.google.zxing:core:3.5.3")
-//video de youtube vivo
-    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
-//api foolbol
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
-    val lifecycle_version = "2.6.2"
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycle_version")
-    implementation("androidx.lifecycle:lifecycle-common-java8:$lifecycle_version")
+
+    // UI y Material
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("androidx.appcompat:appcompat:1.7.0")
+
+    // Glide y Coil (¿Seguro necesitas ambos? Si ya usas Coil, ¡podrías borrar Glide!)
+    implementation("com.github.bumptech.glide:glide:4.15.1")
+    kapt("com.github.bumptech.glide:compiler:4.15.1")
+    implementation("jp.wasabeef:glide-transformations:4.3.0")
     implementation("io.coil-kt:coil:2.7.0")
     implementation("io.coil-kt:coil-svg:2.7.0")
+
+    // Networking (Solo una vez)
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.9.3")
+    implementation("com.github.kittinunf.fuel:fuel:2.3.1")
+    implementation("com.github.kittinunf.fuel:fuel-gson:2.3.1")
+    implementation("com.android.volley:volley:1.2.1")
+
+    // Media3 y YouTubeDL
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-exoplayer-dash:1.4.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
+    implementation("androidx.media3:media3-ui:1.4.1")
+    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
+
+    // Lifecycle (Una sola versión de 2.8.1)
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.1")
+    implementation("androidx.lifecycle:lifecycle-process:2.8.1")
 }

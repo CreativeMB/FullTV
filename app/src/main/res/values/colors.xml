@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="lb_tv_white">#FFFFFF</color>
+
+
     <color name="colorSelected">#D50000</color> <!-- Color para selección -->
     <color name="colorNotSelected">#00C51162</color> <!-- Color para selección -->
     <color name="colorhover">#D500B8D4</color>

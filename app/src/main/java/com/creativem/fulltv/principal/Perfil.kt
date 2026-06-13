@@ -11,7 +11,6 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.text.HtmlCompat
-import androidx.leanback.widget.Presenter
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -58,7 +57,7 @@ class Perfil : AppCompatActivity() {
 
         configurarLayout()
         configurarTextos()
-        setupHeader()
+//        setupHeader()
 
         // ⭐ Cargar películas globales UNA SOLA VEZ (caché)
         cargarPeliculasEnCache()
@@ -122,11 +121,11 @@ class Perfil : AppCompatActivity() {
         }
     }
 
-    private fun setupHeader() {
-        val headerView = findViewById<View>(R.id.headerContainer) ?: return
-        val presenter = HeaderPresenter()
-        presenter.onBindViewHolder(Presenter.ViewHolder(headerView), null)
-    }
+//    private fun setupHeader() {
+//        val headerView = findViewById<View>(R.id.headerContainer) ?: return
+//        val presenter = HeaderPresenter()
+//        presenter.onBindViewHolder(Presenter.ViewHolder(headerView), null)
+//    }
 
     // ==========================================
     // 2. CACHÉ DE PELÍCULAS (Optimización clave)
