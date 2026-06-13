@@ -1,8 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
-
     id("com.google.gms.google-services")
+    id("kotlin-kapt")
 }
 
 android {
@@ -134,7 +134,16 @@ dependencies {
 
     // qr
     implementation("com.google.zxing:core:3.5.3")
-
+//video de youtube vivo
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
+//api foolbol
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
+    val lifecycle_version = "2.6.2"
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycle_version")
+    implementation("androidx.lifecycle:lifecycle-common-java8:$lifecycle_version")
+    implementation("io.coil-kt:coil:2.7.0")
+    implementation("io.coil-kt:coil-svg:2.7.0")
 }

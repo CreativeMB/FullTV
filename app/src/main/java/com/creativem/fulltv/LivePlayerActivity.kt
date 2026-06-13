@@ -1,6 +1,8 @@
 package com.creativem.fulltv
 
+import android.annotation.SuppressLint
 import android.graphics.Color
+import android.graphics.Insets.add
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -27,7 +29,16 @@ import androidx.media3.ui.PlayerView
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlin.concurrent.thread
-
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import android.widget.TextView
+import android.widget.ImageView
+import androidx.lifecycle.coroutineScope
+import androidx.lifecycle.lifecycleScope // Debe estar presente
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import coil.load
 class LivePlayerActivity : AppCompatActivity() {
 
     private var exoPlayer: ExoPlayer? = null
@@ -246,55 +257,161 @@ class LivePlayerActivity : AppCompatActivity() {
                 } else {
                     Log.e(TAG, "La URL devuelta por YoutubeDL es nula o vacía.")
                     // 👉 SOLUCIÓN: Si no devuelve enlace de stream, pasamos a la imagen de espera
-                    mostrarImagenEsperaYSalir()
+                    mostrarPanelResultados()
                 }
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error crítico durante la extracción con YoutubeDL: ${e.message}", e)
                 // 👉 SOLUCIÓN: Si el canal está offline o da error por no transmitir, mostramos la imagen
-                mostrarImagenEsperaYSalir()
+                mostrarPanelResultados()
             }
         }
     }
 
-    private fun mostrarImagenEsperaYSalir() {
+    private fun mostrarPanelResultados() {
         runOnUiThread {
             progressBar.visibility = View.GONE
-            exoPlayer?.stop() // Detenemos ExoPlayer por completo
+            exoPlayer?.stop()
 
-            // Creamos un diálogo nativo a pantalla completa sobre la actividad actual
             val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
 
-            val imageView = android.widget.ImageView(this).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-                scaleType = android.widget.ImageView.ScaleType.FIT_XY
-
-                // 👉 Usa el nombre exacto de tu imagen guardada en res/drawable
-                setImageResource(R.drawable.fondomundial)
-
-                isFocusable = true
-                isFocusableInTouchMode = true
-
-                // Si el usuario presiona el botón central (OK) del control, cierra el aviso y sale al menú
-                setOnClickListener {
-                    dialog.dismiss()
-                    finish()
-                }
+            val container = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                setBackgroundColor(Color.BLACK)
             }
 
-            // Si el usuario presiona el botón "Atrás" del control remoto, también cierra todo de vuelta al menú
-            dialog.setOnCancelListener { finish() }
+            // 👉 BANNER DE CORTESÍA
+            val banner = android.widget.TextView(this).apply {
+                text = "CineParche: Vive el partido en directo aquí"
+                setTextColor(Color.parseColor("#C5A059"))
+                textSize = 22f // Un poco más pequeño para que quepa bien en TV
+                gravity = Gravity.CENTER
+                setPadding(0, 40, 0, 20)
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
 
-            dialog.setContentView(imageView)
+// Subtítulo pequeño para guiar al usuario
+            val subtitulo = android.widget.TextView(this).apply {
+                text = "Programación oficial - Conéctate a la hora del Transmicion"
+                setTextColor(Color.LTGRAY)
+                textSize = 14f
+                gravity = Gravity.CENTER
+                setPadding(0, 0, 0, 30)
+            }
+            container.addView(banner)
+            container.addView(subtitulo)
+
+            val scrollView = android.widget.ScrollView(this)
+            val listaPartidos = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL // ¡Fundamental!
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+            scrollView.addView(listaPartidos)
+            container.addView(scrollView)
+
+            dialog.setContentView(container)
+            dialog.setOnKeyListener { _, keyCode, _ ->
+                if (keyCode == KeyEvent.KEYCODE_BACK) { dialog.dismiss(); finish(); true } else false
+            }
             dialog.show()
 
-            imageView.requestFocus() // Forzamos el foco en la imagen para capturar las pulsaciones del control
+            cargarResultadosMundial(listaPartidos)
+        }
+    }
+    @SuppressLint("SetTextI18n")
+    private fun cargarResultadosMundial(contenedor: android.widget.LinearLayout) {
+        val service = retrofit2.Retrofit.Builder()
+            .baseUrl("https://api.football-data.org/v4/")
+            .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
+            .build().create(FootballApiService::class.java)
+
+        lifecycle.coroutineScope.launch(Dispatchers.IO) {
+            try {
+                val response = service.getWorldCupMatches()
+
+                withContext(Dispatchers.Main) {
+                    contenedor.removeAllViews()
+
+                    if (response.isSuccessful && response.body() != null) {
+                        // Ordenamos TODOS los partidos por fecha (del más antiguo al más nuevo)
+                        val matches = response.body()!!.matches.sortedBy { it.utcDate }
+                        val inflater = android.view.LayoutInflater.from(this@LivePlayerActivity)
+                        val imageLoader = coil.ImageLoader.Builder(this@LivePlayerActivity)
+                            .components { add(coil.decode.SvgDecoder.Factory()) }
+                            .build()
+
+                        // Quitamos el .take(8) si quieres ver más, o déjalo para limitar
+                        matches.forEach { match ->
+                            val view = inflater.inflate(R.layout.item_partido, contenedor, false)
+
+                            val txtHome = view.findViewById<android.widget.TextView>(R.id.txtHome)
+                            val txtAway = view.findViewById<android.widget.TextView>(R.id.txtAway)
+                            val txtScore = view.findViewById<android.widget.TextView>(R.id.txtScore)
+                            val imgHome = view.findViewById<android.widget.ImageView>(R.id.imgHome)
+                            val imgAway = view.findViewById<android.widget.ImageView>(R.id.imgAway)
+
+                            txtHome.text = match.homeTeam.name
+                            txtAway.text = match.awayTeam.name
+
+                            val homeScore = match.score.fullTime?.home ?: 0
+                            val awayScore = match.score.fullTime?.away ?: 0
+
+                            when (match.status) {
+                                "FINISHED" -> {
+                                    txtScore.text = "FINAL: $homeScore - $awayScore"
+                                    txtScore.setTextColor(Color.parseColor("#C5A059"))
+                                }
+                                "IN_PLAY", "PAUSED" -> {
+                                    txtScore.text = "🔴 TRANSMITIENDO AHORA: VER PARTIDO: $homeScore - $awayScore"
+                                    txtScore.setTextColor(Color.RED)
+                                }
+                                "TIMED", "SCHEDULED" -> {
+                                    // Aseguramos que la fecha tenga el largo mínimo para evitar crash en substring
+                                    if (match.utcDate.length >= 16) {
+                                        val horaUTC = match.utcDate.substring(11, 13).toIntOrNull() ?: 0
+                                        val min = match.utcDate.substring(14, 16).toIntOrNull() ?: 0
+                                        val horaLocal = (horaUTC - 5 + 24) % 24
+                                        val horaAmPm = formatoAmPm(horaLocal, min)
+
+                                        val dia = match.utcDate.substring(8, 10)
+                                        val mes = match.utcDate.substring(5, 7)
+
+                                        txtScore.text = "🔜 $dia/$mes  📍 $horaAmPm Colombia"
+                                        txtScore.setTextColor(Color.parseColor("#C5A059"))
+                                    } else {
+                                        txtScore.text = "📅 Fecha por confirmar"
+                                        txtScore.setTextColor(Color.LTGRAY)
+                                    }
+                                }
+                            }
+                            // Carga de banderas (SVG)
+                            match.homeTeam.crest?.let { url ->
+                                imageLoader.enqueue(coil.request.ImageRequest.Builder(this@LivePlayerActivity)
+                                    .data(url).target(imgHome as android.widget.ImageView).build())
+                            }
+                            match.awayTeam.crest?.let { url ->
+                                imageLoader.enqueue(coil.request.ImageRequest.Builder(this@LivePlayerActivity)
+                                    .data(url).target(imgAway as android.widget.ImageView).build())
+                            }
+
+                            contenedor.addView(view)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("API_DEBUG", "Error al cargar partidos: ${e.message}")
+            }
         }
     }
 
+    private fun formatoAmPm(hora24: Int, minuto: Int): String {
+        val amPm = if (hora24 >= 12) "PM" else "AM"
+        val hora12 = if (hora24 % 12 == 0) 12 else hora24 % 12
+        return String.format("%d:%02d %s", hora12, minuto, amPm)
+    }
     @OptIn(UnstableApi::class)
     private fun prepararVideo(urlReal: String) {
         try {
@@ -369,7 +486,7 @@ class LivePlayerActivity : AppCompatActivity() {
                         // Lanzamos la reconexión de inmediato
                         extraerYReproducir(originalYoutubeUrl)
                     } else {
-                        mostrarImagenEsperaYSalir()
+                        mostrarPanelResultados()
                     }
                 }
             })
