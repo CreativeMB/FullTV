@@ -47,9 +47,6 @@
 
         <activity
             android:name=".LivePlayerActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"
-            android:screenOrientation="landscape"
-            android:hardwareAccelerated="true"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
         <activity
             android:name=".api.ApiPeliculaActivity"

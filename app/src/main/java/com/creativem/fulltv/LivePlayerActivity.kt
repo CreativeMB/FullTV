@@ -30,9 +30,13 @@ class LivePlayerActivity : AppCompatActivity() {
         val banner = TextView(this).apply {
             text = "CineParche: Programación"
             setTextColor(Color.parseColor("#C5A059"))
-            textSize = 22f
+            textSize = 18f // Reduje un poco el tamaño para que sea más elegante
             gravity = Gravity.CENTER
-            setPadding(0, 40, 0, 20)
+
+            // Original: 0, 40, 0, 20 (Superior, Izquierda, Inferior, Derecha)
+            // Nuevo: 0, 10, 0, 5 (Mucho más ajustado)
+            setPadding(0, 10, 0, 5)
+
             setTypeface(null, android.graphics.Typeface.BOLD)
         }
         container.addView(banner)
@@ -53,12 +57,6 @@ class LivePlayerActivity : AppCompatActivity() {
 
         // 4. Iniciar carga de datos
         cargarResultadosMundial(listaPartidos)
-    }
-
-    // Mantenemos esta estructura visual para cuando quieras mostrar el panel detallado
-    private fun mostrarPanelResultados(contenedorPadre: LinearLayout) {
-        // Lógica de visualización mantenida según tu diseño
-        cargarResultadosMundial(contenedorPadre)
     }
 
     private fun cargarResultadosMundial(contenedor: LinearLayout) {
