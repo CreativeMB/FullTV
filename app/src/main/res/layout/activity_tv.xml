@@ -20,17 +20,25 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="40dp"
         android:layout_marginTop="30dp"
+        android:layout_marginEnd="20dp"
         android:text="CANALES DE TELEVISIÓN"
         android:textColor="#FFFFFF"
         android:textSize="24sp"
         android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintWidth_default="wrap"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintEnd_toStartOf="@+id/searchEditText"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="@+id/searchEditText" />
 
     <EditText
         android:id="@+id/searchEditText"
         android:layout_width="300dp"
         android:layout_height="50dp"
+        android:layout_marginTop="30dp"
         android:layout_marginEnd="40dp"
         android:background="@color/fondoTexto"
         android:drawableStart="@android:drawable/ic_menu_search"
@@ -42,14 +50,8 @@
         android:textSize="16sp"
         android:singleLine="true"
         android:imeOptions="actionSearch"
-        android:focusable="true"
-        android:nextFocusLeft="@id/searchEditText"
-        android:nextFocusRight="@id/searchEditText"
-        android:nextFocusUp="@id/searchEditText"
-        android:nextFocusDown="@id/recyclerViewTV"
-        app:layout_constraintBottom_toBottomOf="@id/txtTituloTv"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@id/txtTituloTv" />
+        app:layout_constraintTop_toTopOf="parent" />
 
     <!-- Contenedor del RecyclerView para atrapar el foco -->
     <androidx.recyclerview.widget.RecyclerView
