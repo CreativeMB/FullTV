@@ -90,24 +90,26 @@ class TvActivity : AppCompatActivity() {
         val normalizedQuery = query.flatten()
         val favIds = getFavoriteIds()
 
-        // 1. Filtrar por búsqueda
-        val filtered = if (normalizedQuery.isEmpty()) {
+        // 1. Filtrar por búsqueda y ELIMINAR DUPLICADOS por ID si existieran
+        val baseList = if (normalizedQuery.isEmpty()) {
             channelListMaster
         } else {
             channelListMaster.filter { it.title.flatten().contains(normalizedQuery) }
-        }
+        }.distinctBy { it.id } // <-- Esto elimina cualquier "fantasma" duplicado
 
-        // 2. ORDENAR: Favoritos primero, luego alfabético
-        val sortedList = filtered.sortedWith(
+        // 2. ORDENAR: Favoritos primero (true va antes que false), luego por título
+        // Al usar sortedWith, el elemento se MUEVE de lugar, no se duplica.
+        val sortedList = baseList.sortedWith(
             compareByDescending<Modelo> { favIds.contains(it.id) }
                 .thenBy { it.title }
         )
 
         if (::adapter.isInitialized) {
+            // Importante: No usamos notifyDataSetChanged directamente aquí,
+            // dejamos que updateList lo haga
             adapter.updateList(sortedList, favIds)
         }
     }
-
     // --- CONFIGURACIÓN DEL BUSCADOR ROBUSTO ---
     private fun setupBuscador() {
         binding.searchEditText.addTextChangedListener(object : TextWatcher {
@@ -128,34 +130,26 @@ class TvActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val snapshot = databaseRef.get().await()
-                Log.d("TV_DEBUG", "Hijos encontrados en Firebase: ${snapshot.childrenCount}")
+                val canalesTemp = mutableListOf<Modelo>()
 
-                val canales = mutableListOf<Modelo>()
                 for (child in snapshot.children) {
                     val canal = child.getValue(Modelo::class.java)
                     canal?.let {
-                        it.isValid = true
+                        // Forzamos que el ID del objeto sea SIEMPRE la llave de Firebase
                         val canalConId = it.copy(id = child.key ?: "")
-                        canales.add(canalConId)
+                        canalesTemp.add(canalConId)
                     }
                 }
 
                 withContext(Dispatchers.Main) {
-                    if (canales.isEmpty()) {
-                        Log.d("TV_DEBUG", "La lista de canales está vacía en Firebase.")
-                    } else {
-                        // Guardamos todo ordenado en nuestra lista maestra estática
-                        channelListMaster.clear()
-                        channelListMaster.addAll(canales.sortedBy { it.title })
+                    channelListMaster.clear()
+                    // Usamos distinctBy también aquí por seguridad
+                    channelListMaster.addAll(canalesTemp.distinctBy { it.id })
 
-                        // Ejecutamos el filtro inicial por si el usuario ya escribió algo antes de cargar
-                        filterChannels(binding.searchEditText.text.toString())
-
-                        Log.d("TV_DEBUG", "Canales cargados en lista maestra: ${channelListMaster.size}")
-                    }
+                    filterChannels(binding.searchEditText.text.toString())
                 }
             } catch (e: Exception) {
-                Log.e("TV_ACTIVITY", "Error crítico al cargar Firebase: ${e.message}")
+                Log.e("TV_ACTIVITY", "Error: ${e.message}")
             }
         }
     }

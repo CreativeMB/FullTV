@@ -3,20 +3,13 @@ package com.creativem.fulltv.tv
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.graphics.drawable.ColorDrawable
 import android.net.Uri
-import android.os.Build
-import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
+import android.os.*
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.ImageButton
-import android.widget.SeekBar
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -26,11 +19,9 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.fulltv.principal.Reloj
-import kotlinx.coroutines.*
 import android.text.format.DateUtils
-import android.widget.ImageView
+import android.view.ViewGroup
 import androidx.annotation.OptIn
-import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -40,580 +31,362 @@ import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Modelo
 import com.creativem.fulltv.databinding.PlayerBinding
-import com.creativem.fulltv.principal.AudioFocusHelper
-import com.google.firebase.database.FirebaseDatabase // ASEGÚRATE DE TENER ESTE IMPORT
+import com.google.firebase.database.FirebaseDatabase
 
 class PlayerTv : AppCompatActivity() {
+
+    // VARIABLES DE CONTROL DE SEÑAL
+    private var reintentosContador = 0
+    private val MAX_REINTENTOS = 3
+    private var isOffline = false
+    private var masterTvList: List<Modelo> = emptyList()
+    private var currentChannelIndex = -1
 
     private var player: ExoPlayer? = null
     private var streamUrl: String = ""
     private var movieImageUrl: String = ""
     private lateinit var movieTitle: String
-    private var movieYear: String = ""
     private lateinit var binding: PlayerBinding
     private lateinit var adapter: TvMenuAdapter
 
     private val handler = Handler(Looper.getMainLooper())
+    private val updateInterval: Long = 1000
+    private val hideControlsDelay: Long = 10000
+
+    // RUNNABLES PARA EL REPRODUCTOR
     private lateinit var runnableActualizar: Runnable
-    private lateinit var runnableOcultar: Runnable
-    private val hideControlsDelay: Long = 10000 // 10 segundos
-    private val updateInterval: Long = 1000 // 1 segundo
-    private var playerReleased = false
-    private val playerHandler = Handler(Looper.getMainLooper())
+    private val runnableOcultarControles = Runnable {
+        binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.GONE
+    }
 
-
-
+    // VARIABLES PARA EL MENÚ LATERAL
     private lateinit var handlerMenu: Handler
-    private lateinit var ocultarMenuRunnable: Runnable
-    private var lastMenuInteractionTime: Long = 0L
-    private val menuHideDelay = 5000L // 5 segundos
-    // Referencia a la nueva ruta
-    private val databaseRef = FirebaseDatabase.getInstance().getReference("tv")
+    private val menuHideDelay = 5000L
+    private val ocultarMenuRunnable = Runnable {
+        binding.recyclerViewTv.visibility = View.GONE
+    }
+
+    // Actualizador de texto de Búfer
+    private val bufferUpdater = object : Runnable {
+        override fun run() {
+            if (player != null && binding.loadingIndicator.visibility == View.VISIBLE) {
+                val percentage = player?.bufferedPercentage ?: 0
+                val estimatedKb = (player?.bufferedPosition ?: 0) / 1024
+                binding.loadingBufferText.text = "Búfer: $percentage% (${estimatedKb} KB)"
+                handler.postDelayed(this, 500)
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = PlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        handlerMenu = Handler(Looper.getMainLooper()) // Inicializar handler del menú
+
+        binding.loadingIndicator.visibility = View.VISIBLE
+        binding.loadingBufferText.text = "Iniciando señal..."
+
         binding.reproductor.keepScreenOn = true
         initializeRecyclerView()
-        binding.recyclerViewTv.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
-            if (binding.recyclerViewTv.visibility == View.VISIBLE) {
-                reiniciarTemporizadorMenu()
-            }
-        }
-
 
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        val nombrePeliculaTextView: TextView = findViewById(R.id.nombrePelicula)
-        val imagenPeliculaImageView: ImageView = findViewById(R.id.imagenPelicula)
+
         intent?.let {
             streamUrl = it.getStringExtra("EXTRA_STREAM_URL") ?: ""
-            movieTitle = it.getStringExtra("EXTRA_MOVIE_TITLE") ?: "Título desconocido"
+            movieTitle = it.getStringExtra("EXTRA_MOVIE_TITLE") ?: "TV en vivo"
             movieImageUrl = it.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
 
-            nombrePeliculaTextView.text = movieTitle
-            Glide.with(this)
-                .load( movieImageUrl)
-                .placeholder(R.drawable.icono)
-                .error(R.drawable.icono)
-                .into(imagenPeliculaImageView)
-
+            binding.loadingMovieTitle.text = movieTitle
+            findViewById<TextView>(R.id.nombrePelicula).text = movieTitle
+            Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(findViewById<ImageView>(R.id.imagenPelicula))
         }
 
-        if (streamUrl.isEmpty()) {
-            Log.e("PlayerTv", "No se recibió la URL de streaming.")
-            Toast.makeText(this, "No se recibió la URL de streaming.", Toast.LENGTH_SHORT).show()
-            return
-        }
-// --- 1. LLAMAR AL RELOJ (Buscando dentro del reproductor) ---
-        val textHora = binding.reproductor.findViewById<TextView>(R.id.textHora)
-        val textfecha = binding.reproductor.findViewById<TextView>(R.id.textfecha)
-
-        if (textHora != null && textfecha != null) {
-            val reloj = Reloj(textHora, textfecha)
-            reloj.startClock()
-        }
-
-        actualizarTiempo()
-        player = ExoPlayer.Builder(this).build()
-        binding.reproductor.player = player
+        initializePlayerControls()
+        loadTvCollection()
         initializePlayer()
 
-        val menupelis = binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis)
-        menupelis.setOnClickListener {
-            mostarpélis()
+        showControlsAndResetTimer()
+    }
+
+    private fun initializePlayerControls() {
+        val textHora = binding.reproductor.findViewById<TextView>(R.id.textHora)
+        val textfecha = binding.reproductor.findViewById<TextView>(R.id.textfecha)
+        if (textHora != null && textfecha != null) {
+            Reloj(textHora, textfecha).startClock()
         }
 
-        val playPauseButton: ImageButton = findViewById(R.id.play_pause)
-        playPauseButton.setOnClickListener {
-            togglePlayPause()
-        }
-
-        val shuffleButton: ImageButton = findViewById(R.id.home)
-        shuffleButton.setOnClickListener {
-            player?.let {
-                it.playWhenReady = false  // Detiene la reproducción inmediata
-                it.stop() // Asegura que el audio se detenga
-                it.clearMediaItems() // Limpia la lista de reproducción
-                it.release() // Libera los recursos
-            }
-            player = null // Elimina la referencia
-
-            finish()
-        }
-        val pedidosButton: ImageButton = findViewById(R.id.pedidos)
-        pedidosButton.setOnClickListener {
-            val alertDialog = AlertDialog.Builder(this)
-                .setTitle("Acceso Gratuito")
-                .setMessage("Estos son canales de TV en vivo disponibles de forma gratuita como cortesía de la comunidad. El apoyo económico para mantener la plataforma se recauda a través del acceso a las películas.")
-                .setPositiveButton("Entendido") { dialog, _ ->
-                    dialog.dismiss()
-                }
-                .create()
-            alertDialog.setOnShowListener {
-                alertDialog.window?.setBackgroundDrawable(ColorDrawable(ContextCompat.getColor(this, R.color.exo_progress_color)))
-            }
-
-            alertDialog.show()
-
-        }
-
-
-        val renderButton: ImageButton = findViewById(R.id.render)
-        renderButton.setOnClickListener {
-            cycleAspectRatio()
-        }
-
-        val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
-        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    val duration = player?.duration ?: 1
-                    val newPosition = (progress / 100.0 * duration).toLong()
-                    player?.seekTo(newPosition)
-                }
-            }
-
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {
-                player?.pause()
-            }
-
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                player?.playWhenReady = true
-            }
-        })
-
-
-        handlerMenu = Handler(Looper.getMainLooper())
-        ocultarMenuRunnable = Runnable {
-            binding.recyclerViewTv.visibility = View.GONE
-        }
+        binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis).setOnClickListener { mostarpélis() }
+        binding.reproductor.findViewById<ImageButton>(R.id.play_pause).setOnClickListener { togglePlayPause() }
+        binding.reproductor.findViewById<ImageButton>(R.id.home).setOnClickListener { finishPlayer() }
+        binding.reproductor.findViewById<ImageButton>(R.id.render).setOnClickListener { cycleAspectRatio() }
 
         runnableActualizar = Runnable { actualizarTiempo() }
-        runnableOcultar = Runnable {
-            binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility =
-                View.GONE
-        }
 
         binding.reproductor.setOnTouchListener { _, _ ->
             showControlsAndResetTimer()
             true
         }
-        showControlsAndResetTimer()
-        handler.postDelayed(runnableActualizar, updateInterval)
-        actualizarTiempo()
     }
 
-
-
-    private fun mostarpélis() {
-        val recycler = binding.recyclerViewTv
-
-        if (recycler.visibility == View.VISIBLE) {
-            recycler.visibility = View.GONE
-            handlerMenu.removeCallbacks(ocultarMenuRunnable)
-        } else {
-            recycler.visibility = View.VISIBLE
-            reiniciarTemporizadorMenu()
-        }
+    private fun showControlsAndResetTimer() {
+        binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.VISIBLE
+        actualizarTiempo() // Refrescar slider de inmediato
+        handler.removeCallbacks(runnableOcultarControles)
+        handler.postDelayed(runnableOcultarControles, hideControlsDelay)
     }
 
-    private fun initializeRecyclerView() {
-        adapter = TvMenuAdapter(this, mutableListOf()) { movie ->
-            startMoviePlayback(movie.streamUrl, movie.title, movie.imageUrl)
-        }
-
-        binding.recyclerViewTv.adapter = adapter
-        binding.recyclerViewTv.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
-
-        // Asegurar alineación a la izquierda
-        binding.recyclerViewTv.layoutDirection = View.LAYOUT_DIRECTION_LTR
-        binding.recyclerViewTv.setPadding(16, 16, 0, 16) // Margen izquierdo
-
-        loadTvCollection() // Cargar la colección de TV
-    }
-
-    // --- CAMBIO PRINCIPAL: Carga desde la Nueva Ruta ---
-    private fun loadTvCollection() {
-        // Consultamos el nodo "tv" en Realtime Database
-        databaseRef.get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                val tvList = mutableListOf<Modelo>()
-
-                for (child in snapshot.children) {
-                    val canal = child.getValue(Modelo::class.java)
-                    canal?.let {
-                        // Asignamos el ID desde la llave del nodo y lo añadimos a la lista
-                        tvList.add(it.copy(id = child.key ?: ""))
+    private val playerListener = @UnstableApi object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            when (playbackState) {
+                Player.STATE_BUFFERING -> {
+                    if (!isOffline) {
+                        binding.loadingIndicator.visibility = View.VISIBLE
+                        handler.post(bufferUpdater)
                     }
                 }
-
-                // Actualizamos el RecyclerView con los canales de la nueva ruta
-                updateRecyclerView(tvList)
+                Player.STATE_READY -> {
+                    binding.loadingIndicator.visibility = View.GONE
+                    isOffline = false
+                    reintentosContador = 0
+                    handler.removeCallbacks(bufferUpdater)
+                    actualizarTiempo()
+                    showControlsAndResetTimer()
+                }
+                Player.STATE_ENDED -> playNextChannel()
+                Player.STATE_IDLE -> { }
             }
-        }.addOnFailureListener { e ->
-            Log.e("PlayerTv", "Error cargando TV desde Realtime DB: ${e.message}")
-            Toast.makeText(this, "Error al cargar la lista de canales", Toast.LENGTH_SHORT).show()
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            if (isOffline) return
+            reintentosContador++
+
+            Log.e("PlayerTv", "Error al cargar: Intento $reintentosContador de $MAX_REINTENTOS")
+
+            if (reintentosContador <= MAX_REINTENTOS) {
+                // Reintentar en el MISMO canal
+                binding.loadingIndicator.visibility = View.VISIBLE
+                binding.loadingBufferText.text = "Señal débil, reintentando ($reintentosContador/$MAX_REINTENTOS)..."
+                handler.postDelayed({ reiniciarReproductor() }, 3000)
+            } else {
+                // Falló el máximo de veces, marcamos como offline temporalmente
+                isOffline = true
+                binding.loadingMovieTitle.text = "CANAL FUERA DE LÍNEA"
+                binding.loadingBufferText.text = "Vuelve pronto, estamos trabajando en ello."
+                binding.loadingBufferText.setTextColor(ContextCompat.getColor(this@PlayerTv, R.color.redpersonalisado))
+
+                // Esperar 4 segundos para que el usuario lea, y SALTAR AL SIGUIENTE
+                handler.postDelayed({
+                    playNextChannel()
+                }, 4000)
+            }
         }
     }
 
-    private fun updateRecyclerView(tvList: List<Modelo>) {
-        adapter.updateData(tvList) // ✅ Ahora actualizamos la lista en vez de reemplazar el adaptador
+    private fun playNextChannel() {
+        if (masterTvList.isNotEmpty()) {
+            // 1. Encontrar en qué canal estamos
+            if (currentChannelIndex == -1) {
+                currentChannelIndex = masterTvList.indexOfFirst { it.streamUrl == streamUrl }
+            }
+
+            // 2. Calcular el siguiente índice (si llega al final, vuelve al inicio)
+            currentChannelIndex = (currentChannelIndex + 1) % masterTvList.size
+            val nextChannel = masterTvList[currentChannelIndex]
+
+            // 3. Asignar los nuevos datos
+            streamUrl = nextChannel.streamUrl
+            movieTitle = nextChannel.title
+            movieImageUrl = nextChannel.imageUrl
+
+            // 4. RESETEAR VARIABLES CLAVES ANTES DE REINICIAR
+            reintentosContador = 0  // IMPORTANTÍSIMO: Empezar de cero para el nuevo canal
+            isOffline = false       // El nuevo canal no está offline hasta que se demuestre lo contrario
+
+            // 5. Actualizar la interfaz
+            binding.loadingIndicator.visibility = View.VISIBLE
+            binding.loadingMovieTitle.text = movieTitle
+            binding.loadingBufferText.text = "Buscando señal..."
+            binding.loadingBufferText.setTextColor(ContextCompat.getColor(this, android.R.color.white))
+            findViewById<TextView>(R.id.nombrePelicula).text = movieTitle
+
+            // 6. Lanzar el nuevo reproductor
+            reiniciarReproductor()
+        } else {
+            // Si la lista está vacía por alguna razón, cerrar.
+            Toast.makeText(this, "No hay más canales disponibles", Toast.LENGTH_SHORT).show()
+            finishPlayer()
+        }
     }
 
-    private fun startMoviePlayback(streamUrl: String, movieTitle: String, movieImageUrl: String) {
-        val intent = Intent(this, PlayerTv::class.java)
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        intent.putExtra("EXTRA_STREAM_URL", streamUrl)
-        intent.putExtra("EXTRA_MOVIE_TITLE", movieTitle)
-        intent.putExtra("EXTRA_MOVIE_IMAGE_URL", movieImageUrl)
+    private fun loadTvCollection() {
+        FirebaseDatabase.getInstance().getReference("tv").get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                masterTvList = snapshot.children.mapNotNull { it.getValue(Modelo::class.java)?.copy(id = it.key ?: "") }
+                currentChannelIndex = masterTvList.indexOfFirst { it.streamUrl == streamUrl }
+                adapter.updateData(masterTvList)
+            }
+        }
+    }
 
-        // Si necesitas pasar el castv o fecha, hazlo aquí para ser consistente:
-        // intent.putExtra("EXTRA_MOVIE_CASTV", ...)
+    private fun actualizarTiempo() {
+        if (player != null && player!!.isPlaying) {
+            val pos = player?.currentPosition ?: 0
+            val dur = player?.duration ?: 0
+            val tvProgreso = binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido)
+            val tvTotal = binding.reproductor.findViewById<TextView>(R.id.tiempototal)
+            val sbProgreso = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
 
-        startActivity(intent)
+            tvProgreso?.text = DateUtils.formatElapsedTime(pos / 1000)
+            tvTotal?.text = DateUtils.formatElapsedTime(dur / 1000)
+            if (dur > 0) {
+                sbProgreso?.progress = (pos.toFloat() / dur * 100).toInt()
+            }
+            handler.removeCallbacks(runnableActualizar)
+            handler.postDelayed(runnableActualizar, updateInterval)
+        }
+    }
+
+    private fun togglePlayPause() {
+        player?.let { if (it.isPlaying) it.pause() else it.play() }
+        showControlsAndResetTimer()
+    }
+
+    private fun reiniciarReproductor() {
+        player?.release()
+        player = null
+        initializePlayer()
     }
 
     @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
-        if (streamUrl.isEmpty()) {
-            Log.e("PlayerTv", "No se recibió la URL de streaming.")
-            Toast.makeText(this, "No se recibió la URL de streaming.", Toast.LENGTH_SHORT).show()
-            return
-        }
-
+        if (streamUrl.isEmpty()) return
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
-            .setDefaultRequestProperties(mapOf("User-Agent" to "Mozilla/5.0"))
-            .setConnectTimeoutMs(30_000)
-            .setReadTimeoutMs(30_000)
-
-        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
-
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                40_000,  // Min Buffer
-                100_000, // Max Buffer
-                10_000,  // Min Playback Buffer
-                10_000   // Min Rebuffer
-            )
-            .setPrioritizeTimeOverSizeThresholds(false)
-            .build()
+            .setUserAgent("Mozilla/5.0")
+            .setConnectTimeoutMs(15000)
 
         player = ExoPlayer.Builder(this)
-
-            .setLoadControl(loadControl)
-            .setRenderersFactory(
-                DefaultRenderersFactory(this)
-                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-            )
-            .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(DefaultLoadControl.Builder().setBufferDurationsMs(30000, 60000, 2500, 5000).build())
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .build().also { exoPlayer ->
                 binding.reproductor.player = exoPlayer
                 binding.reproductor.useController = false
-                Log.d("PlayerTv", "URL asignada al reproductor: $streamUrl")
-                val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
-                exoPlayer.setMediaItem(mediaItem)
+                exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(streamUrl)))
                 exoPlayer.prepare()
                 exoPlayer.addListener(playerListener)
                 exoPlayer.playWhenReady = true
             }
     }
 
-    private var bufferingStartTime: Long = 0
-    private val maxBufferingTimeMillis = 3000
-    private var consecutiveBufferingAttempts = 0
-    private val maxBufferingAttempts = 3
-    private var isBuffering = false
-    private val playerListener = @UnstableApi
-    object : Player.Listener {
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            playerHandler.post {
-                when (playbackState) {
-                    Player.STATE_BUFFERING -> {
-                        isBuffering = true
-                        consecutiveBufferingAttempts++
-                        if (consecutiveBufferingAttempts >= maxBufferingAttempts) {
-                            Log.w(
-                                "PlayerTv",
-                                "Muchos intentos de buffering consecutivos, reiniciando..."
-                            )
-                            reiniciarReproductor()
-                            consecutiveBufferingAttempts = 0
-                        }
-                    }
+    private fun initializeRecyclerView() {
+        adapter = TvMenuAdapter(this, mutableListOf()) { movie ->
+            val intent = Intent(this, PlayerTv::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                putExtra("EXTRA_STREAM_URL", movie.streamUrl)
+                putExtra("EXTRA_MOVIE_TITLE", movie.title)
+                putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
+            }
+            startActivity(intent)
+        }
 
-                    Player.STATE_READY -> {
-                        consecutiveBufferingAttempts = 0
-                        isBuffering = false
+        binding.recyclerViewTv.adapter = adapter
+        binding.recyclerViewTv.layoutManager = LinearLayoutManager(this)
 
-                        // Eliminamos la llamada a actualizarTiempo() inmediata
-                        Handler(Looper.getMainLooper()).postDelayed({
-                            actualizarTiempo()  //Llamada única y optimizada
-                            mostrarBuffer()     //Llamada única y optimizada
-                        }, 250) //Experimenta con diferentes valores de retraso (250ms o menos)
+        // --- EVITAR QUE EL FOCO SE ESCAPE ---
+        // Le decimos al RecyclerView que atrape el foco arriba, abajo, izquierda y derecha
+        binding.recyclerViewTv.isFocusable = true
+        binding.recyclerViewTv.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
 
-                    }
-
-                    Player.STATE_ENDED -> {
-                        Log.d("PlayerTv", "Reproducción finalizada, reiniciando...")
-                        reiniciarReproductor()
-                    }
-
-                    Player.STATE_IDLE -> {
-                        Log.d(
-                            "PlayerTv",
-                            "Reproductor en estado IDLE, intentando recuperar..."
-                        )
-                        reiniciarReproductor()
-                    }
-                }
+        // Mantiene el menú visible mientras haya interacción (Focus)
+        binding.recyclerViewTv.viewTreeObserver.addOnGlobalFocusChangeListener { _, _ ->
+            if (binding.recyclerViewTv.visibility == View.VISIBLE) {
+                reiniciarTemporizadorMenu()
             }
         }
-
-        override fun onPlayerError(error: PlaybackException) {
-            Log.e(
-                "PlayerTv",
-                "Error de reproducción: ${error.message}, código: ${error.errorCode}, tipo de error: ${error.cause?.javaClass?.simpleName}",
-                error
-            )
-            reiniciarReproductor()
-        }
-
-        override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (isPlaying) {
-                handler.postDelayed(runnableOcultar, hideControlsDelay)
-            } else {
-                handler.removeCallbacks(runnableOcultar)
-            }
-        }
-
-        @SuppressLint("UnsafeOptInUsageError")
-        override fun onPositionDiscontinuity(reason: Int) {
-            Log.w("PlayerTv", "Discontinuidad de posición: $reason")
-        }
-
-
-        override fun onIsLoadingChanged(isLoading: Boolean) {
-            Log.d("PlayerTv", "Está cargando: $isLoading")
-        }
-
     }
+
+    // --- MÉTODOS DEL MENÚ LATERAL ---
+    private fun mostarpélis() {
+        if (binding.recyclerViewTv.visibility == View.VISIBLE) {
+            binding.recyclerViewTv.visibility = View.GONE
+            handlerMenu.removeCallbacks(ocultarMenuRunnable)
+        } else {
+            binding.recyclerViewTv.visibility = View.VISIBLE
+
+            // Le decimos al adaptador cuál es el canal actual
+            adapter.setCurrentPlayingChannel(streamUrl)
+
+            // Buscamos la posición del canal actual
+            val posicionActual = masterTvList.indexOfFirst { it.streamUrl == streamUrl }
+
+            if (posicionActual != -1) {
+                // Hacer scroll hasta esa posición para que quede en el centro de la pantalla
+                (binding.recyclerViewTv.layoutManager as LinearLayoutManager)
+                    .scrollToPositionWithOffset(posicionActual, 200) // 200px de margen arriba
+
+                // DAR FOCO AL ITEM ESPECÍFICO UN SEGUNDO DESPUÉS DEL SCROLL
+                handler.postDelayed({
+                    val viewHolder = binding.recyclerViewTv.findViewHolderForAdapterPosition(posicionActual)
+                    viewHolder?.itemView?.requestFocus()
+                }, 100)
+            } else {
+                binding.recyclerViewTv.requestFocus()
+            }
+
+            reiniciarTemporizadorMenu()
+        }
+    }
+
     fun reiniciarTemporizadorMenu() {
         handlerMenu.removeCallbacks(ocultarMenuRunnable)
         handlerMenu.postDelayed(ocultarMenuRunnable, menuHideDelay)
     }
 
-
-    private fun reiniciarReproductor() {
-        Log.d("PlayerTv", "Reiniciando el reproductor...")
-        player?.release()  // Libera el reproductor actual
-        player = null  // Elimina referencia
-        handler.removeCallbacksAndMessages(null) // Detiene cualquier proceso en espera
-        initializePlayer()  // Vuelve a iniciar ExoPlayer
-    }
-
-    private fun mostrarBuffer() {
-        val bufferedPercentage = player?.bufferedPercentage ?: 0
-        val bufferedData = (bufferedPercentage / 100.0) * (2 * 1024)
-        Toast.makeText(
-            this,
-            "Búfer almacenado: ${bufferedData.toInt()} KB",
-            Toast.LENGTH_SHORT
-        ).show()
-    }
-
-
-    override fun onPause() {
-        super.onPause()
-        releasePlayer()
-        playerHandler.removeCallbacksAndMessages(null) // Limpiar todos los mensajes del Handler
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioFocusHelper.abandonAudioFocus()
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-
-        if (player == null && !playerReleased) {
-            // Solicitar audio focus antes de reproducir
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val granted = AudioFocusHelper.requestAudioFocus(this)
-                if (granted) {
-                    player = ExoPlayer.Builder(this).build()
-                    binding.reproductor.player = player
-                    initializePlayer()
-                } else {
-                    Log.d("AudioFocus", "No se pudo obtener el audio focus")
-                }
-            } else {
-                // Para versiones < Oreo no se requiere AudioFocusRequest
-                player = ExoPlayer.Builder(this).build()
-                binding.reproductor.player = player
-                initializePlayer()
-            }
-        }
-    }
-
-
-    private fun releasePlayer() {
-        if (!playerReleased) {
-            player?.removeListener(playerListener)
-            player?.release()
-            player = null
-            playerReleased = true
-            Log.d("PlayerTv", "Reproductor liberado")
-        }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        releasePlayer()
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) {
-            enterFullScreen()
-        }
-    }
-
-    private fun enterFullScreen() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            window.insetsController?.hide(android.view.WindowInsets.Type.systemBars())
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                    View.SYSTEM_UI_FLAG_FULLSCREEN
-                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    )
-        }
-    }
-
-    private fun showControlsAndResetTimer() {
-        binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.VISIBLE
-        handler.removeCallbacks(runnable)
-        handler.postDelayed(runnable, hideControlsDelay)
-    }
-
-    private val runnable = Runnable {
-        actualizarTiempo()
-        binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.GONE
-    }
-
-    private fun togglePlayPause() {
-        val player = binding.reproductor.player
-        if (player != null) {
-            if (player.isPlaying) {
-                player.pause()
-            } else {
-                player.play()
-            }
-        }
-    }
-
-    private var currentAspectRatioMode = 0
-
-    @OptIn(UnstableApi::class)
-    private fun cycleAspectRatio() {
-        val playerView = binding.reproductor
-        val aspectRatios = listOf(
-            AspectRatioFrameLayout.RESIZE_MODE_FIT,
-            AspectRatioFrameLayout.RESIZE_MODE_FILL,
-            AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-        )
-        currentAspectRatioMode = (currentAspectRatioMode + 1) % aspectRatios.size
-        playerView.resizeMode = aspectRatios[currentAspectRatioMode]
-    }
-
-    private fun actualizarTiempo() {
-        if (player != null && player!!.isPlaying) {
-            MainScope().launch {
-                val tiemporeproducido =
-                    binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido)
-                val tiempototal = binding.reproductor.findViewById<TextView>(R.id.tiempototal)
-                val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
-
-                val posicionActual = player?.currentPosition ?: 0
-                val duracionTotal = player?.duration ?: 0
-
-                tiemporeproducido.text = tiempoFormateado(posicionActual)
-                tiempototal.text = tiempoFormateado(duracionTotal)
-
-                if (duracionTotal > 0) {
-                    val progress = (posicionActual.toFloat() / duracionTotal * 100).toInt()
-                    seekBar.progress = progress
-                    handler.postDelayed(runnableActualizar, updateInterval)
-                    handleBuffering()
-                }
-            }
-        }
-    }
-
-    private fun handleBuffering() {
-        if (bufferingStartTime != 0L) {
-            val bufferingDuration = System.currentTimeMillis() - bufferingStartTime
-            if (bufferingDuration > maxBufferingTimeMillis) {
-                Log.w(
-                    "PlayerTv",
-                    "Buffering prolongado ($bufferingDuration ms), intentando reiniciar..."
-                )
-                reiniciarReproductor()
-                bufferingStartTime = 0L
-            }
-        }
-    }
-
-    private fun tiempoFormateado(tiempoMs: Long): String {
-        return DateUtils.formatElapsedTime(tiempoMs / 1000)
-    }
-
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        val teclasAtras = setOf(
-            KeyEvent.KEYCODE_BACK,
-            KeyEvent.KEYCODE_ESCAPE,
-            KeyEvent.KEYCODE_BUTTON_B,
-            158, 172
-        )
+        // Al tocar cualquier tecla, mostramos los controles principales
+        showControlsAndResetTimer()
+
+        // Si el menú está abierto, cualquier tecla resetea su contador también
+        if (binding.recyclerViewTv.visibility == View.VISIBLE) {
+            reiniciarTemporizadorMenu()
+        }
 
         return when (keyCode) {
-            // ✅ Teclas que muestran el menú
-            KeyEvent.KEYCODE_MENU,
-            KeyEvent.KEYCODE_PAGE_UP,
-            KeyEvent.KEYCODE_PAGE_DOWN,
-            174 -> {
-                mostarpélis()
-                true
-            }
-
-            // ✅ Teclas "OK", "Enter", "Play"
-            KeyEvent.KEYCODE_DPAD_CENTER,
-            KeyEvent.KEYCODE_ENTER,
-            KeyEvent.KEYCODE_NUMPAD_ENTER,
-            KeyEvent.KEYCODE_BUTTON_A,
-            KeyEvent.KEYCODE_MEDIA_PLAY,
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                showControlsAndResetTimer()
-                true
-            }
-
-            // ✅ Teclas "Atrás"
-            in teclasAtras -> {
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_PAGE_DOWN -> { mostarpélis(); true }
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { togglePlayPause(); true }
+            KeyEvent.KEYCODE_BACK -> {
                 if (binding.recyclerViewTv.visibility == View.VISIBLE) {
                     binding.recyclerViewTv.visibility = View.GONE
+                    true
                 } else {
                     finish()
+                    true
                 }
-                true
             }
-
             else -> super.onKeyDown(keyCode, event)
         }
     }
 
+    private fun finishPlayer() {
+        player?.release()
+        player = null
+        finish()
+    }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        player?.release()
+        handler.removeCallbacksAndMessages(null)
+        handlerMenu.removeCallbacksAndMessages(null)
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun cycleAspectRatio() {
+        val aspectRatios = listOf(AspectRatioFrameLayout.RESIZE_MODE_FIT, AspectRatioFrameLayout.RESIZE_MODE_FILL, AspectRatioFrameLayout.RESIZE_MODE_ZOOM)
+        binding.reproductor.resizeMode = aspectRatios[(aspectRatios.indexOf(binding.reproductor.resizeMode) + 1) % aspectRatios.size]
+    }
 }

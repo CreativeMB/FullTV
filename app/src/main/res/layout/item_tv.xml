@@ -61,7 +61,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_margin="6dp"
-            android:background="@drawable/bg_badge_blue"
+            android:background="@drawable/bg_saldo_premium"
             android:paddingHorizontal="4dp"
             android:text="TV"
             android:textColor="#FFFFFF"

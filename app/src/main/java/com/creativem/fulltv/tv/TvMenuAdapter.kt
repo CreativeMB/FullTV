@@ -19,7 +19,13 @@ class TvMenuAdapter(
     private val clickListener: (Modelo) -> Unit
 ) : RecyclerView.Adapter<TvMenuAdapter.TvViewHolder>() {
 
-    private var selectedPosition = RecyclerView.NO_POSITION
+    // Variable para saber qué canal está sonando ahora mismo
+    private var currentPlayingUrl: String = ""
+
+    fun setCurrentPlayingChannel(url: String) {
+        this.currentPlayingUrl = url
+        notifyDataSetChanged()
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TvViewHolder {
         val view = LayoutInflater.from(context).inflate(R.layout.item_menu_tv, parent, false)
@@ -30,53 +36,39 @@ class TvMenuAdapter(
         val tvItem = tvList[position]
         holder.title.text = tvItem.title
 
-        if (!tvItem.imageUrl.isNullOrEmpty()) {
-            Glide.with(holder.imageView.context)
-                .load(tvItem.imageUrl)
-                .placeholder(R.drawable.icono)
-                .error(R.drawable.icono)
-                .into(holder.imageView)
+        Glide.with(holder.imageView.context)
+            .load(tvItem.imageUrl)
+            .placeholder(R.drawable.icono)
+            .error(R.drawable.icono)
+            .into(holder.imageView)
+
+        // Resaltar visualmente si es el canal que está sonando actualmente
+        val isPlaying = tvItem.streamUrl == currentPlayingUrl
+        if (isPlaying) {
+            holder.title.setTextColor(ContextCompat.getColor(context, R.color.colorFocused)) // Color destacado
         } else {
-            holder.imageView.setImageResource(R.drawable.icono)
+            holder.title.setTextColor(ContextCompat.getColor(context, android.R.color.white))
         }
 
+        // CONTROL DE FOCO
         holder.itemView.setOnFocusChangeListener { _, hasFocus ->
             holder.itemView.setBackgroundColor(
-                if (hasFocus) ContextCompat.getColor(context, R.color.colorhover2)
+                if (hasFocus) ContextCompat.getColor(context, R.color.cine_dorado)
                 else ContextCompat.getColor(context, R.color.colorNotSelected)
             )
 
             if (hasFocus) {
-                // Llama a la función en PlayerTv si el context es una instancia válida
                 (context as? PlayerTv)?.reiniciarTemporizadorMenu()
             }
         }
 
-
-
-        // ✅ Click para seleccionar y enviar la película
         holder.itemView.setOnClickListener {
-            val previousSelected = selectedPosition
-            selectedPosition = position
-            notifyItemChanged(previousSelected) // Actualiza el anterior
-            notifyItemChanged(selectedPosition) // Actualiza el nuevo
-
             clickListener(tvItem)
-        }
-
-
-        // ✅ Cambia color al recibir foco (para control remoto/teclado)
-        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
-            holder.itemView.setBackgroundColor(
-                if (hasFocus) ContextCompat.getColor(context, R.color.colorhover2)
-                else ContextCompat.getColor(context, R.color.colorNotSelected)
-            )
         }
     }
 
     override fun getItemCount(): Int = tvList.size
 
-    // ✅ Método para actualizar la lista de películas
     fun updateData(newTvList: List<Modelo>) {
         tvList.clear()
         tvList.addAll(newTvList)

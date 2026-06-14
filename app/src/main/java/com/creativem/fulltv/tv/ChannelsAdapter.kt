@@ -88,7 +88,8 @@ class ChannelsAdapter(
 
     // Actualiza tanto la lista como los IDs favoritos
     fun updateList(newList: List<Modelo>, favIds: Set<String>) {
-        this.channelList = newList
+        // Reemplazamos la referencia por una nueva lista limpia
+        this.channelList = newList.toList()
         this.favoriteIds = favIds
         notifyDataSetChanged()
     }
