@@ -13,7 +13,7 @@
         app:resize_mode="fill">
         <include layout="@layout/player_controles"/>
     </androidx.media3.ui.PlayerView>
-    <!-- Contenedor premium de carga con indicador de búfer -->
+
     <LinearLayout
         android:id="@+id/loadingIndicator"
         android:layout_width="wrap_content"
@@ -23,7 +23,6 @@
         android:gravity="center"
         android:visibility="gone">
 
-        <!-- Anillo dorado animado -->
         <ProgressBar
             android:layout_width="90dp"
             android:layout_height="90dp"
@@ -31,7 +30,6 @@
             android:indeterminateTint="@null"
             android:indeterminateDrawable="@drawable/loader_premium" />
 
-        <!-- Título de la película -->
         <TextView
             android:id="@+id/loadingMovieTitle"
             android:layout_width="wrap_content"
@@ -47,7 +45,6 @@
             android:shadowDy="2"
             android:shadowRadius="3" />
 
-        <!-- TEXTO DINÁMICO DEL BÚFER (Reemplaza al texto fijo) -->
         <TextView
             android:id="@+id/loadingBufferText"
             android:layout_width="wrap_content"
@@ -61,12 +58,11 @@
             android:alpha="0.9" />
     </LinearLayout>
 
-
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerViewTv"
-        android:layout_width="wrap_content"
+        android:layout_width="280dp"
         android:layout_height="match_parent"
-        android:layout_gravity="center_horizontal|start"
+        android:layout_gravity="start"
         android:clipToPadding="false"
         android:nextFocusLeft="@id/recyclerViewTv"
         android:nextFocusRight="@id/recyclerViewTv"
@@ -74,5 +70,17 @@
         android:background="#80000000"
         android:visibility="invisible"/>
 
+    <ImageView
+        android:id="@+id/btnCerrarMenuTv"
+        android:layout_width="45dp"
+        android:layout_height="90dp"
+        android:layout_gravity="start|center_vertical"
+        android:layout_marginStart="280dp"
+        android:src="@drawable/pestana"
+        android:scaleType="centerInside"
+        android:focusable="false"
+        android:clickable="true"
+        android:contentDescription="Cerrar Menú"
+        android:visibility="gone" />
 
 </FrameLayout>

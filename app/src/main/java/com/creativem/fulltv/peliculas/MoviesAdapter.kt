@@ -76,6 +76,18 @@ class MoviesAdapter(
         // 3. Timers
         configurarTiempos(holder, movie)
 
+        // --- EFECTO DE FOCO VISUAL ---
+        holder.itemView.isFocusable = true
+        val colorDorado = androidx.core.content.ContextCompat.getColor(holder.itemView.context, R.color.cine_dorado)
+        // Calculamos el grosor en DP para que no sea muy delgado en TV
+        val strokePx = (4 * holder.itemView.context.resources.displayMetrics.density).toInt()
+        val focusedBorder = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            setStroke(strokePx, colorDorado)
+            setColor(android.graphics.Color.TRANSPARENT) // Totalmente transparente adentro
+            cornerRadius = 8f // Redondeo
+        }
+
         // 4. Gestión de foco y zoom
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             val card = view as? androidx.cardview.widget.CardView
@@ -103,8 +115,9 @@ class MoviesAdapter(
                 parentView?.requestLayout()
                 (parentView as? View)?.invalidate()
 
+                // Poner el borde brillante
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    view.foreground = null
+                    view.foreground = focusedBorder
                 }
                 view.alpha = 1.0f
 
@@ -113,14 +126,20 @@ class MoviesAdapter(
                 card?.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(view.context, R.color.colorhover2))
                 card?.cardElevation = 20f
                 holder.txtTitle.isSelected = true
-                holder.txtTitle.setTextColor(Color.YELLOW)
+                holder.txtTitle.setTextColor(colorDorado) // Hace juego con el borde
 
             } else if (!hasFocus) {
                 view.animate().scaleX(1.0f).scaleY(1.0f).translationZ(0f).setDuration(200).start()
-                card?.setCardBackgroundColor(Color.parseColor("#1A1A1A"))
+
+                // QUITAR EL BORDE AL PERDER EL FOCO (Corrección importante)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    view.foreground = null
+                }
+
+                card?.setCardBackgroundColor(android.graphics.Color.parseColor("#1A1A1A"))
                 card?.cardElevation = 6f
                 holder.txtTitle.isSelected = false
-                holder.txtTitle.setTextColor(Color.WHITE)
+                holder.txtTitle.setTextColor(android.graphics.Color.WHITE)
             }
         }
 

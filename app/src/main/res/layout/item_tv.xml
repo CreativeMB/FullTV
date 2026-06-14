@@ -5,71 +5,70 @@
     android:layout_width="match_parent"
     android:layout_height="120dp"
     android:layout_margin="4dp"
-    android:focusable="true"
     android:clickable="true"
+    android:focusable="true"
     android:focusableInTouchMode="true"
     app:cardBackgroundColor="#1A1A1A"
-    app:cardCornerRadius="12dp"
+    app:cardCornerRadius="8dp"
     app:cardElevation="0dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <!-- CAMBIO: fitCenter para que el logo siempre esté centrado verticalmente -->
+        <!-- Imagen del Canal -->
         <ImageView
             android:id="@+id/imgMovie"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:padding="15dp"
+            android:paddingBottom="35dp"
             android:scaleType="fitCenter"
-            android:src="@drawable/pelifondo"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            android:src="@drawable/pelifondo" />
 
-        <!-- Cinta negra transparente -->
+        <!-- 1. La Cinta de Fondo (Le agregamos ID para referenciarla) -->
         <View
-            android:id="@+id/infoArea"
+            android:id="@+id/viewCintaFondo"
             android:layout_width="match_parent"
             android:layout_height="35dp"
-            android:background="@drawable/bg_degradado_netflix"
+            android:background="@drawable/bg_bordes_difuminados"
             app:layout_constraintBottom_toBottomOf="parent" />
 
-        <!-- Título centrado verticalmente DENTRO de la cinta negra -->
+        <!-- 2. El Título centrado VERTICALMENTE en la Cinta -->
         <TextView
             android:id="@+id/txtMovieTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="4dp"
-            android:ellipsize="end"
-            android:maxLines="1"
+            android:paddingHorizontal="8dp"
             android:gravity="center"
-            android:text="Canal"
+            android:text="Nombre del Canal"
             android:textColor="#FFFFFF"
-            android:textSize="10sp"
+            android:textSize="14sp"
             android:textStyle="bold"
-            app:layout_constraintBottom_toBottomOf="@id/infoArea"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="@id/infoArea" />
+        android:singleLine="true"
+        android:ellipsize="marquee"
+        android:marqueeRepeatLimit="marquee_forever"
+        android:scrollHorizontally="true"
+        app:layout_constraintTop_toTopOf="@id/viewCintaFondo"
+        app:layout_constraintBottom_toBottomOf="@id/viewCintaFondo"
+        app:layout_constraintStart_toStartOf="@id/viewCintaFondo"
+        app:layout_constraintEnd_toEndOf="@id/viewCintaFondo" />
 
-        <!-- Badge TV arriba -->
+        <!-- Badge TV (Izquierda) -->
         <TextView
             android:id="@+id/txtBadge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_margin="6dp"
-            android:background="@drawable/bg_saldo_premium"
+            android:background="@color/fondo"
             android:paddingHorizontal="4dp"
             android:text="TV"
             android:textColor="#FFFFFF"
-            android:textSize="7sp"
+            android:textSize="10sp"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- Status LIVE arriba -->
+        <!-- Badge LIVE (Derecha) -->
         <TextView
             android:id="@+id/txtStatus"
             android:layout_width="wrap_content"
@@ -79,19 +78,22 @@
             android:paddingHorizontal="4dp"
             android:text="LIVE"
             android:textColor="#FFFFFF"
-            android:textSize="7sp"
+            android:textSize="10sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Estrella de Favoritos -->
         <ImageView
             android:id="@+id/imgStar"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_margin="8dp"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_margin="6dp"
+            android:elevation="10dp"
             android:src="@android:drawable/btn_star_big_on"
             android:visibility="gone"
+            app:layout_constraintStart_toEndOf="@id/txtBadge"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:tint="#FFD700" /> <!-- Color Dorado -->
+            app:tint="#FFD700" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.cardview.widget.CardView>

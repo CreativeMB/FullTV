@@ -56,6 +56,18 @@ class PeliculasApiAdapter(
             .error(R.drawable.icono)
             .into(holder.movieImage)
 
+        // --- EFECTO DE FOCO VISUAL ---
+        holder.itemView.isFocusable = true
+        val colorDorado = androidx.core.content.ContextCompat.getColor(holder.itemView.context, R.color.cine_dorado)
+        // Calculamos el grosor en DP para que no sea muy delgado en TV
+        val strokePx = (4 * holder.itemView.context.resources.displayMetrics.density).toInt()
+        val focusedBorder = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            setStroke(strokePx, colorDorado)
+            setColor(android.graphics.Color.TRANSPARENT) // Totalmente transparente adentro
+            cornerRadius = 8f // Redondeo
+        }
+
         // 3. GESTIÓN DE FOCO, ZOOM Y CENTRADO HORIZONTAL
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             val card = view as? androidx.cardview.widget.CardView
@@ -89,7 +101,7 @@ class PeliculasApiAdapter(
 
                 // Brillo máximo (Sin atenuado)
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    view.foreground = null
+                    view.foreground = focusedBorder
                 }
                 view.alpha = 1.0f
 
@@ -103,7 +115,7 @@ class PeliculasApiAdapter(
                 // --- C. COLORES ---
                 card?.setCardBackgroundColor(Color.parseColor("#FFD700")) // Oro
                 card?.cardElevation = 20f
-                holder.movieTitle.setTextColor(Color.YELLOW)
+                holder.movieTitle.setTextColor(colorDorado)
                 holder.movieTitle.isSelected = true
 
             } else if (!hasFocus) {
@@ -114,7 +126,10 @@ class PeliculasApiAdapter(
                     .translationZ(0f)
                     .setDuration(200)
                     .start()
-
+// ¡AQUÍ ESTÁ LA CORRECCIÓN! (Quitar el borde al salir)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    view.foreground = null
+                }
                 card?.setCardBackgroundColor(Color.parseColor("#1A1A1A"))
                 card?.cardElevation = 4f
                 holder.movieTitle.setTextColor(Color.WHITE)

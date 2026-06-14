@@ -57,9 +57,6 @@ class TvMenuAdapter(
                 else ContextCompat.getColor(context, R.color.colorNotSelected)
             )
 
-            if (hasFocus) {
-                (context as? PlayerTv)?.reiniciarTemporizadorMenu()
-            }
         }
 
         holder.itemView.setOnClickListener {

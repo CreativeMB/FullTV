@@ -1,9 +1,11 @@
 package com.creativem.fulltv.tv
 
 import android.graphics.Color
+import android.os.Build
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.DecelerateInterpolator
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
@@ -43,7 +45,7 @@ class ChannelsAdapter(
         holder.txtStatus.text = "GRATIS"
         holder.txtBadge.text = "TV"
 
-        // MOSTRAR/OCULTAR ESTRELLA (imgStar debe estar en tu item_tv.xml)
+        // MOSTRAR/OCULTAR ESTRELLA
         if (favoriteIds.contains(canal.id)) {
             holder.imgStar.visibility = View.VISIBLE
         } else {
@@ -55,20 +57,71 @@ class ChannelsAdapter(
             .apply(glideOptions)
             .into(holder.imgMovie)
 
+        // IMPORTANTE: Hacemos que el ítem pueda recibir el foco directamente por código
+        holder.itemView.isFocusable = true
+        // LLAMAMOS A TU COLOR "cine_dorado" AQUÍ:
+        val colorDorado = androidx.core.content.ContextCompat.getColor(holder.itemView.context, R.color.cine_dorado)
+        // CREAMOS EL BORDE Y FONDO VISUAL POR CÓDIGO (Reemplaza al XML)
+        val focusedBackground = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            setStroke(8, colorDorado) // Grosor del borde (8 píxeles) y color Cyan
+            setColor(Color.parseColor("#3300FFFF")) // Fondo un poco transparente
+            cornerRadius = 8f // Bordes redondeados (ajústalo a tu gusto)
+        }
+
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             if (hasFocus) {
+                // Ejecutamos el callback para actualizar el fondo de la Activity
                 onFocusChange(canal)
-                view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(200).start()
-                holder.txtTitle.setTextColor(Color.CYAN)
+
+                // 1. Animación suave de agrandado y elevación
+                // Usamos translationZ para que el ítem "flote" sobre los demás
+                view.animate()
+                    .scaleX(1.15f) // Un poco más de escala suele verse mejor en TV
+                    .scaleY(1.15f)
+                    .translationZ(15f)
+                    .setDuration(250)
+                    .setInterpolator(DecelerateInterpolator()) // Movimiento más natural
+                    .start()
+
+                // 2. Color de texto resaltado
+                holder.txtTitle.setTextColor(colorDorado)
+                holder.txtTitle.isSelected = true // Activa el Marquee (texto corriendo) si lo tienes configurado
+
+                // 3. Efecto de Borde
+                // Si el itemView es un CardView, es mejor usar 'foreground' para no tapar las esquinas redondeadas
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    view.foreground = focusedBackground
+                } else {
+                    view.background = focusedBackground
+                }
+
             } else {
-                view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(200).start()
+                // 1. Restaurar valores originales
+                view.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .translationZ(0f)
+                    .setDuration(250)
+                    .start()
+
+                // 2. Restaurar texto
                 holder.txtTitle.setTextColor(Color.WHITE)
+                holder.txtTitle.isSelected = false // Detiene el Marquee
+
+                // 3. Quitar el borde
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    view.foreground = null
+                } else {
+                    view.background = null
+                }
             }
         }
 
+        // CLIC NORMAL
         holder.itemView.setOnClickListener { onItemClick(canal) }
 
-        // DETECTAR CLIC SOSTENIDO (Botón OK del control remoto)
+        // CLIC SOSTENIDO
         holder.itemView.setOnLongClickListener {
             onLongClick(canal)
             true
@@ -82,7 +135,6 @@ class ChannelsAdapter(
         val txtTitle: TextView = view.findViewById(R.id.txtMovieTitle)
         val txtStatus: TextView = view.findViewById(R.id.txtStatus)
         val txtBadge: TextView = view.findViewById(R.id.txtBadge)
-        val infoArea: View = view.findViewById(R.id.infoArea)
         val imgStar: ImageView = view.findViewById(R.id.imgStar) // Asegúrate de añadirlo al XML
     }
 

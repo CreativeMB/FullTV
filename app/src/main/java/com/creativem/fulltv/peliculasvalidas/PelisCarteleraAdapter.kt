@@ -60,6 +60,19 @@ class PelisCarteleraAdapter(
             .error(R.drawable.pelifondo)
             .into(holder.poster)
 
+        // --- EFECTO DE FOCO VISUAL MEJORADO ---
+        holder.itemView.isFocusable = true
+
+        // Calculamos 5dp de grosor para que se vea claramente en cualquier TV (1080p o 4K)
+        val strokeWidthPx = (5 * holder.itemView.context.resources.displayMetrics.density).toInt()
+        val colorDorado = androidx.core.content.ContextCompat.getColor(holder.itemView.context, R.color.cine_dorado)
+        val focusedBorder = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            setStroke(strokeWidthPx, colorDorado) // Borde calculado dinámicamente
+            setColor(Color.TRANSPARENT) // Totalmente transparente por dentro para que se vea el colorhover2
+            cornerRadius = 8f // Curva de las esquinas
+        }
+
         // 3. GESTIÓN DE FOCO, ZOOM Y CENTRADO
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             val card = view as? androidx.cardview.widget.CardView
@@ -81,7 +94,6 @@ class PelisCarteleraAdapter(
                     scroller.targetPosition = currentPos
                     rv.layoutManager?.startSmoothScroll(scroller)
 
-                    // Bloqueo de foco para que no salte fuera de la cartelera
                     rv.requestChildFocus(view, view)
                 }
 
@@ -90,9 +102,10 @@ class PelisCarteleraAdapter(
                 (view.parent as? View)?.requestLayout()
                 (view.parent as? View)?.invalidate()
 
-                // Quitar atenuado
+                // Aplicar el borde brillante
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    view.foreground = null
+                    view.foreground = focusedBorder
+                    view.invalidate() // Forzar a la TV a redibujar el ítem
                 }
                 view.alpha = 1.0f
 
@@ -106,8 +119,8 @@ class PelisCarteleraAdapter(
                 // --- C. ESTILO VISUAL ---
                 card?.setCardBackgroundColor(ContextCompat.getColor(view.context, R.color.colorhover2))
                 card?.cardElevation = 20f
-                holder.title.setTextColor(Color.YELLOW)
-                holder.title.isSelected = true // Para el scroll del texto
+                holder.title.setTextColor(colorDorado) // Hace juego con el borde
+                holder.title.isSelected = true
 
             } else if (!hasFocus) {
                 // --- RESET AL PERDER FOCO ---
@@ -117,6 +130,12 @@ class PelisCarteleraAdapter(
                     .translationZ(0f)
                     .setDuration(200)
                     .start()
+
+                // ¡AQUÍ FALTABA ESTO EN TU CÓDIGO! (Quitar el borde al salir)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    view.foreground = null
+                    view.invalidate()
+                }
 
                 card?.setCardBackgroundColor(Color.parseColor("#1A1A1A"))
                 card?.cardElevation = 6f
