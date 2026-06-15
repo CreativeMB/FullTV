@@ -1,7 +1,6 @@
 package com.creativem.fulltv.tv
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.net.Uri
@@ -19,13 +18,10 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.creativem.fulltv.principal.Reloj
-import android.text.format.DateUtils
 import android.view.ViewGroup
 import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultHttpDataSource
 import com.bumptech.glide.Glide
@@ -50,15 +46,6 @@ class PlayerTv : AppCompatActivity() {
     private lateinit var adapter: TvMenuAdapter
 
     private val handler = Handler(Looper.getMainLooper())
-    private val updateInterval: Long = 1000
-    private val hideControlsDelay: Long = 10000
-
-    private lateinit var runnableActualizar: Runnable
-    private val runnableOcultarControles = Runnable {
-        binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.GONE
-    }
-
-    // ELIMINADOS: handlerMenu y ocultarMenuRunnable ya no existen para que no se cierre solo
 
     private val bufferUpdater = object : Runnable {
         override fun run() {
@@ -79,6 +66,9 @@ class PlayerTv : AppCompatActivity() {
             WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         )
+        // Ocultar los controles directamente
+        val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
+        controles?.visibility = View.GONE
         binding.loadingIndicator.visibility = View.VISIBLE
         binding.loadingBufferText.text = "Iniciando señal..."
 
@@ -98,47 +88,21 @@ class PlayerTv : AppCompatActivity() {
             Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(findViewById<ImageView>(R.id.imagenPelicula))
         }
 
-        initializePlayerControls()
+        // NUEVO: Tocar la pantalla abre de una vez el menú de canales
+        binding.reproductor.setOnTouchListener { _, _ ->
+            if (binding.recyclerViewTv.visibility != View.VISIBLE) {
+                mostarpélis()
+            }
+            true
+        }
+
         loadTvCollection()
         initializePlayer()
 
-        showControlsAndResetTimer()
-
-        // NUEVO: Configurar acción táctil del botón X para cerrar el menú en móviles
+        // Configurar acción táctil del botón X para cerrar el menú en móviles
         binding.btnCerrarMenuTv.setOnClickListener {
             ocultarMenuCompleto()
         }
-    }
-
-    private fun initializePlayerControls() {
-        val textHora = binding.reproductor.findViewById<TextView>(R.id.textHora)
-        val textfecha = binding.reproductor.findViewById<TextView>(R.id.textfecha)
-        if (textHora != null && textfecha != null) {
-            Reloj(textHora, textfecha).startClock()
-        }
-
-        binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis).setOnClickListener { mostarpélis() }
-        binding.reproductor.findViewById<ImageButton>(R.id.play_pause).setOnClickListener { togglePlayPause() }
-        binding.reproductor.findViewById<ImageButton>(R.id.home).setOnClickListener { finishPlayer() }
-        binding.reproductor.findViewById<ImageButton>(R.id.render).setOnClickListener { cycleAspectRatio() }
-
-        runnableActualizar = Runnable { actualizarTiempo() }
-
-        binding.reproductor.setOnTouchListener { _, _ ->
-            showControlsAndResetTimer()
-            true
-        }
-    }
-
-    private fun showControlsAndResetTimer() {
-        if (binding.recyclerViewTv.visibility == View.VISIBLE) {
-            return
-        }
-
-        binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.VISIBLE
-        actualizarTiempo()
-        handler.removeCallbacks(runnableOcultarControles)
-        handler.postDelayed(runnableOcultarControles, hideControlsDelay)
     }
 
     private val playerListener = @UnstableApi object : Player.Listener {
@@ -155,8 +119,6 @@ class PlayerTv : AppCompatActivity() {
                     isOffline = false
                     reintentosContador = 0
                     handler.removeCallbacks(bufferUpdater)
-                    actualizarTiempo()
-                    showControlsAndResetTimer()
                 }
                 Player.STATE_ENDED -> playNextChannel()
                 Player.STATE_IDLE -> { }
@@ -225,27 +187,8 @@ class PlayerTv : AppCompatActivity() {
         }
     }
 
-    private fun actualizarTiempo() {
-        if (player != null && player!!.isPlaying) {
-            val pos = player?.currentPosition ?: 0
-            val dur = player?.duration ?: 0
-            val tvProgreso = binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido)
-            val tvTotal = binding.reproductor.findViewById<TextView>(R.id.tiempototal)
-            val sbProgreso = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
-
-            tvProgreso?.text = DateUtils.formatElapsedTime(pos / 1000)
-            tvTotal?.text = DateUtils.formatElapsedTime(dur / 1000)
-            if (dur > 0) {
-                sbProgreso?.progress = (pos.toFloat() / dur * 100).toInt()
-            }
-            handler.removeCallbacks(runnableActualizar)
-            handler.postDelayed(runnableActualizar, updateInterval)
-        }
-    }
-
     private fun togglePlayPause() {
         player?.let { if (it.isPlaying) it.pause() else it.play() }
-        showControlsAndResetTimer()
     }
 
     private fun reiniciarReproductor() {
@@ -293,18 +236,10 @@ class PlayerTv : AppCompatActivity() {
         binding.recyclerViewTv.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
     }
 
-    // --- MÉTODOS DEL MENÚ LATERAL CORREGIDOS ---
     private fun mostarpélis() {
-        val controlesLayout = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
-
         if (binding.recyclerViewTv.visibility == View.VISIBLE) {
             ocultarMenuCompleto()
         } else {
-            if (controlesLayout != null) {
-                controlesLayout.visibility = View.GONE
-                handler.removeCallbacks(runnableOcultarControles)
-            }
-
             binding.recyclerViewTv.visibility = View.VISIBLE
             binding.btnCerrarMenuTv.visibility = View.VISIBLE // Muestra la "X" para móvil
 
@@ -325,27 +260,42 @@ class PlayerTv : AppCompatActivity() {
         }
     }
 
-    // Método centralizado para ocultar el menú de canales y su botón "X"
     private fun ocultarMenuCompleto() {
         binding.recyclerViewTv.visibility = View.GONE
-        binding.btnCerrarMenuTv.visibility = View.GONE // Esconde la "X"
+        binding.btnCerrarMenuTv.visibility = View.GONE
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        // ELIMINADO: Ya no llamamos a reiniciarTemporizadorMenu() aquí adentro.
-
         return when (keyCode) {
-            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_PAGE_DOWN -> {
+            // --- NUEVA LÓGICA: CAMBIO DE CANAL ---
+            KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                cambiarCanal(siguiente = true)
+                true
+            }
+
+            KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                cambiarCanal(siguiente = false)
+                true
+            }
+
+            // --- BOTÓN MENÚ ---
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_INFO -> {
                 mostarpélis()
                 true
             }
 
+            KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_PAGE_DOWN -> {
+                mostarpélis()
+                true
+            }
+
+            // --- LÓGICA EXISTENTE ---
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 if (binding.recyclerViewTv.visibility == View.VISIBLE) {
                     super.onKeyDown(keyCode, event)
                 } else {
-                    showControlsAndResetTimer()
-                    false
+                    mostarpélis()
+                    true
                 }
             }
 
@@ -356,10 +306,7 @@ class PlayerTv : AppCompatActivity() {
 
             KeyEvent.KEYCODE_BACK -> {
                 if (binding.recyclerViewTv.visibility == View.VISIBLE) {
-                    ocultarMenuCompleto() // Cierra el menú de forma fija
-                    true
-                } else if (binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility == View.VISIBLE) {
-                    binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.GONE
+                    ocultarMenuCompleto()
                     true
                 } else {
                     finishPlayer()
@@ -368,17 +315,51 @@ class PlayerTv : AppCompatActivity() {
             }
 
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (binding.recyclerViewTv.visibility != View.VISIBLE) {
+                    mostarpélis()
+                    true
+                } else {
+                    super.onKeyDown(keyCode, event)
+                }
+            }
+
             KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN,
             KeyEvent.KEYCODE_VOLUME_MUTE -> {
-                if (binding.recyclerViewTv.visibility != View.VISIBLE) {
-                    showControlsAndResetTimer()
-                }
                 super.onKeyDown(keyCode, event)
             }
 
             else -> super.onKeyDown(keyCode, event)
         }
+    }
+    private fun cambiarCanal(siguiente: Boolean) {
+        if (masterTvList.isEmpty()) return
+
+        // Cálculo del nuevo índice
+        currentChannelIndex = if (siguiente) {
+            (currentChannelIndex + 1) % masterTvList.size
+        } else {
+            if (currentChannelIndex <= 0) masterTvList.size - 1 else currentChannelIndex - 1
+        }
+
+        val canalElegido = masterTvList[currentChannelIndex]
+
+        // Actualizar datos
+        streamUrl = canalElegido.streamUrl
+        movieTitle = canalElegido.title
+        movieImageUrl = canalElegido.imageUrl
+
+        // Actualizar UI
+        binding.loadingMovieTitle.text = movieTitle
+        findViewById<TextView>(R.id.nombrePelicula).text = movieTitle
+        Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(findViewById(R.id.imagenPelicula))
+
+        // Si el menú está abierto, actualizar su selección
+        adapter.setCurrentPlayingChannel(streamUrl)
+        binding.recyclerViewTv.scrollToPosition(currentChannelIndex)
+
+        // Reiniciar player
+        reiniciarReproductor()
     }
 
     private fun finishPlayer() {
@@ -393,9 +374,4 @@ class PlayerTv : AppCompatActivity() {
         handler.removeCallbacksAndMessages(null)
     }
 
-    @OptIn(UnstableApi::class)
-    private fun cycleAspectRatio() {
-        val aspectRatios = listOf(AspectRatioFrameLayout.RESIZE_MODE_FIT, AspectRatioFrameLayout.RESIZE_MODE_FILL, AspectRatioFrameLayout.RESIZE_MODE_ZOOM)
-        binding.reproductor.resizeMode = aspectRatios[(aspectRatios.indexOf(binding.reproductor.resizeMode) + 1) % aspectRatios.size]
-    }
 }
