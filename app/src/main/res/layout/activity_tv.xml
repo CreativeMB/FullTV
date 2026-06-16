@@ -14,32 +14,33 @@
         android:scaleType="centerCrop"
         android:alpha="0.2" />
 
+    <!-- TITULO (Ocupa el 50% izquierdo) -->
     <TextView
         android:id="@+id/txtTituloTv"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="40dp"
-        android:layout_marginTop="30dp"
-        android:layout_marginEnd="20dp"
+        android:layout_marginStart="5dp"
+        android:layout_marginEnd="8dp"
         android:text="CANALES DE TELEVISIÓN"
         android:textColor="#FFFFFF"
-        android:textSize="24sp"
+        android:textSize="22sp"
         android:textStyle="bold"
         android:maxLines="1"
         android:ellipsize="end"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintWidth_default="wrap"
+        app:layout_constraintHorizontal_weight="1"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@+id/searchEditText"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/searchEditText"
         app:layout_constraintBottom_toBottomOf="@+id/searchEditText" />
 
+    <!-- BUSCADOR (Ocupa el 50% derecho) -->
     <EditText
         android:id="@+id/searchEditText"
-        android:layout_width="300dp"
+        android:layout_width="0dp"
         android:layout_height="50dp"
-        android:layout_marginTop="30dp"
-        android:layout_marginEnd="40dp"
+        android:layout_marginTop="5dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="16dp"
         android:background="@color/fondoTexto"
         android:drawableStart="@android:drawable/ic_menu_search"
         android:drawablePadding="12dp"
@@ -50,6 +51,8 @@
         android:textSize="16sp"
         android:singleLine="true"
         android:imeOptions="actionSearch"
+        app:layout_constraintHorizontal_weight="1"
+        app:layout_constraintStart_toEndOf="@+id/txtTituloTv"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -65,16 +68,17 @@
         android:focusable="true"
         android:focusableInTouchMode="true"
         android:descendantFocusability="afterDescendants"
-
-
+        android:paddingTop="5dp"
     android:nextFocusUp="@id/searchEditText"
     android:nextFocusDown="@id/recyclerViewTV"
     android:nextFocusLeft="@id/recyclerViewTV"
     android:nextFocusRight="@id/recyclerViewTV"
-
     app:layout_constraintBottom_toBottomOf="parent"
     app:layout_constraintEnd_toEndOf="parent"
     app:layout_constraintStart_toStartOf="parent"
-    app:layout_constraintTop_toBottomOf="@id/searchEditText" />
+    app:layout_constraintTop_toBottomOf="@id/searchEditText">
+    <requestFocus />
+
+</androidx.recyclerview.widget.RecyclerView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
