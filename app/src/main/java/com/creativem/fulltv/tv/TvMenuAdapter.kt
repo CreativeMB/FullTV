@@ -32,7 +32,7 @@ class TvMenuAdapter(
         return TvViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: TvViewHolder, @SuppressLint("RecyclerView") position: Int) {
+    override fun onBindViewHolder(holder: TvViewHolder, position: Int) {
         val tvItem = tvList[position]
         holder.title.text = tvItem.title
 
@@ -45,18 +45,56 @@ class TvMenuAdapter(
         // Resaltar visualmente si es el canal que está sonando actualmente
         val isPlaying = tvItem.streamUrl == currentPlayingUrl
         if (isPlaying) {
-            holder.title.setTextColor(ContextCompat.getColor(context, R.color.colorFocused)) // Color destacado
+            holder.title.setTextColor(ContextCompat.getColor(context, R.color.exo_progress_color)) // Color destacado
         } else {
             holder.title.setTextColor(ContextCompat.getColor(context, android.R.color.white))
         }
 
-        // CONTROL DE FOCO
-        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
-            holder.itemView.setBackgroundColor(
-                if (hasFocus) ContextCompat.getColor(context, R.color.cine_dorado)
-                else ContextCompat.getColor(context, R.color.colorNotSelected)
-            )
+        // Asegurar que el elemento pueda recibir foco (buena práctica en TV)
+        holder.itemView.isFocusable = true
 
+        // CONTROL DE FOCO Y CENTRADO
+        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+            val currentPos = holder.bindingAdapterPosition
+
+            if (hasFocus) {
+                // 1. Pone el fondo dorado (tu Drawable)
+                view.background = ContextCompat.getDrawable(context, R.drawable.card_focused_background)
+
+                // 🔥 2. ACTIVA EL MOVIMIENTO DEL TEXTO (MARQUEE)
+                holder.title.isSelected = true
+
+                // 3. LÓGICA DE CENTRADO
+                if (currentPos != RecyclerView.NO_POSITION) {
+                    val parentView = view.parent
+                    if (parentView is RecyclerView) {
+                        val smoothScroller = object : androidx.recyclerview.widget.LinearSmoothScroller(view.context) {
+                            override fun calculateDtToFit(viewStart: Int, viewEnd: Int, boxStart: Int, boxEnd: Int, snapPreference: Int): Int {
+                                // Calcula la diferencia para dejarlo en el puro centro
+                                return (boxStart + (boxEnd - boxStart) / 2) - (viewStart + (viewEnd - viewStart) / 2)
+                            }
+                            override fun calculateSpeedPerPixel(displayMetrics: android.util.DisplayMetrics): Float {
+                                return 100f / displayMetrics.densityDpi
+                            }
+                        }
+                        smoothScroller.targetPosition = currentPos
+                        parentView.layoutManager?.startSmoothScroll(smoothScroller)
+                        parentView.requestChildFocus(view, view)
+                    }
+
+                    // Asegurar que el ítem no quede tapado por otros
+                    view.bringToFront()
+                    (view.parent as? ViewGroup)?.requestLayout()
+                    (view.parent as? View)?.invalidate()
+                }
+
+            } else {
+                // 1. Quita el fondo dorado (vuelve a la normalidad)
+                view.background = null
+
+                // 🔥 2. DETIENE EL MOVIMIENTO DEL TEXTO Y LO DEVUELVE AL INICIO
+                holder.title.isSelected = false
+            }
         }
 
         holder.itemView.setOnClickListener {

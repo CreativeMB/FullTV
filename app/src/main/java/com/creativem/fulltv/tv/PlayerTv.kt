@@ -24,6 +24,8 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Modelo
@@ -104,7 +106,66 @@ class PlayerTv : AppCompatActivity() {
             ocultarMenuCompleto()
         }
     }
+    @SuppressLint("UnsafeOptInUsageError")
+    private fun initializePlayer() {
+        if (streamUrl.isEmpty()) return
 
+        // 1. ORIGEN DE DATOS (Más robusto)
+        val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)") // User-agent más realista para evitar bloqueos
+            .setConnectTimeoutMs(10000) // Reducido a 10s para detectar caídas más rápido
+            .setReadTimeoutMs(10000)
+
+        // 2. CONTROL DE BUFFER (Optimizado para TV y memoria)
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                15000, // minBuffer: 15 seg (suficiente para evitar cortes cortos)
+                30000, // maxBuffer: 30 seg (Evita saturar la RAM del TV después de horas)
+                1500,  // bufferForPlayback: 1.5 seg (Arranca rápido al cambiar de canal)
+                3000   // bufferAfterRebuffer: 3 seg (Arranca rápido tras una caída de internet)
+            )
+            .setPrioritizeTimeOverSizeThresholds(true) // ¡CLAVE! Prioriza el tiempo en vivo sobre el tamaño en memoria
+            .build()
+
+        // 3. SELECTOR DE PISTAS (Adaptativo para internet lento)
+        val trackSelector = DefaultTrackSelector(this).apply {
+            setParameters(
+                buildUponParameters()
+                    .setMaxVideoSizeSd() // Opcional: Si el TV es muy lento, fuerza a calidad SD en redes malas
+                    .setForceHighestSupportedBitrate(false)
+            )
+        }
+
+        // 4. RENDERERS (Tolerancia a fallos de hardware del TV)
+        val renderersFactory = DefaultRenderersFactory(this)
+            .setEnableDecoderFallback(true) // Si falla el decodificador del TV, intenta con otro por software
+
+        // CONSTRUIR EXOPLAYER
+        player = ExoPlayer.Builder(this, renderersFactory)
+            .setTrackSelector(trackSelector)
+            .setLoadControl(loadControl)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .build().also { exoPlayer ->
+                binding.reproductor.player = exoPlayer
+                binding.reproductor.useController = false
+
+                // 5. CONFIGURAR MEDIA ITEM PARA CANALES EN VIVO
+                val mediaItem = MediaItem.Builder()
+                    .setUri(Uri.parse(streamUrl))
+                    .setLiveConfiguration(
+                        MediaItem.LiveConfiguration.Builder()
+                            .setMaxPlaybackSpeed(1.02f) // Si se atrasa un poco, acelera el video imperceptiblemente para alcanzar el "En vivo"
+                            .build()
+                    )
+                    .build()
+
+                exoPlayer.setMediaItem(mediaItem)
+                exoPlayer.prepare()
+                exoPlayer.addListener(playerListener)
+                exoPlayer.playWhenReady = true
+            }
+    }
     private val playerListener = @UnstableApi object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
@@ -197,26 +258,7 @@ class PlayerTv : AppCompatActivity() {
         initializePlayer()
     }
 
-    @SuppressLint("UnsafeOptInUsageError")
-    private fun initializePlayer() {
-        if (streamUrl.isEmpty()) return
-        val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setUserAgent("Mozilla/5.0")
-            .setConnectTimeoutMs(15000)
 
-        player = ExoPlayer.Builder(this)
-            .setLoadControl(DefaultLoadControl.Builder().setBufferDurationsMs(30000, 60000, 2500, 5000).build())
-            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
-            .build().also { exoPlayer ->
-                binding.reproductor.player = exoPlayer
-                binding.reproductor.useController = false
-                exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(streamUrl)))
-                exoPlayer.prepare()
-                exoPlayer.addListener(playerListener)
-                exoPlayer.playWhenReady = true
-            }
-    }
 
     private fun initializeRecyclerView() {
         adapter = TvMenuAdapter(this, mutableListOf()) { movie ->

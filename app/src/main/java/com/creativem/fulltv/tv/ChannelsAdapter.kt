@@ -70,9 +70,34 @@ class ChannelsAdapter(
         }
 
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
-            if (hasFocus) {
-                // Ejecutamos el callback para actualizar el fondo de la Activity
+            val currentPos = holder.bindingAdapterPosition
+
+            if (hasFocus && currentPos != RecyclerView.NO_POSITION) {
                 onFocusChange(canal)
+
+                // =========================================================
+                // LÓGICA DE CENTRADO (Tomada de tu MoviesAdapter)
+                // =========================================================
+                val parentView = view.parent
+                if (parentView is RecyclerView) {
+                    val smoothScroller = object : androidx.recyclerview.widget.LinearSmoothScroller(view.context) {
+                        override fun calculateDtToFit(viewStart: Int, viewEnd: Int, boxStart: Int, boxEnd: Int, snapPreference: Int): Int {
+                            // Calcula la diferencia para dejarlo en el puro centro
+                            return (boxStart + (boxEnd - boxStart) / 2) - (viewStart + (viewEnd - viewStart) / 2)
+                        }
+                        override fun calculateSpeedPerPixel(displayMetrics: android.util.DisplayMetrics): Float {
+                            return 100f / displayMetrics.densityDpi
+                        }
+                    }
+                    smoothScroller.targetPosition = currentPos
+                    parentView.layoutManager?.startSmoothScroll(smoothScroller)
+                    parentView.requestChildFocus(view, view)
+                }
+
+                view.bringToFront()
+                (view.parent as? ViewGroup)?.requestLayout()
+                (view.parent as? View)?.invalidate()
+                // =========================================================
 
                 // 1. Animación suave de agrandado y elevación
                 // Usamos translationZ para que el ítem "flote" sobre los demás
