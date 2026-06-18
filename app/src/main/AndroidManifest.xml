@@ -66,6 +66,7 @@
 
         <activity
             android:name=".tv.TvActivity"
+            android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
         <activity
             android:name=".peliculasvalidas.PeliculasValidasActivity"

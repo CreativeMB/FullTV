@@ -45,6 +45,13 @@ class TvActivity : AppCompatActivity() {
         setContentView(binding.root)
         prefs = getSharedPreferences("TV_PREFS", Context.MODE_PRIVATE)
 
+        // 🔥 SOLUCIÓN 1: Evitar que el teclado se abra automáticamente al entrar
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
+
+        // 🔥 SOLUCIÓN 2: Quitarle el foco inicial al buscador para que no se quede ahí pegado
+        binding.searchEditText.clearFocus()
+
+
         // Configuración para TV
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)

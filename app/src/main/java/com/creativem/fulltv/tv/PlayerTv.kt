@@ -16,7 +16,6 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import android.view.ViewGroup
 import androidx.annotation.OptIn
@@ -90,7 +89,6 @@ class PlayerTv : AppCompatActivity() {
             Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(findViewById<ImageView>(R.id.imagenPelicula))
         }
 
-        // NUEVO: Tocar la pantalla abre de una vez el menú de canales
         binding.reproductor.setOnTouchListener { _, _ ->
             if (binding.recyclerViewTv.visibility != View.VISIBLE) {
                 mostarpélis()
@@ -98,50 +96,36 @@ class PlayerTv : AppCompatActivity() {
             true
         }
 
+        // Cargamos la lista en 2do plano de inmediato. Así cuando llames al menú ya estará lista.
         loadTvCollection()
         initializePlayer()
 
-        // Configurar acción táctil del botón X para cerrar el menú en móviles
         binding.btnCerrarMenuTv.setOnClickListener {
             ocultarMenuCompleto()
         }
     }
+
     @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
         if (streamUrl.isEmpty()) return
 
-        // 1. ORIGEN DE DATOS (Más robusto)
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
-            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)") // User-agent más realista para evitar bloqueos
-            .setConnectTimeoutMs(10000) // Reducido a 10s para detectar caídas más rápido
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+            .setConnectTimeoutMs(10000)
             .setReadTimeoutMs(10000)
 
-        // 2. CONTROL DE BUFFER (Optimizado para TV y memoria)
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                15000, // minBuffer: 15 seg (suficiente para evitar cortes cortos)
-                30000, // maxBuffer: 30 seg (Evita saturar la RAM del TV después de horas)
-                1500,  // bufferForPlayback: 1.5 seg (Arranca rápido al cambiar de canal)
-                3000   // bufferAfterRebuffer: 3 seg (Arranca rápido tras una caída de internet)
-            )
-            .setPrioritizeTimeOverSizeThresholds(true) // ¡CLAVE! Prioriza el tiempo en vivo sobre el tamaño en memoria
+            .setBufferDurationsMs(15000, 30000, 1500, 3000)
+            .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
-        // 3. SELECTOR DE PISTAS (Adaptativo para internet lento)
         val trackSelector = DefaultTrackSelector(this).apply {
-            setParameters(
-                buildUponParameters()
-                    .setMaxVideoSizeSd() // Opcional: Si el TV es muy lento, fuerza a calidad SD en redes malas
-                    .setForceHighestSupportedBitrate(false)
-            )
+            setParameters(buildUponParameters().setMaxVideoSizeSd().setForceHighestSupportedBitrate(false))
         }
 
-        // 4. RENDERERS (Tolerancia a fallos de hardware del TV)
-        val renderersFactory = DefaultRenderersFactory(this)
-            .setEnableDecoderFallback(true) // Si falla el decodificador del TV, intenta con otro por software
+        val renderersFactory = DefaultRenderersFactory(this).setEnableDecoderFallback(true)
 
-        // CONSTRUIR EXOPLAYER
         player = ExoPlayer.Builder(this, renderersFactory)
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
@@ -150,13 +134,10 @@ class PlayerTv : AppCompatActivity() {
                 binding.reproductor.player = exoPlayer
                 binding.reproductor.useController = false
 
-                // 5. CONFIGURAR MEDIA ITEM PARA CANALES EN VIVO
                 val mediaItem = MediaItem.Builder()
                     .setUri(Uri.parse(streamUrl))
                     .setLiveConfiguration(
-                        MediaItem.LiveConfiguration.Builder()
-                            .setMaxPlaybackSpeed(1.02f) // Si se atrasa un poco, acelera el video imperceptiblemente para alcanzar el "En vivo"
-                            .build()
+                        MediaItem.LiveConfiguration.Builder().setMaxPlaybackSpeed(1.02f).build()
                     )
                     .build()
 
@@ -166,6 +147,7 @@ class PlayerTv : AppCompatActivity() {
                 exoPlayer.playWhenReady = true
             }
     }
+
     private val playerListener = @UnstableApi object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
@@ -190,8 +172,6 @@ class PlayerTv : AppCompatActivity() {
             if (isOffline) return
             reintentosContador++
 
-            Log.e("PlayerTv", "Error al cargar: Intento $reintentosContador de $MAX_REINTENTOS")
-
             if (reintentosContador <= MAX_REINTENTOS) {
                 binding.loadingIndicator.visibility = View.VISIBLE
                 binding.loadingBufferText.text = "Señal débil, reintentando ($reintentosContador/$MAX_REINTENTOS)..."
@@ -202,36 +182,14 @@ class PlayerTv : AppCompatActivity() {
                 binding.loadingBufferText.text = "Vuelve pronto, estamos trabajando en ello."
                 binding.loadingBufferText.setTextColor(ContextCompat.getColor(this@PlayerTv, R.color.redpersonalisado))
 
-                handler.postDelayed({
-                    playNextChannel()
-                }, 4000)
+                handler.postDelayed({ playNextChannel() }, 4000)
             }
         }
     }
 
     private fun playNextChannel() {
         if (masterTvList.isNotEmpty()) {
-            if (currentChannelIndex == -1) {
-                currentChannelIndex = masterTvList.indexOfFirst { it.streamUrl == streamUrl }
-            }
-
-            currentChannelIndex = (currentChannelIndex + 1) % masterTvList.size
-            val nextChannel = masterTvList[currentChannelIndex]
-
-            streamUrl = nextChannel.streamUrl
-            movieTitle = nextChannel.title
-            movieImageUrl = nextChannel.imageUrl
-
-            reintentosContador = 0
-            isOffline = false
-
-            binding.loadingIndicator.visibility = View.VISIBLE
-            binding.loadingMovieTitle.text = movieTitle
-            binding.loadingBufferText.text = "Buscando señal..."
-            binding.loadingBufferText.setTextColor(ContextCompat.getColor(this, android.R.color.white))
-            findViewById<TextView>(R.id.nombrePelicula).text = movieTitle
-
-            reiniciarReproductor()
+            cambiarCanal(siguiente = true)
         } else {
             Toast.makeText(this, "No hay más canales disponibles", Toast.LENGTH_SHORT).show()
             finishPlayer()
@@ -244,6 +202,7 @@ class PlayerTv : AppCompatActivity() {
                 masterTvList = snapshot.children.mapNotNull { it.getValue(Modelo::class.java)?.copy(id = it.key ?: "") }
                 currentChannelIndex = masterTvList.indexOfFirst { it.streamUrl == streamUrl }
                 adapter.updateData(masterTvList)
+                // ¡La lista ya queda cargada e invisible en memoria, lista para salir al instante!
             }
         }
     }
@@ -258,17 +217,10 @@ class PlayerTv : AppCompatActivity() {
         initializePlayer()
     }
 
-
-
     private fun initializeRecyclerView() {
-        adapter = TvMenuAdapter(this, mutableListOf()) { movie ->
-            val intent = Intent(this, PlayerTv::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                putExtra("EXTRA_STREAM_URL", movie.streamUrl)
-                putExtra("EXTRA_MOVIE_TITLE", movie.title)
-                putExtra("EXTRA_MOVIE_IMAGE_URL", movie.imageUrl)
-            }
-            startActivity(intent)
+        adapter = TvMenuAdapter(this, mutableListOf()) { canalElegido ->
+            // 🔥 SOLUCIÓN CRÍTICA: Ya no abrimos una nueva ventana. Cambiamos el canal en directo.
+            cambiarCanalDirecto(canalElegido)
         }
 
         binding.recyclerViewTv.adapter = adapter
@@ -278,26 +230,51 @@ class PlayerTv : AppCompatActivity() {
         binding.recyclerViewTv.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
     }
 
+    // Nueva función para cambiar canales al hacer clic en el menú sin recargar toda la Activity
+    private fun cambiarCanalDirecto(canal: Modelo) {
+        currentChannelIndex = masterTvList.indexOfFirst { it.streamUrl == canal.streamUrl }
+        streamUrl = canal.streamUrl
+        movieTitle = canal.title
+        movieImageUrl = canal.imageUrl
+
+        binding.loadingIndicator.visibility = View.VISIBLE
+        binding.loadingMovieTitle.text = movieTitle
+        binding.loadingBufferText.text = "Buscando señal..."
+        binding.loadingBufferText.setTextColor(ContextCompat.getColor(this, android.R.color.white))
+        findViewById<TextView>(R.id.nombrePelicula).text = movieTitle
+        Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(findViewById<ImageView>(R.id.imagenPelicula))
+
+        ocultarMenuCompleto()
+        reiniciarReproductor()
+    }
+
     private fun mostarpélis() {
         if (binding.recyclerViewTv.visibility == View.VISIBLE) {
             ocultarMenuCompleto()
         } else {
             binding.recyclerViewTv.visibility = View.VISIBLE
-            binding.btnCerrarMenuTv.visibility = View.VISIBLE // Muestra la "X" para móvil
+            binding.btnCerrarMenuTv.visibility = View.VISIBLE
 
             adapter.setCurrentPlayingChannel(streamUrl)
             val posicionActual = masterTvList.indexOfFirst { it.streamUrl == streamUrl }
 
             if (posicionActual != -1) {
-                (binding.recyclerViewTv.layoutManager as LinearLayoutManager)
-                    .scrollToPositionWithOffset(posicionActual, 200)
+                // 1. Movemos el scroll internamente a la posición
+                binding.recyclerViewTv.scrollToPosition(posicionActual)
 
-                handler.postDelayed({
+                // 🔥 SOLUCIÓN: Usar .post{} asegura que Android haya terminado de hacer "VISIBLE"
+                // el RecyclerView antes de intentar encontrar la vista para darle foco.
+                // Esto elimina el error de la "primera vez".
+                binding.recyclerViewTv.post {
                     val viewHolder = binding.recyclerViewTv.findViewHolderForAdapterPosition(posicionActual)
-                    viewHolder?.itemView?.requestFocus()
-                }, 100)
+                    if (viewHolder != null) {
+                        viewHolder.itemView.requestFocus()
+                    } else {
+                        binding.recyclerViewTv.requestFocus()
+                    }
+                }
             } else {
-                binding.recyclerViewTv.requestFocus()
+                binding.recyclerViewTv.post { binding.recyclerViewTv.requestFocus() }
             }
         }
     }
@@ -309,29 +286,19 @@ class PlayerTv : AppCompatActivity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         return when (keyCode) {
-            // --- NUEVA LÓGICA: CAMBIO DE CANAL ---
             KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
                 cambiarCanal(siguiente = true)
                 true
             }
-
             KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.KEYCODE_MEDIA_REWIND -> {
                 cambiarCanal(siguiente = false)
                 true
             }
-
-            // --- BOTÓN MENÚ ---
-            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_INFO -> {
-                mostarpélis()
-                true
-            }
-
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_INFO,
             KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_PAGE_DOWN -> {
                 mostarpélis()
                 true
             }
-
-            // --- LÓGICA EXISTENTE ---
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 if (binding.recyclerViewTv.visibility == View.VISIBLE) {
                     super.onKeyDown(keyCode, event)
@@ -340,12 +307,10 @@ class PlayerTv : AppCompatActivity() {
                     true
                 }
             }
-
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
                 togglePlayPause()
                 true
             }
-
             KeyEvent.KEYCODE_BACK -> {
                 if (binding.recyclerViewTv.visibility == View.VISIBLE) {
                     ocultarMenuCompleto()
@@ -355,7 +320,6 @@ class PlayerTv : AppCompatActivity() {
                     true
                 }
             }
-
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 if (binding.recyclerViewTv.visibility != View.VISIBLE) {
@@ -365,19 +329,16 @@ class PlayerTv : AppCompatActivity() {
                     super.onKeyDown(keyCode, event)
                 }
             }
-
-            KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN,
-            KeyEvent.KEYCODE_VOLUME_MUTE -> {
+            KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE -> {
                 super.onKeyDown(keyCode, event)
             }
-
             else -> super.onKeyDown(keyCode, event)
         }
     }
+
     private fun cambiarCanal(siguiente: Boolean) {
         if (masterTvList.isEmpty()) return
 
-        // Cálculo del nuevo índice
         currentChannelIndex = if (siguiente) {
             (currentChannelIndex + 1) % masterTvList.size
         } else {
@@ -386,21 +347,22 @@ class PlayerTv : AppCompatActivity() {
 
         val canalElegido = masterTvList[currentChannelIndex]
 
-        // Actualizar datos
         streamUrl = canalElegido.streamUrl
         movieTitle = canalElegido.title
         movieImageUrl = canalElegido.imageUrl
 
-        // Actualizar UI
+        binding.loadingIndicator.visibility = View.VISIBLE
         binding.loadingMovieTitle.text = movieTitle
+        binding.loadingBufferText.text = "Buscando señal..."
+        binding.loadingBufferText.setTextColor(ContextCompat.getColor(this, android.R.color.white))
         findViewById<TextView>(R.id.nombrePelicula).text = movieTitle
         Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(findViewById(R.id.imagenPelicula))
 
-        // Si el menú está abierto, actualizar su selección
-        adapter.setCurrentPlayingChannel(streamUrl)
-        binding.recyclerViewTv.scrollToPosition(currentChannelIndex)
+        if (binding.recyclerViewTv.visibility == View.VISIBLE) {
+            adapter.setCurrentPlayingChannel(streamUrl)
+            binding.recyclerViewTv.scrollToPosition(currentChannelIndex)
+        }
 
-        // Reiniciar player
         reiniciarReproductor()
     }
 
@@ -415,5 +377,4 @@ class PlayerTv : AppCompatActivity() {
         player?.release()
         handler.removeCallbacksAndMessages(null)
     }
-
 }
