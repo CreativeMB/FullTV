@@ -35,13 +35,14 @@ class PeliculasApiAdapter(
     override fun onBindViewHolder(holder: SmallMovieViewHolder, position: Int) {
         val movie = modeloList[position]
 
-        // 1. CONFIGURACIÓN DEL TÍTULO Y AÑO
-        val tituloLimpio = movie.title.replace(Regex("\\(\\d{4}-\\d{2}-\\d{2}\\)"), "").trim()
-        val yearMatch = Regex("(\\d{4})").find(movie.title)
-        val año = yearMatch?.value ?: ""
+        // 1. CONFIGURACIÓN DEL TÍTULO Y FECHA COMPLETA
+        val tituloOriginal = movie.title // Aquí viene "Ápex"
+        val fecha = movie.releaseDate    // Aquí viene "2026-04-24"
 
         holder.movieTitle.apply {
-            text = if (año.isNotEmpty()) "$tituloLimpio ($año)" else tituloLimpio
+            // Si hay fecha, unimos las dos variables. Si no, mostramos solo el título.
+            text = if (fecha.isNotEmpty()) "$tituloOriginal ($fecha)" else tituloOriginal
+
             ellipsize = TextUtils.TruncateAt.MARQUEE
             marqueeRepeatLimit = -1
             isSingleLine = true

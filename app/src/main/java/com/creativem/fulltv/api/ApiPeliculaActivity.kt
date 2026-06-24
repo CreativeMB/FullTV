@@ -401,7 +401,10 @@ class ApiPeliculaActivity : AppCompatActivity() {
     }
 
     private fun showConfirmPurchaseDialog(costo: Int, correoKey: String) {
-        val tituloUsado = modeloActual?.title ?: movieTitle
+        // ARMAMOS EL TÍTULO CON LA FECHA COMPLETA PARA EL DIÁLOGO
+        val tituloBase = modeloActual?.title ?: movieTitle
+        val fecha = modeloActual?.releaseDate ?: ""
+        val tituloUsado = if (fecha.isNotEmpty()) "$tituloBase ($fecha)" else tituloBase
         val colorDorado = Color.parseColor("#C5A059")
         val colorFondo = Color.parseColor("#0A122A")
 
@@ -523,7 +526,12 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
     private fun manejarEnlaceRoto(costo: Int) {
         val correoUsuario = auth.currentUser?.email ?: ""
-        val tituloUsado = modeloActual?.title ?: movieTitle
+
+        // ARMAMOS EL TÍTULO CON LA FECHA COMPLETA PARA EL DIÁLOGO
+        val tituloBase = modeloActual?.title ?: movieTitle
+        val fecha = modeloActual?.releaseDate ?: ""
+        val tituloUsado = if (fecha.isNotEmpty()) "$tituloBase ($fecha)" else tituloBase
+
         showErrorDialog(tituloUsado, costo, correoUsuario)
     }
 
@@ -594,9 +602,6 @@ class ApiPeliculaActivity : AppCompatActivity() {
         val endLabelRestricciones = spannable.length
         spannable.setSpan(ForegroundColorSpan(colorRojoSuave), startRestricciones, endLabelRestricciones, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         spannable.setSpan(StyleSpan(Typeface.BOLD), startRestricciones, endLabelRestricciones, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-
-        spannable.append("• Películas con menos de un mes de estreno en cines no serán procesadas.\n")
-        spannable.append("• El valor del pedido será reembolsado automáticamente como crédito en CasTV.\n")
         spannable.append("• Recuerda mantener saldo en tu cuenta para tus próximos alquileres.")
         val endAll = spannable.length
 
@@ -722,11 +727,33 @@ class ApiPeliculaActivity : AppCompatActivity() {
         }
 
         btnAlquilar.setOnClickListener {
-            CastvHelper.mostrarSelectorFechaHora(this@ApiPeliculaActivity) { fechaSeleccionada, horaSeleccionada ->
-                enviarPedido(alertDialog, fechaSeleccionada, horaSeleccionada)
-            }
-        }
+            // Deshabilitamos el botón mientras consulta TMDb
+            btnAlquilar.isEnabled = false
+            val textoOriginal = btnAlquilar.text
+            btnAlquilar.text = "Verificando fecha..."
 
+            validarEstrenoYProcesar(
+                onSuccess = {
+                    // Si pasó los 40 días: restauramos el botón y abrimos el calendario
+                    btnAlquilar.isEnabled = true
+                    btnAlquilar.text = textoOriginal
+                    CastvHelper.mostrarSelectorFechaHora(this@ApiPeliculaActivity) { fechaSeleccionada, horaSeleccionada ->
+                        enviarPedido(alertDialog, fechaSeleccionada, horaSeleccionada)
+                    }
+                },
+                onRechazado = { mensajeError ->
+                    // Si es reciente o hubo error: restauramos el botón y mostramos el mensaje rojo
+                    btnAlquilar.isEnabled = true
+                    btnAlquilar.text = textoOriginal
+                    CineAlert.show(
+                        this@ApiPeliculaActivity,
+                        mensajeError,
+                        CineAlert.Tipo.ERROR,
+                        alertDialog.window?.decorView as? ViewGroup
+                    )
+                }
+            )
+        }
         alertDialog.show()
 
         alertDialog.window?.apply {
@@ -735,6 +762,63 @@ class ApiPeliculaActivity : AppCompatActivity() {
         }
 
         btnAlquilar.requestFocus()
+    }
+    private fun validarEstrenoYProcesar(onSuccess: () -> Unit, onRechazado: (String) -> Unit) {
+        // Tomamos el título original o el título normal para buscarlo en la API
+        val queryTitle = movieOriginalTitle.ifBlank { modeloActual?.originalTitle ?: movieTitle }
+
+        // Consultamos la API oficial
+        apiService.searchMovie(apiKey, "es-MX", queryTitle).enqueue(object : Callback<MovieResponse> {
+            override fun onResponse(call: Call<MovieResponse>, response: Response<MovieResponse>) {
+                var fechaAValidar = ""
+
+                // 1. Intentamos sacar la fecha real de TMDb
+                if (response.isSuccessful) {
+                    val primeraPeli = response.body()?.results?.firstOrNull()
+                    if (primeraPeli != null && !primeraPeli.release_date.isNullOrBlank()) {
+                        fechaAValidar = primeraPeli.release_date
+                    }
+                }
+
+                // 2. Si TMDb no respondió con fecha, usamos la fecha que llegó por la app
+                if (fechaAValidar.isBlank()) {
+                    fechaAValidar = modeloActual?.releaseDate ?: movieReleaseDate
+                }
+
+                // 3. SI DEFINITIVAMENTE NO HAY FECHA (Seguridad estricta): RECHAZAMOS
+                if (fechaAValidar.isBlank()) {
+                    onRechazado("No se pudo verificar la fecha de estreno en la base de datos. Operación denegada por seguridad.")
+                    return
+                }
+
+                // 4. HACEMOS EL CÁLCULO ESTRICTO DE LOS 40 DÍAS
+                try {
+                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                    val dateEstreno = sdf.parse(fechaAValidar)
+
+                    if (dateEstreno != null) {
+                        val diffMillis = System.currentTimeMillis() - dateEstreno.time
+                        val diffDias = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(diffMillis)
+
+                        if (diffDias < 40) {
+                            val diasFaltantes = if (diffDias < 0) 40 + kotlin.math.abs(diffDias) else 40 - diffDias
+                            onRechazado("Película en cines Estreno ($fechaAValidar).\nDeben pasar 40 días. Faltan aprox. $diasFaltantes días.")
+                        } else {
+                            onSuccess() // Pasó la prueba, procedemos
+                        }
+                    } else {
+                        onRechazado("Error leyendo la fecha de estreno.")
+                    }
+                } catch (e: Exception) {
+                    onRechazado("Error de formato en la fecha.")
+                }
+            }
+
+            override fun onFailure(call: Call<MovieResponse>, t: Throwable) {
+                // Si no hay internet para consultar la API, bloqueamos el pedido por seguridad
+                onRechazado("Error de red. No se pudo conectar con la base de datos para validar el estreno.")
+            }
+        })
     }
 
     private fun volverAlContenido() {
@@ -766,14 +850,21 @@ class ApiPeliculaActivity : AppCompatActivity() {
                                 if (exitoDescuento) {
                                     val tituloOriginal = movieOriginalTitle.ifBlank { modeloActual?.originalTitle ?: movieTitle }
                                     val urlImagen = movieImageUrl.ifBlank { modeloActual?.imageUrl ?: "" }
-                                    val anioEstreno = "2026"
+
+                                    // 🟢 EXTRAEMOS LA FECHA Y ARMAMOS EL TÍTULO
+                                    val tituloBase = modeloActual?.title ?: movieTitle
+                                    val fecha = modeloActual?.releaseDate ?: ""
+                                    val tituloUsado = if (fecha.isNotEmpty()) "$tituloBase ($fecha)" else tituloBase
+
+                                    // 🟢 SACAMOS EL AÑO REAL DE LA FECHA (Ej: "2026" de "2026-04-24")
+                                    val anioEstreno = if (fecha.length >= 4) fecha.substring(0, 4) else "2024"
 
                                     verificarYCrearPeliculaRota(
-                                        tituloMovie = movieTitle,
+                                        tituloMovie = tituloUsado, // Enviamos el título con fecha a Firebase
                                         originalTitleMovie = tituloOriginal,
                                         imageUrlMovie = urlImagen,
                                         urlRota = streamUrlGuardado,
-                                        anio = anioEstreno,
+                                        anio = anioEstreno, // Año real
                                         userEmail = userEmail,
                                         userName = userName,
                                         fechaActivacion = fechaActivacion,
@@ -838,16 +929,13 @@ class ApiPeliculaActivity : AppCompatActivity() {
     }
 
     private fun irAlReproductorDirecto() {
-        val tituloConFecha = if (modeloActual != null) {
-            val fecha = modeloActual?.releaseDate ?: movieReleaseDate
-            "${modeloActual?.title} $fecha"
-        } else {
-            "$movieTitle $movieReleaseDate"
-        }
+        val tituloBase = modeloActual?.title ?: movieTitle
+        val fecha = modeloActual?.releaseDate ?: ""
+        val tituloConFecha = if (fecha.isNotEmpty()) "$tituloBase ($fecha)" else tituloBase
 
         val intent = Intent(this, PlayerPeliculas::class.java).apply {
             putExtra("EXTRA_STREAM_URL", streamUrlGuardado)
-            putExtra("EXTRA_MOVIE_TITLE", tituloConFecha)
+            putExtra("EXTRA_MOVIE_TITLE", tituloConFecha) // Pasamos título + fecha
             putExtra("EXTRA_MOVIE_CASTV", modeloActual?.castv ?: movieCastv)
             putExtra("EXTRA_MOVIE_IMAGE_URL", modeloActual?.imageUrl ?: movieImageUrl)
             putExtra("EXTRA_COUNTDOWN", modeloActual?.countdownMinutes ?: movieCountdown)

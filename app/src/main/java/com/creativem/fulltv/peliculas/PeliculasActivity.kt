@@ -1634,21 +1634,66 @@ private var usuarioEsperandoMas = false
                     return@setOnClickListener
                 }
 
-                comprobantepago(
-                    selectedTitle,
-                    selectedOriginalTitle,
-                    selectedImageUrl,
-                    selectedAnio,
-                    selectedSipnosis,
-                    selectedCalificacion
+                // 🟢 AQUÍ LLAMAMOS A LA VALIDACIÓN ANTES DE PASAR A COMPROBANTEPAGO
+                validarPeliculaRecienteLocal(
+                    fechaAValidar = selectedAnio, // Usamos la fecha que ya extrajiste de la API
+                    onSuccess = {
+                        // Si la película ya tiene más de 40 días, la manda a procesar
+                        comprobantepago(
+                            selectedTitle,
+                            selectedOriginalTitle,
+                            selectedImageUrl,
+                            selectedAnio,
+                            selectedSipnosis,
+                            selectedCalificacion
+                        )
+                        dialog?.dismiss()
+                    },
+                    onRechazado = { mensajeError ->
+                        // Si es muy reciente, la detenemos y mostramos el cuadro rojo
+                        CineAlert.show(
+                            this@PeliculasActivity,
+                            mensajeError,
+                            CineAlert.Tipo.ERROR,
+                            dialog?.window?.decorView as? ViewGroup
+                        )
+                    }
                 )
-                dialog?.dismiss()
             }
         }
 
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE).apply {
             setTextColor(Color.WHITE)
             textSize = 14f
+        }
+    }
+    private fun validarPeliculaRecienteLocal(fechaAValidar: String, onSuccess: () -> Unit, onRechazado: (String) -> Unit) {
+        // Si el usuario eligió "Pedido Personalizado", no podemos validar fecha, así que lo dejamos pasar
+        if (fechaAValidar.isBlank() || fechaAValidar == "Personalizado") {
+            onSuccess()
+            return
+        }
+
+        try {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+            val dateEstreno = sdf.parse(fechaAValidar)
+
+            if (dateEstreno != null) {
+                val diffMillis = System.currentTimeMillis() - dateEstreno.time
+                val diffDias = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(diffMillis)
+
+                // Verificamos si tiene menos de 40 días (o si es un estreno futuro)
+                if (diffDias < 40) {
+                    val diasFaltantes = if (diffDias < 0) 40 + kotlin.math.abs(diffDias) else 40 - diffDias
+                    onRechazado("Película muy reciente Estreno ($fechaAValidar).\nDeben pasar 40 días. Faltan aprox. $diasFaltantes días.")
+                } else {
+                    onSuccess() // Pasó la prueba de los 40 días
+                }
+            } else {
+                onSuccess() // Si la fecha venía rota por defecto de la API, evitamos bloquear al usuario
+            }
+        } catch (e: Exception) {
+            onSuccess() // Error de formato, lo dejamos pasar por precaución
         }
     }
 
