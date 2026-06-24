@@ -180,9 +180,6 @@ class TvActivity : AppCompatActivity() {
             }
         }
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            // Tu lógica de regreso
-            val intent = Intent(this, PeliculasActivity::class.java)
-            startActivity(intent)
             finish()
             return true
         }
