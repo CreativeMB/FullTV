@@ -159,7 +159,6 @@ class TvActivity : AppCompatActivity() {
         }
     }
 
-
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         val layoutManager = binding.recyclerViewTV.layoutManager as? GridLayoutManager
 
