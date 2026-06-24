@@ -74,5 +74,13 @@ interface TMDbApiService {
         @Query("page") page: Int = 1
     ): Call<PeliculasResponse>
 
+    // Agrega esto en tu TMDbApiService
+    @GET("movie/{movie_id}/videos")
+    fun getMovieVideos(
+        @Path("movie_id") movieId: Int,
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String = "es-MX"
+    ): Call<ApiPeliculaActivity.VideoResponse>
+
 }
 

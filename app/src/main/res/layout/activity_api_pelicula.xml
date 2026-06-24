@@ -192,6 +192,23 @@
                         android:duplicateParentState="true"
                         android:textSize="18sp" />
                 </ScrollView>
+                <!-- Botón Reproducir -->
+                <TextView
+                    android:id="@+id/btnVerTrailer"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="2"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="10dp"
+                    android:background="@drawable/bg_reproducir_selector"
+                    android:textColor="@color/text_reproducir_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:gravity="center"
+                    android:text="TRAILER"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
 
                 <!-- Botón Reproducir -->
                 <TextView

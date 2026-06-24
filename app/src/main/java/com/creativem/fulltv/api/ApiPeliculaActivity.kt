@@ -46,6 +46,11 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 class ApiPeliculaActivity : AppCompatActivity() {
 
+    private var realTmdbId: Int = 0
+    private var realReleaseDate: String = ""
+    private var realTitle: String = ""
+    data class VideoResponse(val results: List<VideoResult>)
+    data class VideoResult(val key: String, val site: String, val type: String)
     private val auth by lazy { FirebaseAuth.getInstance() }
     private var isProcessingOrder = false
     private val validaciones = Validaciones()
@@ -221,11 +226,81 @@ class ApiPeliculaActivity : AppCompatActivity() {
             v.scaleY = if (hasFocus) 1.05f else 1f
         }
 
+        // BUSCAMOS EL BOTÓN POR SU ID (Asegúrate de que en tu XML el botón tenga el id "btnVerTrailer")
+        val btnVerTrailer = findViewById<View>(R.id.btnVerTrailer)
+
+        btnVerTrailer.setOnClickListener {
+            reproducirTrailer()
+        }
+
         cargarCartelera()
         buscarPelicula(movieOriginalTitle.ifBlank { movieTitle })
+        // Limpiamos el nombre de cualquier residuo como "(2026-04-24)" o "[1080p]" para asegurar la búsqueda
+        val consultaLimpia = (movieOriginalTitle.ifBlank { movieTitle })
+            .replace(Regex("\\(\\d{4}-\\d{2}-\\d{2}\\)"), "")
+            .replace(Regex("\\(\\d{4}\\)"), "")
+            .replace(Regex("\\[.*?\\]"), "")
+            .trim()
+
+        buscarPelicula(consultaLimpia)
     }
 
-    private fun verificarYCrearPeliculaRota(
+    private fun reproducirTrailer() {
+        if (realTmdbId == 0) {
+            Toast.makeText(this, "El tráiler no está disponible para esta película.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Buscamos primero en Español de México
+        apiService.getMovieVideos(realTmdbId, apiKey, "es-MX").enqueue(object : Callback<VideoResponse> {
+            override fun onResponse(call: Call<VideoResponse>, response: Response<VideoResponse>) {
+                var keyTrailer = ""
+                if (response.isSuccessful) {
+                    val resultados = response.body()?.results ?: emptyList()
+                    val trailer = resultados.find { it.site == "YouTube" && it.type == "Trailer" }
+                        ?: resultados.find { it.site == "YouTube" }
+                    if (trailer != null) {
+                        keyTrailer = trailer.key
+                    }
+                }
+
+                if (keyTrailer.isNotEmpty()) {
+                    abrirTrailer(keyTrailer)
+                } else {
+                    // Plan B: Si no hay en español, buscamos el original sin idioma
+                    apiService.getMovieVideos(realTmdbId, apiKey, "").enqueue(object : Callback<VideoResponse> {
+                        override fun onResponse(call: Call<VideoResponse>, response: Response<VideoResponse>) {
+                            if (response.isSuccessful) {
+                                val resultados = response.body()?.results ?: emptyList()
+                                val trailer = resultados.find { it.site == "YouTube" && it.type == "Trailer" }
+                                    ?: resultados.find { it.site == "YouTube" }
+                                if (trailer != null) {
+                                    abrirTrailer(trailer.key)
+                                } else {
+                                    Toast.makeText(this@ApiPeliculaActivity, "Tráiler no disponible en YouTube.", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                        override fun onFailure(call: Call<VideoResponse>, t: Throwable) {
+                            Toast.makeText(this@ApiPeliculaActivity, "Tráiler no disponible.", Toast.LENGTH_SHORT).show()
+                        }
+                    })
+                }
+            }
+
+            override fun onFailure(call: Call<VideoResponse>, t: Throwable) {
+                Toast.makeText(this@ApiPeliculaActivity, "Error de red al buscar el tráiler.", Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+
+    private fun abrirTrailer(key: String) {
+        val intent = Intent(this@ApiPeliculaActivity, TrailerActivity::class.java).apply {
+            putExtra("EXTRA_TRAILER_KEY", key)
+        }
+        startActivity(intent)
+    }
+        private fun verificarYCrearPeliculaRota(
         tituloMovie: String,
         originalTitleMovie: String,
         imageUrlMovie: String,
@@ -1036,6 +1111,9 @@ class ApiPeliculaActivity : AppCompatActivity() {
     }
 
     private fun mostrarPelicula(movie: TmdbMovie) {
+        realTmdbId = movie.id
+        realReleaseDate = movie.release_date ?: ""
+        realTitle = movie.title ?: ""
         tvTitulo.text = movie.title
         tvFecha.text = "\uD83D\uDDD3 ${movie.release_date ?: "N/A"}"
         tvCalificacion.text = "⭐ ${movie.vote_average ?: "N/A"} "
@@ -1084,6 +1162,11 @@ class ApiPeliculaActivity : AppCompatActivity() {
 
     private fun mostrarContenidoLocal() {
         val movie = modeloActual ?: return
+        // 🟢 Fallback: si TMDb no responde, usamos los datos locales/intent
+        realReleaseDate = movie.releaseDate
+        realTitle = movie.title
+        realTmdbId = movie.id.toIntOrNull() ?: 0
+
         val url = movie.imageUrl
 
         tvTitulo.text = movie.title.ifEmpty { "Gran Estreno CineParche" }
