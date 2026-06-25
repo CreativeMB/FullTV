@@ -518,7 +518,14 @@ private var usuarioEsperandoMas = false
                 if (response.isSuccessful) {
                     val result = response.body()?.results?.firstOrNull()
                     if (result != null) {
-                        tvTitulo.text = result.title
+                        // 🟢 CONCATENACIÓN: Nombre de película + fecha completa (YYYY-MM-DD) entre paréntesis
+                        val fechaCompleta = result.release_date ?: ""
+                        tvTitulo.text = if (fechaCompleta.isNotEmpty()) {
+                            "${result.title} ($fechaCompleta)"
+                        } else {
+                            result.title
+                        }
+
                         tvSinopsis.text = result.overview ?: movie.overview
                         val anio = result.release_date?.take(4) ?: "2026"
                         val cal = if (result.vote_average > 0.0) "${result.vote_average}" else "8.5"
