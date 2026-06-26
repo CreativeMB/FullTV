@@ -8,6 +8,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -30,12 +32,16 @@ class NotificationMonitorService : Service() {
         crearCanalesNotificacion()
 
         // Iniciamos el servicio en primer plano con una notificación constante
-        startForeground(999, crearNotificacionServicio())
+        try {
+            startForeground(999, crearNotificacionServicio())
+        } catch (e: Exception) {
+            Log.e("SERVICIO_MONITOREO", "Error al iniciar startForeground: ${e.message}")
+        }
+
         iniciarMonitoreoRealtime()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // START_STICKY hace que el servicio se reinicie automáticamente si Android lo detiene por memoria
         return START_STICKY
     }
 
@@ -76,18 +82,15 @@ class NotificationMonitorService : Service() {
     }
 
     private fun crearNotificacionServicio(): Notification {
-        val intent = Intent(this, requireActivityClassDynamic())
-        val flagsPendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
-        val pendingIntent = PendingIntent.getActivity(this, 0, intent, flagsPendingIntent)
+        val pendingIntent = obtenerPendingIntentDeInicio()
+
+        // Se intenta usar tu icono, si falla se usa el icono por defecto del sistema
+        val iconRes = obtenerIconoSeguro()
 
         return NotificationCompat.Builder(this, "CANAL_SERVICIO_SILENCIOSO")
             .setContentTitle("Monitoreo de Pedidos Activo")
             .setContentText("Buscando solicitudes en segundo plano...")
-            .setSmallIcon(R.drawable.baseline_people_alt_24)
+            .setSmallIcon(iconRes)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()
@@ -95,29 +98,28 @@ class NotificationMonitorService : Service() {
 
     @SuppressLint("MissingPermission")
     private fun mostrarNotificacionAdmin(tituloPelicula: String) {
-        val intent = Intent(this, requireActivityClassDynamic()).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
+        val pendingIntent = obtenerPendingIntentDeInicio()
+        val iconRes = obtenerIconoSeguro()
 
-        val flagsPendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
+        // Ruta del sonido para compatibilidad con versiones anteriores a Android 8.0
+        val soundUri = Uri.parse("android.resource://$packageName/${R.raw.pedido}")
 
-        val pendingIntent = PendingIntent.getActivity(this, 0, intent, flagsPendingIntent)
-
-        val builder = NotificationCompat.Builder(this, "CANAL_ADMIN_PEDIDOS")
-            .setSmallIcon(R.drawable.baseline_people_alt_24)
-            .setContentTitle("🔔 ¡Nuevo Pedido Recibido!")
-            .setContentText("Se ha solicitado la película: '$tituloPelicula'")
+        val builder = NotificationCompat.Builder(this, "CANAL_ADMIN_PEDIDOS_V2") // Apunta al nuevo canal V2
+            .setSmallIcon(iconRes)
+            .setContentTitle("🔔 ¡Activar pelicula!")
+            .setContentText("$tituloPelicula")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .setSound(soundUri) // Soporte para versiones antiguas de Android
 
         try {
             with(androidx.core.app.NotificationManagerCompat.from(this)) {
-                notify(System.currentTimeMillis().toInt(), builder.build())
+                // Generamos un ID único basado en el texto del título de la película.
+                // Usamos kotlin.math.abs para asegurar que el número siempre sea positivo.
+                val notificationId = kotlin.math.abs(tituloPelicula.hashCode())
+
+                notify(notificationId, builder.build())
             }
         } catch (e: Exception) {
             Log.e("SERVICIO_MONITOREO", "Error al lanzar notificación: ${e.message}")
@@ -128,34 +130,54 @@ class NotificationMonitorService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-            // Canal del Servicio Persistente (Silencioso para no molestar)
             val canalServicio = NotificationChannel(
                 "CANAL_SERVICIO_SILENCIOSO",
                 "Servicio de Monitoreo",
                 NotificationManager.IMPORTANCE_MIN
             )
             manager.createNotificationChannel(canalServicio)
+            val soundUri = Uri.parse("android.resource://$packageName/${R.raw.pedido}")
 
-            // Canal para las alertas de nuevos pedidos (Prioridad alta)
+            // 3. Atributos de audio requeridos para el canal
+            val audioAttributes = AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .build()
+            // 4. Creamos un nuevo ID de canal ("CANAL_ADMIN_PEDIDOS_V2") para forzar el cambio de sonido
             val canalAlertas = NotificationChannel(
-                "CANAL_ADMIN_PEDIDOS",
+                "CANAL_ADMIN_PEDIDOS_V2",
                 "Alertas de Nuevos Pedidos",
                 NotificationManager.IMPORTANCE_HIGH
-            )
+            ).apply {
+                // Asignamos el sonido personalizado al canal
+                setSound(soundUri, audioAttributes)
+                enableLights(true)
+                enableVibration(true)
+            }
             manager.createNotificationChannel(canalAlertas)
         }
     }
 
-    // Busca de forma segura la actividad de inicio
-    private fun requireActivityClassDynamic(): Class<*> {
-        return try {
-            Class.forName("com.creativem.tvfullurl.MainActivity") // ⚠️ Reemplaza por la ruta exacta de tu Actividad Principal
-        } catch (e: Exception) {
-            try {
-                Class.forName("com.creativem.tvfullurl.BrowserActivity")
-            } catch (ex: Exception) {
-                this.javaClass
-            }
+    // Obtiene de manera segura el PendingIntent para abrir la aplicación, sin importar su nombre de paquete o clase
+    private fun obtenerPendingIntentDeInicio(): PendingIntent? {
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return null
+        launchIntent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+
+        val flagsPendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+        return PendingIntent.getActivity(this, 0, launchIntent, flagsPendingIntent)
+    }
+
+    // Retorna el icono personalizado si existe, de lo contrario devuelve el icono genérico de Android
+    private fun obtenerIconoSeguro(): Int {
+        val customIcon = resources.getIdentifier("baseline_people_alt_24", "drawable", packageName)
+        return if (customIcon != 0) {
+            customIcon
+        } else {
+            android.R.drawable.sym_def_app_icon
         }
     }
 }

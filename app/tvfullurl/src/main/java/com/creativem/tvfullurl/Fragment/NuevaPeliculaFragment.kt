@@ -68,16 +68,7 @@ class NuevaPeliculaFragment : Fragment() {
         }
     }
 
-    private val requestNotificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            verificarYPedirExcepcionBateria()
-        } else {
-            Toast.makeText(requireContext(), "Las alertas de nuevos pedidos no sonarán sin este permiso", Toast.LENGTH_LONG).show()
-            verificarYPedirExcepcionBateria()
-        }
-    }
+
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         binding = FragmentNuevaEditarBinding.inflate(inflater, container, false)
@@ -88,7 +79,7 @@ class NuevaPeliculaFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        verificarYPedirPermisos()
+
         setupRecyclerView()
         setupListeners()
 
@@ -100,50 +91,9 @@ class NuevaPeliculaFragment : Fragment() {
         }
     }
 
-    private fun verificarYPedirPermisos() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val permisoNotif = android.Manifest.permission.POST_NOTIFICATIONS
-            if (ContextCompat.checkSelfPermission(requireContext(), permisoNotif) != PackageManager.PERMISSION_GRANTED) {
-                requestNotificationPermissionLauncher.launch(permisoNotif)
-            } else {
-                verificarYPedirExcepcionBateria()
-            }
-        } else {
-            verificarYPedirExcepcionBateria()
-        }
-    }
 
-    @SuppressLint("BatteryLife")
-    private fun verificarYPedirExcepcionBateria() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val context = requireContext()
-            val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-            val pName = context.packageName
 
-            if (!pm.isIgnoringBatteryOptimizations(pName)) {
-                try {
-                    val intent = Intent().apply {
-                        action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
-                        data = Uri.parse("package:$pName")
-                    }
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    Log.e("PERMISOS", "No se pudo abrir la solicitud de batería: ${e.message}")
-                }
-            }
-        }
 
-        arrancarServicioMonitoreo()
-    }
-
-    private fun arrancarServicioMonitoreo() {
-        val serviceIntent = Intent(requireContext(), NotificationMonitorService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ContextCompat.startForegroundService(requireContext(), serviceIntent)
-        } else {
-            requireContext().startService(serviceIntent)
-        }
-    }
 
     private fun setupRecyclerView() {
         sugerenciaAdapter = SugerenciaAdapter(emptyList()) { peli -> rellenarCampos(peli) }

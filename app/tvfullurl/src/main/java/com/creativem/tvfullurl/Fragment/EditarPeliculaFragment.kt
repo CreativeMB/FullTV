@@ -4,10 +4,17 @@ import android.R.attr.orientation
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,10 +24,13 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.creativem.cineflexurl.modelo.Movie
+import com.creativem.tvfullurl.NotificationMonitorService
 import com.creativem.tvfullurl.R
 import com.creativem.tvfullurl.adapter.MoviesAdapter
 import com.creativem.tvfullurl.databinding.FragmentPedidosBinding
@@ -39,11 +49,14 @@ class EditarPeliculaFragment : Fragment() {
     private val solicitudesConocidas = mutableSetOf<String>()
     private var esPrimeraCarga = true
 
-    private val requestPermissionLauncher = registerForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (!isGranted) {
-            Toast.makeText(requireContext(), "Permiso de notificaciones denegado", Toast.LENGTH_SHORT).show()
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            verificarYPedirExcepcionBateria()
+        } else {
+            Toast.makeText(requireContext(), "Las alertas de nuevos pedidos no sonarán sin este permiso", Toast.LENGTH_LONG).show()
+            verificarYPedirExcepcionBateria()
         }
     }
 
@@ -58,7 +71,7 @@ class EditarPeliculaFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         crearCanalNotificaciones()
-        validarPermisosNotificacion()
+        verificarYPedirPermisos()
 
         iniciarRecycler()
         escucharPeliculasEnTiempoReal()
@@ -85,60 +98,51 @@ class EditarPeliculaFragment : Fragment() {
         }
     }
 
-    private fun validarPermisosNotificacion() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            if (androidx.core.content.ContextCompat.checkSelfPermission(
-                    requireContext(),
-                    android.Manifest.permission.POST_NOTIFICATIONS
-                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
-            ) {
-                requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+    private fun verificarYPedirPermisos() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val permisoNotif = android.Manifest.permission.POST_NOTIFICATIONS
+            if (ContextCompat.checkSelfPermission(requireContext(), permisoNotif) != PackageManager.PERMISSION_GRANTED) {
+                requestNotificationPermissionLauncher.launch(permisoNotif)
+            } else {
+                verificarYPedirExcepcionBateria()
             }
+        } else {
+            verificarYPedirExcepcionBateria()
         }
     }
 
-    @SuppressLint("MissingPermission")
-    private fun mostrarNotificacionAdmin(tituloPelicula: String) {
-        val intent = Intent(requireContext(), requireActivity()::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
 
-        val flagsPendingIntent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
+    @SuppressLint("BatteryLife")
+    private fun verificarYPedirExcepcionBateria() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val context = requireContext()
+            val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            val pName = context.packageName
 
-        val pendingIntent = PendingIntent.getActivity(
-            requireContext(),
-            0,
-            intent,
-            flagsPendingIntent
-        )
-
-        val builder = androidx.core.app.NotificationCompat.Builder(requireContext(), "CANAL_ADMIN_PEDIDOS")
-            .setSmallIcon(R.drawable.baseline_people_alt_24)
-            .setContentTitle("🔔 ¡Nuevo Pedido Recibido!")
-            .setContentText("Se ha solicitado la película: '$tituloPelicula'")
-            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-
-        try {
-            with(androidx.core.app.NotificationManagerCompat.from(requireContext())) {
-                if (androidx.core.content.ContextCompat.checkSelfPermission(
-                        requireContext(),
-                        android.Manifest.permission.POST_NOTIFICATIONS
-                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU
-                ) {
-                    notify(System.currentTimeMillis().toInt(), builder.build())
+            if (!pm.isIgnoringBatteryOptimizations(pName)) {
+                try {
+                    val intent = Intent().apply {
+                        action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                        data = Uri.parse("package:$pName")
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    Log.e("PERMISOS", "No se pudo abrir la solicitud de batería: ${e.message}")
                 }
             }
-        } catch (e: Exception) {
-            android.util.Log.e("NOTIFICACION_ADMIN", "Error al lanzar la notificación: ${e.message}")
         }
+
+        arrancarServicioMonitoreo()
     }
 
+    private fun arrancarServicioMonitoreo() {
+        val serviceIntent = Intent(requireContext(), NotificationMonitorService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ContextCompat.startForegroundService(requireContext(), serviceIntent)
+        } else {
+            requireContext().startService(serviceIntent)
+        }
+    }
     private fun escucharPeliculasEnTiempoReal() {
         databaseRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -206,7 +210,6 @@ class EditarPeliculaFragment : Fragment() {
                 if (!esPrimeraCarga) {
                     val nuevasSolicitudes = solicitudesCargaActual.filter { it.first !in solicitudesConocidas }
                     for (nueva in nuevasSolicitudes) {
-                        mostrarNotificacionAdmin(nueva.second)
                     }
                 } else {
                     esPrimeraCarga = false
