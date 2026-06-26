@@ -266,7 +266,12 @@ private var usuarioEsperandoMas = false
 
 
     }
-
+    // Agregue esta función dentro de la clase PeliculasActivity
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // El estado de la vista, scroll y adaptadores se mantiene intacto de forma nativa.
+    }
 
     private fun useryoutube() {
         val intent = Intent(this, LivePlayerActivity::class.java)

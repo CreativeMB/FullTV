@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.text.HtmlCompat
 import androidx.recyclerview.widget.GridLayoutManager
@@ -70,6 +71,9 @@ class Perfil : AppCompatActivity() {
         cargarPeliculasEnCache()
         // Luego cargar los alquileres del usuario
         cargarPeliculasAlquiladas()
+        onBackPressedDispatcher.addCallback(this) {
+            CastvHelper.regresarAPeliculas(this@Perfil)
+        }
     }
 
     // ==========================================
@@ -401,15 +405,11 @@ class Perfil : AppCompatActivity() {
         }
         Log.d("PERFIL", "🧹 onDestroy completado")
     }
-//    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-//        if (keyCode == KeyEvent.KEYCODE_BACK) {
-//            val intent = Intent(this, PeliculasActivity::class.java).apply {
-//                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-//            }
-//            startActivity(intent)
-//            finish()
-//            return true
-//        }
-//        return super.onKeyDown(keyCode, event)
-//    }
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            CastvHelper.regresarAPeliculas(this)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 }

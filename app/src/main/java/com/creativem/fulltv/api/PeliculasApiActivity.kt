@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
 import android.view.WindowManager
+import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
@@ -13,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
 import com.creativem.fulltv.menu.MenuSuperiorAdapter
 import com.creativem.fulltv.peliculas.PeliculasActivity
+import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Modelo
 import com.creativem.fulltv.principal.ViewUtils
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +43,9 @@ class PeliculasApiActivity : AppCompatActivity() {
         setupRecyclerView()
 
         cargarCategoria("Populares")
+        onBackPressedDispatcher.addCallback(this) {
+            CastvHelper.regresarAPeliculas(this@PeliculasApiActivity)
+        }
     }
 
     private fun setupApiService() {
@@ -157,11 +162,7 @@ class PeliculasApiActivity : AppCompatActivity() {
     }
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            val intent = Intent(this, PeliculasActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            startActivity(intent)
-            finish()
+            CastvHelper.regresarAPeliculas(this)
             return true
         }
         return super.onKeyDown(keyCode, event)

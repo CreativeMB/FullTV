@@ -13,12 +13,14 @@ import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.databinding.ActivityTvBinding
 import com.creativem.fulltv.peliculas.PeliculasActivity
 import com.creativem.fulltv.principal.AudioFocusHelper
+import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Modelo
 import com.creativem.fulltv.principal.ViewUtils
 import com.google.firebase.database.FirebaseDatabase
@@ -59,6 +61,9 @@ class TvActivity : AppCompatActivity() {
         setupRecyclerView()
         setupBuscador()
         loadTvChannels()
+        onBackPressedDispatcher.addCallback(this) {
+            CastvHelper.regresarAPeliculas(this@TvActivity)
+        }
 
     }
 
@@ -179,12 +184,7 @@ class TvActivity : AppCompatActivity() {
             }
         }
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            // En lugar de solo finish(), llamamos a la actividad anterior con flags específicas
-            val intent = Intent(this, PeliculasActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            startActivity(intent)
-            finish()
+            CastvHelper.regresarAPeliculas(this)
             return true
         }
 

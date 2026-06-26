@@ -1,7 +1,10 @@
 package com.creativem.fulltv.principal
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.util.Log
 import android.view.View
 import android.widget.ImageView
@@ -13,6 +16,7 @@ import com.google.firebase.database.*
 import java.text.SimpleDateFormat
 import java.util.*
 import com.creativem.fulltv.R
+import com.creativem.fulltv.peliculas.PeliculasActivity
 
 
 object CastvHelper {
@@ -90,6 +94,31 @@ object CastvHelper {
                     Glide.with(context).load(it).placeholder(R.drawable.icono).into(imagenUser)
                 } ?: imagenUser.setImageResource(R.drawable.icono)
             }
+        }
+    }
+    fun regresarAPeliculas(activity: Activity) {
+        // Validación de ciclo de vida para evitar fugas o fallas si la actividad ya está cerrándose
+        if (activity.isFinishing || activity.isDestroyed) return
+
+        try {
+            val intent = Intent(activity, PeliculasActivity::class.java).apply {
+                // Reordena la actividad existente al frente evitando recrear el estado
+                flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            }
+            activity.startActivity(intent)
+            activity.finish()
+
+            // Desactivación segura de animaciones de transición según la versión de API de Android
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0)
+            } else {
+                @Suppress("DEPRECATION")
+                activity.overridePendingTransition(0, 0)
+            }
+        } catch (e: Exception) {
+            // Plan de contingencia si falla la llamada de intención: finaliza la actividad de forma clásica
+            Log.e("CastvHelper", "Error durante la navegación de retorno seguro: ${e.message}")
+            activity.finish()
         }
     }
 
@@ -484,6 +513,7 @@ object CastvHelper {
         }
     }
 
+    @SuppressLint("SoonBlockedPrivateApi")
     private fun aplicarColorPorReflexion(numberPicker: android.widget.NumberPicker, color: Int) {
         // Paso A: Forzar color negro en el campo de texto central (EditText)
         val count = numberPicker.childCount

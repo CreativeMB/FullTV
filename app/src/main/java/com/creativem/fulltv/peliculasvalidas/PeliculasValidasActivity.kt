@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import com.bumptech.glide.Glide
@@ -13,6 +14,7 @@ import com.creativem.fulltv.peliculas.MoviesAdapter
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.databinding.ActivityPeliculasValidasBinding
 import com.creativem.fulltv.peliculas.PeliculasActivity
+import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Modelo
 import com.creativem.fulltv.principal.ViewUtils
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +39,9 @@ class PeliculasValidasActivity : AppCompatActivity() {
 
         setupRecyclerView()
         loadValidatedMovies()
+        onBackPressedDispatcher.addCallback(this) {
+            CastvHelper.regresarAPeliculas(this@PeliculasValidasActivity)
+        }
     }
 
     private fun setupRecyclerView() {
@@ -119,21 +124,12 @@ class PeliculasValidasActivity : AppCompatActivity() {
         }
         startActivity(intent)
     }
-
-//    private fun calcularColumnas(context: Context): Int {
-//        val displayMetrics = context.resources.displayMetrics
-//        val dpWidth = displayMetrics.widthPixels / displayMetrics.density
-//        return (dpWidth / 180).toInt().coerceAtLeast(2)
-//    }
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            val intent = Intent(this, PeliculasActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            startActivity(intent)
-            finish()
+            CastvHelper.regresarAPeliculas(this)
             return true
         }
         return super.onKeyDown(keyCode, event)
     }
+
 }

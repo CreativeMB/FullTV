@@ -16,10 +16,12 @@ import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import android.util.Log
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.*
+import androidx.activity.addCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -243,6 +245,9 @@ class ApiPeliculaActivity : AppCompatActivity() {
             .trim()
 
         buscarPelicula(consultaLimpia)
+        onBackPressedDispatcher.addCallback(this) {
+            CastvHelper.regresarAPeliculas(this@ApiPeliculaActivity)
+        }
     }
 
     private fun reproducirTrailer() {
@@ -1205,5 +1210,12 @@ class ApiPeliculaActivity : AppCompatActivity() {
             .transition(DrawableTransitionOptions.withCrossFade())
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .into(backgroundImageView)
+    }
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            CastvHelper.regresarAPeliculas(this)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 }
