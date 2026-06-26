@@ -41,6 +41,7 @@
 
         <activity
             android:name=".peliculas.PeliculasActivity"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.FullTV.tv">
 
         </activity>

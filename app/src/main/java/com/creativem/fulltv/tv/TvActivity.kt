@@ -179,6 +179,11 @@ class TvActivity : AppCompatActivity() {
             }
         }
         if (keyCode == KeyEvent.KEYCODE_BACK) {
+            // En lugar de solo finish(), llamamos a la actividad anterior con flags específicas
+            val intent = Intent(this, PeliculasActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            startActivity(intent)
             finish()
             return true
         }
