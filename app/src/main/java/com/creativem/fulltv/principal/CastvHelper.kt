@@ -97,27 +97,30 @@ object CastvHelper {
         }
     }
     fun regresarAPeliculas(activity: Activity) {
-        // Validación de ciclo de vida para evitar fugas o fallas si la actividad ya está cerrándose
         if (activity.isFinishing || activity.isDestroyed) return
 
         try {
             val intent = Intent(activity, PeliculasActivity::class.java).apply {
-                // Reordena la actividad existente al frente evitando recrear el estado
-                flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
+
             activity.startActivity(intent)
             activity.finish()
 
-            // Desactivación segura de animaciones de transición según la versión de API de Android
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0)
+                activity.overrideActivityTransition(
+                    Activity.OVERRIDE_TRANSITION_CLOSE,
+                    0,
+                    0
+                )
             } else {
                 @Suppress("DEPRECATION")
                 activity.overridePendingTransition(0, 0)
             }
+
         } catch (e: Exception) {
-            // Plan de contingencia si falla la llamada de intención: finaliza la actividad de forma clásica
-            Log.e("CastvHelper", "Error durante la navegación de retorno seguro: ${e.message}")
+            Log.e("CastvHelper", "Error al regresar: ${e.message}", e)
             activity.finish()
         }
     }
