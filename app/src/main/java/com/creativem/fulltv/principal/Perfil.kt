@@ -4,6 +4,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -15,6 +16,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
+import com.creativem.fulltv.peliculas.PeliculasActivity
 import com.creativem.fulltv.peliculas.PlayerPeliculas
 import com.creativem.fulltv.peliculasvalidas.AlquileresAdapter
 import com.google.firebase.auth.FirebaseAuth
@@ -399,4 +401,15 @@ class Perfil : AppCompatActivity() {
         }
         Log.d("PERFIL", "🧹 onDestroy completado")
     }
+//    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+//        if (keyCode == KeyEvent.KEYCODE_BACK) {
+//            val intent = Intent(this, PeliculasActivity::class.java).apply {
+//                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+//            }
+//            startActivity(intent)
+//            finish()
+//            return true
+//        }
+//        return super.onKeyDown(keyCode, event)
+//    }
 }

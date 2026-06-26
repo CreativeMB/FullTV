@@ -3,6 +3,7 @@ package com.creativem.fulltv.api
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -11,6 +12,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
 import com.creativem.fulltv.menu.MenuSuperiorAdapter
+import com.creativem.fulltv.peliculas.PeliculasActivity
 import com.creativem.fulltv.principal.Modelo
 import com.creativem.fulltv.principal.ViewUtils
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +21,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import retrofit2.*
 import retrofit2.converter.gson.GsonConverterFactory
+import kotlin.jvm.java
 
 class PeliculasApiActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
@@ -151,5 +154,16 @@ class PeliculasApiActivity : AppCompatActivity() {
             "Película de TV" -> 10770; "Suspenso" -> 53; "Bélica" -> 10752
             "Western" -> 37; else -> 28
         }
+    }
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            val intent = Intent(this, PeliculasActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            startActivity(intent)
+            finish()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 }

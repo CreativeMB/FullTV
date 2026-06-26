@@ -2208,7 +2208,12 @@ class PlayerPeliculas : AppCompatActivity() {
 
             // 🔙 Tecla "Atrás"
             KeyEvent.KEYCODE_BACK -> {
-                false // deja que el sistema lo maneje
+                val intent = Intent(this, PeliculasActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                startActivity(intent)
+                finish()
+               true
             }
 
             else -> super.onKeyDown(keyCode, event)
