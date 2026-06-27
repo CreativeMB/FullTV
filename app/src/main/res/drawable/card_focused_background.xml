@@ -5,11 +5,11 @@
     <item android:state_focused="true">
         <shape android:shape="rectangle">
             <!-- Color de fondo sutil cuando está seleccionado (10% de blanco para dar brillo) -->
-            <solid android:color="#0277BD" />
+            <solid android:color="#A50277BD" />
 
             <!-- Borde Dorado Grueso: 3dp es ideal para que se vea bien en TV -->
             <stroke
-                android:width="3dp"
+                android:width="2dp"
                 android:color="#C5A059" />
 
             <!-- Esquinas redondeadas suaves (Premium Look) -->
@@ -22,9 +22,9 @@
         <shape android:shape="rectangle">
             <solid android:color="@android:color/transparent" />
             <stroke
-                android:width="3dp"
+                android:width="2dp"
                 android:color="@android:color/transparent" />
-            <corners android:radius="12dp" />
+            <corners android:radius="8dp" />
         </shape>
     </item>
 

@@ -1,4 +1,4 @@
-package com.creativem.fulltv
+package com.creativem.fulltv.peliculas
 
 import android.annotation.SuppressLint
 import android.graphics.Color

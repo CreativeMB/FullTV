@@ -18,7 +18,7 @@ import android.widget.TextView
 import androidx.fragment.app.DialogFragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.creativem.fulltv.peliculasvalidas.AlquileresAdapter
+import com.creativem.fulltv.peliculas.AlquileresAdapter
 import com.creativem.fulltv.principal.Modelo
 import com.google.firebase.database.FirebaseDatabase
 

@@ -19,7 +19,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
 import com.creativem.fulltv.peliculas.PeliculasActivity
 import com.creativem.fulltv.peliculas.PlayerPeliculas
-import com.creativem.fulltv.peliculasvalidas.AlquileresAdapter
+import com.creativem.fulltv.peliculas.AlquileresAdapter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError

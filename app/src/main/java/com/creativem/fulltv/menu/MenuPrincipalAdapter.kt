@@ -17,12 +17,15 @@ class MenuPrincipalAdapter(
 
     var lastFocusedPosition: Int = 0
 
+    // Color dorado CineParche y blanco definidos como constantes
+    private val colorDorado = Color.parseColor("#C5A059")
+    private val colorBlanco = Color.WHITE
+
     inner class MenuViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.iconoMenu)
         val text: TextView = view.findViewById(R.id.textoMenu)
 
         init {
-            // Aseguramos que el texto sea visible siempre
             text.visibility = View.VISIBLE
 
             view.setOnClickListener {
@@ -37,15 +40,16 @@ class MenuPrincipalAdapter(
                 else
                     null
 
-                // Efectos visuales de foco
                 text.isSelected = hasFocus
                 if (hasFocus) {
-                    text.setTextColor(Color.YELLOW)
+                    // 🟢 CORRECCIÓN: Color dorado al tener el foco
+                    text.setTextColor(colorDorado)
                     v.scaleX = 1.1f
                     v.scaleY = 1.1f
                     lastFocusedPosition = bindingAdapterPosition
                 } else {
-                    text.setTextColor(Color.WHITE)
+                    // 🟢 CORRECCIÓN: Color blanco por defecto
+                    text.setTextColor(colorBlanco)
                     v.scaleX = 1.0f
                     v.scaleY = 1.0f
                 }
@@ -64,20 +68,19 @@ class MenuPrincipalAdapter(
         holder.icon.setImageResource(item.iconResId)
         holder.text.text = item.name
 
-        // --- CORRECCIÓN AQUÍ ---
-        // Forzamos a que el texto sea VISIBLE siempre para todos
         holder.text.visibility = View.VISIBLE
 
-        // Aplicamos el estado inicial (si es el último enfocado o no)
         val isFocused = position == lastFocusedPosition
         holder.text.isSelected = isFocused
 
         if (isFocused) {
-            holder.text.setTextColor(Color.YELLOW)
+            // 🟢 CORRECCIÓN: Color dorado si fue el último elemento seleccionado
+            holder.text.setTextColor(colorDorado)
             holder.itemView.scaleX = 1.1f
             holder.itemView.scaleY = 1.1f
         } else {
-            holder.text.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.texto))
+            // 🟢 CORRECCIÓN: Asegura que el resto de los elementos mantengan el color blanco
+            holder.text.setTextColor(colorBlanco)
             holder.itemView.scaleX = 1.0f
             holder.itemView.scaleY = 1.0f
         }

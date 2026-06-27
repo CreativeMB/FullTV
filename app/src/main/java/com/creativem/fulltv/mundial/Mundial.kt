@@ -1,11 +1,10 @@
-package com.creativem.fulltv
+package com.creativem.fulltv.mundial
 
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
-import android.view.View
 import android.view.WindowManager
 import android.widget.GridLayout
 import android.widget.ImageView
@@ -16,11 +15,17 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.coroutineScope
+import coil.ImageLoader
+import coil.decode.SvgDecoder
+import coil.request.ImageRequest
+import com.creativem.fulltv.mundial.MundialApiService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
-class LivePlayerActivity : AppCompatActivity() {
+class Mundial : AppCompatActivity() {
 
     // Diccionario de traducción para los países del mundial
     private val traduccionesPaises = mapOf(
@@ -124,10 +129,10 @@ class LivePlayerActivity : AppCompatActivity() {
     }
 
     private fun cargarResultadosMundial(contenedor: GridLayout) {
-        val service = retrofit2.Retrofit.Builder()
+        val service = Retrofit.Builder()
             .baseUrl("https://api.football-data.org/v4/")
-            .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
-            .build().create(FootballApiService::class.java)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build().create(MundialApiService::class.java)
 
         lifecycle.coroutineScope.launch(Dispatchers.IO) {
             try {
@@ -173,8 +178,10 @@ class LivePlayerActivity : AppCompatActivity() {
                                     teamToGroup[awayName] = nuevoGrupo
                                 }
 
-                                val homeStats = teamStatsMap.getOrPut(homeName) { TeamStats(homeName) }
-                                val awayStats = teamStatsMap.getOrPut(awayName) { TeamStats(awayName) }
+                                val homeStats =
+                                    teamStatsMap.getOrPut(homeName) { TeamStats(homeName) }
+                                val awayStats =
+                                    teamStatsMap.getOrPut(awayName) { TeamStats(awayName) }
 
                                 if (match.status == "FINISHED") {
                                     val homeScore = match.score.fullTime?.home ?: 0
@@ -225,15 +232,16 @@ class LivePlayerActivity : AppCompatActivity() {
                             }
                         }
 
-                        val imageLoader = coil.ImageLoader.Builder(this@LivePlayerActivity)
-                            .components { add(coil.decode.SvgDecoder.Factory()) }
+                        val imageLoader = ImageLoader.Builder(this@Mundial)
+                            .components { add(SvgDecoder.Factory()) }
                             .build()
 
                         val density = resources.displayMetrics.density
                         val marginPx = (6 * density).toInt()
 
                         val isPantallaGrande = resources.configuration.screenWidthDp >= 600
-                        val tamanoBandera = if (isPantallaGrande) (64 * density).toInt() else (48 * density).toInt()
+                        val tamanoBandera =
+                            if (isPantallaGrande) (64 * density).toInt() else (48 * density).toInt()
                         val tamanoTextoNombre = if (isPantallaGrande) 11f else 10f
                         val tamanoTextoCentral = if (isPantallaGrande) 13f else 11f
 
@@ -249,10 +257,15 @@ class LivePlayerActivity : AppCompatActivity() {
 
                             val colorConfig = obtenerColoresFase(match.stage)
 
-                            val layoutInterno = LinearLayout(this@LivePlayerActivity).apply {
+                            val layoutInterno = LinearLayout(this@Mundial).apply {
                                 orientation = LinearLayout.HORIZONTAL
                                 gravity = Gravity.CENTER_VERTICAL
-                                setPadding((10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt())
+                                setPadding(
+                                    (10 * density).toInt(),
+                                    (12 * density).toInt(),
+                                    (10 * density).toInt(),
+                                    (12 * density).toInt()
+                                )
                                 layoutParams = LinearLayout.LayoutParams(
                                     LinearLayout.LayoutParams.MATCH_PARENT,
                                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -260,15 +273,20 @@ class LivePlayerActivity : AppCompatActivity() {
                             }
 
                             // Bloque Local
-                            val bloqueLocal = LinearLayout(this@LivePlayerActivity).apply {
+                            val bloqueLocal = LinearLayout(this@Mundial).apply {
                                 orientation = LinearLayout.VERTICAL
                                 gravity = Gravity.CENTER_HORIZONTAL
-                                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.2f)
+                                layoutParams = LinearLayout.LayoutParams(
+                                    0,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                                    1.2f
+                                )
                             }
 
-                            val txtHome = TextView(this@LivePlayerActivity).apply {
+                            val txtHome = TextView(this@Mundial).apply {
                                 val nameEs = traducirNombrePais(homeName)
-                                text = if (isHomeEliminated) "❌ $nameEs" else "$nameEs ($homePts pts)"
+                                text =
+                                    if (isHomeEliminated) "❌ $nameEs" else "$nameEs ($homePts pts)"
                                 textSize = tamanoTextoNombre
                                 setTextColor(if (isHomeEliminated) Color.GRAY else Color.WHITE)
                                 gravity = Gravity.CENTER
@@ -276,20 +294,25 @@ class LivePlayerActivity : AppCompatActivity() {
                                 setPadding(0, 0, 0, (6 * density).toInt())
                             }
 
-                            val imgHome = ImageView(this@LivePlayerActivity).apply {
-                                layoutParams = LinearLayout.LayoutParams(tamanoBandera, tamanoBandera)
+                            val imgHome = ImageView(this@Mundial).apply {
+                                layoutParams =
+                                    LinearLayout.LayoutParams(tamanoBandera, tamanoBandera)
                             }
                             bloqueLocal.addView(txtHome)
                             bloqueLocal.addView(imgHome)
 
                             // Bloque Central
-                            val bloqueCentral = LinearLayout(this@LivePlayerActivity).apply {
+                            val bloqueCentral = LinearLayout(this@Mundial).apply {
                                 orientation = LinearLayout.VERTICAL
                                 gravity = Gravity.CENTER
-                                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.6f)
+                                layoutParams = LinearLayout.LayoutParams(
+                                    0,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                                    1.6f
+                                )
                             }
 
-                            val txtScore = TextView(this@LivePlayerActivity).apply {
+                            val txtScore = TextView(this@Mundial).apply {
                                 textSize = tamanoTextoCentral
                                 gravity = Gravity.CENTER
                                 setTypeface(null, Typeface.BOLD)
@@ -300,16 +323,20 @@ class LivePlayerActivity : AppCompatActivity() {
 
                             when (match.status) {
                                 "FINISHED" -> {
-                                    txtScore.text = "${colorConfig.etiquetaFase}\nFINAL\n$homeScore - $awayScore"
+                                    txtScore.text =
+                                        "${colorConfig.etiquetaFase}\nFINAL\n$homeScore - $awayScore"
                                     txtScore.setTextColor(Color.parseColor("#C5A059"))
                                 }
+
                                 "IN_PLAY", "PAUSED" -> {
                                     txtScore.text = "🔴 EN VIVO\n$homeScore - $awayScore"
                                     txtScore.setTextColor(Color.RED)
                                 }
+
                                 "TIMED", "SCHEDULED" -> {
                                     if (match.utcDate.length >= 16) {
-                                        val horaUTC = match.utcDate.substring(11, 13).toIntOrNull() ?: 0
+                                        val horaUTC =
+                                            match.utcDate.substring(11, 13).toIntOrNull() ?: 0
                                         val min = match.utcDate.substring(14, 16).toIntOrNull() ?: 0
                                         val horaLocal = (horaUTC - 5 + 24) % 24
                                         val horaAmPm = formatoAmPm(horaLocal, min)
@@ -323,15 +350,20 @@ class LivePlayerActivity : AppCompatActivity() {
                             bloqueCentral.addView(txtScore)
 
                             // Bloque Visitante
-                            val bloqueVisitante = LinearLayout(this@LivePlayerActivity).apply {
+                            val bloqueVisitante = LinearLayout(this@Mundial).apply {
                                 orientation = LinearLayout.VERTICAL
                                 gravity = Gravity.CENTER_HORIZONTAL
-                                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.2f)
+                                layoutParams = LinearLayout.LayoutParams(
+                                    0,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                                    1.2f
+                                )
                             }
 
-                            val txtAway = TextView(this@LivePlayerActivity).apply {
+                            val txtAway = TextView(this@Mundial).apply {
                                 val nameEs = traducirNombrePais(awayName)
-                                text = if (isAwayEliminated) "❌ $nameEs" else "$nameEs ($awayPts pts)"
+                                text =
+                                    if (isAwayEliminated) "❌ $nameEs" else "$nameEs ($awayPts pts)"
                                 textSize = tamanoTextoNombre
                                 setTextColor(if (isAwayEliminated) Color.GRAY else Color.WHITE)
                                 gravity = Gravity.CENTER
@@ -339,8 +371,9 @@ class LivePlayerActivity : AppCompatActivity() {
                                 setPadding(0, 0, 0, (6 * density).toInt())
                             }
 
-                            val imgAway = ImageView(this@LivePlayerActivity).apply {
-                                layoutParams = LinearLayout.LayoutParams(tamanoBandera, tamanoBandera)
+                            val imgAway = ImageView(this@Mundial).apply {
+                                layoutParams =
+                                    LinearLayout.LayoutParams(tamanoBandera, tamanoBandera)
                             }
                             bloqueVisitante.addView(txtAway)
                             bloqueVisitante.addView(imgAway)
@@ -351,15 +384,19 @@ class LivePlayerActivity : AppCompatActivity() {
 
                             // Banderas mediante Coil
                             match.homeTeam.crest?.let { url ->
-                                imageLoader.enqueue(coil.request.ImageRequest.Builder(this@LivePlayerActivity)
-                                    .data(url).target(imgHome).build())
+                                imageLoader.enqueue(
+                                    ImageRequest.Builder(this@Mundial)
+                                        .data(url).target(imgHome).build()
+                                )
                             }
                             match.awayTeam.crest?.let { url ->
-                                imageLoader.enqueue(coil.request.ImageRequest.Builder(this@LivePlayerActivity)
-                                    .data(url).target(imgAway).build())
+                                imageLoader.enqueue(
+                                    ImageRequest.Builder(this@Mundial)
+                                        .data(url).target(imgAway).build()
+                                )
                             }
 
-                            val cardView = CardView(this@LivePlayerActivity).apply {
+                            val cardView = CardView(this@Mundial).apply {
                                 isFocusable = true
                                 isClickable = true
                                 radius = 8 * density
@@ -368,11 +405,13 @@ class LivePlayerActivity : AppCompatActivity() {
 
                                 setOnFocusChangeListener { v, hasFocus ->
                                     if (hasFocus) {
-                                        v.animate().scaleX(1.05f).scaleY(1.05f).setDuration(120).start()
+                                        v.animate().scaleX(1.05f).scaleY(1.05f).setDuration(120)
+                                            .start()
                                         setCardBackgroundColor(colorConfig.colorFocus)
                                         cardElevation = 8 * density
                                     } else {
-                                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(120).start()
+                                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(120)
+                                            .start()
                                         setCardBackgroundColor(colorConfig.colorNormal)
                                         cardElevation = 4 * density
                                     }

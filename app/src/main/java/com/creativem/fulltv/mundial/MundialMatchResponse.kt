@@ -1,4 +1,4 @@
-package com.creativem.fulltv
+package com.creativem.fulltv.mundial
 
 import com.google.gson.annotations.SerializedName
 

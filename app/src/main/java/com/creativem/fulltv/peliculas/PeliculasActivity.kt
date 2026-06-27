@@ -36,7 +36,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
-import android.widget.AbsListView
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageView
@@ -56,7 +55,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import com.creativem.fulltv.BannerPromosAdapter
+import com.creativem.fulltv.peliculas.BannerPromosAdapter
 import com.creativem.fulltv.R
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.api.MovieDetailResponse
@@ -67,7 +66,6 @@ import com.creativem.fulltv.api.TMDbApiService
 import com.creativem.fulltv.databinding.ActivityPeliculasBinding
 import com.creativem.fulltv.menu.MenuPrincipalAdapter
 import com.creativem.fulltv.menu.MenuPrincipalItem
-import com.creativem.fulltv.peliculasvalidas.AlquileresAdapter
 import com.creativem.fulltv.peliculasvalidas.PeliculasValidasActivity
 import com.creativem.fulltv.peliculasvalidas.Validaciones
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
@@ -104,7 +102,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
 import com.creativem.fulltv.BuildConfig
-import com.creativem.fulltv.LivePlayerActivity
+import com.creativem.fulltv.mundial.Mundial
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 
@@ -274,7 +272,7 @@ private var usuarioEsperandoMas = false
     }
 
     private fun useryoutube() {
-        val intent = Intent(this, LivePlayerActivity::class.java)
+        val intent = Intent(this, Mundial::class.java)
         startActivity(intent)
     }
     private fun intentarVerificacionAlquileres() {

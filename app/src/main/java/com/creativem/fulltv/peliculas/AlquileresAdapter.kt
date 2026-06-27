@@ -1,12 +1,18 @@
-package com.creativem.fulltv.peliculasvalidas
+package com.creativem.fulltv.peliculas
 
+import android.content.res.Configuration
 import android.graphics.Color
+import android.os.Build
 import android.os.CountDownTimer
+import android.util.DisplayMetrics
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.cardview.widget.CardView
+import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.Priority
@@ -50,7 +56,7 @@ class AlquileresAdapter(
         val context = parent.context
         val orientation = context.resources.configuration.orientation
 
-        if (orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+        if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
             val density = context.resources.displayMetrics.density
             val widthInPx = (150 * density).toInt()
             val heightInPx = (255 * density).toInt()
@@ -81,17 +87,17 @@ class AlquileresAdapter(
         configurarContador(holder, item)
 
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
-            val card = view as? androidx.cardview.widget.CardView
+            val card = view as? CardView
             val currentPos = holder.bindingAdapterPosition
 
             if (hasFocus && currentPos != RecyclerView.NO_POSITION) {
                 val parentView = view.parent
                 if (parentView is RecyclerView) {
-                    val smoothScroller = object : androidx.recyclerview.widget.LinearSmoothScroller(view.context) {
+                    val smoothScroller = object : LinearSmoothScroller(view.context) {
                         override fun calculateDtToFit(viewStart: Int, viewEnd: Int, boxStart: Int, boxEnd: Int, snapPreference: Int): Int {
                             return (boxStart + (boxEnd - boxStart) / 2) - (viewStart + (viewEnd - viewStart) / 2)
                         }
-                        override fun calculateSpeedPerPixel(displayMetrics: android.util.DisplayMetrics): Float {
+                        override fun calculateSpeedPerPixel(displayMetrics: DisplayMetrics): Float {
                             return 100f / displayMetrics.densityDpi
                         }
                     }
@@ -104,14 +110,14 @@ class AlquileresAdapter(
                 parentView?.requestLayout()
                 (parentView as? View)?.invalidate()
 
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     view.foreground = null
                 }
                 view.alpha = 1.0f
 
                 view.animate().scaleX(1.2f).scaleY(1.2f).translationZ(35f).setDuration(250).start()
 
-                card?.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(view.context, R.color.colorhover2))
+                card?.setCardBackgroundColor(ContextCompat.getColor(view.context, R.color.colorhover2))
                 card?.cardElevation = 20f
                 holder.txtTitle.isSelected = true
                 holder.txtTitle.setTextColor(Color.YELLOW)
