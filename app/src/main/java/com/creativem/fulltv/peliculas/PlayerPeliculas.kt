@@ -445,7 +445,6 @@ class PlayerPeliculas : AppCompatActivity() {
         intent.putExtra("EXTRA_MOVIE_IMAGE_URL", movieImageUrl)
         // Inicia la actividad de reproducción
         startActivity(intent)
-        finish()
     }
 
     @SuppressLint("UnsafeOptInUsageError")
@@ -2208,10 +2207,6 @@ class PlayerPeliculas : AppCompatActivity() {
 
             // 🔙 Tecla "Atrás"
             KeyEvent.KEYCODE_BACK -> {
-                val intent = Intent(this, PeliculasActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                }
-                startActivity(intent)
                 finish()
                true
             }

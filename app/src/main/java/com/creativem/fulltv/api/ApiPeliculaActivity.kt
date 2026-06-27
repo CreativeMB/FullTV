@@ -901,13 +901,9 @@ class ApiPeliculaActivity : AppCompatActivity() {
         })
     }
 
+    // Modifique su función volverAlContenido() para que use el helper:
     private fun volverAlContenido() {
-        val intent = Intent(this@ApiPeliculaActivity, PeliculasActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-        }
-        startActivity(intent)
-        overridePendingTransition(R.anim.fade_in_slow, R.anim.stay)
-        finish()
+        CastvHelper.regresarAPeliculas(this)
     }
 
     private fun enviarPedido(dialog: AlertDialog, fechaActivacion: String, horaActivacion: Int) {
@@ -1022,7 +1018,6 @@ class ApiPeliculaActivity : AppCompatActivity() {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         startActivity(intent)
-        finish()
     }
 
     private fun cargarCartelera() {

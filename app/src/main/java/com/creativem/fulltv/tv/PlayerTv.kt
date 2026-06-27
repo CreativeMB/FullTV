@@ -365,16 +365,26 @@ class PlayerTv : AppCompatActivity() {
 
         reiniciarReproductor()
     }
-
+    private fun liberarReproductor() {
+        player?.let {
+            it.release()
+            player = null
+        }
+    }
     private fun finishPlayer() {
-        player?.release()
-        player = null
+        liberarReproductor()
         finish()
     }
-
+    override fun onStop() {
+        super.onStop()
+        // Si el usuario presiona "Home" en el mando, liberamos los recursos aquí también
+        liberarReproductor()
+    }
     override fun onDestroy() {
         super.onDestroy()
         player?.release()
+        liberarReproductor()
         handler.removeCallbacksAndMessages(null)
     }
+
 }

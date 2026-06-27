@@ -101,8 +101,9 @@ object CastvHelper {
 
         try {
             val intent = Intent(activity, PeliculasActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+                // CLEAR_TOP busca PeliculasActivity en la pila y destruye todo lo que esté por encima.
+                // SINGLE_TOP asegura que si ya existe en la pila, NO se vuelva a crear (evita la recarga de datos).
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
 
             activity.startActivity(intent)
