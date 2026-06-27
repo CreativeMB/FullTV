@@ -1,0 +1,11 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Este path dibuja una letra "C" grande y gruesa en formato vector plano -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,4c-4.42,0 -8,3.58 -8,8s3.58,8 8,8c3.13,0 5.84,-1.81 7.15,-4.43l-2.74,-1.37C15.54,16.03 13.88,17 12,17c-2.76,0 -5,-2.24 -5,-5s2.24,-5 5,-5c1.88,0 3.54,0.97 4.41,2.8l2.74,-1.37C17.84,5.81 15.13,4 12,4z" />
+</vector>

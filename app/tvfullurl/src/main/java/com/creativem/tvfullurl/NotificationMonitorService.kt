@@ -84,28 +84,27 @@ class NotificationMonitorService : Service() {
     private fun crearNotificacionServicio(): Notification {
         val pendingIntent = obtenerPendingIntentDeInicio()
 
-        // Se intenta usar tu icono, si falla se usa el icono por defecto del sistema
-        val iconRes = obtenerIconoSeguro()
 
         return NotificationCompat.Builder(this, "CANAL_SERVICIO_SILENCIOSO")
-            .setContentTitle("Monitoreo de Pedidos Activo")
-            .setContentText("Buscando solicitudes en segundo plano...")
-            .setSmallIcon(iconRes)
+            .setSmallIcon(R.drawable.icono_notificacion) // Se muestra solo tu icono
+            .setContentTitle(" ")  // Espacio en blanco para reducir el tamaño al mínimo
+            .setContentText("")    // Sin texto de descripción
+            .setShowWhen(false)    // Oculta la hora/reloj de la notificación
             .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setPriority(NotificationCompat.PRIORITY_MIN) // Mínima prioridad
+            .setSilent(true)       // Silencio absoluto
             .build()
     }
 
     @SuppressLint("MissingPermission")
     private fun mostrarNotificacionAdmin(tituloPelicula: String) {
         val pendingIntent = obtenerPendingIntentDeInicio()
-        val iconRes = obtenerIconoSeguro()
 
         // Ruta del sonido para compatibilidad con versiones anteriores a Android 8.0
         val soundUri = Uri.parse("android.resource://$packageName/${R.raw.pedido}")
 
         val builder = NotificationCompat.Builder(this, "CANAL_ADMIN_PEDIDOS_V2") // Apunta al nuevo canal V2
-            .setSmallIcon(iconRes)
+            .setSmallIcon(R.drawable.icono_notificacion)
             .setContentTitle("🔔 ¡Activar pelicula!")
             .setContentText("$tituloPelicula")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -133,7 +132,7 @@ class NotificationMonitorService : Service() {
             val canalServicio = NotificationChannel(
                 "CANAL_SERVICIO_SILENCIOSO",
                 "Servicio de Monitoreo",
-                NotificationManager.IMPORTANCE_MIN
+                NotificationManager.IMPORTANCE_LOW
             )
             manager.createNotificationChannel(canalServicio)
             val soundUri = Uri.parse("android.resource://$packageName/${R.raw.pedido}")
@@ -171,13 +170,4 @@ class NotificationMonitorService : Service() {
         return PendingIntent.getActivity(this, 0, launchIntent, flagsPendingIntent)
     }
 
-    // Retorna el icono personalizado si existe, de lo contrario devuelve el icono genérico de Android
-    private fun obtenerIconoSeguro(): Int {
-        val customIcon = resources.getIdentifier("baseline_people_alt_24", "drawable", packageName)
-        return if (customIcon != 0) {
-            customIcon
-        } else {
-            android.R.drawable.sym_def_app_icon
-        }
-    }
 }
