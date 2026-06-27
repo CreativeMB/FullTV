@@ -91,10 +91,6 @@ class NuevaPeliculaFragment : Fragment() {
         }
     }
 
-
-
-
-
     private fun setupRecyclerView() {
         sugerenciaAdapter = SugerenciaAdapter(emptyList()) { peli -> rellenarCampos(peli) }
         binding.rvSugerencias.layoutManager = LinearLayoutManager(requireContext())
