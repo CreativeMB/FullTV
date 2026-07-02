@@ -15,9 +15,9 @@ class MenuPrincipalAdapter(
     private val onItemClick: (MenuPrincipalItem) -> Unit
 ) : RecyclerView.Adapter<MenuPrincipalAdapter.MenuViewHolder>() {
 
-    var lastFocusedPosition: Int = 0
+    var lastFocusedPosition: Int = -1
 
-    // Color dorado CineParche y blanco definidos como constantes
+    // 🟢 COINCIDENCIA DE COLORES: Definimos el color dorado y blanco de su marca
     private val colorDorado = Color.parseColor("#C5A059")
     private val colorBlanco = Color.WHITE
 
@@ -26,7 +26,11 @@ class MenuPrincipalAdapter(
         val text: TextView = view.findViewById(R.id.textoMenu)
 
         init {
-            text.visibility = View.VISIBLE
+            // Ocultamos el icono por código para que solo quede el texto
+            icon.visibility = View.GONE
+
+            view.isFocusable = true
+            view.isFocusableInTouchMode = true
 
             view.setOnClickListener {
                 val item = items[bindingAdapterPosition]
@@ -34,25 +38,26 @@ class MenuPrincipalAdapter(
             }
 
             view.setOnFocusChangeListener { v, hasFocus ->
-                // Fondo de selección
-                v.background = if (hasFocus)
+                // Efecto de fondo (Borde Dorado / Selección)
+                v.background = if (hasFocus) {
                     ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
-                else
+                } else {
                     null
+                }
 
-                text.isSelected = hasFocus
                 if (hasFocus) {
-                    // 🟢 CORRECCIÓN: Color dorado al tener el foco
+                    // 🟢 CORRECCIÓN: Se aplica su color dorado original en lugar de amarillo
                     text.setTextColor(colorDorado)
                     v.scaleX = 1.1f
                     v.scaleY = 1.1f
                     lastFocusedPosition = bindingAdapterPosition
                 } else {
-                    // 🟢 CORRECCIÓN: Color blanco por defecto
                     text.setTextColor(colorBlanco)
                     v.scaleX = 1.0f
                     v.scaleY = 1.0f
                 }
+
+                text.isSelected = hasFocus
             }
         }
     }
@@ -65,21 +70,23 @@ class MenuPrincipalAdapter(
 
     override fun onBindViewHolder(holder: MenuViewHolder, position: Int) {
         val item = items[position]
-        holder.icon.setImageResource(item.iconResId)
         holder.text.text = item.name
 
-        holder.text.visibility = View.VISIBLE
+        // Asegurar que el icono permanezca oculto
+        holder.icon.visibility = View.GONE
 
+        // Aplicamos el estado visual inicial para que no se pierda el rastro de la selección
         val isFocused = position == lastFocusedPosition
         holder.text.isSelected = isFocused
 
         if (isFocused) {
-            // 🟢 CORRECCIÓN: Color dorado si fue el último elemento seleccionado
+            holder.itemView.background = ContextCompat.getDrawable(holder.itemView.context, R.drawable.card_focused_background)
+            // 🟢 CORRECCIÓN: Se aplica su color dorado original en lugar de amarillo
             holder.text.setTextColor(colorDorado)
             holder.itemView.scaleX = 1.1f
             holder.itemView.scaleY = 1.1f
         } else {
-            // 🟢 CORRECCIÓN: Asegura que el resto de los elementos mantengan el color blanco
+            holder.itemView.background = null
             holder.text.setTextColor(colorBlanco)
             holder.itemView.scaleX = 1.0f
             holder.itemView.scaleY = 1.0f

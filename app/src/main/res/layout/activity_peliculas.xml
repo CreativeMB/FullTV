@@ -5,16 +5,10 @@
     android:layout_height="match_parent"
     android:background="#050505"
     android:animateLayoutChanges="true">
-    <ImageView
-        android:id="@+id/imgFondo"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:alpha="0.3"
-        android:scaleType="centerCrop" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/menuPrincipal"
-        android:layout_width="0dp"
+        android:layout_width ="0dp"
         android:layout_height="40dp"
         android:layout_marginTop="10dp"
         android:clipToPadding="false"
@@ -22,34 +16,15 @@
         android:paddingHorizontal="20dp"
         android:descendantFocusability="afterDescendants"
         android:nextFocusDown="@id/rvBannerPromos"
-        app:layout_constraintEnd_toStartOf="@+id/layoutSaldo"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <LinearLayout
-        android:id="@+id/layoutSaldo"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:layout_marginEnd="20dp"
-        android:background="@drawable/bg_saldo_premium"
-        android:gravity="center"
-        android:orientation="horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="4dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <TextView
-            android:id="@+id/tvSaldoValue"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="🪙 CasTV: 0"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:maxLines="1" />
-    </LinearLayout>
+    <ImageView
+        android:id="@+id/imgFondo"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.3"
+        android:scaleType="centerCrop" />
 
     <androidx.cardview.widget.CardView
         android:id="@+id/layoutBannerNetflix"
@@ -209,19 +184,47 @@
 
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.cardview.widget.CardView>
-
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvPeliculas"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:paddingTop="25dp"
-        android:paddingBottom="25dp"
         android:clipToPadding="false"
+        android:paddingStart="20dp"
+    android:paddingLeft="20dp"
+    android:paddingEnd="20dp"
+    android:paddingRight="20dp"
         android:descendantFocusability="afterDescendants"
         android:nextFocusUp="@id/rvBannerPromos"
         app:layout_constraintTop_toBottomOf="@id/layoutBannerNetflix"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
+    <!-- 4. SALDO DE CRÉDITOS (Alineado arriba a la derecha) -->
+    <LinearLayout
+        android:id="@+id/layoutSaldo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="40dp"
+        android:layout_marginEnd="20dp"
+        android:background="@drawable/bg_saldo_premium"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="4dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:id="@+id/tvSaldoValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🪙 CasTV: 0"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:maxLines="1" />
+    </LinearLayout>
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>

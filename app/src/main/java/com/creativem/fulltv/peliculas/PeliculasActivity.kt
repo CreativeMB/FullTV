@@ -102,6 +102,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
 import com.creativem.fulltv.BuildConfig
+import com.creativem.fulltv.menu.MenuPrincipalVerticalAdapter
 import com.creativem.fulltv.mundial.Mundial
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -149,7 +150,9 @@ private var usuarioEsperandoMas = false
     private var publicidadDialog: Dialog? = null
     private var lastFocusedMovie: View? = null
     private val handler = Handler(Looper.getMainLooper())
-
+    // Variable global para respaldar el diseño original del menú en móviles
+    private var originalMenuLayoutParams: ViewGroup.LayoutParams? = null
+    private var isMenuExpanded = false
     private var progressDialog: AlertDialog? = null
     private lateinit var apiService: TMDbApiService
     private val apiKey = "678193d2c735c6f37840cee035f4d69a"
@@ -224,8 +227,17 @@ private var usuarioEsperandoMas = false
         setupMovieGrid()
 
         binding.root.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
-            if (newFocus != null && isViewDescendantOf(newFocus, binding.rvPeliculas)) {
-                lastFocusedMovie = newFocus
+            if (newFocus != null) {
+                if (isViewDescendantOf(newFocus, binding.rvPeliculas)) {
+                    lastFocusedMovie = newFocus
+                }
+
+                // Ejecutar la expansión del menú lateral con foco únicamente si está en horizontal
+                val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                if (isLandscape) {
+                    val focusInMenu = isViewDescendantOf(newFocus, binding.menuPrincipal) || newFocus == binding.menuPrincipal
+                    setMenuExpandedState(focusInMenu)
+                }
             }
         }
 
@@ -676,30 +688,208 @@ private var usuarioEsperandoMas = false
             MenuPrincipalItem(name, menuIcons[i])
         }
 
-        val adapter = MenuPrincipalAdapter(menuList) { item ->
-            when (item.name) {
-                "Mundial" -> useryoutube()
-                "Activar" -> navegarGratis()
-                "Buscar" -> buscarPeliculaDialogo()
-                "Pedir" -> mostrarDialogoPedido()
-                "Paquete" -> activarpaquete()
-                "Alquila" -> navegarAPeliculasApi()
-                "Perfil" -> {
-                    val intent = Intent(this, Perfil::class.java)
-                    startActivity(intent)
-                }
-                "TV" -> navegarATv()
-                "Cerrar" -> cerrarSesion()
-                else -> Toast.makeText(this, "${item.name} seleccionado", Toast.LENGTH_SHORT).show()
+        // Respaldar LayoutParams originales del XML para la vista móvil vertical
+        if (originalMenuLayoutParams == null) {
+            val lp = binding.menuPrincipal.layoutParams
+            originalMenuLayoutParams = when (lp) {
+                is androidx.constraintlayout.widget.ConstraintLayout.LayoutParams -> androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(lp)
+                is ViewGroup.MarginLayoutParams -> ViewGroup.MarginLayoutParams(lp)
+                else -> ViewGroup.LayoutParams(lp)
             }
         }
 
-        binding.menuPrincipal.layoutManager =
-            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        binding.menuPrincipal.adapter = adapter
+        val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+        if (isLandscape) {
+            // --- CONFIGURACIÓN PARA MODO TV/HORIZONTAL ---
+            aplicarDisenoEstructuralTv(true)
+
+            // 🟢 CORRECCIÓN: Se cambia el color oscuro por transparente para evitar la franja de inicio
+            binding.menuPrincipal.setBackgroundColor(Color.TRANSPARENT)
+            binding.menuPrincipal.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
+
+            // El adaptador se inicializa colapsado (isExpanded = false)
+            val adapter = MenuPrincipalVerticalAdapter(menuList, isExpanded = false) { item ->
+                ejecutarAccionMenu(item)
+            }
+            binding.menuPrincipal.adapter = adapter
+
+            // Solicitar enfoque inicial en el catálogo de películas para evitar que el menú se auto-expanda al iniciar
+            binding.rvPeliculas.post {
+                binding.rvPeliculas.requestFocus()
+            }
+        } else {
+            // --- CONFIGURACIÓN ORIGINAL PARA MÓVIL/VERTICAL ---
+            aplicarDisenoEstructuralTv(false)
+
+            binding.menuPrincipal.background = null
+            binding.menuPrincipal.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+
+            val adapter = MenuPrincipalAdapter(menuList) { item ->
+                ejecutarAccionMenu(item)
+            }
+            binding.menuPrincipal.adapter = adapter
+        }
+
         binding.menuPrincipal.isFocusable = true
     }
+    private fun aplicarDisenoEstructuralTv(isLandscape: Boolean) {
+        val menuView = binding.menuPrincipal
+        val density = resources.displayMetrics.density
+        val menuParams = menuView.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams ?: return
 
+        val banner = findViewById<View>(R.id.layoutBannerNetflix)
+        val rvPeliculas = binding.rvPeliculas
+
+        if (isLandscape) {
+            // --- MODO HORIZONTAL (BARRA LATERAL IZQUIERDA VERTICAL) ---
+            menuView.setPadding(0, 0, 0, 0)
+
+            menuParams.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+            menuParams.leftToLeft = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+            menuParams.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+            menuParams.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+
+            // Desvincular restricciones derechas
+            menuParams.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET
+            menuParams.endToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET
+            menuParams.rightToRight = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET
+            menuParams.rightToLeft = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET
+
+            menuParams.width = (90 * density).toInt() // Ancho colapsado inicial
+            menuParams.height = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.MATCH_PARENT
+            menuView.layoutParams = menuParams
+
+            // Forzar fondo totalmente transparente en el contenedor del menú
+            menuView.setBackgroundColor(Color.TRANSPARENT)
+            menuView.background = null
+
+            // 🟢 SOLUCCIÓN: El contenido (Banner y Películas) ocupará TODA la pantalla.
+            // Solo dejamos un margen de 80dp para que la carátula no quede tapada por los iconos fijos.
+            if (banner != null) {
+                val bannerParams = banner.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+                if (bannerParams != null) {
+                    bannerParams.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+                    bannerParams.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+                    bannerParams.leftToLeft = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+
+                    bannerParams.leftMargin = (90 * density).toInt()
+                    bannerParams.marginStart = (90 * density).toInt()
+                    banner.layoutParams = bannerParams
+                }
+            }
+
+            val rvParams = rvPeliculas.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+            if (rvParams != null) {
+                rvParams.topToBottom = banner?.id ?: androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET
+                rvParams.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+                rvParams.leftToLeft = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+
+                // Dejar espacio fijo equivalente al ancho del menú colapsado
+                rvParams.leftMargin = (60 * density).toInt()
+                rvParams.marginStart = (60 * density).toInt()
+                rvPeliculas.layoutParams = rvParams
+            }
+
+            // 🟢 Asegurar que el menú esté al frente estructuralmente en Android TV
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                menuView.elevation = 10 * density
+                rvPeliculas.elevation = 0f
+                banner?.elevation = 0f
+            }
+
+        } else {
+            // --- RESTAURAR ESTADO VERTICAL ORIGINAL (MÓVIL) ---
+            val paddingVal = (20 * density).toInt()
+            menuView.setPadding(paddingVal, 0, paddingVal, 0)
+
+            originalMenuLayoutParams?.let {
+                menuView.layoutParams = it
+            }
+
+            if (banner != null) {
+                val bannerParams = banner.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+                if (bannerParams != null) {
+                    bannerParams.topToBottom = menuView.id
+                    bannerParams.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+                    bannerParams.leftToLeft = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+                    bannerParams.leftMargin = 0
+                    bannerParams.marginStart = 0
+                    banner.layoutParams = bannerParams
+                }
+            }
+
+            val rvParams = rvPeliculas.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+            if (rvParams != null) {
+                rvParams.topToBottom = banner?.id ?: androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET
+                rvParams.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+                rvParams.leftToLeft = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+                rvParams.leftMargin = 0
+                rvParams.marginStart = 0
+                rvPeliculas.layoutParams = rvParams
+            }
+        }
+    }
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        setupMenuHorizontal()
+    }
+
+    private fun setMenuExpandedState(expand: Boolean) {
+        val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        if (!isLandscape || isMenuExpanded == expand) return
+        isMenuExpanded = expand
+
+        val menuView = binding.menuPrincipal
+        val rvPeliculas = binding.rvPeliculas
+        val density = resources.displayMetrics.density
+        val targetWidth = if (expand) (160 * density).toInt() else (90 * density).toInt()
+
+        menuView.background = null
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            if (expand) {
+                menuView.elevation = 15 * density
+                rvPeliculas.elevation = 5 * density
+            } else {
+                menuView.elevation = 0f
+                rvPeliculas.elevation = 5 * density
+            }
+        }
+
+        // 🟢 CORRECCIÓN: Le pasamos la vista "menuView" al adaptador para que actualice los textos sin alterar el foco
+        menuView.post {
+            if (!isFinishing && !isDestroyed) {
+                (menuView.adapter as? MenuPrincipalVerticalAdapter)?.setExpanded(expand, menuView)
+            }
+        }
+
+        val anim = android.animation.ValueAnimator.ofInt(menuView.width, targetWidth)
+        anim.addUpdateListener { valueAnimator ->
+            val lp = menuView.layoutParams
+            lp.width = valueAnimator.animatedValue as Int
+            menuView.layoutParams = lp
+        }
+        anim.duration = 200
+        anim.start()
+    }
+    private fun ejecutarAccionMenu(item: MenuPrincipalItem) {
+        when (item.name) {
+            "Mundial" -> useryoutube()
+            "Activar" -> navegarGratis()
+            "Buscar" -> buscarPeliculaDialogo()
+            "Pedir" -> mostrarDialogoPedido()
+            "Paquete" -> activarpaquete()
+            "Alquila" -> navegarAPeliculasApi()
+            "Perfil" -> {
+                val intent = Intent(this, Perfil::class.java)
+                startActivity(intent)
+            }
+            "TV" -> navegarATv()
+            "Cerrar" -> cerrarSesion()
+            else -> Toast.makeText(this, "${item.name} seleccionado", Toast.LENGTH_SHORT).show()
+        }
+    }
     fun navegarGratis() {
         val intent = Intent(this, PeliculasValidasActivity::class.java)
         startActivity(intent)

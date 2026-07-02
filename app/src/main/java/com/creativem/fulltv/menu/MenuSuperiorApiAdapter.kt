@@ -10,20 +10,23 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
 
-class MenuSuperiorAdapter(
+class MenuSuperiorApiAdapter(
     private val items: List<String>,
     private val onItemClick: (String) -> Unit
-) : RecyclerView.Adapter<MenuSuperiorAdapter.MenuViewHolder>() {
+) : RecyclerView.Adapter<MenuSuperiorApiAdapter.MenuViewHolder>() {
 
-    var lastFocusedPosition: Int = 0
+    var lastFocusedPosition: Int = -1
+
+    // 🟢 COINCIDENCIA DE COLORES: Definimos el color dorado y blanco de su marca
+    private val colorDorado = Color.parseColor("#C5A059")
+    private val colorBlanco = Color.WHITE
 
     inner class MenuViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        // Usamos los mismos ID del layout del menú principal
         val icon: ImageView = view.findViewById(R.id.iconoMenu)
         val text: TextView = view.findViewById(R.id.textoMenu)
 
         init {
-            // OCULTAMOS EL ICONO por código para que solo quede el texto
+            // Ocultamos el icono por código para que solo quede el texto
             icon.visibility = View.GONE
 
             view.isFocusable = true
@@ -34,20 +37,21 @@ class MenuSuperiorAdapter(
             }
 
             view.setOnFocusChangeListener { v, hasFocus ->
-                // 1. Efecto de fondo (Borde Dorado)
+                // Efecto de fondo (Borde Dorado)
                 v.background = if (hasFocus)
                     ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
                 else
                     null
 
-                // 2. Efectos visuales (Color y Escala)
+                // Efectos visuales de color y escala unificados
                 if (hasFocus) {
-                    text.setTextColor(Color.YELLOW)
+                    // 🟢 CORRECCIÓN: Se aplica su color dorado original en lugar de amarillo
+                    text.setTextColor(colorDorado)
                     v.scaleX = 1.1f
                     v.scaleY = 1.1f
                     lastFocusedPosition = bindingAdapterPosition
                 } else {
-                    text.setTextColor(Color.WHITE)
+                    text.setTextColor(colorBlanco)
                     v.scaleX = 1.0f
                     v.scaleY = 1.0f
                 }
@@ -58,7 +62,6 @@ class MenuSuperiorAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MenuViewHolder {
-        // Usamos el MISMO layout para que el tamaño y fuente sean iguales
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_menu_principal, parent, false)
         return MenuViewHolder(view)
@@ -67,14 +70,15 @@ class MenuSuperiorAdapter(
     override fun onBindViewHolder(holder: MenuViewHolder, position: Int) {
         holder.text.text = items[position]
 
-        // Aplicamos el estado visual inicial para que no se pierda el rastro
+        // Aplicamos el estado visual inicial para que no se pierda el rastro de la selección
         val isFocused = position == lastFocusedPosition
         if (isFocused) {
-            holder.text.setTextColor(Color.YELLOW)
+            // 🟢 CORRECCIÓN: Se aplica su color dorado original en lugar de amarillo
+            holder.text.setTextColor(colorDorado)
             holder.itemView.scaleX = 1.1f
             holder.itemView.scaleY = 1.1f
         } else {
-            holder.text.setTextColor(Color.WHITE)
+            holder.text.setTextColor(colorBlanco)
             holder.itemView.scaleX = 1.0f
             holder.itemView.scaleY = 1.0f
         }

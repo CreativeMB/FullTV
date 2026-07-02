@@ -12,8 +12,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.creativem.fulltv.R
-import com.creativem.fulltv.menu.MenuSuperiorAdapter
-import com.creativem.fulltv.peliculas.PeliculasActivity
+import com.creativem.fulltv.menu.MenuSuperiorApiAdapter
 import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Modelo
 import com.creativem.fulltv.principal.ViewUtils
@@ -68,7 +67,7 @@ class PeliculasApiActivity : AppCompatActivity() {
 
         val menuRecycler = findViewById<RecyclerView>(R.id.menu_horizontal)
         menuRecycler.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        menuRecycler.adapter = MenuSuperiorAdapter(menuOpciones) { seleccion ->
+        menuRecycler.adapter = MenuSuperiorApiAdapter(menuOpciones) { seleccion ->
             cargarCategoria(seleccion)
         }
     }
