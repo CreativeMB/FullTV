@@ -15,7 +15,7 @@
         android:elevation="10dp"
         android:paddingHorizontal="20dp"
         android:descendantFocusability="afterDescendants"
-        android:nextFocusDown="@id/rvBannerPromos"
+        android:nextFocusRight="@id/rvPeliculas"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -174,7 +174,7 @@
                 android:orientation="horizontal"
                 android:scrollbars="none"
                 android:descendantFocusability="afterDescendants"
-                android:nextFocusUp="@id/menuPrincipal"
+                android:nextFocusLeft="@id/menuPrincipal"
                 android:nextFocusDown="@id/rvPeliculas"
                 android:clipToPadding="false"
                 app:layout_constraintBottom_toBottomOf="@id/cvBannerPoster"
@@ -194,6 +194,7 @@
     android:paddingEnd="20dp"
     android:paddingRight="20dp"
         android:descendantFocusability="afterDescendants"
+        android:nextFocusLeft="@id/menuPrincipal"
         android:nextFocusUp="@id/rvBannerPromos"
         app:layout_constraintTop_toBottomOf="@id/layoutBannerNetflix"
         app:layout_constraintBottom_toBottomOf="parent"
