@@ -136,20 +136,32 @@ class SplashActivity : AppCompatActivity() {
     }
 
     private fun checkConexionYProcesar() {
-        if (isNetworkAvailable()) {
-            reintentosConexion = 0
-            findViewById<View>(R.id.layoutNoInternet).visibility = View.GONE
-            iniciarCargaDeDatos()
-        } else {
-            // Antes de mostrar error, intentar reintentar varias veces
-            // (porque en TV recién encendida la red tarda en validarse)
-            reintentarConexion()
-        }
-    }
+        // 1. Iniciamos una verificación en segundo plano para no congelar la UI
+        Thread {
+            var conectado = false
 
-    /**
-     * Reintenta verificar la conexión antes de mostrar el error
-     */
+            // Hacemos hasta 3 intentos rápidos "silenciosos" antes de asustar al usuario
+            // Esto soluciona el fallo en la primera apertura
+            for (i in 1..3) {
+                if (isNetworkAvailable() || probarConexionReal()) {
+                    conectado = true
+                    break
+                }
+                Thread.sleep(800) // Esperamos casi un segundo entre intentos silenciosos
+            }
+
+            runOnUiThread {
+                if (conectado) {
+                    reintentosConexion = 0
+                    findViewById<View>(R.id.layoutNoInternet).visibility = View.GONE
+                    iniciarCargaDeDatos()
+                } else {
+                    // Si tras los intentos silenciosos sigue fallando, entramos en el bucle de reintento visible
+                    reintentarConexion()
+                }
+            }
+        }.start()
+    }
     private fun reintentarConexion() {
         if (reintentosConexion < MAX_REINTENTOS) {
             reintentosConexion++
@@ -170,76 +182,43 @@ class SplashActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Verificación robusta de conexión para Android TV
-     * Valida: WiFi, Ethernet (cable/fibra), Cellular, VPN
-     * Y confirma que la red tenga INTERNET REAL (no solo red local)
-     */
     private fun isNetworkAvailable(): Boolean {
         val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
 
-        // Método 1: Verificación rápida de la red activa reportada por el sistema
+        // Intentamos primero con la red activa (es lo más rápido)
         val activeNetwork = connectivityManager.activeNetwork
         if (activeNetwork != null) {
-            val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
-            if (capabilities != null && validarCapacidades(capabilities)) {
+            val caps = connectivityManager.getNetworkCapabilities(activeNetwork)
+            if (caps != null && (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                        caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
+                        caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN))) {
                 return true
             }
         }
 
-        // Método 2: Escaneo de todas las interfaces de red (Útil al encender el TV)
-        val networks = connectivityManager.allNetworks
-        if (networks != null) {
-            for (network in networks) {
-                val capabilities = connectivityManager.getNetworkCapabilities(network) ?: continue
-                if (validarCapacidades(capabilities)) {
-                    return true
-                }
-            }
+        // Si falla lo anterior, revisamos todas las interfaces (útil en algunas TV Boxes)
+        return connectivityManager.allNetworks.any { network ->
+            val caps = connectivityManager.getNetworkCapabilities(network)
+            caps != null && (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                    caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
+                    caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN))
         }
-
-        // Método 3: Validación definitiva por Socket real (Ignora errores de firmware del TV)
-        return probarConexionReal()
     }
 
-    private fun validarCapacidades(capabilities: NetworkCapabilities): Boolean {
-        val tieneTransporteValido = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) || // Cable de red / Fibra
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH)
-
-        if (!tieneTransporteValido) return false
-
-        // Si tiene transporte e internet básico, validamos
-        if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-            // Si el SO ya lo validó, retornamos positivo de inmediato
-            if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
-                return true
-            }
-            // Si la TV está encendiendo y el SO aún no completa la validación nativa,
-            // forzamos la prueba de socket real para no detener al usuario.
-            return probarConexionReal()
-        }
-
-        return false
-    }
 
     private fun probarConexionReal(): Boolean {
         return try {
+            // Usamos una dirección IP directa para evitar perder tiempo con el DNS
+            // 1.1.1.1 es el DNS de Cloudflare, muy rápido.
+            val timeoutMs = 2000
             val socket = Socket()
-            // Conexión rápida por socket a los DNS públicos de Google en el puerto 53 (DNS)
-            socket.connect(InetSocketAddress("8.8.8.8", 53), 1500)
+            socket.connect(InetSocketAddress("1.1.1.1", 53), timeoutMs)
             socket.close()
             true
         } catch (e: Exception) {
             false
         }
     }
-
-    /**
-     * Muestra el error de conexión con animación
-     */
     private fun mostrarErrorConexion() {
         val layoutError = findViewById<View>(R.id.layoutNoInternet)
         val btnReintentar = findViewById<Button>(R.id.btnReintentar)
