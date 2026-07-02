@@ -176,7 +176,6 @@
                 android:descendantFocusability="afterDescendants"
                 android:nextFocusUp="@id/menuPrincipal"
                 android:nextFocusDown="@id/rvPeliculas"
-                android:clipChildren="false"
                 android:clipToPadding="false"
                 app:layout_constraintBottom_toBottomOf="@id/cvBannerPoster"
                 app:layout_constraintStart_toEndOf="@id/cvBannerPoster"
