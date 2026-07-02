@@ -201,6 +201,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
     <!-- 4. SALDO DE CRÉDITOS (Alineado arriba a la derecha) -->
+    <!-- 4. SALDO DE CRÉDITOS (Alineado arriba a la derecha) -->
     <LinearLayout
         android:id="@+id/layoutSaldo"
         android:layout_width="wrap_content"
@@ -212,19 +213,20 @@
         android:orientation="horizontal"
         android:paddingHorizontal="12dp"
         android:paddingVertical="4dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        android:elevation="12dp"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintTop_toTopOf="parent">
 
-        <TextView
-            android:id="@+id/tvSaldoValue"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="🪙 CasTV: 0"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:maxLines="1" />
-    </LinearLayout>
+    <TextView
+        android:id="@+id/tvSaldoValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🪙 CasTV: 0"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:maxLines="1" />
+</LinearLayout>
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>
