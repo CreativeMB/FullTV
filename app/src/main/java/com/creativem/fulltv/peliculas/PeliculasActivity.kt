@@ -3055,6 +3055,8 @@ private var usuarioEsperandoMas = false
 
         Log.d("PeliculasActivity", "Limpieza de onDestroy completada")
     }
+
+
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
         if (event.action == android.view.KeyEvent.ACTION_DOWN) {
             val currentFocus = currentFocus
@@ -3066,7 +3068,6 @@ private var usuarioEsperandoMas = false
                 when (event.keyCode) {
                     android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
                         // 1. MENÚ VERTICAL -> DERECHA -> PORTAL DE SALIDA AL CONTENIDO
-                        // Solo permite salir del menú hacia la derecha (UP/DOWN se quedan estrictamente navegando dentro del menú)
                         if (isViewDescendantOf(currentFocus, binding.menuPrincipal) || currentFocus == binding.menuPrincipal) {
                             if (rvBannerPromos != null && rvBannerPromos.visibility == View.VISIBLE && rvBannerPromos.childCount > 0) {
                                 rvBannerPromos.getChildAt(0)?.requestFocus()
@@ -3085,12 +3086,9 @@ private var usuarioEsperandoMas = false
                         if (rvBannerPromos != null && (isViewDescendantOf(currentFocus, rvBannerPromos) || currentFocus == rvBannerPromos)) {
                             val bannerLm = rvBannerPromos.layoutManager as? LinearLayoutManager
                             val bannerPos = bannerLm?.getPosition(currentFocus) ?: -1
-                            // Si está en el primer elemento del banner y presiona izquierda, regresa al menú
                             if (bannerPos == 0) {
-                                if (binding.menuPrincipal.childCount > 0) {
-                                    binding.menuPrincipal.getChildAt(0).requestFocus()
-                                    return true
-                                }
+                                binding.menuPrincipal.requestFocus()
+                                return true
                             }
                         }
 
@@ -3103,12 +3101,9 @@ private var usuarioEsperandoMas = false
                                 val focusedChild = rvPeliculas.findContainingItemView(currentFocus)
                                 if (focusedChild != null) {
                                     val position = rvPeliculas.getChildAdapterPosition(focusedChild)
-                                    // Si está en la columna extrema izquierda de la grilla, salta directo al menú vertical
                                     if (position % columnas == 0) {
-                                        if (binding.menuPrincipal.childCount > 0) {
-                                            binding.menuPrincipal.getChildAt(0).requestFocus()
-                                            return true
-                                        }
+                                        binding.menuPrincipal.requestFocus()
+                                        return true
                                     }
                                 }
                             }
@@ -3123,16 +3118,34 @@ private var usuarioEsperandoMas = false
                                 return true
                             }
                         }
+
+                        // 5. 🟢 PELÍCULAS (Fila inferior) -> ABAJO -> BLOQUEO DE SALIDA (No hace nada)
+                        if (isViewDescendantOf(currentFocus, binding.rvPeliculas) || currentFocus == binding.rvPeliculas) {
+                            val lm = binding.rvPeliculas.layoutManager as? GridLayoutManager
+                            if (lm != null) {
+                                val position = lm.getPosition(currentFocus)
+                                val columns = lm.spanCount
+                                val totalItems = lm.itemCount
+
+                                if (position != RecyclerView.NO_POSITION && totalItems > 0) {
+                                    // Calculamos el índice donde inicia la última fila de la grilla
+                                    val bottomRowStart = (totalItems - 1) / columns * columns
+                                    if (position >= bottomRowStart) {
+                                        // Consumimos el evento devolviendo true sin realizar ninguna acción
+                                        return true
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     android.view.KeyEvent.KEYCODE_DPAD_UP -> {
-                        // 5. PELÍCULAS (Fila superior) -> ARRIBA -> ENTRAR AL BANNER
+                        // 6. PELÍCULAS (Fila superior) -> ARRIBA -> ENTRAR AL BANNER
                         if (isViewDescendantOf(currentFocus, binding.rvPeliculas) || currentFocus == binding.rvPeliculas) {
                             val lm = binding.rvPeliculas.layoutManager as? GridLayoutManager
                             val position = lm?.getPosition(currentFocus) ?: -1
                             val columns = lm?.spanCount ?: 3
 
-                            // Si está en la primera fila de películas y presiona arriba, se enfoca el primer ítem del banner
                             if (position in 0 until columns) {
                                 if (rvBannerPromos != null && rvBannerPromos.visibility == View.VISIBLE && rvBannerPromos.childCount > 0) {
                                     rvBannerPromos.getChildAt(0)?.requestFocus()

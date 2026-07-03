@@ -354,27 +354,31 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
     private fun initializeRecyclerView() {
-        // 1. Usamos PelisCarteleraAdapter en lugar de PeliculasApiAdapter
-        // Pasamos una lista vacía inicialmente y la lógica de clic
         carteleraAdapter = PelisCarteleraAdapter(mutableListOf()) { movie ->
-            // Al tocar una peli en el reproductor, la reproducimos
             startMoviePlayback(movie.streamUrl, movie.title, movie.castv, movie.imageUrl)
         }
 
         val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
 
-        // 2. Configuración del LayoutManager (Horizontal para TV)
+        if (menuPelis != null) {
+            // 🟢 INYECCIÓN DINÁMICA DE MÁRGENES (Evita recortados sin usar XML):
+            val density = resources.displayMetrics.density
+            val paddingHorizontal = (8 * density).toInt() // 8dp de los lados
+            val paddingVertical = (22 * density).toInt()  // 22dp arriba y abajo (Amortiguación de escala)
+
+            // Forzamos el relleno y el comportamiento clipToPadding por código
+            menuPelis.setPadding(paddingHorizontal, paddingVertical, paddingHorizontal, paddingVertical)
+            menuPelis.clipToPadding = false
+        }
+
         menuPelis.layoutManager = LinearLayoutManager(
             this@PlayerPeliculas,
             LinearLayoutManager.HORIZONTAL,
             false
-
         )
 
-        // 3. Asignamos el nuevo adaptador al RecyclerView del reproductor
         menuPelis.adapter = carteleraAdapter
 
-        // 4. Cargamos los datos (asegúrate de que loadMovies actualice ahora carteleraAdapter)
         loadMovies()
     }
 
@@ -1244,71 +1248,14 @@ class PlayerPeliculas : AppCompatActivity() {
             }
         }
     }
-//    @OptIn(UnstableApi::class)
-//    private fun prepararReproductor(posicionInicial: Long) {
-//        // 1. Limpieza
-//        player?.let {
-//            it.stop()
-//            it.clearMediaItems()
-//            it.release()
-//        }
-//        player = null
-//
-//        // 2. Factory de red: Añadimos "Connection: close" para evitar el bloqueo del CDN
-//        val dataSourceFactory = DefaultHttpDataSource.Factory()
-//            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-//            .setDefaultRequestProperties(mapOf("Connection" to "close")) // Obliga a refrescar el socket
-//            .setConnectTimeoutMs(15_000)
-//            .setReadTimeoutMs(15_000)
-//            .setAllowCrossProtocolRedirects(true)
-//
-//        // 3. Load Control para arranque rápido
-//        val loadControl = DefaultLoadControl.Builder()
-//            .setBufferDurationsMs(1_000, 30_000, 500, 1_000)
-//            .setPrioritizeTimeOverSizeThresholds(true)
-//            .build()
-//
-//        // 4. Instancia del reproductor
-//        player = ExoPlayer.Builder(this@PlayerPeliculas)
-//            .setLoadControl(loadControl)
-//            .build()
-//
-//        binding.reproductor.player = player
-//
-//        // 5. Configuración específica por tipo de archivo
-//        val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
-//
-//        if (streamUrl.contains(".m3u8")) {
-//            // Para HLS: Usamos la factoría explícita y desactivamos el Chunkless
-//            // si falla (a veces es más estable sin ello)
-//            val hlsSource = HlsMediaSource.Factory(dataSourceFactory)
-//                .setAllowChunklessPreparation(false) // <--- Cambiado a FALSE para mayor compatibilidad
-//                .createMediaSource(mediaItem)
-//            player?.setMediaSource(hlsSource)
-//        } else {
-//            // Para MP4: Usamos ProgressiveMediaSource
-//            val progressiveSource = ProgressiveMediaSource.Factory(dataSourceFactory)
-//                .createMediaSource(mediaItem)
-//            player?.setMediaSource(progressiveSource)
-//        }
-//
-//        // 6. Preparar
-//        player?.prepare()
-//        player?.addListener(playerListener)
-//
-//        if (posicionInicial > 0) player?.seekTo(posicionInicial)
-//        player?.playWhenReady = true
-//    }
-
 
     private fun obtenerProgresoGuardado(): Long {
         val clave = generarClaveProgreso()
         val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
-
         return try {
             prefs.getLong(clave, 0L)
-        } catch (e: ClassCastException) {
-            prefs.getInt(clave, 0).toLong() // 🛠️ Conversión segura
+        } catch (e: Exception) {
+            prefs.getInt(clave, 0).toLong() // Conversión de seguridad por registros antiguos
         }
     }
 
@@ -1421,16 +1368,41 @@ class PlayerPeliculas : AppCompatActivity() {
     }
 
     private fun generarClaveProgreso(): String {
-        val titulo = movieTitle.trim().ifBlank { "pelicula_sin_titulo" }
-        val año = if (movieCastv <= 0) "sin_año" else movieCastv.toString()
-        return "$titulo-$año".replace(Regex("[^A-Za-z0-9_-]"), "_")
+        // Extraemos la URL limpia (sin tokens dinámicos "?token=" ni cabeceras "|User-Agent=")
+        val urlLimpia = streamUrl.split("?")[0].split("|")[0].trim()
+        return if (urlLimpia.isNotEmpty()) {
+            "progreso_peli_" + urlLimpia.hashCode().toString()
+        } else {
+            val titulo = movieTitle.trim().ifBlank { "pelicula_sin_titulo" }
+            val anio = if (movieCastv <= 0) "0" else movieCastv.toString()
+            "progreso_peli_" + "$titulo-$anio".replace(Regex("[^A-Za-z0-9_-]"), "_")
+        }
     }
 
+    private fun guardarProgresoActual() {
+        val activePlayer = player ?: return
+        val currentPosition = activePlayer.currentPosition
+        val duration = activePlayer.duration
+
+        // Guardamos progreso si se ha reproducido más de 10 segundos y no ha terminado por completo (con un margen de 15s)
+        if (currentPosition > 10_000 && (duracionTotalMs <= 0 || (duracionTotalMs - currentPosition) > 15_000)) {
+            val clave = generarClaveProgreso()
+            val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
+
+            // Usamos commit() en lugar de apply() para asegurar la escritura física inmediata en disco
+            prefs.edit().putLong(clave, currentPosition).commit()
+            Log.d("ProgresoPeliculas", "Progreso guardado de forma síncrona para $clave: $currentPosition ms")
+        }
+    }
+
+    // Variable de soporte para guardar la duración total
+    private val duracionTotalMs: Long
+        get() = player?.duration ?: 0L
 
     private fun borrarProgresoGuardado() {
         val clave = generarClaveProgreso()
         val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
-        prefs.edit().remove(clave).apply()
+        prefs.edit().remove(clave).commit()
     }
 
 
@@ -1444,6 +1416,7 @@ class PlayerPeliculas : AppCompatActivity() {
             prefs.edit().putLong(clave, position).apply()
         }
 
+        guardarProgresoActual()
         player?.pause()
         handler.postDelayed(runnableActualizar, 1000)
     }
@@ -1916,8 +1889,15 @@ class PlayerPeliculas : AppCompatActivity() {
         player?.release()
         player = null
     }
+    override fun onStop() {
+        super.onStop()
+        // Aseguramos la persistencia si el usuario minimizó o cambió de app bruscamente
+        guardarProgresoActual()
+    }
 
     override fun onDestroy() {
+        // Salvaguarda final antes de liberar por completo el hardware del ExoPlayer
+        guardarProgresoActual()
         super.onDestroy()
         releasePlayer()
     }

@@ -9,6 +9,8 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
 import android.view.KeyEvent
+import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
@@ -47,24 +49,23 @@ class TvActivity : AppCompatActivity() {
         setContentView(binding.root)
         prefs = getSharedPreferences("TV_PREFS", Context.MODE_PRIVATE)
 
-        // 🔥 SOLUCIÓN 1: Evitar que el teclado se abra automáticamente al entrar
+        // 🔥 Evita que el teclado virtual de la TV se abra solo al iniciar
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
 
-        // 🔥 SOLUCIÓN 2: Quitarle el foco inicial al buscador para que no se quede ahí pegado
+        // 🔥 Quitar el enfoque inicial a la barra de texto
         binding.searchEditText.clearFocus()
 
-
-        // Configuración para TV
+        // Configuración de pantalla de TV
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
 
         setupRecyclerView()
         setupBuscador()
         loadTvChannels()
+
         onBackPressedDispatcher.addCallback(this) {
             CastvHelper.regresarAPeliculas(this@TvActivity)
         }
-
     }
 
     private fun setupRecyclerView() {
@@ -138,25 +139,24 @@ class TvActivity : AppCompatActivity() {
                     if (buscadorTeníaFoco) {
                         binding.searchEditText.requestFocus()
                     } else {
-                        // --- LÓGICA DE RESTAURACIÓN DE FOCO ---
-                        // Buscamos la posición del último ID que tuvo foco en la nueva lista
                         val positionToFocus = sortedList.indexOfFirst { it.id == lastFocusedChannelId }
 
                         if (positionToFocus != -1) {
-                            // Si el elemento existe en la nueva lista, vamos a él
                             val view = binding.recyclerViewTV.layoutManager?.findViewByPosition(positionToFocus)
                             if (view != null) {
                                 view.requestFocus()
                             } else {
-                                // Si la vista no está creada (fuera de pantalla), hacemos scroll y enfocamos
                                 binding.recyclerViewTV.scrollToPosition(positionToFocus)
                                 binding.recyclerViewTV.postDelayed({
                                     binding.recyclerViewTV.layoutManager?.findViewByPosition(positionToFocus)?.requestFocus()
                                 }, 50)
                             }
                         } else {
-                            // Si el canal que tenía foco ya no está en la lista (por el filtro), enfocamos el primero
-                            binding.recyclerViewTV.layoutManager?.findViewByPosition(0)?.requestFocus()
+                            // 🟢 SOLUCIÓN AL FOCO INICIAL: Damos foco al RecyclerView y luego a su primera celda
+                            binding.recyclerViewTV.requestFocus()
+                            binding.recyclerViewTV.postDelayed({
+                                binding.recyclerViewTV.layoutManager?.findViewByPosition(0)?.requestFocus()
+                            }, 100)
                         }
                     }
                 }
@@ -280,5 +280,87 @@ class TvActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             AudioFocusHelper.abandonAudioFocus()
         }
+    }
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            val currentFocus = currentFocus
+            val lm = binding.recyclerViewTV.layoutManager as? GridLayoutManager
+
+            if (currentFocus != null && lm != null) {
+                val esHijoDeGrid = isViewDescendantOf(currentFocus, binding.recyclerViewTV) || currentFocus == binding.recyclerViewTV
+                val position = if (esHijoDeGrid) lm.getPosition(currentFocus) else androidx.recyclerview.widget.RecyclerView.NO_POSITION
+                val columns = lm.spanCount
+                val totalItems = lm.itemCount
+
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_BACK -> {
+                        CastvHelper.regresarAPeliculas(this)
+                        return true
+                    }
+
+                    KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        // Si el foco está en la barra de búsqueda, baja de forma controlada al último canal
+                        if (binding.searchEditText.hasFocus()) {
+                            val positionToFocus = channelListMaster.indexOfFirst { it.id == lastFocusedChannelId }
+                            val finalPos = if (positionToFocus != -1) positionToFocus else 0
+
+                            binding.recyclerViewTV.requestFocus()
+                            lm.scrollToPositionWithOffset(finalPos, 100)
+                            binding.recyclerViewTV.postDelayed({
+                                lm.findViewByPosition(finalPos)?.requestFocus()
+                            }, 100)
+                            return true
+                        }
+
+                        // REGLA 3: Si está en la última fila de canales, bloqueamos la salida por abajo
+                        if (position != androidx.recyclerview.widget.RecyclerView.NO_POSITION && totalItems > 0) {
+                            val bottomRowStart = (totalItems - 1) / columns * columns
+                            if (position >= bottomRowStart) {
+                                return true
+                            }
+                        }
+                    }
+
+                    KeyEvent.KEYCODE_DPAD_UP -> {
+                        // REGLA 4: Si está en la primera fila de canales y presiona arriba, enfoca el buscador
+                        if (position != androidx.recyclerview.widget.RecyclerView.NO_POSITION && position in 0 until columns) {
+                            binding.searchEditText.requestFocus()
+                            return true
+                        }
+                    }
+
+                    KeyEvent.KEYCODE_DPAD_LEFT -> {
+                        // REGLA 2A: Si está en la primera columna de canales y presiona izquierda, enfoca el buscador
+                        if (position != androidx.recyclerview.widget.RecyclerView.NO_POSITION) {
+                            if (position % columns == 0) {
+                                binding.searchEditText.requestFocus()
+                                return true
+                            }
+                        }
+                    }
+
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        // REGLA 2B: Si está en la última columna de canales y presiona derecha, enfoca el buscador
+                        if (position != androidx.recyclerview.widget.RecyclerView.NO_POSITION && totalItems > 0) {
+                            val isLastColumn = (position % columns == columns - 1) || (position == totalItems - 1)
+                            if (isLastColumn) {
+                                binding.searchEditText.requestFocus()
+                                return true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun isViewDescendantOf(view: View, parent: ViewGroup): Boolean {
+        var current = view.parent
+        while (current != null) {
+            if (current == parent) return true
+            current = current.parent
+        }
+        return false
     }
 }
