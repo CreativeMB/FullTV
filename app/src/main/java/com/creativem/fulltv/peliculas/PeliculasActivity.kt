@@ -158,7 +158,7 @@ private var usuarioEsperandoMas = false
     private lateinit var apiService: TMDbApiService
     private val apiKey = "678193d2c735c6f37840cee035f4d69a"
     private var bannerTimer: CountDownTimer? = null
-
+    private var ultimoSaldo = "0"
     private val promoRotationHandler = Handler(Looper.getMainLooper())
     private var promoRotationRunnable: Runnable? = null
     private val peliculasPromoList = mutableListOf<Modelo>()
@@ -705,39 +705,10 @@ private var usuarioEsperandoMas = false
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
                     val saldo = snapshot.child("castv").value?.toString() ?: "0"
-                    val emoji = "🪙 "
-                    val etiqueta = "CasTV: "
-                    val textoCompleto = "$emoji$etiqueta$saldo"
 
-                    val spannable = SpannableStringBuilder(textoCompleto)
-
-                    spannable.setSpan(
-                        ForegroundColorSpan(Color.WHITE),
-                        emoji.length,
-                        emoji.length + etiqueta.length,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-
-                    spannable.setSpan(
-                        ForegroundColorSpan(Color.parseColor("#C5A059")),
-                        emoji.length + etiqueta.length,
-                        textoCompleto.length,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-
-                    binding.tvSaldoValue.text = spannable
-
-                    binding.layoutSaldo.animate()
-                        .scaleX(1.1f)
-                        .scaleY(1.1f)
-                        .setDuration(200)
-                        .withEndAction {
-                            binding.layoutSaldo.animate()
-                                .scaleX(1f)
-                                .scaleY(1f)
-                                .setDuration(200)
-                                .start()
-                        }.start()
+                    // Actualizamos la variable global y refrescamos los ítems del menú con el nuevo valor
+                    ultimoSaldo = saldo
+                    actualizarMenuConSaldo()
                 }
             }
 
@@ -746,6 +717,7 @@ private var usuarioEsperandoMas = false
             }
         })
     }
+
 
     private fun isViewDescendantOf(view: View, parent: ViewGroup): Boolean {
         var current = view.parent
@@ -757,21 +729,7 @@ private var usuarioEsperandoMas = false
     }
 
     private fun setupMenuHorizontal() {
-        val menuItems = listOf(
-            "Mundial", "Perfil", "Activar", "Alquila", "Buscar",
-            "Pedir", "Paquete",  "TV", "Cerrar"
-        )
-        val menuIcons = listOf(
-            R.drawable.youtube, R.drawable.home, R.drawable.cartelera,
-            R.drawable.cine, R.drawable.buscar, R.drawable.pedido,
-            R.drawable.activacion, R.drawable.tv, R.drawable.cerrrarp
-        )
-
-        val menuList = menuItems.mapIndexed { i, name ->
-            MenuPrincipalItem(name, menuIcons[i])
-        }
-
-        // Respaldar LayoutParams originales del XML para la vista móvil vertical
+        // 1. Respaldar LayoutParams originales del XML para la vista móvil vertical (Solo una vez)
         if (originalMenuLayoutParams == null) {
             val lp = binding.menuPrincipal.layoutParams
             originalMenuLayoutParams = when (lp) {
@@ -783,19 +741,13 @@ private var usuarioEsperandoMas = false
 
         val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
+        // 2. Configurar la estructura de diseño física (LayoutManagers y backgrounds)
         if (isLandscape) {
             // --- CONFIGURACIÓN PARA MODO TV/HORIZONTAL ---
             aplicarDisenoEstructuralTv(true)
 
-            // 🟢 CORRECCIÓN: Se cambia el color oscuro por transparente para evitar la franja de inicio
             binding.menuPrincipal.setBackgroundColor(Color.TRANSPARENT)
             binding.menuPrincipal.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
-
-            // El adaptador se inicializa colapsado (isExpanded = false)
-            val adapter = MenuPrincipalVerticalAdapter(menuList, isExpanded = false) { item ->
-                ejecutarAccionMenu(item)
-            }
-            binding.menuPrincipal.adapter = adapter
 
             // Solicitar enfoque inicial en el catálogo de películas para evitar que el menú se auto-expanda al iniciar
             binding.rvPeliculas.post {
@@ -807,14 +759,76 @@ private var usuarioEsperandoMas = false
 
             binding.menuPrincipal.background = null
             binding.menuPrincipal.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        }
 
+        // 3. 🟢 CARGA REACTIVA: Vincula el adaptador con el saldo actual inyectado
+        actualizarMenuConSaldo()
+
+        // 4. 🟢 INTERCEPTOR DE FOCO: Desactiva el foco del ítem informativo de CasTV al dibujarse
+        binding.menuPrincipal.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
+            override fun onChildViewAttachedToWindow(view: View) {
+                val tv = view.findTextView()
+                if (tv != null && tv.text.toString().contains("CasTV")) {
+                    view.isFocusable = false
+                    view.isFocusableInTouchMode = false
+                    view.isClickable = false
+                    tv.setTextColor(Color.parseColor("#C5A059")) // Color Dorado Premium
+                }
+            }
+            override fun onChildViewDetachedFromWindow(view: View) {}
+        })
+
+        binding.menuPrincipal.isFocusable = true
+    }
+    private fun View.findTextView(): TextView? {
+        if (this is TextView) return this
+        if (this is ViewGroup) {
+            for (i in 0 until childCount) {
+                val child = getChildAt(i).findTextView()
+                if (child != null) return child
+            }
+        }
+        return null
+    }
+    private fun actualizarMenuConSaldo() {
+        val menuItems = listOf(
+            "Mundial", "Perfil", "Activar", "Alquila", "Buscar",
+            "Pedir", "Paquete", "TV", "Cerrar"
+        ).toMutableList()
+
+        val menuIcons = listOf(
+            R.drawable.youtube, R.drawable.home, R.drawable.cartelera,
+            R.drawable.cine, R.drawable.buscar, R.drawable.pedido,
+            R.drawable.activacion, R.drawable.tv, R.drawable.cerrrarp
+        ).toMutableList()
+
+        // 🟢 INSERCIÓN AL INICIO (Posición 0):
+        // Insertamos el saldo al principio de las listas. Reemplace 'R.drawable.moneda' por el nombre de su drawable de la moneda dorada.
+        menuItems.add(0, "$$ultimoSaldo")
+        menuIcons.add(0, R.drawable.pagos)
+
+        val menuList = menuItems.mapIndexed { i, name ->
+            MenuPrincipalItem(name, menuIcons[i])
+        }
+
+        val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+        if (isLandscape) {
+            val adapter = MenuPrincipalVerticalAdapter(menuList, isExpanded = isMenuExpanded) { item ->
+                // Filtro para ignorar clicks físicos sobre el saldo de créditos
+                if (!item.name.contains("CasTV")) {
+                    ejecutarAccionMenu(item)
+                }
+            }
+            binding.menuPrincipal.adapter = adapter
+        } else {
             val adapter = MenuPrincipalAdapter(menuList) { item ->
-                ejecutarAccionMenu(item)
+                if (!item.name.contains("CasTV")) {
+                    ejecutarAccionMenu(item)
+                }
             }
             binding.menuPrincipal.adapter = adapter
         }
-
-        binding.menuPrincipal.isFocusable = true
     }
     private fun aplicarDisenoEstructuralTv(isLandscape: Boolean) {
         val menuView = binding.menuPrincipal

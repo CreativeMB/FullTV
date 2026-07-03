@@ -28,26 +28,31 @@ class MenuPrincipalVerticalAdapter(
         if (isExpanded != expanded) {
             isExpanded = expanded
 
-            // Recorremos las celdas actualmente visibles en pantalla y modificamos el texto directamente
             val childCount = recyclerView.childCount
             for (i in 0 until childCount) {
                 val child = recyclerView.getChildAt(i)
                 val holder = recyclerView.getChildViewHolder(child) as? ViewHolder
                 if (holder != null) {
-                    // Cambiar visibilidad sin recrear la celda
                     holder.textView.visibility = if (expanded) View.VISIBLE else View.GONE
 
-                    // Asegurar que mantenga la escala y colores correspondientes
-                    val isFocused = (holder.bindingAdapterPosition == lastFocusedPosition) && expanded
-                    if (isFocused) {
+                    val pos = holder.bindingAdapterPosition
+                    val item = items.getOrNull(pos)
+                    val isFocused = (pos == lastFocusedPosition) && expanded
+                    val esCasTV = item?.name?.contains("CasTV") ?: false
+
+                    if (isFocused && !esCasTV) {
                         holder.textView.setTextColor(colorDorado)
-                        holder.iconView.setColorFilter(colorDorado, PorterDuff.Mode.SRC_IN)
+                        // 🟢 Sin filtros de color sobre el icono al expandir el menú
                         holder.contentWrapper.background = ContextCompat.getDrawable(holder.itemView.context, R.drawable.card_focused_background)
                         holder.contentWrapper.scaleX = 1.1f
                         holder.contentWrapper.scaleY = 1.1f
                     } else {
-                        holder.textView.setTextColor(colorBlanco)
-                        holder.iconView.clearColorFilter()
+                        if (esCasTV) {
+                            holder.textView.setTextColor(colorDorado)
+                        } else {
+                            holder.textView.setTextColor(colorBlanco)
+                        }
+                        // 🟢 Sin filtros de color sobre el icono al colapsar el menú
                         holder.contentWrapper.background = null
                         holder.contentWrapper.scaleX = 1.0f
                         holder.contentWrapper.scaleY = 1.0f
@@ -127,44 +132,63 @@ class MenuPrincipalVerticalAdapter(
 
         holder.textView.visibility = if (isExpanded) View.VISIBLE else View.GONE
 
+        // Si es el saldo de CasTV, desactivamos el foco físico de esta celda
+        val esCasTV = item.name.contains("CasTV")
+        if (esCasTV) {
+            holder.container.isFocusable = false
+            holder.container.isFocusableInTouchMode = false
+            holder.container.isClickable = false
+            holder.textView.setTextColor(colorDorado) // Siempre dorado y fijo
+        } else {
+            holder.container.isFocusable = true
+            holder.container.isFocusableInTouchMode = true
+            holder.container.isClickable = true
+            holder.textView.setTextColor(colorBlanco)
+        }
+
         val isFocused = (position == lastFocusedPosition) && isExpanded
         holder.textView.isSelected = isFocused
 
-        if (isFocused) {
+        if (isFocused && !esCasTV) {
             holder.textView.setTextColor(colorDorado)
-            holder.iconView.setColorFilter(colorDorado, PorterDuff.Mode.SRC_IN)
+            // 🟢 SE ELIMINARON LOS FILTROS DE COLOR (Las imágenes siempre mantienen sus colores nativos)
             holder.contentWrapper.background = ContextCompat.getDrawable(holder.itemView.context, R.drawable.card_focused_background)
             holder.contentWrapper.scaleX = 1.1f
             holder.contentWrapper.scaleY = 1.1f
         } else {
-            holder.textView.setTextColor(colorBlanco)
-            holder.iconView.clearColorFilter()
+            if (!esCasTV) {
+                holder.textView.setTextColor(colorBlanco)
+            }
             holder.contentWrapper.background = null
             holder.contentWrapper.scaleX = 1.0f
             holder.contentWrapper.scaleY = 1.0f
         }
 
         holder.container.setOnFocusChangeListener { v, hasFocus ->
+            if (esCasTV) return@setOnFocusChangeListener // CasTV nunca reacciona al foco
+
             holder.textView.isSelected = hasFocus
 
             if (hasFocus) {
                 holder.contentWrapper.background = ContextCompat.getDrawable(v.context, R.drawable.card_focused_background)
                 holder.textView.setTextColor(colorDorado)
-                holder.iconView.setColorFilter(colorDorado, PorterDuff.Mode.SRC_IN)
+                // 🟢 Sin filtros de color sobre el icono al enfocar de forma activa
                 holder.contentWrapper.scaleX = 1.1f
                 holder.contentWrapper.scaleY = 1.1f
                 lastFocusedPosition = holder.bindingAdapterPosition
             } else {
                 holder.contentWrapper.background = null
                 holder.textView.setTextColor(colorBlanco)
-                holder.iconView.clearColorFilter()
+                // 🟢 Sin filtros de color sobre el icono al perder el foco
                 holder.contentWrapper.scaleX = 1.0f
                 holder.contentWrapper.scaleY = 1.0f
             }
         }
 
         holder.container.setOnClickListener {
-            onItemClick(item)
+            if (!esCasTV) {
+                onItemClick(item)
+            }
         }
     }
 
