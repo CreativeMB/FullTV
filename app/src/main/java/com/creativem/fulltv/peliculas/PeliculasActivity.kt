@@ -106,18 +106,20 @@ import com.creativem.fulltv.menu.MenuPrincipalVerticalAdapter
 import com.creativem.fulltv.mundial.Mundial
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import androidx.transition.TransitionManager
 
 class PeliculasActivity : AppCompatActivity() {
     companion object {
         private var haVerificadoAlquileresEnEstaSesion = false
-
         // 🟢 CACHÉ GLOBAL: Recibe las primeras 24 películas pre-validadas de la SplashActivity
         val primeraPaginaPrecalculada = mutableListOf<Modelo>()
-
+        var bannerPeliculaInicial: Modelo? = null
         fun restablecerEstadoSesion() {
             haVerificadoAlquileresEnEstaSesion = false
             primeraPaginaPrecalculada.clear()
         }
+        private var bannerHeightCached = -1
+        private var currentDisplayedMovieId: String? = null
     }
 
 //    import com.creativem.fulltv.BuildConfig
@@ -130,7 +132,6 @@ private var usuarioEsperandoMas = false
     private var paginasCargadas = 1
     private var cargandoSiguientePagina = false
 
-    private var cargandoPagina = false
     private var haVerificadoAlquileresEnEstaSesion = false
 
     private var primeraCargaBanner = true
@@ -170,6 +171,8 @@ private var usuarioEsperandoMas = false
     }
 
     private val onDownloadComplete = object : BroadcastReceiver() {
+
+
         override fun onReceive(context: Context, intent: Intent) {
             val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
             if (id == downloadId) {
@@ -196,10 +199,8 @@ private var usuarioEsperandoMas = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_FullTV_tv)
-        overridePendingTransition(0, 0)
         super.onCreate(savedInstanceState)
         window.setBackgroundDrawableResource(android.R.color.black)
-
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setFlags(
@@ -210,8 +211,17 @@ private var usuarioEsperandoMas = false
         binding = ActivityPeliculasBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        val peliculasYaCargadas = Validacioneslista.obtenerPeliculasValidas()
-        // 🟢 CARGA INMEDIATA DE PÁGINA 1 COMPLETA Y PRE-VALIDADA (Sin parpadeos)
+        // 🟢 1. INICIALIZACIÓN INMEDIATA DE RETROFIT / API SERVICE:
+        // Debe ocurrir antes de cualquier intento de dibujo del banner para evitar crashes de lateinit
+        val client = OkHttpClient.Builder().hostnameVerifier { _, _ -> true }.build()
+        val retrofit = Retrofit.Builder()
+            .baseUrl("https://api.themoviedb.org/3/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(client)
+            .build()
+        apiService = retrofit.create(TMDbApiService::class.java)
+
+        // 2. Inicialización de la primera página desde memoria caché rápida
         if (primeraPaginaPrecalculada.isNotEmpty()) {
             modeloList.clear()
             modeloList.addAll(primeraPaginaPrecalculada)
@@ -223,6 +233,21 @@ private var usuarioEsperandoMas = false
             }
         }
 
+        // 🟢 3. RESPALDO SÍNCRONO DEL BANNER:
+        if (bannerPeliculaInicial == null && primeraPaginaPrecalculada.isNotEmpty()) {
+            bannerPeliculaInicial = primeraPaginaPrecalculada.firstOrNull()
+        }
+
+        // Pintado instantáneo seguro del banner ahora que apiService está inicializado
+        val bannerContainer = findViewById<View>(R.id.layoutBannerNetflix)
+        val bannerPeli = bannerPeliculaInicial
+        if (bannerPeli != null) {
+            mostrarDatosPeliculaEnBanner(bannerPeli)
+            bannerContainer.visibility = View.VISIBLE
+        } else {
+            bannerContainer.visibility = View.GONE
+        }
+
         setupMenuHorizontal()
         setupMovieGrid()
 
@@ -231,8 +256,6 @@ private var usuarioEsperandoMas = false
                 if (isViewDescendantOf(newFocus, binding.rvPeliculas)) {
                     lastFocusedMovie = newFocus
                 }
-
-                // Ejecutar la expansión del menú lateral con foco únicamente si está en horizontal
                 val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
                 if (isLandscape) {
                     val focusInMenu = isViewDescendantOf(newFocus, binding.menuPrincipal) || newFocus == binding.menuPrincipal
@@ -245,9 +268,17 @@ private var usuarioEsperandoMas = false
             mostrarConfirmacionSalida()
         }
 
-        escucharCambiosEnPeliculas()
-        iniciarVerificacionDeEstadoDeCuenta()
-        obtenerNoticiaYActualizaciones()
+        // Tareas diferidas de red
+        handler.postDelayed({
+            if (!isFinishing && !isDestroyed) {
+                escucharCambiosEnPeliculas()
+                iniciarVerificacionDeEstadoDeCuenta()
+                obtenerNoticiaYActualizaciones()
+                configurarAnimacionDelBanner()
+                cargarBannerPromocional()
+                intentarVerificacionAlquileres()
+            }
+        }, 150)
 
         val currentUser = auth.currentUser
         if (currentUser != null && !currentUser.email.isNullOrBlank()) {
@@ -259,22 +290,6 @@ private var usuarioEsperandoMas = false
             CastvHelper.nuevosusuarios(this, nombreAMostrar, currentUser.email!!)
         }
         escucharSaldoUsuario()
-
-        configurarAnimacionDelBanner()
-        cargarBannerPromocional()
-
-        val client = OkHttpClient.Builder().hostnameVerifier { _, _ -> true }.build()
-        val retrofit = Retrofit.Builder()
-            .baseUrl("https://api.themoviedb.org/3/")
-            .addConverterFactory(GsonConverterFactory.create())
-            .client(client)
-            .build()
-        apiService = retrofit.create(TMDbApiService::class.java)
-
-        // 👇 CORRECCIÓN: Llamamos al verificador inteligente
-        intentarVerificacionAlquileres()
-
-
     }
     // Agregue esta función dentro de la clase PeliculasActivity
     override fun onNewIntent(intent: Intent) {
@@ -292,10 +307,15 @@ private var usuarioEsperandoMas = false
         if (currentUser != null && !currentUser.email.isNullOrBlank()) {
             if (!haVerificadoAlquileresEnEstaSesion) {
                 haVerificadoAlquileresEnEstaSesion = true
-                verificarAlquileresActivos()
+                // Retraso de seguridad para que no interfiera visualmente con la transición
+                handler.postDelayed({
+                    if (!isFinishing && !isDestroyed) {
+                        verificarAlquileresActivos()
+                    }
+                }, 2000)
             }
         } else {
-            Handler(Looper.getMainLooper()).postDelayed({
+            handler.postDelayed({
                 if (!isFinishing && !isDestroyed) {
                     intentarVerificacionAlquileres()
                 }
@@ -304,27 +324,21 @@ private var usuarioEsperandoMas = false
     }
 
     private fun configurarAnimacionDelBanner() {
-        val layoutBannerNetflix = findViewById<View>(R.id.layoutBannerNetflix)
         val rvPeliculas = findViewById<RecyclerView>(R.id.rvPeliculas)
         val rvBannerPromos = findViewById<RecyclerView>(R.id.rvBannerPromos)
 
         window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
-            // 🟢 SOLUCIÓN AL CRASH (NullPointerException):
-            // Si el foco sale de la pantalla o cambia la actividad, newFocus es null.
-            // Validamos que no sea nulo antes de ejecutar findContainingItemView.
             if (newFocus == null) return@addOnGlobalFocusChangeListener
 
             val focoEnPeliculas = rvPeliculas?.findContainingItemView(newFocus) != null
             val focoEnGuiones = rvBannerPromos?.findContainingItemView(newFocus) != null || newFocus == rvBannerPromos
 
             if (focoEnPeliculas) {
-                if (layoutBannerNetflix?.visibility == View.VISIBLE) {
-                    layoutBannerNetflix.visibility = View.GONE
-                    detenerRotacionAutomatica()
-                }
+                alternarVisibilidadBanner(false)
+                detenerRotacionAutomatica()
             } else {
-                if (layoutBannerNetflix?.visibility == View.GONE && peliculasPromoList.isNotEmpty()) {
-                    layoutBannerNetflix.visibility = View.VISIBLE
+                if (peliculasPromoList.isNotEmpty()) {
+                    alternarVisibilidadBanner(true)
                 }
 
                 if (focoEnGuiones) {
@@ -337,12 +351,69 @@ private var usuarioEsperandoMas = false
             }
         }
     }
+    private var bannerAnimationRunnable: Runnable? = null
+
+    private fun alternarVisibilidadBanner(mostrar: Boolean) {
+        val banner = findViewById<View>(R.id.layoutBannerNetflix) ?: return
+
+        // Evitamos reprogramar la animación si ya se solicitó el mismo estado de visibilidad
+        if (banner.tag == mostrar) return
+        banner.tag = mostrar
+
+        bannerAnimationRunnable?.let { handler.removeCallbacks(it) }
+
+        bannerAnimationRunnable = Runnable {
+            if (bannerHeightCached == -1) {
+                bannerHeightCached = banner.height
+                if (bannerHeightCached <= 0) {
+                    banner.post {
+                        bannerHeightCached = banner.height
+                        ejecutarAnimacionDeCortina(mostrar)
+                    }
+                    return@Runnable
+                }
+            }
+            ejecutarAnimacionDeCortina(mostrar)
+        }
+
+        // 180ms es el tiempo óptimo para absorber los rebotes de pérdida de foco en Android TV
+        handler.postDelayed(bannerAnimationRunnable!!, 180)
+    }
+
+    private fun ejecutarAnimacionDeCortina(mostrar: Boolean) {
+        val banner = findViewById<View>(R.id.layoutBannerNetflix) ?: return
+        val parentView = binding.root as? ViewGroup ?: return
+
+        val isCurrentlyVisible = banner.visibility == View.VISIBLE
+        if (mostrar == isCurrentlyVisible) {
+            return
+        }
+
+        // 🟢 TRANSICIÓN SIMULTÁNEA UNIFICADA:
+        // Creamos un set de transición que ejecuta el rediseño de límites (ChangeBounds)
+        // y el desvanecimiento (Fade) AL MISMO TIEMPO, eliminando el parpadeo secuencial.
+        val transition = androidx.transition.TransitionSet().apply {
+            ordering = androidx.transition.TransitionSet.ORDERING_TOGETHER
+            addTransition(androidx.transition.ChangeBounds())
+            addTransition(androidx.transition.Fade())
+            duration = 300
+            interpolator = android.view.animation.DecelerateInterpolator()
+        }
+
+        androidx.transition.TransitionManager.beginDelayedTransition(parentView, transition)
+
+        if (mostrar) {
+            banner.visibility = View.VISIBLE
+            banner.alpha = 1f
+        } else {
+            banner.visibility = View.GONE
+            banner.alpha = 0f
+        }
+    }
 
     private fun cargarBannerPromocional() {
         val bannerContainer = findViewById<View>(R.id.layoutBannerNetflix)
         val rvBannerPromos = findViewById<RecyclerView>(R.id.rvBannerPromos)
-
-        bannerContainer.visibility = View.GONE
 
         databaseRef.child("movies").get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
@@ -367,14 +438,19 @@ private var usuarioEsperandoMas = false
                 }
 
                 if (peliculasPromoList.isNotEmpty()) {
-                    val indiceInicialAleatorio = (0 until peliculasPromoList.size).random()
-                    val peliculaInicial = peliculasPromoList[indiceInicialAleatorio]
+                    val indexInicial = if (bannerPeliculaInicial != null) {
+                        peliculasPromoList.indexOfFirst { it.id == bannerPeliculaInicial?.id }.coerceAtLeast(0)
+                    } else {
+                        (0 until peliculasPromoList.size).random()
+                    }
 
-                    currentPromoIndex = indiceInicialAleatorio
+                    currentPromoIndex = indexInicial
                     isUserInteractingWithPromo = false
 
-                    mostrarDatosPeliculaEnBanner(peliculaInicial)
-                    bannerContainer.visibility = View.VISIBLE
+                    if (bannerContainer.visibility != View.VISIBLE) {
+                        mostrarDatosPeliculaEnBanner(peliculasPromoList[indexInicial])
+                        alternarVisibilidadBanner(true)
+                    }
 
                     rvBannerPromos.layoutManager = LinearLayoutManager(
                         this,
@@ -405,21 +481,23 @@ private var usuarioEsperandoMas = false
 
                     rvBannerPromos.post {
                         val currentAdapter = rvBannerPromos.adapter as? BannerPromosAdapter
-                        currentAdapter?.updateSelectedPosition(indiceInicialAleatorio, rvBannerPromos)
+                        currentAdapter?.updateSelectedPosition(indexInicial, rvBannerPromos)
 
                         val layoutManager = rvBannerPromos.layoutManager as? LinearLayoutManager
-                        layoutManager?.scrollToPositionWithOffset(indiceInicialAleatorio, 0)
+                        layoutManager?.scrollToPositionWithOffset(indexInicial, 0)
                     }
 
-                    iniciarRotacionAutomaticaDesde(indiceInicialAleatorio)
+                    iniciarRotacionAutomaticaDesde(indexInicial)
                 } else {
-                    bannerContainer.visibility = View.GONE
+                    alternarVisibilidadBanner(false)
                 }
             } else {
-                bannerContainer.visibility = View.GONE
+                alternarVisibilidadBanner(false)
             }
         }.addOnFailureListener {
-            bannerContainer.visibility = View.GONE
+            if (bannerPeliculaInicial == null) {
+                alternarVisibilidadBanner(false)
+            }
         }
     }
 
@@ -486,6 +564,14 @@ private var usuarioEsperandoMas = false
 
         if (isFinishing || isDestroyed) return
 
+        // 🟢 OPTIMIZACIÓN CRÍTICA: Si ya estamos mostrando esta película, no reiniciamos el banner a negro
+        if (currentPromoIndex != -1 && bannerPeliculaInicial?.id == movie.id && !primeraCargaBanner) {
+            return
+        }
+        if (lastFocusedMovie == null && !primeraCargaBanner && movie.id == peliculasPromoList.getOrNull(currentPromoIndex)?.id) {
+            return
+        }
+
         if (primeraCargaBanner) {
             primeraCargaBanner = false
             cargarDatosEnBanner(
@@ -493,7 +579,8 @@ private var usuarioEsperandoMas = false
                 tvBannerInfoAdicional, tvContador, ivBackdrop, ivPoster, layoutInfo
             )
         } else {
-            layoutInfo.animate().alpha(0f).setDuration(400).withEndAction {
+            // Reducimos el tiempo de desvanecimiento para que la transición entre promos sea más rápida
+            layoutInfo.animate().alpha(0f).setDuration(250).withEndAction {
                 if (isFinishing || isDestroyed) return@withEndAction
                 cargarDatosEnBanner(
                     movie, tvTitulo, tvSinopsis, tvCalificacion,
@@ -514,16 +601,18 @@ private var usuarioEsperandoMas = false
         ivPoster: ImageView,
         layoutInfo: LinearLayout
     ) {
+        // 1. CARGA INMEDIATA: Pintamos el fondo local y los textos antes de llamar a cualquier API
+        cargarImagenSuave(movie.imageUrl, ivBackdrop)
+        cargarImagenSuave(movie.imageUrl, ivPoster)
+
         tvTitulo.text = movie.title
         tvSinopsis.text = movie.overview.ifBlank { "Estreno exclusivo." }
         tvCalificacion.text = "⭐ 8.5"
         tvBannerInfoAdicional.text = movie.genres.ifBlank { "Acción • Aventura • Cine" }
 
-        if (layoutInfo.alpha == 0f) {
-            layoutInfo.alpha = 1f
-        } else {
-            layoutInfo.animate().alpha(1f).setDuration(500).start()
-        }
+        // Aseguramos visibilidad inmediata de los textos locales
+        layoutInfo.animate().cancel()
+        layoutInfo.alpha = 1f
 
         val queryBusqueda = movie.originalTitle.ifBlank { movie.title }
         apiService.searchMovie(apiKey, "es-MX", queryBusqueda).enqueue(object : retrofit2.Callback<MovieResponse> {
@@ -533,7 +622,6 @@ private var usuarioEsperandoMas = false
                 if (response.isSuccessful) {
                     val result = response.body()?.results?.firstOrNull()
                     if (result != null) {
-                        // 🟢 CONCATENACIÓN: Nombre de película + fecha completa (YYYY-MM-DD) entre paréntesis
                         val fechaCompleta = result.release_date ?: ""
                         tvTitulo.text = if (fechaCompleta.isNotEmpty()) {
                             "${result.title} ($fechaCompleta)"
@@ -565,20 +653,12 @@ private var usuarioEsperandoMas = false
                         val posterUrl = "https://image.tmdb.org/t/p/w500${result.poster_path ?: result.backdrop_path}"
                         cargarImagenSuave(backdropUrl, ivBackdrop)
                         cargarImagenSuave(posterUrl, ivPoster)
-                    } else {
-                        cargarImagenSuave(movie.imageUrl, ivBackdrop)
-                        cargarImagenSuave(movie.imageUrl, ivPoster)
                     }
-                } else {
-                    cargarImagenSuave(movie.imageUrl, ivBackdrop)
-                    cargarImagenSuave(movie.imageUrl, ivPoster)
                 }
             }
 
             override fun onFailure(call: retrofit2.Call<MovieResponse>, t: Throwable) {
                 if (isFinishing || isDestroyed) return
-                cargarImagenSuave(movie.imageUrl, ivBackdrop)
-                cargarImagenSuave(movie.imageUrl, ivPoster)
             }
         })
 
@@ -589,11 +669,14 @@ private var usuarioEsperandoMas = false
     }
 
     private fun cargarImagenSuave(url: String, imageView: ImageView) {
-        if (isFinishing || isDestroyed) return
+        if (isFinishing || isDestroyed || url.isBlank()) return
         Glide.with(this)
             .load(url)
-            .placeholder(imageView.drawable)
+            // Si no hay imagen previa (primer inicio), usa el recurso local R.drawable.cine instantáneamente
+            .placeholder(imageView.drawable ?: androidx.core.content.ContextCompat.getDrawable(this, R.drawable.cine))
+            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
             .dontAnimate()
+            .centerCrop()
             .into(imageView)
     }
 
@@ -2850,7 +2933,7 @@ private var usuarioEsperandoMas = false
             putExtra("EXTRA_CREATED_AT", modelo.createdAt / 1000)
         }
         startActivity(intent)
-        overridePendingTransition(0, 0)
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
     }
 
     private fun cerrarSesion() {
@@ -2920,7 +3003,7 @@ private var usuarioEsperandoMas = false
 
     override fun onStart() {
         super.onStart()
-        if (modeloList.isEmpty()) {
+        if (!yaTieneListener) {
             escucharCambiosEnPeliculas()
         } else {
             sincronizarConCacheLocal()

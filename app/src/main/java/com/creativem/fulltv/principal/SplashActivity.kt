@@ -78,17 +78,14 @@ class SplashActivity : AppCompatActivity() {
 
     private fun iniciarCargaDeDatos() {
         lifecycleScope.launch {
-            // 1. Lanzamos validación global de fondo
             CoroutineScope(Dispatchers.IO).launch {
                 try { Validacioneslista.cargarPeliculas() } catch (e: Exception) {}
             }
 
-            // 2. Intentamos cargar la página 1 con más paciencia
-            // Aumentamos el tiempo a 25 segundos para dar margen al televisor
             var cargado = false
             val startTime = System.currentTimeMillis()
 
-            while (!cargado && (System.currentTimeMillis() - startTime) < 25000) {
+            while (!cargado && (System.currentTimeMillis() - startTime) < 3500) {
                 try {
                     val exito = withContext(Dispatchers.IO) {
                         val snapshot = FirebaseDatabase.getInstance().reference.child("movies").get().await()
@@ -109,19 +106,51 @@ class SplashActivity : AppCompatActivity() {
                             PeliculasActivity.primeraPaginaPrecalculada.clear()
                             PeliculasActivity.primeraPaginaPrecalculada.addAll(validadas)
 
+                            // Evaluación de películas promocionales activas
+                            val peliculasPromoValidas = todas.filter { movie ->
+                                val countdownMinutes = movie.countdownMinutes
+                                val createdAt = movie.createdAt
+                                val createdAtMillis = if (createdAt > 0 && createdAt < 1000000000000L) createdAt * 1000 else createdAt
+
+                                if (countdownMinutes > 0 && createdAtMillis > 0L) {
+                                    val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(countdownMinutes.toLong())
+                                    val elapsed = System.currentTimeMillis() - createdAtMillis
+                                    (durationMillis - elapsed) > 0
+                                } else false
+                            }
+
+                            val bannerSeleccionado = peliculasPromoValidas.randomOrNull() ?: validadas.firstOrNull()
+                            PeliculasActivity.bannerPeliculaInicial = bannerSeleccionado
+
+                            // 🟢 DESCARGA EN LÍNEA GARANTIZADA: Esperamos de forma síncrona la descarga del archivo de imagen
+                            if (bannerSeleccionado != null && !bannerSeleccionado.imageUrl.isNullOrBlank()) {
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        withTimeoutOrNull(3000) { // Timeout de seguridad de 3 segundos
+                                            Glide.with(applicationContext)
+                                                .asBitmap()
+                                                .load(bannerSeleccionado.imageUrl)
+                                                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                                                .submit()
+                                                .get() // Detiene la corrutina hasta que la imagen se descarga por completo
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("SPLASH_GLIDE", "La descarga en línea de la imagen excedió el tiempo límite: ${e.message}")
+                                }
+                            }
+
                             true
                         } else false
                     }
                     cargado = exito
                 } catch (e: Exception) {
-                    Log.e("SPLASH", "Reintentando carga silenciosa...")
+                    Log.e("SPLASH", "Reintentando carga...")
                 }
 
-                if (!cargado) delay(2000) // Espera 2 segundos antes de reintentar si falló
+                if (!cargado) delay(500)
             }
 
-            // 3. Navegamos. Si después de 25 seg no cargó nada, igual entramos
-            // para que el usuario no se quede atrapado, pero al menos lo intentamos bien.
             navegarSiguientePantalla()
         }
     }
@@ -138,7 +167,8 @@ class SplashActivity : AppCompatActivity() {
         }
 
         startActivity(intentDestino)
-        overridePendingTransition(0, 0)
+        // Animación de transición nativa (fade in/out) que previene destellos y pantallas negras
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
         finish()
     }
 
