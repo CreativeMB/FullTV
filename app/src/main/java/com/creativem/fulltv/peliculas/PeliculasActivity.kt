@@ -889,7 +889,7 @@ private var usuarioEsperandoMas = false
         val rvPeliculas = binding.rvPeliculas
 
         if (isLandscape) {
-            // --- MODO HORIZONTAL (BARRA LATERAL IZQUIERDA VERTICAL) ---
+            // --- CONFIGURACIÓN PARA MODO TV/HORIZONTAL ---
             menuView.setPadding(0, 0, 0, 0)
 
             menuParams.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
@@ -903,7 +903,7 @@ private var usuarioEsperandoMas = false
             menuParams.rightToRight = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET
             menuParams.rightToLeft = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET
 
-            menuParams.width = (90 * density).toInt() // Ancho colapsado inicial
+            menuParams.width = (90 * density).toInt() // Ancho colapsado vertical para TV
             menuParams.height = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.MATCH_PARENT
             menuView.layoutParams = menuParams
 
@@ -911,8 +911,6 @@ private var usuarioEsperandoMas = false
             menuView.setBackgroundColor(Color.TRANSPARENT)
             menuView.background = null
 
-            // 🟢 SOLUCCIÓN: El contenido (Banner y Películas) ocupará TODA la pantalla.
-            // Solo dejamos un margen de 80dp para que la carátula no quede tapada por los iconos fijos.
             if (banner != null) {
                 val bannerParams = banner.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
                 if (bannerParams != null) {
@@ -932,13 +930,13 @@ private var usuarioEsperandoMas = false
                 rvParams.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
                 rvParams.leftToLeft = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
 
-                // Dejar espacio fijo equivalente al ancho del menú colapsado
+                // Dejar espacio de margen para el menú
                 rvParams.leftMargin = (60 * density).toInt()
                 rvParams.marginStart = (60 * density).toInt()
                 rvPeliculas.layoutParams = rvParams
             }
 
-            // 🟢 Asegurar que el menú esté al frente estructuralmente en Android TV
+            // Asegurar orden de elevación en TV
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
                 menuView.elevation = 10 * density
                 rvPeliculas.elevation = 0f
@@ -946,13 +944,24 @@ private var usuarioEsperandoMas = false
             }
 
         } else {
-            // --- RESTAURAR ESTADO VERTICAL ORIGINAL (MÓVIL) ---
-            val paddingVal = (20 * density).toInt()
+            // --- CONFIGURACIÓN EXPLÍCITA PARA MÓVIL/VERTICAL ---
+            val paddingVal = (12 * density).toInt()
             menuView.setPadding(paddingVal, 0, paddingVal, 0)
 
-            originalMenuLayoutParams?.let {
-                menuView.layoutParams = it
-            }
+            // 🟢 Corrección: Forzamos límites de ancho completo y una altura de 75dp
+            // para dar espacio vertical suficiente a iconos y textos sin recortarlos.
+            menuParams.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+            menuParams.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+            menuParams.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+
+            menuParams.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET
+            menuParams.bottomToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET
+
+            menuParams.width = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.MATCH_PARENT
+            menuParams.height = (75 * density).toInt() // Altura ideal para albergar iconos y etiquetas de texto
+            menuView.layoutParams = menuParams
+
+            menuView.background = null
 
             if (banner != null) {
                 val bannerParams = banner.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
@@ -977,6 +986,7 @@ private var usuarioEsperandoMas = false
             }
         }
     }
+
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
         setupMenuHorizontal()

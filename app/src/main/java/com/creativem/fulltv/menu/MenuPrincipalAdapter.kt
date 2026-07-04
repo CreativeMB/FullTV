@@ -26,8 +26,8 @@ class MenuPrincipalAdapter(
         val text: TextView = view.findViewById(R.id.textoMenu)
 
         init {
-            // Ocultamos el icono por código para que solo quede el texto
-            icon.visibility = View.GONE
+            // El icono ahora es visible por defecto
+            icon.visibility = View.VISIBLE
 
             view.isFocusable = true
             view.isFocusableInTouchMode = true
@@ -46,13 +46,14 @@ class MenuPrincipalAdapter(
                 }
 
                 if (hasFocus) {
-                    // 🟢 CORRECCIÓN: Se aplica su color dorado original en lugar de amarillo
                     text.setTextColor(colorDorado)
+                    // 🟢 CORRECCIÓN: Se eliminó icon.setColorFilter para respetar los colores originales
                     v.scaleX = 1.1f
                     v.scaleY = 1.1f
                     lastFocusedPosition = bindingAdapterPosition
                 } else {
                     text.setTextColor(colorBlanco)
+                    // 🟢 CORRECCIÓN: Se eliminó icon.setColorFilter para respetar los colores originales
                     v.scaleX = 1.0f
                     v.scaleY = 1.0f
                 }
@@ -72,8 +73,9 @@ class MenuPrincipalAdapter(
         val item = items[position]
         holder.text.text = item.name
 
-        // Asegurar que el icono permanezca oculto
-        holder.icon.visibility = View.GONE
+        // Hacer visible el icono y asignarle la imagen correspondiente de la lista
+        holder.icon.visibility = View.VISIBLE
+        holder.icon.setImageResource(item.iconResId)
 
         // Aplicamos el estado visual inicial para que no se pierda el rastro de la selección
         val isFocused = position == lastFocusedPosition
@@ -81,13 +83,14 @@ class MenuPrincipalAdapter(
 
         if (isFocused) {
             holder.itemView.background = ContextCompat.getDrawable(holder.itemView.context, R.drawable.card_focused_background)
-            // 🟢 CORRECCIÓN: Se aplica su color dorado original en lugar de amarillo
             holder.text.setTextColor(colorDorado)
+            // 🟢 CORRECCIÓN: Se eliminó holder.icon.setColorFilter
             holder.itemView.scaleX = 1.1f
             holder.itemView.scaleY = 1.1f
         } else {
             holder.itemView.background = null
             holder.text.setTextColor(colorBlanco)
+            // 🟢 CORRECCIÓN: Se eliminó holder.icon.setColorFilter
             holder.itemView.scaleX = 1.0f
             holder.itemView.scaleY = 1.0f
         }
