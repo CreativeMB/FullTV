@@ -249,7 +249,16 @@ class ApiPeliculaActivity : AppCompatActivity() {
             CastvHelper.regresarAPeliculas(this@ApiPeliculaActivity)
         }
     }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(CastvHelper.ajustarContexto(newBase))
+    }
 
+    override fun getResources(): android.content.res.Resources {
+        val res = super.getResources()
+        // 🟢 Pasamos 'this' (el contexto de la actividad) para autodetectar la pantalla
+        CastvHelper.ajustarRecursos(res, this)
+        return res
+    }
     private fun reproducirTrailer() {
         if (realTmdbId == 0) {
             Toast.makeText(this, "El tráiler no está disponible para esta película.", Toast.LENGTH_SHORT).show()

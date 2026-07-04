@@ -71,6 +71,7 @@ import androidx.recyclerview.widget.RecyclerView
 import java.util.concurrent.TimeUnit
 import com.creativem.fulltv.peliculasvalidas.PelisCarteleraAdapter
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
+import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Modelo
 import com.creativem.fulltv.principal.Perfil
 import com.creativem.fulltv.principal.PistaAudio
@@ -331,7 +332,16 @@ class PlayerPeliculas : AppCompatActivity() {
             }
         }
     }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(CastvHelper.ajustarContexto(newBase))
+    }
 
+    override fun getResources(): android.content.res.Resources {
+        val res = super.getResources()
+        // 🟢 Pasamos 'this' (el contexto de la actividad) para autodetectar la pantalla
+        CastvHelper.ajustarRecursos(res, this)
+        return res
+    }
     private fun mostarpelis() {
         val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
 

@@ -27,14 +27,46 @@ import kotlinx.coroutines.tasks.await
 class SplashActivity : AppCompatActivity() {
 
     private val frasesCine = listOf(
-        "Reuniendo al parche para la gran función",
-        "Sincronizando lo mejor del cine en nuestro idioma",
-        "Preparando la sala para compartir en comunidad",
-        "Alistando los estrenos en español latino",
-        "Haciendo posible el cine para todos",
-        "Tu parche, tu cine, tu comunidad",
-        "Conectando con la mejor señal latina",
-        "Organizando la cartelera para el grupo"
+        "Reuniendo al parche para una gran función",
+        "Preparando el mejor cine en español latino",
+        "Organizando la cartelera de la comunidad",
+        "Conectando historias que unen al parche",
+        "Cada película es mejor cuando la compartes",
+        "Disfruta el mejor cine junto a tu comunidad",
+        "Historias inolvidables habladas en español",
+        "La mejor experiencia de cine comienza aquí",
+        "El mejor contenido reunido para el parche",
+        "Creando momentos que merecen compartirse",
+        "Cada estreno nos reúne como una comunidad",
+        "Las mejores películas llegan para todos",
+        "El cine une personas, historias y emociones",
+        "Descubre grandes historias sin interrupciones",
+        "Una comunidad construida por amantes del cine",
+        "El siguiente gran estreno te está esperando",
+        "Comparte emociones a través del mejor cine",
+        "Las mejores historias hablan nuestro idioma",
+        "Donde cada película encuentra su audiencia",
+        "Vive el cine con quienes comparten tu pasión",
+        "Cada función comienza con una gran historia",
+        "El entretenimiento que reúne a la comunidad",
+        "Porque el buen cine siempre se disfruta juntos",
+        "El mejor cine latino pensado para compartir",
+        "Aquí cada película crea un nuevo recuerdo",
+        "Preparando una experiencia digna de disfrutar",
+        "Más que películas, compartimos emociones",
+        "Donde el cine cobra vida junto al parche",
+        "El idioma nos une, el cine nos inspira",
+        "Siempre hay una historia esperando por ti",
+        "La magia del cine comienza en comunidad",
+        "Cada película abre la puerta a otro mundo",
+        "Historias que emocionan, inspiran y acompañan",
+        "Compartiendo la pasión por el cine latino",
+        "Tu próxima gran historia comienza ahora",
+        "Una experiencia creada para disfrutar juntos",
+        "El cine que conecta generaciones y amigos",
+        "Aquí las historias nunca dejan de emocionar",
+        "Cada estreno fortalece nuestra comunidad",
+        "Bienvenido al lugar donde vive el mejor cine"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -106,7 +138,6 @@ class SplashActivity : AppCompatActivity() {
                             PeliculasActivity.primeraPaginaPrecalculada.clear()
                             PeliculasActivity.primeraPaginaPrecalculada.addAll(validadas)
 
-                            // Evaluación de películas promocionales activas
                             val peliculasPromoValidas = todas.filter { movie ->
                                 val countdownMinutes = movie.countdownMinutes
                                 val createdAt = movie.createdAt
@@ -122,21 +153,74 @@ class SplashActivity : AppCompatActivity() {
                             val bannerSeleccionado = peliculasPromoValidas.randomOrNull() ?: validadas.firstOrNull()
                             PeliculasActivity.bannerPeliculaInicial = bannerSeleccionado
 
-                            // 🟢 DESCARGA EN LÍNEA GARANTIZADA: Esperamos de forma síncrona la descarga del archivo de imagen
-                            if (bannerSeleccionado != null && !bannerSeleccionado.imageUrl.isNullOrBlank()) {
+                            // 🟢 Resolución anticipada de la API de TMDb para el banner inicial
+                            if (bannerSeleccionado != null) {
+                                val queryBusqueda = bannerSeleccionado.originalTitle.ifBlank { bannerSeleccionado.title }
+                                val apiKey = "678193d2c735c6f37840cee035f4d69a"
                                 try {
-                                    withContext(Dispatchers.IO) {
-                                        withTimeoutOrNull(3000) { // Timeout de seguridad de 3 segundos
-                                            Glide.with(applicationContext)
-                                                .asBitmap()
-                                                .load(bannerSeleccionado.imageUrl)
-                                                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
-                                                .submit()
-                                                .get() // Detiene la corrutina hasta que la imagen se descarga por completo
+                                    val searchResponse = com.creativem.fulltv.api.TMDbApiClient.service.searchMovies(apiKey, "es-MX", queryBusqueda).execute()
+                                    if (searchResponse.isSuccessful) {
+                                        val result = searchResponse.body()?.results?.firstOrNull()
+                                        if (result != null) {
+                                            val fechaCompleta = result.release_date ?: ""
+                                            val titleText = if (fechaCompleta.isNotEmpty()) "${result.title} ($fechaCompleta)" else result.title
+                                            val overviewText = result.overview ?: bannerSeleccionado.overview
+                                            val anio = result.release_date?.take(4) ?: "2026"
+                                            val cal = if (result.vote_average > 0.0) "${result.vote_average}" else "8.5"
+                                            val ratingText = "⭐ $cal   |   $anio"
+
+                                            var infoAdicionalText = bannerSeleccionado.genres.ifBlank { "Acción • Aventura • Cine" }
+                                            try {
+                                                val detailResponse = com.creativem.fulltv.api.TMDbApiClient.service.getMovieDetails(result.id, apiKey, "es-MX").execute()
+                                                if (detailResponse.isSuccessful) {
+                                                    val detalles = detailResponse.body()
+                                                    val generos = detalles?.genres?.joinToString(" • ") { it.name } ?: "Desconocidos"
+                                                    val duracion = detalles?.runtime ?: 0
+                                                    infoAdicionalText = "🎭 $generos  ⏱️ ${duracion} Min"
+                                                }
+                                            } catch (e: Exception) {
+                                                Log.e("SPLASH_TMDB", "Error cargando detalles del banner: ${e.message}")
+                                            }
+
+                                            val backdropUrl = "https://image.tmdb.org/t/p/w1280${result.backdrop_path ?: result.poster_path}"
+                                            val posterUrl = "https://image.tmdb.org/t/p/w500${result.poster_path ?: result.backdrop_path}"
+
+                                            // Guardar de forma estática los datos procesados en la caché
+                                            PeliculasActivity.bannerTMDBResolved = PeliculasActivity.Companion.TMDBResolvedData(
+                                                movieId = bannerSeleccionado.id,
+                                                title = titleText,
+                                                overview = overviewText,
+                                                rating = ratingText,
+                                                infoAdicional = infoAdicionalText,
+                                                backdropUrl = backdropUrl,
+                                                posterUrl = posterUrl
+                                            )
+
+                                            // Descargar previamente las imágenes finales utilizando Glide
+                                            try {
+                                                withTimeoutOrNull(2500) {
+                                                    Glide.with(applicationContext)
+                                                        .asBitmap()
+                                                        .load(backdropUrl)
+                                                        .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                                        .submit()
+                                                        .get()
+                                                }
+                                                withTimeoutOrNull(1500) {
+                                                    Glide.with(applicationContext)
+                                                        .asBitmap()
+                                                        .load(posterUrl)
+                                                        .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                                        .submit()
+                                                        .get()
+                                                }
+                                            } catch (e: Exception) {
+                                                Log.e("SPLASH_GLIDE", "Error en precarga de imágenes: ${e.message}")
+                                            }
                                         }
                                     }
                                 } catch (e: Exception) {
-                                    Log.e("SPLASH_GLIDE", "La descarga en línea de la imagen excedió el tiempo límite: ${e.message}")
+                                    Log.e("SPLASH_TMDB", "Fallo de conexión a TMDb: ${e.message}")
                                 }
                             }
 

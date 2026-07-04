@@ -96,6 +96,52 @@ object CastvHelper {
             }
         }
     }
+    // 🟢 Función 1 corregida: Protege el cálculo contra llamadas recursivas de recursos
+    fun obtenerFactorEscalaDinamico(context: android.content.Context, res: android.content.res.Resources): Float {
+        val config = res.configuration
+        val appContext = context.applicationContext
+        val uiModeManager = appContext.getSystemService(android.content.Context.UI_MODE_SERVICE) as? android.app.UiModeManager
+        val esTv = uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+
+        // Diferenciamos una Tablet estándar (emulador) de una pantalla panorámica de Auto
+        val esPantallaAutoOVeryWide = config.smallestScreenWidthDp >= 750
+        val esTabletEstandar = config.smallestScreenWidthDp in 600..749
+
+        return when {
+            esTv -> 1.0f                   // 📺 TV original
+            esPantallaAutoOVeryWide -> 1.60f // 🚗 Pantallas de Auto anchas
+            esTabletEstandar -> 1.10f      // 📱 Emuladores y Tablets normales (ligero aumento sin desborde)
+            else -> 0.75f                   // 📱 Móviles
+        }
+    }
+
+    // 🟢 Función 2 corregida
+    fun ajustarContexto(context: android.content.Context): android.content.Context {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            val res = context.resources
+            val factorEscala = obtenerFactorEscalaDinamico(context, res)
+            if (factorEscala == 1.0f) return context
+
+            val config = android.content.res.Configuration(res.configuration)
+            val baseDpi = android.content.res.Resources.getSystem().displayMetrics.densityDpi
+            config.densityDpi = (baseDpi * factorEscala).toInt()
+
+            return context.createConfigurationContext(config)
+        }
+        return context
+    }
+
+    // 🟢 Función 3 corregida: Pasa el objeto 'res' directamente a la detección de escala
+    fun ajustarRecursos(res: android.content.res.Resources, context: android.content.Context) {
+        val factorEscala = obtenerFactorEscalaDinamico(context, res)
+        if (factorEscala == 1.0f) return
+
+        val config = res.configuration
+        val baseDpi = android.content.res.Resources.getSystem().displayMetrics.densityDpi
+        config.densityDpi = (baseDpi * factorEscala).toInt()
+
+        res.updateConfiguration(config, res.displayMetrics)
+    }
     fun regresarAPeliculas(activity: Activity) {
         if (activity.isFinishing || activity.isDestroyed) return
 

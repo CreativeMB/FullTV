@@ -111,17 +111,29 @@ import androidx.transition.TransitionManager
 class PeliculasActivity : AppCompatActivity() {
     companion object {
         private var haVerificadoAlquileresEnEstaSesion = false
-        // 🟢 CACHÉ GLOBAL: Recibe las primeras 24 películas pre-validadas de la SplashActivity
         val primeraPaginaPrecalculada = mutableListOf<Modelo>()
         var bannerPeliculaInicial: Modelo? = null
+
+        // 🟢 Caché global para almacenar los datos resueltos desde TMDb en SplashActivity
+        data class TMDBResolvedData(
+            val movieId: String,
+            val title: String,
+            val overview: String,
+            val rating: String,
+            val infoAdicional: String,
+            val backdropUrl: String,
+            val posterUrl: String
+        )
+        var bannerTMDBResolved: TMDBResolvedData? = null
+
         fun restablecerEstadoSesion() {
             haVerificadoAlquileresEnEstaSesion = false
             primeraPaginaPrecalculada.clear()
+            bannerTMDBResolved = null
         }
         private var bannerHeightCached = -1
-        private var currentDisplayedMovieId: String? = null
-    }
 
+    }
 //    import com.creativem.fulltv.BuildConfig
 private var usuarioEsperandoMas = false
     private val modeloList = mutableListOf<Modelo>() // Lista visible en pantalla
@@ -291,6 +303,19 @@ private var usuarioEsperandoMas = false
         }
         escucharSaldoUsuario()
     }
+
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(CastvHelper.ajustarContexto(newBase))
+    }
+
+    override fun getResources(): android.content.res.Resources {
+        val res = super.getResources()
+        // 🟢 Pasamos 'this' (el contexto de la actividad) para autodetectar la pantalla
+        CastvHelper.ajustarRecursos(res, this)
+        return res
+    }
+
+
     // Agregue esta función dentro de la clase PeliculasActivity
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -564,7 +589,12 @@ private var usuarioEsperandoMas = false
 
         if (isFinishing || isDestroyed) return
 
-        // 🟢 OPTIMIZACIÓN CRÍTICA: Si ya estamos mostrando esta película, no reiniciamos el banner a negro
+        // 🟢 Limpieza inmediata: Remueve cualquier imagen clara por defecto del XML para evitar el destello
+        ivBackdrop?.setImageResource(0)
+        ivPoster?.setImageResource(0)
+        ivBackdrop?.setBackgroundColor(Color.BLACK)
+        ivPoster?.setBackgroundColor(Color.BLACK)
+
         if (currentPromoIndex != -1 && bannerPeliculaInicial?.id == movie.id && !primeraCargaBanner) {
             return
         }
@@ -579,7 +609,6 @@ private var usuarioEsperandoMas = false
                 tvBannerInfoAdicional, tvContador, ivBackdrop, ivPoster, layoutInfo
             )
         } else {
-            // Reducimos el tiempo de desvanecimiento para que la transición entre promos sea más rápida
             layoutInfo.animate().alpha(0f).setDuration(250).withEndAction {
                 if (isFinishing || isDestroyed) return@withEndAction
                 cargarDatosEnBanner(
@@ -601,7 +630,28 @@ private var usuarioEsperandoMas = false
         ivPoster: ImageView,
         layoutInfo: LinearLayout
     ) {
-        // 1. CARGA INMEDIATA: Pintamos el fondo local y los textos antes de llamar a cualquier API
+        // 🟢 Paso 1: Si existen datos resueltos para esta película, se aplican de forma inmediata sin parpadeo
+        val resolved = bannerTMDBResolved
+        if (resolved != null && resolved.movieId == movie.id) {
+            cargarImagenSuave(resolved.backdropUrl, ivBackdrop)
+            cargarImagenSuave(resolved.posterUrl, ivPoster)
+
+            tvTitulo.text = resolved.title
+            tvSinopsis.text = resolved.overview
+            tvCalificacion.text = resolved.rating
+            tvBannerInfoAdicional.text = resolved.infoAdicional
+
+            layoutInfo.animate().cancel()
+            layoutInfo.alpha = 1f
+
+            val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
+            val createdAtMillis = if (movie.createdAt > 0 && movie.createdAt < 1000000000000L) movie.createdAt * 1000 else movie.createdAt
+            val elapsed = System.currentTimeMillis() - createdAtMillis
+            iniciarContadorBanner(tvContador, durationMillis - elapsed)
+            return
+        }
+
+        // Paso 2: Carga asíncrona de respaldo en caso de que ocurra una rotación a otra película promocional
         cargarImagenSuave(movie.imageUrl, ivBackdrop)
         cargarImagenSuave(movie.imageUrl, ivPoster)
 
@@ -610,7 +660,6 @@ private var usuarioEsperandoMas = false
         tvCalificacion.text = "⭐ 8.5"
         tvBannerInfoAdicional.text = movie.genres.ifBlank { "Acción • Aventura • Cine" }
 
-        // Aseguramos visibilidad inmediata de los textos locales
         layoutInfo.animate().cancel()
         layoutInfo.alpha = 1f
 
@@ -644,9 +693,7 @@ private var usuarioEsperandoMas = false
                                     tvBannerInfoAdicional.text = "🎭 $generos  ⏱️ ${duracion} Min"
                                 }
                             }
-                            override fun onFailure(call: retrofit2.Call<MovieDetailResponse>, t: Throwable) {
-                                if (isFinishing || isDestroyed) return
-                            }
+                            override fun onFailure(call: retrofit2.Call<MovieDetailResponse>, t: Throwable) {}
                         })
 
                         val backdropUrl = "https://image.tmdb.org/t/p/w1280${result.backdrop_path ?: result.poster_path}"
@@ -657,9 +704,7 @@ private var usuarioEsperandoMas = false
                 }
             }
 
-            override fun onFailure(call: retrofit2.Call<MovieResponse>, t: Throwable) {
-                if (isFinishing || isDestroyed) return
-            }
+            override fun onFailure(call: retrofit2.Call<MovieResponse>, t: Throwable) {}
         })
 
         val durationMillis = java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
@@ -670,10 +715,14 @@ private var usuarioEsperandoMas = false
 
     private fun cargarImagenSuave(url: String, imageView: ImageView) {
         if (isFinishing || isDestroyed || url.isBlank()) return
+
+        // 🟢 Forzar fondo negro sólido en la vista mientras se realiza la decodificación
+        imageView.background = ColorDrawable(Color.BLACK)
+
         Glide.with(this)
             .load(url)
-            // Si no hay imagen previa (primer inicio), usa el recurso local R.drawable.cine instantáneamente
-            .placeholder(imageView.drawable ?: androidx.core.content.ContextCompat.getDrawable(this, R.drawable.cine))
+            .placeholder(ColorDrawable(Color.BLACK)) // Reemplaza marcadores de posición claros por negro
+            .error(ColorDrawable(Color.BLACK))       // En caso de error, mantiene el fondo negro
             .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
             .dontAnimate()
             .centerCrop()

@@ -43,6 +43,16 @@ class PeliculasValidasActivity : AppCompatActivity() {
             CastvHelper.regresarAPeliculas(this@PeliculasValidasActivity)
         }
     }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(CastvHelper.ajustarContexto(newBase))
+    }
+
+    override fun getResources(): android.content.res.Resources {
+        val res = super.getResources()
+        // 🟢 Pasamos 'this' (el contexto de la actividad) para autodetectar la pantalla
+        CastvHelper.ajustarRecursos(res, this)
+        return res
+    }
 
     private fun setupRecyclerView() {
         // Usamos la función centralizada

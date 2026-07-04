@@ -29,6 +29,7 @@ import com.bumptech.glide.Glide
 import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.Modelo
 import com.creativem.fulltv.databinding.PlayerBinding
+import com.creativem.fulltv.principal.CastvHelper
 import com.google.firebase.database.FirebaseDatabase
 
 class PlayerTv : AppCompatActivity() {
@@ -104,7 +105,16 @@ class PlayerTv : AppCompatActivity() {
             ocultarMenuCompleto()
         }
     }
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(CastvHelper.ajustarContexto(newBase))
+    }
 
+    override fun getResources(): android.content.res.Resources {
+        val res = super.getResources()
+        // 🟢 Pasamos 'this' (el contexto de la actividad) para autodetectar la pantalla
+        CastvHelper.ajustarRecursos(res, this)
+        return res
+    }
     @SuppressLint("UnsafeOptInUsageError")
     private fun initializePlayer() {
         if (streamUrl.isEmpty()) return
