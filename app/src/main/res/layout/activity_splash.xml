@@ -6,171 +6,99 @@
     android:layout_height="match_parent"
     android:background="#050505">
 
-    <!-- LUZ DE FONDO (PROYECTOR) -->
+    <!-- Brillo de fondo (Se mantiene perfectamente centrado detrás del logo) -->
     <View
         android:id="@+id/viewGlow"
         android:layout_width="600dp"
         android:layout_height="600dp"
         android:background="@drawable/splash_glow"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="@id/imgLogoSplash"
+        app:layout_constraintBottom_toBottomOf="@id/imgLogoSplash"
+        app:layout_constraintStart_toStartOf="@id/imgLogoSplash"
+        app:layout_constraintEnd_toEndOf="@id/imgLogoSplash" />
 
-    <!-- LOGO -->
+    <!-- 🟢 Logo (Inicia la cadena vertical empaquetada) -->
     <ImageView
         android:id="@+id/imgLogoSplash"
-        android:layout_width="300dp"
-        android:layout_height="300dp"
+        android:layout_width="190dp"
+        android:layout_height="190dp"
         android:src="@drawable/icono"
-        app:layout_constraintBottom_toTopOf="@+id/txtBienvenido"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/txtBienvenido"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintVertical_chainStyle="packed" />
 
-    <!-- TÍTULO: CINE PARCHE (Grande e impactante) -->
+    <!-- Título (Siguiente en la cadena vertical) -->
     <TextView
         android:id="@+id/txtBienvenido"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="EL CINE QUE NOS UNE"
+        android:layout_marginTop="-24dp"
+        android:text="Nuevas historias"
         android:textColor="#C5A059"
-        android:textSize="40sp"
         android:textStyle="bold"
-        android:letterSpacing="0.1"
-        android:shadowColor="#000000"
+        android:textSize="26sp"
         android:gravity="center"
-        android:shadowDx="5"
-        android:shadowDy="5"
+        android:letterSpacing="0.08"
+        android:shadowColor="#000000"
+        android:shadowDx="4"
+        android:shadowDy="4"
         android:shadowRadius="10"
-        app:layout_constraintBottom_toTopOf="@+id/txtCargandoAnim"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/imgLogoSplash"
+        app:layout_constraintBottom_toTopOf="@id/txtCargandoAnim"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/imgLogoSplash" />
+        app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- FRASES DE COMUNIDAD (Blancas con brillo dorado) -->
+    <!-- Frases descriptivas (Siguiente en la cadena vertical) -->
     <TextView
         android:id="@+id/txtCargandoAnim"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
-        android:layout_marginStart="100dp"
-        android:layout_marginEnd="100dp"
-        android:textAlignment="center"
+        android:layout_marginStart="40dp"
+        android:layout_marginEnd="40dp"
         android:fontFamily="sans-serif-black"
-        android:text="Uniendo al parche para la gran función"
+        android:gravity="center"
+        android:text="Reuniendo al parche para una gran función"
         android:textColor="#FFFFFF"
-        android:textSize="32sp"
-        android:lineSpacingExtra="8dp"
+        android:textSize="20sp"
+        android:lineSpacingExtra="4dp"
         android:shadowColor="#C5A059"
-        android:shadowRadius="15"
-        app:layout_constraintBottom_toTopOf="@+id/progressBarSplash"
-        app:layout_constraintEnd_toEndOf="parent"
+        android:shadowRadius="12"
+        app:layout_constraintTop_toBottomOf="@id/txtBienvenido"
+        app:layout_constraintBottom_toTopOf="@id/progressBarSplash"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/txtBienvenido" />
+        app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- BARRA DE CARGA -->
+    <!-- Barra de progreso horizontal (Siguiente en la cadena vertical) -->
     <ProgressBar
         android:id="@+id/progressBarSplash"
         style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="350dp"
-        android:layout_height="6dp"
-        android:layout_marginTop="40dp"
+        android:layout_width="250dp"
+        android:layout_height="5dp"
+        android:layout_marginTop="28dp"
         android:indeterminate="true"
         android:indeterminateTint="#C5A059"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/txtCargandoAnim"
+        app:layout_constraintBottom_toTopOf="@id/txtVersion"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/txtCargandoAnim" />
+        app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- VERSIÓN (Más visible pero elegante) -->
+    <!-- Versión (Finaliza la cadena vertical empaquetada) -->
     <TextView
         android:id="@+id/txtVersion"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="40dp"
+        android:layout_marginTop="24dp"
         android:text="VERSIÓN 1.0.0"
         android:textColor="#C5A059"
-        android:textSize="18sp"
         android:textStyle="bold"
+        android:textSize="15sp"
         android:alpha="0.8"
+        app:layout_constraintTop_toBottomOf="@id/progressBarSplash"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-
-
-    <!-- CONTENEDOR DE ERROR DE CONEXIÓN (Inicia GONE) -->
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/layoutNoInternet"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#F2050505"
-        android:visibility="gone"
-        android:elevation="50dp">
-
-        <ImageView
-            android:id="@+id/imgError"
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:src="@android:drawable/ic_dialog_alert"
-            app:tint="#C5A059"
-            app:layout_constraintBottom_toTopOf="@+id/tvErrorTitulo"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_chainStyle="packed" />
-
-        <TextView
-            android:id="@+id/tvErrorTitulo"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="SIN CONEXIÓN AL PARCHE"
-            android:textColor="#C5A059"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            app:layout_constraintBottom_toTopOf="@+id/tvErrorMensaje"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/imgError" />
-
-        <TextView
-            android:id="@+id/tvErrorMensaje"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="100dp"
-            android:layout_marginTop="10dp"
-            android:layout_marginEnd="100dp"
-            android:text="Necesitamos internet para encender los proyectores.\nRevisa tu red y vuelve a intentarlo."
-            android:textAlignment="center"
-            android:textColor="#FFFFFF"
-            android:textSize="22sp"
-            app:layout_constraintBottom_toTopOf="@+id/btnReintentar"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/tvErrorTitulo" />
-
-        <Button
-            android:id="@+id/btnReintentar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="40dp"
-            android:backgroundTint="#C5A059"
-            android:padding="20dp"
-            android:text="REINTENTAR CONEXIÓN"
-            android:textColor="#050505"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:focusable="true"
-            android:nextFocusUp="@id/btnReintentar"
-            android:nextFocusDown="@id/btnReintentar"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/tvErrorMensaje" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

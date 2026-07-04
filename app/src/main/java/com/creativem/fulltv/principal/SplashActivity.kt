@@ -83,7 +83,7 @@ class SplashActivity : AppCompatActivity() {
         val txtBienvenido = findViewById<TextView>(R.id.txtBienvenido)
         val txtCargando = findViewById<TextView>(R.id.txtCargandoAnim)
         val txtVersion = findViewById<TextView>(R.id.txtVersion)
-        val viewGlow = findViewById<View>(R.id.viewGlow)
+
 
         // Efecto Dorado
         txtBienvenido.post {
@@ -100,13 +100,12 @@ class SplashActivity : AppCompatActivity() {
 
         txtVersion.text = "VERSIÓN ${BuildConfig.VERSION_NAME}"
 
-        // Ocultar layout de error para que nunca moleste
-        findViewById<View>(R.id.layoutNoInternet).visibility = View.GONE
 
         // Iniciar procesos
         iniciarCicloFrases(txtCargando)
         iniciarCargaDeDatos()
     }
+
 
     private fun iniciarCargaDeDatos() {
         lifecycleScope.launch {
@@ -257,17 +256,42 @@ class SplashActivity : AppCompatActivity() {
     }
 
     private fun iniciarCicloFrases(textView: TextView) {
+        val prefs = getSharedPreferences("SplashPrefs", MODE_PRIVATE)
+
+        // 1. Recuperamos la lista de índices de frases pendientes de mostrar en este dispositivo
+        val indicesString = prefs.getString("unshown_indices", "") ?: ""
+        var listaIndices = if (indicesString.isNotEmpty()) {
+            indicesString.split(",").mapNotNull { it.toIntOrNull() }.toMutableList()
+        } else {
+            mutableListOf()
+        }
+
+        // 2. Si está vacía (primera vez o ya se mostraron todas), generamos un nuevo orden aleatorio completo
+        if (listaIndices.isEmpty()) {
+            listaIndices = (0 until frasesCine.size).shuffled().toMutableList()
+            prefs.edit().putString("unshown_indices", listaIndices.joinToString(",")).apply()
+        }
+
         lifecycleScope.launch {
-            var ultimoIndex = -1
             while (isActive) {
-                var index: Int
-                do { index = (0 until frasesCine.size).random() } while (index == ultimoIndex)
-                ultimoIndex = index
+                if (listaIndices.isEmpty()) {
+                    // Al agotar todas las frases de la lista, se genera una nueva secuencia aleatoria
+                    listaIndices = (0 until frasesCine.size).shuffled().toMutableList()
+                }
+
+                // Extraemos el siguiente índice disponible
+                val index = listaIndices.removeAt(0)
+
+                // Guardamos la lista restante de forma persistente para la siguiente vez que se abra la app
+                prefs.edit().putString("unshown_indices", listaIndices.joinToString(",")).apply()
+
                 textView.text = frasesCine[index]
-                textView.animate().alpha(1f).setDuration(400).start()
-                delay(2500)
-                textView.animate().alpha(0f).setDuration(400).start()
-                delay(500)
+
+                // 🟢 Animación acelerada para que las transiciones sean más dinámicas y rápidas
+                textView.animate().alpha(1f).setDuration(250).start()
+                delay(2000) // Se reduce el tiempo de exposición de la frase a 1.5 segundos
+                textView.animate().alpha(0f).setDuration(250).start()
+                delay(200)  // Intervalo breve de espera entre frases
             }
         }
     }
