@@ -14,7 +14,7 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = 10
-        versionName = "1.0.48"
+        versionName = "1.0.49"
         ndk {
             // Solo incluye las arquitecturas más comunes para bajar el peso
             abiFilters.add("armeabi-v7a")
