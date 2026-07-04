@@ -100,18 +100,29 @@ object CastvHelper {
     fun obtenerFactorEscalaDinamico(context: android.content.Context, res: android.content.res.Resources): Float {
         val config = res.configuration
         val appContext = context.applicationContext
+
+        // 📺 Detección de TV original
         val uiModeManager = appContext.getSystemService(android.content.Context.UI_MODE_SERVICE) as? android.app.UiModeManager
         val esTv = uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
 
-        // Diferenciamos una Tablet estándar (emulador) de una pantalla panorámica de Auto
-        val esPantallaAutoOVeryWide = config.smallestScreenWidthDp >= 750
-        val esTabletEstandar = config.smallestScreenWidthDp in 600..749
+        // 📱 Clasificación oficial de pantalla (Altamente confiable en emuladores y configuraciones variables)
+        val screenLayoutSize = config.screenLayout and android.content.res.Configuration.SCREENLAYOUT_SIZE_MASK
+        val esDispositivoGrande = screenLayoutSize == android.content.res.Configuration.SCREENLAYOUT_SIZE_LARGE
+                || screenLayoutSize == android.content.res.Configuration.SCREENLAYOUT_SIZE_XLARGE
+
+        val smallestWidth = config.smallestScreenWidthDp
+
+        // Diferenciamos pantallas anchas de Auto o Ultra-Anchas
+        val esPantallaAutoOVeryWide = smallestWidth >= 750
+
+        // 🟢 Detección robusta para tablet física y emuladores de tablet
+        val esTabletEstandar = (smallestWidth in 600..749) || (esDispositivoGrande && smallestWidth < 750)
 
         return when {
-            esTv -> 1.0f                   // 📺 TV original
-            esPantallaAutoOVeryWide -> 1.60f // 🚗 Pantallas de Auto anchas
-            esTabletEstandar -> 1.10f      // 📱 Emuladores y Tablets normales (ligero aumento sin desborde)
-            else -> 0.75f                   // 📱 Móviles
+            esTv -> 1.0f                     // 📺 TV original
+            esPantallaAutoOVeryWide -> 1.60f // 🚗 Pantallas de Auto o ultra anchas
+            esTabletEstandar -> 1.10f        // 📱 Tablets físicas y Emuladores de Tablet
+            else -> 0.75f                    // 📱 Móviles
         }
     }
 
