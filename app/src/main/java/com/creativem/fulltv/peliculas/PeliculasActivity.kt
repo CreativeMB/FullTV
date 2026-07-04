@@ -132,6 +132,7 @@ class PeliculasActivity : AppCompatActivity() {
             bannerTMDBResolved = null
         }
         private var bannerHeightCached = -1
+        private var idDePeliculaMostradaEnBanner: String? = null
 
     }
 //    import com.creativem.fulltv.BuildConfig
@@ -589,18 +590,18 @@ private var usuarioEsperandoMas = false
 
         if (isFinishing || isDestroyed) return
 
-        // 🟢 Limpieza inmediata: Remueve cualquier imagen clara por defecto del XML para evitar el destello
+        // 🟢 CORRECCIÓN: Compara contra la película visible en pantalla en este instante exacto,
+        // en lugar de comparar contra la película de arranque inicial de la aplicación.
+        if (idDePeliculaMostradaEnBanner == movie.id && !primeraCargaBanner) {
+            return
+        }
+        idDePeliculaMostradaEnBanner = movie.id
+
+        // Limpieza inmediata: Remueve cualquier imagen clara por defecto del XML para evitar el destello
         ivBackdrop?.setImageResource(0)
         ivPoster?.setImageResource(0)
         ivBackdrop?.setBackgroundColor(Color.BLACK)
         ivPoster?.setBackgroundColor(Color.BLACK)
-
-        if (currentPromoIndex != -1 && bannerPeliculaInicial?.id == movie.id && !primeraCargaBanner) {
-            return
-        }
-        if (lastFocusedMovie == null && !primeraCargaBanner && movie.id == peliculasPromoList.getOrNull(currentPromoIndex)?.id) {
-            return
-        }
 
         if (primeraCargaBanner) {
             primeraCargaBanner = false
