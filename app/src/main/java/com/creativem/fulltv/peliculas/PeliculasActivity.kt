@@ -103,7 +103,6 @@ import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
 import com.creativem.fulltv.BuildConfig
 import com.creativem.fulltv.menu.MenuPrincipalVerticalAdapter
-import com.creativem.fulltv.mundial.Mundial
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import androidx.transition.TransitionManager
@@ -322,11 +321,6 @@ private var usuarioEsperandoMas = false
         super.onNewIntent(intent)
         setIntent(intent)
         // El estado de la vista, scroll y adaptadores se mantiene intacto de forma nativa.
-    }
-
-    private fun useryoutube() {
-        val intent = Intent(this, Mundial::class.java)
-        startActivity(intent)
     }
     private fun intentarVerificacionAlquileres() {
         val currentUser = auth.currentUser
@@ -842,12 +836,12 @@ private var usuarioEsperandoMas = false
     }
     private fun actualizarMenuConSaldo() {
         val menuItems = listOf(
-            "Mundial", "Perfil", "Activar", "Alquila", "Buscar",
+            "Perfil", "Activar", "Alquila", "Buscar",
             "Pedir", "Paquete", "TV", "Cerrar"
         ).toMutableList()
 
         val menuIcons = listOf(
-            R.drawable.youtube, R.drawable.home, R.drawable.cartelera,
+            R.drawable.home, R.drawable.cartelera,
             R.drawable.cine, R.drawable.buscar, R.drawable.pedido,
             R.drawable.activacion, R.drawable.tv, R.drawable.cerrrarp
         ).toMutableList()
@@ -1032,7 +1026,6 @@ private var usuarioEsperandoMas = false
     }
     private fun ejecutarAccionMenu(item: MenuPrincipalItem) {
         when (item.name) {
-            "Mundial" -> useryoutube()
             "Activar" -> navegarGratis()
             "Buscar" -> buscarPeliculaDialogo()
             "Pedir" -> mostrarDialogoPedido()
