@@ -7,18 +7,18 @@
     android:layout_height="match_parent"
     tools:context=".Fragment.TvFragment">
 
-    <!-- Reproductor en la parte superior -->
+    <!-- 1. Reproductor en la parte superior para probar el canal seleccionado -->
     <androidx.media3.ui.PlayerView
         android:id="@+id/playerView"
         android:layout_width="0dp"
         android:layout_height="250dp"
-        app:use_controller="true"
-        app:resize_mode="fixed_width"
+        app:use_controller="false"
+        app:resize_mode="fill"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- NUEVA FILA: URL y BUSCADOR JUNTOS -->
+    <!-- 2. FILA DE INSUMOS: CAJUELA DE URL Y BUSCADOR JUNTOS -->
     <LinearLayout
         android:id="@+id/layoutInputsContainer"
         android:layout_width="0dp"
@@ -34,7 +34,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="URL .m3u"
+            android:hint="URL .m3u de IPTV"
             android:inputType="textUri"
             android:textSize="14sp"
             android:layout_marginEnd="4dp" />
@@ -44,7 +44,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="Buscar..."
+            android:hint="Buscar canal..."
             android:drawableStart="@android:drawable/ic_menu_search"
             android:inputType="text"
             android:textSize="14sp"
@@ -52,7 +52,7 @@
 
     </LinearLayout>
 
-    <!-- Contenedor para los botones -->
+    <!-- 3. CONTENEDOR DE BOTONES -->
     <LinearLayout
         android:id="@+id/layoutButtons"
         android:layout_width="0dp"
@@ -69,7 +69,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginEnd="4dp"
-            android:text="Cargar" />
+            android:text="Guardar URL" />
 
         <Button
             android:id="@+id/btnClearAll"
@@ -77,12 +77,25 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="4dp"
-            android:text="Limpiar Todo"
+            android:text="Borrar URL"
             android:backgroundTint="#B71C1C" />
 
     </LinearLayout>
 
-    <!-- Lista de canales corregida para que empiece debajo de los botones -->
+    <!-- Indicador de Carga ProgressBar sobre la pantalla -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:indeterminate="true"
+        android:indeterminateTint="#FFD700"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 4. LISTA DE CANALES OBTENIDOS DE LA URL -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerViewTV"
         android:layout_width="0dp"

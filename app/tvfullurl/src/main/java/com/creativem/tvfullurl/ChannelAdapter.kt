@@ -18,8 +18,8 @@ class ChannelAdapter(
 
     class ChannelViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val titleTextView: TextView = view.findViewById(R.id.textViewTitle)
-        val deleteButton: Button = view.findViewById(R.id.btnDelete)
         val imageView: ImageView = view.findViewById(R.id.imageViewChannel)
+
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChannelViewHolder {
@@ -46,10 +46,7 @@ class ChannelAdapter(
         // Clic en la fila para reproducir
         holder.itemView.setOnClickListener { onItemClick(channel) }
 
-        // Clic en eliminar (pasa el objeto completo al Fragment para el AlertDialog)
-        holder.deleteButton.setOnClickListener {
-            onDeleteClick(channel) // CORREGIDO: ahora pasa 'channel' y no 'channel.id'
-        }
+
     }
 
     // Método para actualizar la lista (usado por el buscador y Firebase)

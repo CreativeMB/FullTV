@@ -1,8 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false">
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">209.45.101.35</domain>
+        <domain includeSubdomains="true">209.45.101.36</domain>
+        <domain includeSubdomains="true">160.20.165.246</domain>
+        <domain includeSubdomains="true">181.78.71.5</domain>
+        <domain includeSubdomains="true">181.78.6.106</domain>
+        <domain includeSubdomains="true">filmaffinity.com</domain>
+        <domain includeSubdomains="true">teleclub.xyz</domain>
+        <domain includeSubdomains="true">coninfo.net</domain>
+        <domain includeSubdomains="true">cineparche.duckdns.org</domain>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+
 </network-security-config>
