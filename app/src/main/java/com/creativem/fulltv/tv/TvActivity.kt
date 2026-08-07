@@ -20,7 +20,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import com.bumptech.glide.Glide
 import com.creativem.fulltv.databinding.ActivityTvBinding
-import com.creativem.fulltv.peliculas.PeliculasActivity
 import com.creativem.fulltv.principal.AudioFocusHelper
 import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Modelo
@@ -31,6 +30,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
+import java.nio.charset.StandardCharsets
 import java.text.Normalizer
 
 class TvActivity : AppCompatActivity() {
@@ -41,7 +45,6 @@ class TvActivity : AppCompatActivity() {
 
     private var channelsShowing: List<Modelo> = mutableListOf()
     private val channelListMaster = mutableListOf<Modelo>()
-    private val databaseRef = FirebaseDatabase.getInstance().getReference("tv")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,34 +52,33 @@ class TvActivity : AppCompatActivity() {
         setContentView(binding.root)
         prefs = getSharedPreferences("TV_PREFS", Context.MODE_PRIVATE)
 
-        // 🔥 Evita que el teclado virtual de la TV se abra solo al iniciar
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
-
-        // 🔥 Quitar el enfoque inicial a la barra de texto
         binding.searchEditText.clearFocus()
 
-        // Configuración de pantalla de TV
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
 
         setupRecyclerView()
         setupBuscador()
+
+        // 🟢 Carga la lista de canales desde Firebase
         loadTvChannels()
 
         onBackPressedDispatcher.addCallback(this) {
             CastvHelper.regresarAPeliculas(this@TvActivity)
         }
     }
+
     override fun attachBaseContext(newBase: android.content.Context) {
         super.attachBaseContext(CastvHelper.ajustarContexto(newBase))
     }
 
     override fun getResources(): android.content.res.Resources {
         val res = super.getResources()
-        // 🟢 Pasamos 'this' (el contexto de la actividad) para autodetectar la pantalla
         CastvHelper.ajustarRecursos(res, this)
         return res
     }
+
     private fun setupRecyclerView() {
         val columnas = ViewUtils.calcularColumnas(this)
         binding.recyclerViewTV.layoutManager = GridLayoutManager(this, columnas)
@@ -85,7 +87,6 @@ class TvActivity : AppCompatActivity() {
             mutableListOf(),
             onItemClick = { canal -> abrirReproductor(canal) },
             onFocusChange = { canal ->
-                // GUARDAMOS EL ID DEL CANAL ENFOCADO
                 lastFocusedChannelId = canal.id
                 actualizarFondo(canal.imageUrl)
             },
@@ -93,15 +94,9 @@ class TvActivity : AppCompatActivity() {
         )
         binding.recyclerViewTV.adapter = adapter
 
-        // Evita que el foco se pierda al limpiar el buscador
-        binding.recyclerViewTV.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus && binding.searchEditText.text.isNotEmpty()) {
-                // No limpiamos aquí para no perder la navegación
-            }
-        }
+        binding.recyclerViewTV.setOnFocusChangeListener { _, _ -> }
     }
 
-    // --- LÓGICA DE FAVORITOS ---
     private fun toggleFavorite(canal: Modelo) {
         val currentFavs = getFavoriteIds().toMutableSet()
 
@@ -114,8 +109,6 @@ class TvActivity : AppCompatActivity() {
         }
 
         prefs.edit().putStringSet("fav_ids", currentFavs).apply()
-
-        // Al marcar favorito, refrescamos respetando lo que esté escrito en el buscador
         filterChannels(binding.searchEditText.text.toString())
     }
 
@@ -137,6 +130,8 @@ class TvActivity : AppCompatActivity() {
             compareByDescending<Modelo> { favIds.contains(it.id) }
                 .thenBy { it.title }
         )
+
+        channelsShowing = sortedList
 
         if (::adapter.isInitialized) {
             val buscadorTeníaFoco = binding.searchEditText.hasFocus()
@@ -161,7 +156,6 @@ class TvActivity : AppCompatActivity() {
                                 }, 50)
                             }
                         } else {
-                            // 🟢 SOLUCIÓN AL FOCO INICIAL: Damos foco al RecyclerView y luego a su primera celda
                             binding.recyclerViewTV.requestFocus()
                             binding.recyclerViewTV.postDelayed({
                                 binding.recyclerViewTV.layoutManager?.findViewByPosition(0)?.requestFocus()
@@ -178,12 +172,10 @@ class TvActivity : AppCompatActivity() {
 
         if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
             if (binding.searchEditText.hasFocus()) {
-                // USAMOS channelsShowing EN LUGAR DE currentList
                 val positionToFocus = channelsShowing.indexOfFirst { it.id == lastFocusedChannelId }
 
                 if (positionToFocus != -1) {
                     binding.recyclerViewTV.requestFocus()
-                    // Hacemos scroll y enfocamos
                     layoutManager?.scrollToPositionWithOffset(positionToFocus, 100)
                     binding.recyclerViewTV.postDelayed({
                         layoutManager?.findViewByPosition(positionToFocus)?.requestFocus()
@@ -200,7 +192,6 @@ class TvActivity : AppCompatActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
-    // --- CONFIGURACIÓN DEL BUSCADOR ROBUSTO ---
     private fun setupBuscador() {
         binding.searchEditText.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -210,14 +201,11 @@ class TvActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {}
         })
 
-        // NUEVO: Al presionar buscar en el teclado de la TV
         binding.searchEditText.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                // Ocultar teclado
                 val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
                 imm.hideSoftInputFromWindow(binding.searchEditText.windowToken, 0)
 
-                // Forzar el foco a la lista
                 binding.recyclerViewTV.requestFocus()
                 true
             } else {
@@ -231,31 +219,154 @@ class TvActivity : AppCompatActivity() {
         return temp.replace("[\\p{InCombiningDiacriticalMarks}]".toRegex(), "").lowercase().trim()
     }
 
+    // 🟢 Carga desde Firebase (Ruta exacta: tv/urliptv)
     private fun loadTvChannels() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val snapshot = databaseRef.get().await()
-                val canalesTemp = mutableListOf<Modelo>()
+                // 1. Si ya están cargados en el repositorio compartido, los usamos directamente
+                if (TvRepository.channelListMaster.isNotEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        channelListMaster.clear()
+                        channelListMaster.addAll(TvRepository.channelListMaster)
+                        filterChannels(binding.searchEditText.text.toString())
+                    }
+                    return@launch
+                }
 
-                for (child in snapshot.children) {
-                    val canal = child.getValue(Modelo::class.java)
-                    canal?.let {
-                        val canalConId = it.copy(id = child.key ?: "")
-                        canalesTemp.add(canalConId)
+                // 2. Consulta exacta a Firebase usando la constante del repositorio ("tv/urliptv")
+                val snapshot = FirebaseDatabase.getInstance(TvRepository.FIREBASE_DB_URL)
+                    .getReference(TvRepository.FIREBASE_PATH)
+                    .get().await()
+
+                val m3uUrl = snapshot.value?.toString()?.trim()
+
+                if (!m3uUrl.isNullOrEmpty()) {
+                    Log.d("TV_ACTIVITY", "URL obtenida de Firebase (${TvRepository.FIREBASE_PATH}): $m3uUrl")
+
+                    val canalesTemp = descargarM3uStream(m3uUrl)
+
+                    withContext(Dispatchers.Main) {
+                        channelListMaster.clear()
+                        channelListMaster.addAll(canalesTemp)
+
+                        // 🟢 GUARDAMOS EN LA VARIABLE GLOBAL DEL REPOSITORIO PARA PLAYERTV
+                        TvRepository.channelListMaster = canalesTemp
+
+                        if (channelListMaster.isEmpty()) {
+                            Toast.makeText(this@TvActivity, "La lista IPTV en Firebase no contiene canales válidos", Toast.LENGTH_LONG).show()
+                        } else {
+                            Log.d("TV_ACTIVITY", "Canales cargados exitosamente: ${channelListMaster.size}")
+                        }
+
+                        filterChannels(binding.searchEditText.text.toString())
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        Log.e("TV_ACTIVITY", "El nodo '${TvRepository.FIREBASE_PATH}' en Firebase está vacío")
+                        Toast.makeText(this@TvActivity, "No se encontró la URL IPTV en Firebase", Toast.LENGTH_LONG).show()
                     }
                 }
-
-                withContext(Dispatchers.Main) {
-                    channelListMaster.clear()
-                    channelListMaster.addAll(canalesTemp.distinctBy { it.id })
-
-                    // Carga inicial respetando el texto que tenga el buscador
-                    filterChannels(binding.searchEditText.text.toString())
-                }
             } catch (e: Exception) {
-                Log.e("TV_ACTIVITY", "Error: ${e.message}")
+                Log.e("TV_ACTIVITY", "Error de conexión con Firebase: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@TvActivity, "Error al conectar con Firebase", Toast.LENGTH_LONG).show()
+                }
             }
         }
+    }
+
+    private fun descargarM3uStream(urlString: String): List<Modelo> {
+        var currentUrl = urlString.trim()
+        var redirects = 0
+        val maxRedirects = 5
+
+        while (redirects < maxRedirects) {
+            var connection: HttpURLConnection? = null
+            try {
+                val url = URL(currentUrl)
+                connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                connection.instanceFollowRedirects = true
+
+                val status = connection.responseCode
+
+                if (status == HttpURLConnection.HTTP_MOVED_TEMP ||
+                    status == HttpURLConnection.HTTP_MOVED_PERM ||
+                    status == HttpURLConnection.HTTP_SEE_OTHER ||
+                    status == 307 || status == 308) {
+
+                    val newUrl = connection.getHeaderField("Location")
+                    if (newUrl.isNullOrEmpty()) break
+                    currentUrl = newUrl
+                    redirects++
+                    connection.disconnect()
+                    continue
+                }
+
+                if (status == HttpURLConnection.HTTP_OK) {
+                    val reader = BufferedReader(InputStreamReader(connection.inputStream, StandardCharsets.UTF_8))
+                    return parseM3uBuffer(reader)
+                } else {
+                    Log.e("TV_ACTIVITY", "Respuesta HTTP $status en la URL: $currentUrl")
+                    return emptyList()
+                }
+            } catch (e: Exception) {
+                Log.e("TV_ACTIVITY", "Error de red al conectar con: $currentUrl", e)
+                return emptyList()
+            } finally {
+                connection?.disconnect()
+            }
+        }
+        return emptyList()
+    }
+
+    private fun parseM3uBuffer(reader: BufferedReader): List<Modelo> {
+        val channels = mutableListOf<Modelo>()
+        var currentName = ""
+        var currentLogo = ""
+        var idContador = 0
+
+        reader.useLines { lines ->
+            lines.forEach { line ->
+                val trimmed = line.trim()
+                if (trimmed.isEmpty()) return@forEach
+
+                if (trimmed.startsWith("#EXTINF:", ignoreCase = true)) {
+                    val logoMatch = Regex("""tvg-logo="([^"]*)"""", RegexOption.IGNORE_CASE).find(trimmed)
+                    currentLogo = logoMatch?.groupValues?.get(1)?.trim() ?: ""
+
+                    val tvgNameMatch = Regex("""tvg-name="([^"]*)"""", RegexOption.IGNORE_CASE).find(trimmed)
+                    val tvgName = tvgNameMatch?.groupValues?.get(1)?.trim()
+
+                    val nameAfterComma = trimmed.substringAfterLast(",", "").trim()
+
+                    currentName = when {
+                        nameAfterComma.isNotEmpty() -> nameAfterComma
+                        !tvgName.isNullOrEmpty() -> tvgName
+                        else -> ""
+                    }
+                } else if (!trimmed.startsWith("#")) {
+                    if (trimmed.contains("://") || trimmed.startsWith("rtmp", ignoreCase = true) || trimmed.startsWith("udp", ignoreCase = true)) {
+                        val finalName = if (currentName.isNotEmpty()) currentName else "Canal ${channels.size + 1}"
+                        channels.add(
+                            Modelo(
+                                id = "iptv_$idContador",
+                                title = finalName,
+                                streamUrl = trimmed,
+                                imageUrl = currentLogo
+                            )
+                        )
+                        idContador++
+                    }
+                    currentName = ""
+                    currentLogo = ""
+                }
+            }
+        }
+        return channels
     }
 
     private fun actualizarFondo(url: String?) {
@@ -290,6 +401,7 @@ class TvActivity : AppCompatActivity() {
             AudioFocusHelper.abandonAudioFocus()
         }
     }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
             val currentFocus = currentFocus
@@ -308,7 +420,6 @@ class TvActivity : AppCompatActivity() {
                     }
 
                     KeyEvent.KEYCODE_DPAD_DOWN -> {
-                        // Si el foco está en la barra de búsqueda, baja de forma controlada al último canal
                         if (binding.searchEditText.hasFocus()) {
                             val positionToFocus = channelListMaster.indexOfFirst { it.id == lastFocusedChannelId }
                             val finalPos = if (positionToFocus != -1) positionToFocus else 0
@@ -321,7 +432,6 @@ class TvActivity : AppCompatActivity() {
                             return true
                         }
 
-                        // REGLA 3: Si está en la última fila de canales, bloqueamos la salida por abajo
                         if (position != androidx.recyclerview.widget.RecyclerView.NO_POSITION && totalItems > 0) {
                             val bottomRowStart = (totalItems - 1) / columns * columns
                             if (position >= bottomRowStart) {
@@ -331,7 +441,6 @@ class TvActivity : AppCompatActivity() {
                     }
 
                     KeyEvent.KEYCODE_DPAD_UP -> {
-                        // REGLA 4: Si está en la primera fila de canales y presiona arriba, enfoca el buscador
                         if (position != androidx.recyclerview.widget.RecyclerView.NO_POSITION && position in 0 until columns) {
                             binding.searchEditText.requestFocus()
                             return true
@@ -339,7 +448,6 @@ class TvActivity : AppCompatActivity() {
                     }
 
                     KeyEvent.KEYCODE_DPAD_LEFT -> {
-                        // REGLA 2A: Si está en la primera columna de canales y presiona izquierda, enfoca el buscador
                         if (position != androidx.recyclerview.widget.RecyclerView.NO_POSITION) {
                             if (position % columns == 0) {
                                 binding.searchEditText.requestFocus()
@@ -349,7 +457,6 @@ class TvActivity : AppCompatActivity() {
                     }
 
                     KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                        // REGLA 2B: Si está en la última columna de canales y presiona derecha, enfoca el buscador
                         if (position != androidx.recyclerview.widget.RecyclerView.NO_POSITION && totalItems > 0) {
                             val isLastColumn = (position % columns == columns - 1) || (position == totalItems - 1)
                             if (isLastColumn) {

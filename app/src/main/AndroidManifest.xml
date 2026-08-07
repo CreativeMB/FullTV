@@ -36,6 +36,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FullTV.tv"
         android:usesCleartextTraffic="true"
+
         tools:ignore="UnusedAttribute">
 
 
