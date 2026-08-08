@@ -75,7 +75,6 @@ import com.creativem.fulltv.principal.Modelo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
-
 class PlayerTv : ComponentActivity() {
 
     private lateinit var prefs: SharedPreferences
@@ -301,16 +300,8 @@ fun PlayerTvScreen(
 
         val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
-        val tsFlags =
-            // 1. Detecta unidades de acceso para sincronizar audio/video correctamente
-            DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-
-                    // 2. FUNDAMENTAL PARA IPTV: Permite fotogramas clave no-IDR.
-                    // Evita que la pantalla se congele o tiemble cuando el servidor IPTV envía frames desordenados.
-                    DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
-
-                    // 3. Ignora transmisiones de información de empalme/cortes (que suelen causar saltos o cuelgues)
-                    DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
+        val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+                DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
 
         val extractorsFactory = DefaultExtractorsFactory().apply {
             setTsExtractorFlags(tsFlags)
@@ -318,7 +309,7 @@ fun PlayerTvScreen(
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
 
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(15000, 50000, 2500, 5000)
+            .setBufferDurationsMs(10000, 40000, 1500, 3000)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
@@ -393,16 +384,8 @@ fun PlayerTvScreen(
 
             val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
-            val tsFlags =
-                // 1. Detecta unidades de acceso para sincronizar audio/video correctamente
-                DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-
-                        // 2. FUNDAMENTAL PARA IPTV: Permite fotogramas clave no-IDR.
-                        // Evita que la pantalla se congele o tiemble cuando el servidor IPTV envía frames desordenados.
-                        DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
-
-                        // 3. Ignora transmisiones de información de empalme/cortes (que suelen causar saltos o cuelgues)
-                        DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
+            val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+                    DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
 
             val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
@@ -440,14 +423,10 @@ fun PlayerTvScreen(
         // 1. REPRODUCTOR DE VIDEO
         AndroidView(
             factory = { ctx ->
-                // 🟢 TextureView EVITA LA TEMBLADERA AL ESTIRAR EL VIDEO EN PANTALLA COMPLETA
-                val textureView = android.view.TextureView(ctx)
-                exoPlayer.setVideoTextureView(textureView)
-
                 PlayerView(ctx).apply {
                     player = exoPlayer
                     useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL // 🟢 ESTIRA EL VIDEO
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     keepScreenOn = true
                 }
             },
@@ -456,12 +435,12 @@ fun PlayerTvScreen(
                 .clickable { onToggleMenu() }
         )
 
-        // 2. BUFFER DE CARGA OVERLAY
+        // 2. BUFFER DE CARGA OVERLAY (CINEPARCHE STYLE)
         if (isBuffering || isOffline) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.7f)),
+                    .background(Color(0xFF0A122A).copy(alpha = 0.85f)),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -476,6 +455,7 @@ fun PlayerTvScreen(
                             .size(100.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color.Black)
+                            .border(1.dp, GoldAccent, RoundedCornerShape(12.dp))
                             .padding(8.dp)
                     )
 
@@ -487,12 +467,12 @@ fun PlayerTvScreen(
                     )
 
                     if (!isOffline) {
-                        CircularProgressIndicator(color = Color.Red)
+                        CircularProgressIndicator(color = GoldAccent)
                     }
 
                     Text(
                         text = if (isOffline) "CANAL FUERA DE LÍNEA" else currentBufferText,
-                        color = if (isOffline) Color.Red else Color.LightGray,
+                        color = if (isOffline) RedLive else Color.LightGray,
                         fontSize = 14.sp
                     )
                 }
@@ -518,7 +498,7 @@ fun PlayerTvScreen(
 }
 
 // -------------------------------------------------------------
-// MENÚ OVERLAY FAVORITOS (CON FOCO AUTOMÁTICO D-PAD)
+// MENÚ OVERLAY FAVORITOS (ESTILO CINEPARCHE)
 // -------------------------------------------------------------
 @Composable
 fun FavoritesOverlayMenu(
@@ -545,7 +525,7 @@ fun FavoritesOverlayMenu(
         modifier = Modifier
             .fillMaxHeight()
             .width(320.dp),
-        color = Color(0xFF141414).copy(alpha = 0.96f),
+        color = Color(0xFF0A122A).copy(alpha = 0.96f),
         shadowElevation = 16.dp
     ) {
         Column(
@@ -563,10 +543,10 @@ fun FavoritesOverlayMenu(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.Favorite, contentDescription = null, tint = Color.Red)
+                    Icon(Icons.Default.Favorite, contentDescription = null, tint = RedLive)
                     Text(
                         text = "MIS FAVORITOS",
-                        color = Color.White,
+                        color = GoldAccent,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -577,7 +557,7 @@ fun FavoritesOverlayMenu(
                 }
             }
 
-            Divider(color = Color(0xFF333333))
+            Divider(color = Color(0xFF2A2A38))
 
             if (favoriteChannels.isEmpty()) {
                 Box(
@@ -624,15 +604,15 @@ fun FavoriteMenuItem(
     val scale by animateFloatAsState(targetValue = if (isFocused) 1.05f else 1.0f, label = "scale")
 
     val borderColor = when {
-        isFocused -> Color(0xFFFFD600)
-        isPlaying -> Color.Red
+        isFocused -> GoldAccent
+        isPlaying -> RedLive
         else -> Color.Transparent
     }
 
     val backgroundColor = when {
-        isFocused -> Color(0xFF2E2E38)
+        isFocused -> Color(0xFF282836)
         isPlaying -> Color(0xFF2D1515)
-        else -> Color(0xFF1E1E1E)
+        else -> Color(0xFF161622)
     }
 
     Row(
@@ -676,7 +656,7 @@ fun FavoriteMenuItem(
             if (isPlaying) {
                 Text(
                     text = "🔴 Reproduciendo ahora",
-                    color = Color.Red,
+                    color = RedLive,
                     fontSize = 10.sp
                 )
             }

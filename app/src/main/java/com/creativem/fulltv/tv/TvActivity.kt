@@ -88,6 +88,12 @@ import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.text.Normalizer
 
+// 🎨 VALORES DE COLOR UNIFICADOS CON PELICULASACTIVITY
+val GoldAccent = Color(0xFFC5A059)
+val DeepDarkBg = Color(0xFF0A122A)
+val CardDarkBg = Color(0xFF161622)
+val RedLive = Color(0xFFFF2A2A)
+
 class TvActivity : ComponentActivity() {
 
     private lateinit var prefs: SharedPreferences
@@ -107,7 +113,7 @@ class TvActivity : ComponentActivity() {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = Color(0xFF0D0D12)
+                    color = DeepDarkBg
                 ) {
                     TvInteractiveScreen(
                         prefs = prefs,
@@ -195,7 +201,7 @@ fun TvInteractiveScreen(
     var selectedChannel by remember { mutableStateOf<Modelo?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // 🟢 SINCRONIZACIÓN AL REGRESAR DE PLAYERTV
+    // Sincronización al regresar de PlayerTv
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -212,7 +218,7 @@ fun TvInteractiveScreen(
         }
     }
 
-    // Carga desde Firebase / Repositorio
+    // Carga desde Firebase
     LaunchedEffect(Unit) {
         coroutineScope.launch(Dispatchers.IO) {
             val savedChannelId = prefs.getString("last_selected_channel_id", null)
@@ -298,7 +304,7 @@ fun TvInteractiveScreen(
 
     if (isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = Color(0xFFFF2A2A))
+            CircularProgressIndicator(color = GoldAccent)
         }
     } else {
         Row(
@@ -326,12 +332,12 @@ fun TvInteractiveScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(start = 4.dp)
                 ) {
-                    Icon(Icons.Default.Favorite, contentDescription = null, tint = Color(0xFFFF2A2A))
+                    Icon(Icons.Default.Favorite, contentDescription = null, tint = RedLive)
                     Text(
                         text = "MIS FAVORITOS (${favoriteChannels.size})",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = GoldAccent
                     )
                 }
 
@@ -340,7 +346,7 @@ fun TvInteractiveScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF16161E)),
+                            .background(CardDarkBg),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -376,7 +382,7 @@ fun TvInteractiveScreen(
             }
 
             // =========================================================================
-            // LADO DERECHO (50%): REPRODUCTOR MINI + CANALES + INFORMACIÓN
+            // LADO DERECHO (50%): REPRODUCTOR + CANALES + INFORMACIÓN
             // =========================================================================
             Column(
                 modifier = Modifier
@@ -394,7 +400,7 @@ fun TvInteractiveScreen(
                     modifier = Modifier.padding(start = 2.dp)
                 )
 
-                // 1. REPRODUCTOR MINI EXOPLAYER
+                // 1. REPRODUCTOR MINI
                 TvPlayerCard(
                     selectedChannel = selectedChannel,
                     onOpenFullScreen = { canal -> onOpenFullScreenPlayer(canal) }
@@ -406,7 +412,7 @@ fun TvInteractiveScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(start = 2.dp)
                 ) {
-                    Icon(Icons.Default.Tv, contentDescription = null, tint = Color.LightGray)
+                    Icon(Icons.Default.Tv, contentDescription = null, tint = GoldAccent)
                     Text(
                         text = "Todos los Canales (${allChannelsFiltered.size})",
                         fontSize = 14.sp,
@@ -463,7 +469,7 @@ fun TvInteractiveScreen(
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: FICHA DE INFORMACIÓN DEL CANAL ACTIVO
+// COMPOSABLE: FICHA DE INFORMACIÓN DEL CANAL ACTIVO (ESTILO CINEPARCHE)
 // -------------------------------------------------------------
 @Composable
 fun SelectedChannelDetailCard(
@@ -473,9 +479,9 @@ fun SelectedChannelDetailCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF16161E)),
+        colors = CardDefaults.cardColors(containerColor = CardDarkBg),
         shape = RoundedCornerShape(12.dp),
-        modifier = modifier.border(1.dp, Color(0xFF2A2A38), RoundedCornerShape(12.dp))
+        modifier = modifier.border(1.dp, GoldAccent.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
     ) {
         Row(
             modifier = Modifier
@@ -513,7 +519,7 @@ fun SelectedChannelDetailCard(
                         Icon(
                             imageVector = Icons.Default.Favorite,
                             contentDescription = null,
-                            tint = if (isFavorite) Color(0xFFFF2A2A) else Color.Gray,
+                            tint = if (isFavorite) RedLive else Color.Gray,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -521,7 +527,7 @@ fun SelectedChannelDetailCard(
 
                 Text(
                     text = "🔴 TRANSMISIÓN EN VIVO",
-                    color = Color(0xFFFF2A2A),
+                    color = RedLive,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -539,7 +545,7 @@ fun SelectedChannelDetailCard(
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: BUSCADOR TV
+// COMPOSABLE: BUSCADOR TV (DORADO CINEPARCHE)
 // -------------------------------------------------------------
 @Composable
 fun TvSearchBar(query: String, onQueryChange: (String) -> Unit) {
@@ -553,24 +559,25 @@ fun TvSearchBar(query: String, onQueryChange: (String) -> Unit) {
             .onFocusChanged { isFocused = it.isFocused }
             .border(
                 width = 2.dp,
-                color = if (isFocused) Color(0xFF00E5FF) else Color.Transparent,
+                color = if (isFocused) GoldAccent else Color.Transparent,
                 shape = RoundedCornerShape(10.dp)
             ),
         placeholder = { Text("Buscar canal por nombre...", fontSize = 13.sp) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFFF2A2A)) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = GoldAccent) },
         singleLine = true,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Color(0xFF00E5FF),
+            focusedBorderColor = GoldAccent,
             unfocusedBorderColor = Color(0xFF2A2A38),
             focusedContainerColor = Color(0xFF1E1E28),
-            unfocusedContainerColor = Color(0xFF16161E)
+            unfocusedContainerColor = CardDarkBg
         )
     )
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: TARJETA GRILLA
+// COMPOSABLE: TARJETA GRILLA (DORADO EN FOCO / ROJO EN SELECCIÓN)
 // -------------------------------------------------------------
+
 @kotlin.OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChannelCard(
@@ -585,8 +592,8 @@ fun ChannelCard(
     val scale by animateFloatAsState(targetValue = if (isFocused) 1.08f else 1.0f, label = "scale")
 
     val borderColor = when {
-        isFocused -> Color(0xFF00E5FF)
-        isSelected -> Color(0xFFFF2A2A)
+        isFocused -> GoldAccent
+        isSelected -> RedLive
         else -> Color.Transparent
     }
 
@@ -627,7 +634,7 @@ fun ChannelCard(
                 Icon(
                     imageVector = Icons.Default.Favorite,
                     contentDescription = null,
-                    tint = Color(0xFFFF2A2A),
+                    tint = RedLive,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .size(14.dp)
@@ -666,8 +673,8 @@ fun HorizontalChannelCard(
     val scale by animateFloatAsState(targetValue = if (isFocused) 1.08f else 1.0f, label = "scale")
 
     val borderColor = when {
-        isFocused -> Color(0xFF00E5FF)
-        isSelected -> Color(0xFFFF2A2A)
+        isFocused -> GoldAccent
+        isSelected -> RedLive
         else -> Color(0xFF2A2A38)
     }
 
@@ -709,7 +716,7 @@ fun HorizontalChannelCard(
                 Icon(
                     imageVector = Icons.Default.Favorite,
                     contentDescription = null,
-                    tint = Color(0xFFFF2A2A),
+                    tint = RedLive,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .size(12.dp)
@@ -740,7 +747,7 @@ fun TvPlayerCard(
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
-    val borderColor = if (isFocused) Color(0xFF00E5FF) else Color(0xFFFF2A2A).copy(alpha = 0.8f)
+    val borderColor = if (isFocused) GoldAccent else RedLive.copy(alpha = 0.8f)
 
     Box(
         modifier = Modifier
@@ -770,7 +777,7 @@ fun TvPlayerCard(
 }
 
 // -------------------------------------------------------------
-// REPRODUCTOR EMBEBIDO MEDIA3 EXOPLAYER (SIN TEMBLADERA Y ESTIRADO FULL)
+// REPRODUCTOR EMBEBIDO MEDIA3 EXOPLAYER (SIN TEXTO SOBREPUESTO)
 // -------------------------------------------------------------
 @OptIn(UnstableApi::class)
 @Composable
@@ -790,25 +797,16 @@ fun EmbeddedPlayerView(
 
         val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
-        val tsFlags =
-            // 1. Detecta unidades de acceso para sincronizar audio/video correctamente
-            DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-
-                    // 2. FUNDAMENTAL PARA IPTV: Permite fotogramas clave no-IDR.
-                    // Evita que la pantalla se congele o tiemble cuando el servidor IPTV envía frames desordenados.
-                    DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
-
-                    // 3. Ignora transmisiones de información de empalme/cortes (que suelen causar saltos o cuelgues)
-                    DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
+        val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+                DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
 
         val extractorsFactory = DefaultExtractorsFactory().apply {
             setTsExtractorFlags(tsFlags)
         }
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
 
-        // 🟢 BÚFER AUMENTADO: Amortigua variaciones en la señal
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(15000, 50000, 2500, 5000)
+            .setBufferDurationsMs(10000, 40000, 1500, 3000)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
@@ -865,17 +863,8 @@ fun EmbeddedPlayerView(
                 .setReadTimeoutMs(20000)
             val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
-            val tsFlags =
-                // 1. Detecta unidades de acceso para sincronizar audio/video correctamente
-                DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-
-                        // 2. FUNDAMENTAL PARA IPTV: Permite fotogramas clave no-IDR.
-                        // Evita que la pantalla se congele o tiemble cuando el servidor IPTV envía frames desordenados.
-                        DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
-
-                        // 3. Ignora transmisiones de información de empalme/cortes (que suelen causar saltos o cuelgues)
-                        DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
-
+            val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+                    DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
             val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
@@ -911,32 +900,14 @@ fun EmbeddedPlayerView(
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             factory = { ctx ->
-                // 🟢 TextureView EVITA LA TEMBLADERA EN TABLETS AL ESTIRAR EL VIDEO
-                val textureView = android.view.TextureView(ctx)
-                exoPlayer.setVideoTextureView(textureView)
-
                 PlayerView(ctx).apply {
                     player = exoPlayer
                     useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL // 🟢 ESTIRA EL VIDEO
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 }
             },
             modifier = Modifier.fillMaxSize()
         )
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp)
-                .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Presiona OK para Pantalla Completa", color = Color.White, fontSize = 10.sp)
-            }
-        }
     }
 }
 
