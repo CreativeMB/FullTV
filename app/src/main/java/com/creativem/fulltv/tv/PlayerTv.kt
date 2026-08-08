@@ -1,18 +1,55 @@
 package com.creativem.fulltv.tv
 
-import android.annotation.SuppressLint
+import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.net.Uri
-import android.os.*
-import android.util.Log
+import android.os.Build
+import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
-import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.*
+import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
+import androidx.activity.compose.setContent
 import androidx.annotation.OptIn
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
@@ -30,97 +67,184 @@ import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.recyclerview.widget.LinearLayoutManager
-import com.bumptech.glide.Glide
-import com.creativem.fulltv.R
-import com.creativem.fulltv.databinding.PlayerBinding
+import androidx.media3.ui.PlayerView
+import coil.compose.AsyncImage
+import com.creativem.fulltv.principal.AudioFocusHelper
 import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Modelo
-import com.google.firebase.database.FirebaseDatabase
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.Executors
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
-class PlayerTv : AppCompatActivity() {
+class PlayerTv : ComponentActivity() {
 
-    private var reintentosContador = 0
-    private val MAX_REINTENTOS = 3
-    private var isOffline = false
-    private var masterTvList: List<Modelo> = emptyList()
-    private var currentChannelIndex = -1
+    private lateinit var prefs: SharedPreferences
 
-    private var player: ExoPlayer? = null
+    private var currentChannelState = mutableStateOf<Modelo?>(null)
+    private var isMenuVisibleState = mutableStateOf(false)
+    private var favoriteChannelsState = mutableStateOf<List<Modelo>>(emptyList())
+    private var isLoadingState = mutableStateOf(true)
+    private var bufferTextState = mutableStateOf("Iniciando señal...")
+    private var isOfflineState = mutableStateOf(false)
 
-    private var streamUrl: String = ""
-    private var movieImageUrl: String = ""
-    private lateinit var movieTitle: String
-    private lateinit var binding: PlayerBinding
-    private lateinit var adapter: TvMenuAdapter
-
-    private val handler = Handler(Looper.getMainLooper())
-
-    private val bufferUpdater = object : Runnable {
-        override fun run() {
-            if (player != null && binding.loadingIndicator.visibility == View.VISIBLE) {
-                val percentage = player?.bufferedPercentage ?: 0
-                val estimatedKb = (player?.bufferedPosition ?: 0) / 1024
-                binding.loadingBufferText.text = "Búfer: $percentage% (${estimatedKb} KB)"
-                handler.postDelayed(this, 500)
-            }
-        }
-    }
+    private var exoPlayerInstance: ExoPlayer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = PlayerBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_FULLSCREEN,
-            WindowManager.LayoutParams.FLAG_FULLSCREEN
+
+        configurarPantallaTvFull()
+        prefs = getSharedPreferences("TV_PREFS", Context.MODE_PRIVATE)
+
+        val streamUrl = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
+        val movieTitle = intent.getStringExtra("EXTRA_MOVIE_TITLE") ?: "TV en Vivo"
+        val movieImageUrl = intent.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
+
+        val canalInicial = Modelo(
+            id = "canal_actual",
+            title = movieTitle,
+            streamUrl = streamUrl,
+            imageUrl = movieImageUrl
         )
 
-        val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
-        controles?.visibility = View.GONE
-        binding.loadingIndicator.visibility = View.VISIBLE
-        binding.loadingBufferText.text = "Iniciando señal..."
+        currentChannelState.value = canalInicial
+        TvRepository.lastPlayedChannel = canalInicial
 
-        binding.reproductor.keepScreenOn = true
-        initializeRecyclerView()
+        cargarListaFavoritos()
 
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-        intent?.let {
-            streamUrl = it.getStringExtra("EXTRA_STREAM_URL") ?: ""
-            movieTitle = it.getStringExtra("EXTRA_MOVIE_TITLE") ?: "TV en vivo"
-            movieImageUrl = it.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
-
-            binding.loadingMovieTitle.text = movieTitle
-            findViewById<TextView>(R.id.nombrePelicula)?.text = movieTitle
-            findViewById<ImageView>(R.id.imagenPelicula)?.let { img ->
-                Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(img)
+        onBackPressedDispatcher.addCallback(this) {
+            if (isMenuVisibleState.value) {
+                isMenuVisibleState.value = false
+            } else {
+                finish()
             }
         }
 
-        binding.reproductor.setOnTouchListener { _, _ ->
-            if (binding.recyclerViewTv.visibility != View.VISIBLE) {
-                mostarpélis()
+        setContent {
+            MaterialTheme(colorScheme = darkColorScheme()) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = Color.Black
+                ) {
+                    PlayerTvScreen(
+                        currentChannel = currentChannelState.value,
+                        favoriteChannels = favoriteChannelsState.value,
+                        isMenuVisible = isMenuVisibleState.value,
+                        isLoading = isLoadingState.value,
+                        bufferText = bufferTextState.value,
+                        isOffline = isOfflineState.value,
+                        onCloseMenu = { isMenuVisibleState.value = false },
+                        onSelectFavoriteChannel = { canal -> cambiarCanalDirecto(canal) },
+                        onToggleMenu = { isMenuVisibleState.value = !isMenuVisibleState.value },
+                        onPlayerCreated = { player -> exoPlayerInstance = player }
+                    )
+                }
             }
-            true
-        }
-
-        loadTvCollection()
-        initializePlayer()
-
-        binding.btnCerrarMenuTv.setOnClickListener {
-            ocultarMenuCompleto()
         }
     }
 
-    override fun attachBaseContext(newBase: android.content.Context) {
+    private fun cargarListaFavoritos() {
+        val favIds = prefs.getStringSet("fav_ids", emptySet()) ?: emptySet()
+        val masterList = TvRepository.channelListMaster
+
+        val favsList = masterList.filter { favIds.contains(it.id) }
+        favoriteChannelsState.value = if (favsList.isNotEmpty()) favsList else masterList
+    }
+
+    private fun cambiarCanalDirecto(canal: Modelo) {
+        currentChannelState.value = canal
+        TvRepository.lastPlayedChannel = canal
+        isMenuVisibleState.value = false
+        isOfflineState.value = false
+        isLoadingState.value = true
+        bufferTextState.value = "Cargando canal..."
+    }
+
+    private fun cambiarCanalSiguienteAnterior(siguiente: Boolean) {
+        val lista = favoriteChannelsState.value
+        if (lista.isEmpty()) return
+
+        val canalActual = currentChannelState.value
+        val indexActual = lista.indexOfFirst { it.streamUrl == canalActual?.streamUrl }
+
+        val nuevoIndex = if (siguiente) {
+            if (indexActual == -1 || indexActual >= lista.size - 1) 0 else indexActual + 1
+        } else {
+            if (indexActual <= 0) lista.size - 1 else indexActual - 1
+        }
+
+        cambiarCanalDirecto(lista[nuevoIndex])
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        return when (keyCode) {
+            KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                cambiarCanalSiguienteAnterior(siguiente = true)
+                true
+            }
+            KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                cambiarCanalSiguienteAnterior(siguiente = false)
+                true
+            }
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_INFO,
+            KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_PAGE_DOWN -> {
+                isMenuVisibleState.value = !isMenuVisibleState.value
+                true
+            }
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                if (!isMenuVisibleState.value) {
+                    isMenuVisibleState.value = true
+                    true
+                } else {
+                    super.onKeyDown(keyCode, event)
+                }
+            }
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (isMenuVisibleState.value) {
+                    isMenuVisibleState.value = false
+                    true
+                } else if (keyCode == KeyEvent.KEYCODE_BACK) {
+                    finish()
+                    true
+                } else {
+                    super.onKeyDown(keyCode, event)
+                }
+            }
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (!isMenuVisibleState.value) {
+                    isMenuVisibleState.value = true
+                    true
+                } else {
+                    // Permitir que las flechas arriba/abajo naveguen naturalmente dentro del menú de Compose
+                    super.onKeyDown(keyCode, event)
+                }
+            }
+            else -> super.onKeyDown(keyCode, event)
+        }
+    }
+
+    private fun configurarPantallaTvFull() {
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+
+        @Suppress("DEPRECATION")
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            window.setFlags(
+                WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN
+            )
+            window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_FULLSCREEN
+                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
+        }
+    }
+
+    override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(CastvHelper.ajustarContexto(newBase))
     }
 
@@ -130,30 +254,53 @@ class PlayerTv : AppCompatActivity() {
         return res
     }
 
-    @OptIn(UnstableApi::class)
-    @SuppressLint("UnsafeOptInUsageError")
-    private fun initializePlayer() {
-        if (streamUrl.isEmpty()) return
+    override fun onResume() {
+        super.onResume()
+        configurarPantallaTvFull()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioFocusHelper.requestAudioFocus(this)
+        }
+    }
 
-        liberarReproductor()
+    override fun onPause() {
+        super.onPause()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioFocusHelper.abandonAudioFocus()
+        }
+    }
+}
 
-        Log.d("PlayerTv_DEBUG", "--------------------------------------------------")
-        Log.d("PlayerTv_DEBUG", "Iniciando reproduccion de URL: $streamUrl")
+// -------------------------------------------------------------
+// COMPOSABLE PANTALLA
+// -------------------------------------------------------------
+@OptIn(UnstableApi::class)
+@Composable
+fun PlayerTvScreen(
+    currentChannel: Modelo?,
+    favoriteChannels: List<Modelo>,
+    isMenuVisible: Boolean,
+    isLoading: Boolean,
+    bufferText: String,
+    isOffline: Boolean,
+    onCloseMenu: () -> Unit,
+    onSelectFavoriteChannel: (Modelo) -> Unit,
+    onToggleMenu: () -> Unit,
+    onPlayerCreated: (ExoPlayer) -> Unit
+) {
+    val context = LocalContext.current
 
-        // 1. Configuración de Pantalla
-        binding.reproductor.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
-        binding.reproductor.useController = false
+    var currentBufferText by remember { mutableStateOf(bufferText) }
+    var isBuffering by remember { mutableStateOf(isLoading) }
 
-        // 2. HTTP DataSource con User-Agent de reproductor estándar
+    val exoPlayer = remember(context) {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
-            .setUserAgent("VLC/3.0.18 LibVLC/3.0.18") // Cambiado a VLC para mayor compatibilidad IPTV
+            .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
             .setConnectTimeoutMs(20000)
             .setReadTimeoutMs(20000)
 
-        val dataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
+        val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
-        // 3. Extracción permisiva para canales MPEG-TS / IPTV
         val tsFlags = DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
                 DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
                 DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
@@ -161,18 +308,15 @@ class PlayerTv : AppCompatActivity() {
         val extractorsFactory = DefaultExtractorsFactory().apply {
             setTsExtractorFlags(tsFlags)
         }
-
         val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
-
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
 
-        // 4. Búfer optimizado
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(10000, 40000, 1500, 3000)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
-        val trackSelector = DefaultTrackSelector(this).apply {
+        val trackSelector = DefaultTrackSelector(context).apply {
             setParameters(
                 buildUponParameters()
                     .setMaxVideoSize(3840, 2160)
@@ -180,443 +324,346 @@ class PlayerTv : AppCompatActivity() {
             )
         }
 
-        val renderersFactory = DefaultRenderersFactory(this)
+        val renderersFactory = DefaultRenderersFactory(context)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
             .setEnableDecoderFallback(true)
 
-        player = ExoPlayer.Builder(this, renderersFactory)
+        ExoPlayer.Builder(context, renderersFactory)
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
             .setMediaSourceFactory(mediaSourceFactory)
-            .build().also { exoPlayer ->
-
-                // 🟢 LOGS AVANZADOS DE EXOPLAYER (MUESTRA TODO EN LOGCAT FILTRANDO POR "EventLogger")
-                exoPlayer.addAnalyticsListener(androidx.media3.exoplayer.util.EventLogger("PlayerTv_EventLogger"))
-
-                binding.reproductor.player = exoPlayer
-
-                val uri = Uri.parse(streamUrl)
-                val mediaItemBuilder = MediaItem.Builder().setUri(uri)
-
-                // 🟢 CORRECCIÓN DE DETECCIÓN HLS VS MPEG-TS
-                // Solo tratamos como HLS si la URL termina en .m3u8 o contiene la extensión explícita.
-                // NO usar "/live/" o "/stream/" porque usualmente son streams TS directos.
-                val isStrictHls = streamUrl.contains(".m3u8", ignoreCase = true) ||
-                        streamUrl.contains("format=m3u8", ignoreCase = true)
-
-                val isTsStream = streamUrl.contains(".ts", ignoreCase = true) ||
-                        streamUrl.contains("/live/", ignoreCase = true) ||
-                        streamUrl.contains("/stream/", ignoreCase = true)
-
-                Log.d("PlayerTv_DEBUG", "Es HLS Estricto: $isStrictHls | Es TS Stream: $isTsStream")
-
-                val mediaSource = if (isStrictHls) {
-                    Log.d("PlayerTv_DEBUG", "Creando HlsMediaSource...")
-                    mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
-                    HlsMediaSource.Factory(dataSourceFactory)
-                        .setExtractorFactory(hlsExtractorFactory)
-                        .setAllowChunklessPreparation(false)
-                        .createMediaSource(mediaItemBuilder.build())
-                } else if (isTsStream) {
-                    Log.d("PlayerTv_DEBUG", "Creando MediaSource para MPEG-TS...")
-                    mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP2T)
-                    mediaSourceFactory.createMediaSource(mediaItemBuilder.build())
-                } else {
-                    Log.d("PlayerTv_DEBUG", "Creando MediaSource Generico (Auto-detect)...")
-                    mediaSourceFactory.createMediaSource(mediaItemBuilder.build())
-                }
-
-                exoPlayer.setMediaSource(mediaSource)
-                exoPlayer.prepare()
-                exoPlayer.addListener(playerListener)
-                exoPlayer.playWhenReady = true
+            .build().apply {
+                playWhenReady = true
+                onPlayerCreated(this)
             }
     }
 
-    private val playerListener = @UnstableApi object : Player.Listener {
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            when (playbackState) {
-                Player.STATE_BUFFERING -> {
+    DisposableEffect(exoPlayer) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                when (playbackState) {
+                    Player.STATE_BUFFERING -> isBuffering = true
+                    Player.STATE_READY -> isBuffering = false
+                    else -> {}
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                isBuffering = true
+                currentBufferText = "Error de señal. Reintentando..."
+            }
+        }
+        exoPlayer.addListener(listener)
+
+        onDispose {
+            exoPlayer.removeListener(listener)
+            exoPlayer.release()
+        }
+    }
+
+    LaunchedEffect(exoPlayer) {
+        while (isActive) {
+            if (isBuffering) {
+                val percentage = exoPlayer.bufferedPercentage
+                val estimatedKb = exoPlayer.bufferedPosition / 1024
+                currentBufferText = "Búfer: $percentage% (${estimatedKb} KB)"
+            }
+            delay(500)
+        }
+    }
+
+    LaunchedEffect(currentChannel?.streamUrl) {
+        val streamUrl = currentChannel?.streamUrl ?: ""
+        if (streamUrl.isNotEmpty()) {
+            isBuffering = true
+            currentBufferText = "Cargando señal..."
+
+            val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+                .setAllowCrossProtocolRedirects(true)
+                .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
+                .setConnectTimeoutMs(20000)
+                .setReadTimeoutMs(20000)
+
+            val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+
+            val tsFlags = DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
+                    DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+                    DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
+
+            val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
+            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
+            val uri = Uri.parse(streamUrl)
+            val mediaItemBuilder = MediaItem.Builder().setUri(uri)
+
+            val isStrictHls = streamUrl.contains(".m3u8", ignoreCase = true) ||
+                    streamUrl.contains("format=m3u8", ignoreCase = true)
+
+            val isTsStream = streamUrl.contains(".ts", ignoreCase = true) ||
+                    streamUrl.contains("/live/", ignoreCase = true) ||
+                    streamUrl.contains("/stream/", ignoreCase = true)
+
+            val mediaSource = if (isStrictHls) {
+                mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
+                HlsMediaSource.Factory(dataSourceFactory)
+                    .setExtractorFactory(hlsExtractorFactory)
+                    .setAllowChunklessPreparation(false)
+                    .createMediaSource(mediaItemBuilder.build())
+            } else if (isTsStream) {
+                mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP2T)
+                mediaSourceFactory.createMediaSource(mediaItemBuilder.build())
+            } else {
+                mediaSourceFactory.createMediaSource(mediaItemBuilder.build())
+            }
+
+            exoPlayer.setMediaSource(mediaSource)
+            exoPlayer.prepare()
+            exoPlayer.play()
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 1. REPRODUCTOR DE VIDEO
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    player = exoPlayer
+                    useController = false
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                    keepScreenOn = true
+                }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable { onToggleMenu() }
+        )
+
+        // 2. BUFFER DE CARGA OVERLAY
+        if (isBuffering || isOffline) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.7f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    AsyncImage(
+                        model = currentChannel?.imageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.Black)
+                            .padding(8.dp)
+                    )
+
+                    Text(
+                        text = currentChannel?.title ?: "",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
                     if (!isOffline) {
-                        binding.loadingIndicator.visibility = View.VISIBLE
-                        handler.post(bufferUpdater)
+                        CircularProgressIndicator(color = Color.Red)
                     }
+
+                    Text(
+                        text = if (isOffline) "CANAL FUERA DE LÍNEA" else currentBufferText,
+                        color = if (isOffline) Color.Red else Color.LightGray,
+                        fontSize = 14.sp
+                    )
                 }
-                Player.STATE_READY -> {
-                    Log.d("PlayerTv_DEBUG", " Reproducción iniciada correctamente para: $streamUrl")
-                    binding.loadingIndicator.visibility = View.GONE
-                    isOffline = false
-                    reintentosContador = 0
-                    handler.removeCallbacks(bufferUpdater)
-                }
-                Player.STATE_ENDED -> playNextChannel()
-                Player.STATE_IDLE -> { }
             }
         }
 
-        override fun onPlayerError(error: PlaybackException) {
-            val errorMsg = error.localizedMessage ?: error.errorCodeName
-
-            // 🟢 LOGS DETALLADOS DEL ERROR DE FUENTE (SOURCE ERROR)
-            Log.e("PlayerTv_DEBUG", "================ ERROR DE REPRODUCCION ================")
-            Log.e("PlayerTv_DEBUG", "Codigo Error Nombre: ${error.errorCodeName}")
-            Log.e("PlayerTv_DEBUG", "Codigo Error Int: ${error.errorCode}")
-            Log.e("PlayerTv_DEBUG", "Mensaje: $errorMsg")
-
-            val cause = error.cause
-            if (cause != null) {
-                Log.e("PlayerTv_DEBUG", "Causa raiz (Class): ${cause.javaClass.name}")
-                Log.e("PlayerTv_DEBUG", "Causa raiz (Mensaje): ${cause.message}")
-
-                // Verificar si fue un error HTTP (ej. 403 Forbidden, 404 Not Found)
-                if (cause is androidx.media3.datasource.HttpDataSource.HttpDataSourceException) {
-                    Log.e("PlayerTv_DEBUG", "Error de red HTTP detectado")
-                    if (cause is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
-                        Log.e("PlayerTv_DEBUG", "Codigo HTTP devuelto por servidor: ${cause.responseCode}")
-                    }
-                }
-            }
-            Log.e("PlayerTv_DEBUG", "=======================================================")
-
-            if (isOffline) return
-            reintentosContador++
-
-            if (reintentosContador <= MAX_REINTENTOS) {
-                binding.loadingIndicator.visibility = View.VISIBLE
-                binding.loadingBufferText.text = "Reintentando canal ($reintentosContador/$MAX_REINTENTOS)..."
-                handler.postDelayed({ reiniciarReproductor() }, 3000)
-            } else {
-                isOffline = true
-                binding.loadingMovieTitle.text = "CANAL FUERA DE LÍNEA"
-                binding.loadingBufferText.text = "Error: $errorMsg"
-                binding.loadingBufferText.setTextColor(ContextCompat.getColor(this@PlayerTv, R.color.redpersonalisado))
-
-                handler.postDelayed({ playNextChannel() }, 4000)
-            }
+        // 3. OVERLAY MENÚ LATERAL DE FAVORITOS
+        AnimatedVisibility(
+            visible = isMenuVisible,
+            enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+            exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+            modifier = Modifier.align(Alignment.CenterEnd)
+        ) {
+            FavoritesOverlayMenu(
+                favoriteChannels = favoriteChannels,
+                currentStreamUrl = currentChannel?.streamUrl ?: "",
+                isMenuVisible = isMenuVisible,
+                onCloseMenu = onCloseMenu,
+                onSelectChannel = onSelectFavoriteChannel
+            )
         }
     }
-    private fun playNextChannel() {
-        if (masterTvList.isNotEmpty()) {
-            cambiarCanal(siguiente = true)
-        } else {
-            Toast.makeText(this, "No hay más canales disponibles", Toast.LENGTH_SHORT).show()
-            finishPlayer()
-        }
-    }
+}
 
-    private fun loadTvCollection() {
-        if (TvRepository.channelListMaster.isNotEmpty()) {
-            masterTvList = TvRepository.channelListMaster
-            currentChannelIndex = masterTvList.indexOfFirst { it.streamUrl == streamUrl }
-            adapter.updateData(masterTvList)
-            Log.d("PlayerTv", "Menú cargado desde TvRepository (${masterTvList.size} canales)")
-            return
-        }
+// -------------------------------------------------------------
+// MENÚ OVERLAY FAVORITOS (CON FOCO AUTOMÁTICO D-PAD)
+// -------------------------------------------------------------
+@Composable
+fun FavoritesOverlayMenu(
+    favoriteChannels: List<Modelo>,
+    currentStreamUrl: String,
+    isMenuVisible: Boolean,
+    onCloseMenu: () -> Unit,
+    onSelectChannel: (Modelo) -> Unit
+) {
+    // 🎯 Solicitador de Foco para el Control Remoto
+    val firstItemFocusRequester = remember { FocusRequester() }
 
-        FirebaseDatabase.getInstance(TvRepository.FIREBASE_DB_URL)
-            .getReference(TvRepository.FIREBASE_PATH)
-            .get().addOnSuccessListener { snapshot ->
-                val m3uUrl = snapshot.value?.toString()?.trim()
-                if (!m3uUrl.isNullOrEmpty()) {
-                    descargarYParsearM3u(m3uUrl)
-                } else {
-                    Log.e("PlayerTv", "No se encontró la URL IPTV en Firebase (${TvRepository.FIREBASE_PATH})")
-                }
-            }.addOnFailureListener { exception ->
-                Log.e("PlayerTv", "Error al conectar con Firebase", exception)
-            }
-    }
-
-    private fun descargarYParsearM3u(m3uUrl: String) {
-        val executor = Executors.newSingleThreadExecutor()
-        executor.execute {
-            val canales = descargarM3uStream(m3uUrl)
-            if (canales.isNotEmpty()) {
-                handler.post {
-                    masterTvList = canales
-                    TvRepository.channelListMaster = canales
-                    currentChannelIndex = masterTvList.indexOfFirst { it.streamUrl == streamUrl }
-                    adapter.updateData(masterTvList)
-                    Log.d("PlayerTv", "Lista cargada desde Firebase con ${canales.size} canales")
-                }
-            } else {
-                Log.e("PlayerTv", "La lista M3U descargada desde Firebase no trajo canales válidos")
-            }
-        }
-    }
-
-    private fun descargarM3uStream(urlString: String): List<Modelo> {
-        var currentUrl = urlString.trim()
-        var redirects = 0
-        val maxRedirects = 5
-
-        while (redirects < maxRedirects) {
-            var connection: HttpURLConnection? = null
+    // Al abrir el menú, asigna automáticamente el foco D-Pad al primer canal
+    LaunchedEffect(isMenuVisible) {
+        if (isMenuVisible && favoriteChannels.isNotEmpty()) {
+            delay(150) // Pequeña espera para que la animación termine
             try {
-                val url = URL(currentUrl)
-                connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 15000
-                connection.readTimeout = 15000
-                connection.requestMethod = "GET"
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                connection.instanceFollowRedirects = true
-
-                val status = connection.responseCode
-
-                if (status == HttpURLConnection.HTTP_MOVED_TEMP ||
-                    status == HttpURLConnection.HTTP_MOVED_PERM ||
-                    status == HttpURLConnection.HTTP_SEE_OTHER ||
-                    status == 307 || status == 308) {
-
-                    val newUrl = connection.getHeaderField("Location")
-                    if (newUrl.isNullOrEmpty()) break
-                    currentUrl = newUrl
-                    redirects++
-                    connection.disconnect()
-                    continue
-                }
-
-                if (status == HttpURLConnection.HTTP_OK) {
-                    val reader = BufferedReader(InputStreamReader(connection.inputStream, StandardCharsets.UTF_8))
-                    return parseM3uBuffer(reader)
-                } else {
-                    Log.e("PlayerTv", "Error HTTP $status en la URL remota: $currentUrl")
-                    return emptyList()
-                }
+                firstItemFocusRequester.requestFocus()
             } catch (e: Exception) {
-                Log.e("PlayerTv", "Excepción al conectar con la lista de Firebase: $currentUrl", e)
-                return emptyList()
-            } finally {
-                connection?.disconnect()
+                // Captura por si la vista aún no está lista
             }
         }
-        return emptyList()
     }
 
-    private fun parseM3uBuffer(reader: BufferedReader): List<Modelo> {
-        val channels = mutableListOf<Modelo>()
-        var currentName = ""
-        var currentLogo = ""
-        var idContador = 0
+    Surface(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(320.dp),
+        color = Color(0xFF141414).copy(alpha = 0.96f),
+        shadowElevation = 16.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.Favorite, contentDescription = null, tint = Color.Red)
+                    Text(
+                        text = "MIS FAVORITOS",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
-        reader.useLines { lines ->
-            lines.forEach { line ->
-                val trimmed = line.trim()
-                if (trimmed.isEmpty()) return@forEach
-
-                if (trimmed.startsWith("#EXTINF:", ignoreCase = true)) {
-                    val logoMatch = Regex("""tvg-logo="([^"]*)"""", RegexOption.IGNORE_CASE).find(trimmed)
-                    currentLogo = logoMatch?.groupValues?.get(1)?.trim() ?: ""
-
-                    val tvgNameMatch = Regex("""tvg-name="([^"]*)"""", RegexOption.IGNORE_CASE).find(trimmed)
-                    val tvgName = tvgNameMatch?.groupValues?.get(1)?.trim()
-
-                    val nameAfterComma = trimmed.substringAfterLast(",", "").trim()
-
-                    currentName = when {
-                        nameAfterComma.isNotEmpty() -> nameAfterComma
-                        !tvgName.isNullOrEmpty() -> tvgName
-                        else -> ""
-                    }
-                } else if (!trimmed.startsWith("#")) {
-                    if (trimmed.contains("://") || trimmed.startsWith("rtmp", ignoreCase = true) || trimmed.startsWith("udp", ignoreCase = true)) {
-                        val finalName = if (currentName.isNotEmpty()) currentName else "Canal ${channels.size + 1}"
-                        channels.add(
-                            Modelo(
-                                id = "iptv_$idContador",
-                                title = finalName,
-                                streamUrl = trimmed,
-                                imageUrl = currentLogo
-                            )
-                        )
-                        idContador++
-                    }
-                    currentName = ""
-                    currentLogo = ""
+                IconButton(onClick = onCloseMenu) {
+                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
                 }
             }
-        }
-        return channels
-    }
 
-    private fun togglePlayPause() {
-        player?.let { if (it.isPlaying) it.pause() else it.play() }
-    }
+            Divider(color = Color(0xFF333333))
 
-    private fun reiniciarReproductor() {
-        liberarReproductor()
-        initializePlayer()
-    }
-
-    private fun initializeRecyclerView() {
-        adapter = TvMenuAdapter(this, mutableListOf()) { canalElegido ->
-            cambiarCanalDirecto(canalElegido)
-        }
-
-        binding.recyclerViewTv.adapter = adapter
-        binding.recyclerViewTv.layoutManager = LinearLayoutManager(this)
-
-        binding.recyclerViewTv.isFocusable = true
-        binding.recyclerViewTv.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-    }
-
-    private fun cambiarCanalDirecto(canal: Modelo) {
-        currentChannelIndex = masterTvList.indexOfFirst { it.streamUrl == canal.streamUrl }
-        streamUrl = canal.streamUrl
-        movieTitle = canal.title
-        movieImageUrl = canal.imageUrl
-
-        binding.loadingIndicator.visibility = View.VISIBLE
-        binding.loadingMovieTitle.text = movieTitle
-        binding.loadingBufferText.text = "Buscando señal..."
-        binding.loadingBufferText.setTextColor(ContextCompat.getColor(this, android.R.color.white))
-
-        findViewById<TextView>(R.id.nombrePelicula)?.text = movieTitle
-        findViewById<ImageView>(R.id.imagenPelicula)?.let { img ->
-            Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(img)
-        }
-
-        ocultarMenuCompleto()
-        reiniciarReproductor()
-    }
-
-    private fun mostarpélis() {
-        if (binding.recyclerViewTv.visibility == View.VISIBLE) {
-            ocultarMenuCompleto()
-        } else {
-            binding.recyclerViewTv.visibility = View.VISIBLE
-            binding.btnCerrarMenuTv.visibility = View.VISIBLE
-
-            adapter.setCurrentPlayingChannel(streamUrl)
-            val posicionActual = masterTvList.indexOfFirst { it.streamUrl == streamUrl }
-
-            if (posicionActual != -1) {
-                binding.recyclerViewTv.scrollToPosition(posicionActual)
-
-                binding.recyclerViewTv.post {
-                    val viewHolder = binding.recyclerViewTv.findViewHolderForAdapterPosition(posicionActual)
-                    if (viewHolder != null) {
-                        viewHolder.itemView.requestFocus()
-                    } else {
-                        binding.recyclerViewTv.requestFocus()
-                    }
+            if (favoriteChannels.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No tienes canales en favoritos",
+                        color = Color.Gray,
+                        fontSize = 13.sp
+                    )
                 }
             } else {
-                binding.recyclerViewTv.post { binding.recyclerViewTv.requestFocus() }
-            }
-        }
-    }
-
-    private fun ocultarMenuCompleto() {
-        binding.recyclerViewTv.visibility = View.GONE
-        binding.btnCerrarMenuTv.visibility = View.GONE
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        return when (keyCode) {
-            KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                cambiarCanal(siguiente = true)
-                true
-            }
-            KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                cambiarCanal(siguiente = false)
-                true
-            }
-            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_INFO,
-            KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_PAGE_DOWN -> {
-                mostarpélis()
-                true
-            }
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                if (binding.recyclerViewTv.visibility == View.VISIBLE) {
-                    super.onKeyDown(keyCode, event)
-                } else {
-                    mostarpélis()
-                    true
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    itemsIndexed(favoriteChannels, key = { _, canal -> "menu_fav_${canal.id}" }) { index, canal ->
+                        FavoriteMenuItem(
+                            canal = canal,
+                            isPlaying = canal.streamUrl == currentStreamUrl,
+                            onSelect = { onSelectChannel(canal) },
+                            modifier = if (index == 0) Modifier.focusRequester(firstItemFocusRequester) else Modifier
+                        )
+                    }
                 }
             }
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                togglePlayPause()
-                true
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// ÍTEM DEL MENÚ DE FAVORITOS (CON CURSOR AMARILLO D-PAD)
+// -------------------------------------------------------------
+@Composable
+fun FavoriteMenuItem(
+    canal: Modelo,
+    isPlaying: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    val scale by animateFloatAsState(targetValue = if (isFocused) 1.05f else 1.0f, label = "scale")
+
+    val borderColor = when {
+        isFocused -> Color(0xFFFFD600) // 🟡 Amarillo Neón brillante para el control de la TV
+        isPlaying -> Color.Red
+        else -> Color.Transparent
+    }
+
+    val backgroundColor = when {
+        isFocused -> Color(0xFF2E2E38)
+        isPlaying -> Color(0xFF2D1515)
+        else -> Color(0xFF1E1E1E)
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
             }
-            KeyEvent.KEYCODE_BACK -> {
-                if (binding.recyclerViewTv.visibility == View.VISIBLE) {
-                    ocultarMenuCompleto()
-                    true
-                } else {
-                    finishPlayer()
-                    true
-                }
+            .clip(RoundedCornerShape(8.dp))
+            .background(backgroundColor)
+            .border(2.5.dp, borderColor, RoundedCornerShape(8.dp))
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable() // 🎯 Habilita navegación con Control Remoto
+            .clickable { onSelect() }
+            .padding(10.dp)
+    ) {
+        AsyncImage(
+            model = canal.imageUrl,
+            contentDescription = canal.title,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .size(45.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.Black)
+                .padding(2.dp)
+        )
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = canal.title,
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = if (isPlaying || isFocused) FontWeight.Bold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            if (isPlaying) {
+                Text(
+                    text = "🔴 Reproduciendo ahora",
+                    color = Color.Red,
+                    fontSize = 10.sp
+                )
             }
-            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                if (binding.recyclerViewTv.visibility != View.VISIBLE) {
-                    mostarpélis()
-                    true
-                } else {
-                    super.onKeyDown(keyCode, event)
-                }
-            }
-            KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE -> {
-                super.onKeyDown(keyCode, event)
-            }
-            else -> super.onKeyDown(keyCode, event)
         }
-    }
-
-    private fun cambiarCanal(siguiente: Boolean) {
-        if (masterTvList.isEmpty()) return
-
-        currentChannelIndex = if (siguiente) {
-            (currentChannelIndex + 1) % masterTvList.size
-        } else {
-            if (currentChannelIndex <= 0) masterTvList.size - 1 else currentChannelIndex - 1
-        }
-
-        val canalElegido = masterTvList[currentChannelIndex]
-
-        streamUrl = canalElegido.streamUrl
-        movieTitle = canalElegido.title
-        movieImageUrl = canalElegido.imageUrl
-
-        binding.loadingIndicator.visibility = View.VISIBLE
-        binding.loadingMovieTitle.text = movieTitle
-        binding.loadingBufferText.text = "Buscando señal..."
-        binding.loadingBufferText.setTextColor(ContextCompat.getColor(this, android.R.color.white))
-
-        findViewById<TextView>(R.id.nombrePelicula)?.text = movieTitle
-        findViewById<ImageView>(R.id.imagenPelicula)?.let { img ->
-            Glide.with(this).load(movieImageUrl).placeholder(R.drawable.icono).into(img)
-        }
-
-        if (binding.recyclerViewTv.visibility == View.VISIBLE) {
-            adapter.setCurrentPlayingChannel(streamUrl)
-            binding.recyclerViewTv.scrollToPosition(currentChannelIndex)
-        }
-
-        reiniciarReproductor()
-    }
-
-    private fun liberarReproductor() {
-        player?.let {
-            it.release()
-            player = null
-        }
-    }
-
-    private fun finishPlayer() {
-        liberarReproductor()
-        finish()
-    }
-
-    override fun onStop() {
-        super.onStop()
-        liberarReproductor()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        liberarReproductor()
-        handler.removeCallbacksAndMessages(null)
     }
 }

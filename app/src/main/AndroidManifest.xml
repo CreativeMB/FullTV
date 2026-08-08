@@ -49,9 +49,6 @@
         </activity>
 
         <activity
-            android:name=".mundial.Mundial"
-            android:theme="@style/Theme.AppCompat.NoActionBar" />
-        <activity
             android:name=".api.ApiPeliculaActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="false"
@@ -68,8 +65,9 @@
             android:theme="@style/Theme.AppCompat.NoActionBar"/>
 
         <activity
-            android:name=".tv.TvActivity"
+            android:name=".tv.TvActivity" android:exported="true"
             android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|screenSize|keyboardHidden"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
         <activity
             android:name=".peliculasvalidas.PeliculasValidasActivity"

@@ -14,19 +14,19 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = 10
-        versionName = "1.0.50"
+        versionName = "1.0.51"
         ndk {
             // Solo incluye las arquitecturas más comunes para bajar el peso
             abiFilters.add("armeabi-v7a")
             abiFilters.add("arm64-v8a")
         }
-
     }
 
     buildFeatures {
-        buildConfig = true // 👈 Asegúrate que esto esté presente
+        buildConfig = true
+        compose = true
+        viewBinding = true
     }
-
 
     buildTypes {
         release {
@@ -38,35 +38,34 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions {
         jvmTarget = "17"
     }
-    buildFeatures {
-        compose = true
-    }
+
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.13"
     }
+
     kotlin {
         compilerOptions {
             freeCompilerArgs.add("-P")
             freeCompilerArgs.add("plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true")
         }
     }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
-    buildFeatures {
-        viewBinding = true
-    }
-
 }
+
 dependencies {
     // Firebase (BOM)
     implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
@@ -81,18 +80,21 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation("com.google.zxing:core:3.5.3")
 
-    // UI y Material
+    // UI y Material Tradicional
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
 
-    // Glide y Coil (¿Seguro necesitas ambos? Si ya usas Coil, ¡podrías borrar Glide!)
+    // Glide y Coil
     implementation("com.github.bumptech.glide:glide:4.15.1")
     kapt("com.github.bumptech.glide:compiler:4.15.1")
     implementation("jp.wasabeef:glide-transformations:4.3.0")
+
+    // 🖼️ Coil para Jetpack Compose (CORREGIDO)
     implementation("io.coil-kt:coil:2.7.0")
+    implementation("io.coil-kt:coil-compose:2.7.0") // 👈 AÑADIDO: Requerido para AsyncImage
     implementation("io.coil-kt:coil-svg:2.7.0")
 
-    // Networking (Solo una vez)
+    // Networking
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.9.3")
@@ -100,23 +102,25 @@ dependencies {
     implementation("com.github.kittinunf.fuel:fuel-gson:2.3.1")
     implementation("com.android.volley:volley:1.2.1")
 
-    // Media3 y YouTubeDL
+    // 🎧 Media3 ExoPlayer (UNIFICADO A 1.4.1)
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-exoplayer-dash:1.4.1")
     implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
+    implementation("androidx.media3:media3-extractor:1.4.1")
+    implementation("androidx.media3:media3-session:1.4.1")
+    implementation("androidx.media3:media3-common:1.4.1")
 
-    // =========================================================================
-    // 🎧 MEDIA3 EXOPLAYER (Video, Radio Online y Control del Volante - 1.3.0)
-    // =========================================================================
-    implementation("androidx.media3:media3-extractor:1.3.0")
-    implementation("androidx.media3:media3-ui:1.3.0")
-    implementation("androidx.media3:media3-session:1.3.0")
-    implementation("androidx.media3:media3-common:1.3.0")
-
-    // Lifecycle (Una sola versión de 2.8.1)
+    // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.1")
     implementation("androidx.lifecycle:lifecycle-process:2.8.1")
 
+    // 🎨 JETPACK COMPOSE (CORREGIDO Y COMPLETADO)
+    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3") // 👈 AÑADIDO: Requerido para la interfaz Material3
+    implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.compose.material:material-icons-extended:1.6.8")
 }
