@@ -75,6 +75,7 @@ import com.creativem.fulltv.principal.Modelo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
+
 class PlayerTv : ComponentActivity() {
 
     private lateinit var prefs: SharedPreferences
@@ -213,7 +214,6 @@ class PlayerTv : ComponentActivity() {
                     isMenuVisibleState.value = true
                     true
                 } else {
-                    // Permitir que las flechas arriba/abajo naveguen naturalmente dentro del menú de Compose
                     super.onKeyDown(keyCode, event)
                 }
             }
@@ -271,7 +271,7 @@ class PlayerTv : ComponentActivity() {
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE PANTALLA
+// COMPOSABLE PANTALLA REPRODUCTOR MEDIA3 EXOPLAYER
 // -------------------------------------------------------------
 @OptIn(UnstableApi::class)
 @Composable
@@ -301,32 +301,39 @@ fun PlayerTvScreen(
 
         val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
-        val tsFlags = DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
-                DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-                DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
+        val tsFlags =
+            // 1. Detecta unidades de acceso para sincronizar audio/video correctamente
+            DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+
+                    // 2. FUNDAMENTAL PARA IPTV: Permite fotogramas clave no-IDR.
+                    // Evita que la pantalla se congele o tiemble cuando el servidor IPTV envía frames desordenados.
+                    DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
+
+                    // 3. Ignora transmisiones de información de empalme/cortes (que suelen causar saltos o cuelgues)
+                    DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
 
         val extractorsFactory = DefaultExtractorsFactory().apply {
             setTsExtractorFlags(tsFlags)
         }
-        val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
 
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(10000, 40000, 1500, 3000)
+            .setBufferDurationsMs(15000, 50000, 2500, 5000)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
         val trackSelector = DefaultTrackSelector(context).apply {
             setParameters(
                 buildUponParameters()
-                    .setMaxVideoSize(3840, 2160)
+                    .setMaxVideoSize(1920, 1080)
                     .setForceHighestSupportedBitrate(false)
             )
         }
 
-        val renderersFactory = DefaultRenderersFactory(context)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
-            .setEnableDecoderFallback(true)
+        val renderersFactory = DefaultRenderersFactory(context).apply {
+            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+            setEnableDecoderFallback(true)
+        }
 
         ExoPlayer.Builder(context, renderersFactory)
             .setTrackSelector(trackSelector)
@@ -386,9 +393,16 @@ fun PlayerTvScreen(
 
             val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
-            val tsFlags = DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
-                    DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-                    DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
+            val tsFlags =
+                // 1. Detecta unidades de acceso para sincronizar audio/video correctamente
+                DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+
+                        // 2. FUNDAMENTAL PARA IPTV: Permite fotogramas clave no-IDR.
+                        // Evita que la pantalla se congele o tiemble cuando el servidor IPTV envía frames desordenados.
+                        DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
+
+                        // 3. Ignora transmisiones de información de empalme/cortes (que suelen causar saltos o cuelgues)
+                        DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
 
             val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
@@ -426,10 +440,14 @@ fun PlayerTvScreen(
         // 1. REPRODUCTOR DE VIDEO
         AndroidView(
             factory = { ctx ->
+                // 🟢 TextureView EVITA LA TEMBLADERA AL ESTIRAR EL VIDEO EN PANTALLA COMPLETA
+                val textureView = android.view.TextureView(ctx)
+                exoPlayer.setVideoTextureView(textureView)
+
                 PlayerView(ctx).apply {
                     player = exoPlayer
                     useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL // 🟢 ESTIRA EL VIDEO
                     keepScreenOn = true
                 }
             },
@@ -510,17 +528,15 @@ fun FavoritesOverlayMenu(
     onCloseMenu: () -> Unit,
     onSelectChannel: (Modelo) -> Unit
 ) {
-    // 🎯 Solicitador de Foco para el Control Remoto
     val firstItemFocusRequester = remember { FocusRequester() }
 
-    // Al abrir el menú, asigna automáticamente el foco D-Pad al primer canal
     LaunchedEffect(isMenuVisible) {
         if (isMenuVisible && favoriteChannels.isNotEmpty()) {
-            delay(150) // Pequeña espera para que la animación termine
+            delay(150)
             try {
                 firstItemFocusRequester.requestFocus()
             } catch (e: Exception) {
-                // Captura por si la vista aún no está lista
+                // Captura si la vista aún no está lista
             }
         }
     }
@@ -594,7 +610,7 @@ fun FavoritesOverlayMenu(
 }
 
 // -------------------------------------------------------------
-// ÍTEM DEL MENÚ DE FAVORITOS (CON CURSOR AMARILLO D-PAD)
+// ÍTEM DEL MENÚ DE FAVORITOS
 // -------------------------------------------------------------
 @Composable
 fun FavoriteMenuItem(
@@ -608,7 +624,7 @@ fun FavoriteMenuItem(
     val scale by animateFloatAsState(targetValue = if (isFocused) 1.05f else 1.0f, label = "scale")
 
     val borderColor = when {
-        isFocused -> Color(0xFFFFD600) // 🟡 Amarillo Neón brillante para el control de la TV
+        isFocused -> Color(0xFFFFD600)
         isPlaying -> Color.Red
         else -> Color.Transparent
     }
@@ -632,7 +648,7 @@ fun FavoriteMenuItem(
             .background(backgroundColor)
             .border(2.5.dp, borderColor, RoundedCornerShape(8.dp))
             .onFocusChanged { isFocused = it.isFocused }
-            .focusable() // 🎯 Habilita navegación con Control Remoto
+            .focusable()
             .clickable { onSelect() }
             .padding(10.dp)
     ) {

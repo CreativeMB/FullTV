@@ -220,11 +220,6 @@ fun TvInteractiveScreen(
             if (TvRepository.channelListMaster.isNotEmpty()) {
                 masterChannels = TvRepository.channelListMaster
 
-                // 🟢 JERARQUÍA DE CARGA AL INICIAR:
-                // 1. Canal del reproductor en memoria
-                // 2. Último canal guardado en SharedPreferences al cerrar la app
-                // 3. Primer favorito
-                // 4. Primer canal general
                 val canalASelec = TvRepository.lastPlayedChannel
                     ?: masterChannels.firstOrNull { it.id == savedChannelId }
                     ?: masterChannels.firstOrNull { favoriteIds.contains(it.id) }
@@ -381,7 +376,7 @@ fun TvInteractiveScreen(
             }
 
             // =========================================================================
-            // LADO DERECHO (50%): REPRODUCTOR + CANALES + INFORMACIÓN
+            // LADO DERECHO (50%): REPRODUCTOR MINI + CANALES + INFORMACIÓN
             // =========================================================================
             Column(
                 modifier = Modifier
@@ -399,7 +394,7 @@ fun TvInteractiveScreen(
                     modifier = Modifier.padding(start = 2.dp)
                 )
 
-                // 1. REPRODUCTOR MINI
+                // 1. REPRODUCTOR MINI EXOPLAYER
                 TvPlayerCard(
                     selectedChannel = selectedChannel,
                     onOpenFullScreen = { canal -> onOpenFullScreenPlayer(canal) }
@@ -468,7 +463,7 @@ fun TvInteractiveScreen(
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: FICHA DE INFORMACIÓN DEL CANAL ACTIVO (MODERNA)
+// COMPOSABLE: FICHA DE INFORMACIÓN DEL CANAL ACTIVO
 // -------------------------------------------------------------
 @Composable
 fun SelectedChannelDetailCard(
@@ -544,7 +539,7 @@ fun SelectedChannelDetailCard(
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: BUSCADOR TV (ESTILO CÍAN NEÓN)
+// COMPOSABLE: BUSCADOR TV
 // -------------------------------------------------------------
 @Composable
 fun TvSearchBar(query: String, onQueryChange: (String) -> Unit) {
@@ -574,9 +569,8 @@ fun TvSearchBar(query: String, onQueryChange: (String) -> Unit) {
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: TARJETA GRILLA (FAVORITOS CON BORDES PERFECTOS)
+// COMPOSABLE: TARJETA GRILLA
 // -------------------------------------------------------------
-
 @kotlin.OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChannelCard(
@@ -655,7 +649,7 @@ fun ChannelCard(
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: TARJETA HORIZONTAL (CANALES ABAJO DEL REPRODUCTOR)
+// COMPOSABLE: TARJETA HORIZONTAL
 // -------------------------------------------------------------
 
 @kotlin.OptIn(ExperimentalFoundationApi::class)
@@ -776,7 +770,7 @@ fun TvPlayerCard(
 }
 
 // -------------------------------------------------------------
-// REPRODUCTOR EMBEBIDO AVANZADO (MUTE/PAUSE EN SEGUNDO PLANO)
+// REPRODUCTOR EMBEBIDO MEDIA3 EXOPLAYER (SIN TEMBLADERA Y ESTIRADO FULL)
 // -------------------------------------------------------------
 @OptIn(UnstableApi::class)
 @Composable
@@ -796,32 +790,40 @@ fun EmbeddedPlayerView(
 
         val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
-        val tsFlags = DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
-                DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-                DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
+        val tsFlags =
+            // 1. Detecta unidades de acceso para sincronizar audio/video correctamente
+            DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+
+                    // 2. FUNDAMENTAL PARA IPTV: Permite fotogramas clave no-IDR.
+                    // Evita que la pantalla se congele o tiemble cuando el servidor IPTV envía frames desordenados.
+                    DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
+
+                    // 3. Ignora transmisiones de información de empalme/cortes (que suelen causar saltos o cuelgues)
+                    DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
 
         val extractorsFactory = DefaultExtractorsFactory().apply {
             setTsExtractorFlags(tsFlags)
         }
-        val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
 
+        // 🟢 BÚFER AUMENTADO: Amortigua variaciones en la señal
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(10000, 40000, 1500, 3000)
+            .setBufferDurationsMs(15000, 50000, 2500, 5000)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
         val trackSelector = DefaultTrackSelector(context).apply {
             setParameters(
                 buildUponParameters()
-                    .setMaxVideoSize(3840, 2160)
+                    .setMaxVideoSize(1920, 1080)
                     .setForceHighestSupportedBitrate(false)
             )
         }
 
-        val renderersFactory = DefaultRenderersFactory(context)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
-            .setEnableDecoderFallback(true)
+        val renderersFactory = DefaultRenderersFactory(context).apply {
+            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+            setEnableDecoderFallback(true)
+        }
 
         ExoPlayer.Builder(context, renderersFactory)
             .setTrackSelector(trackSelector)
@@ -832,7 +834,6 @@ fun EmbeddedPlayerView(
             }
     }
 
-    // 🟢 PAUSA EL MINI REPRODUCTOR CUANDO SE ABRE PLAYERTV
     DisposableEffect(lifecycleOwner, exoPlayer) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -864,9 +865,17 @@ fun EmbeddedPlayerView(
                 .setReadTimeoutMs(20000)
             val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
-            val tsFlags = DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
-                    DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-                    DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
+            val tsFlags =
+                // 1. Detecta unidades de acceso para sincronizar audio/video correctamente
+                DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+
+                        // 2. FUNDAMENTAL PARA IPTV: Permite fotogramas clave no-IDR.
+                        // Evita que la pantalla se congele o tiemble cuando el servidor IPTV envía frames desordenados.
+                        DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
+
+                        // 3. Ignora transmisiones de información de empalme/cortes (que suelen causar saltos o cuelgues)
+                        DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
+
             val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
@@ -902,10 +911,14 @@ fun EmbeddedPlayerView(
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             factory = { ctx ->
+                // 🟢 TextureView EVITA LA TEMBLADERA EN TABLETS AL ESTIRAR EL VIDEO
+                val textureView = android.view.TextureView(ctx)
+                exoPlayer.setVideoTextureView(textureView)
+
                 PlayerView(ctx).apply {
                     player = exoPlayer
                     useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL // 🟢 ESTIRA EL VIDEO
                 }
             },
             modifier = Modifier.fillMaxSize()

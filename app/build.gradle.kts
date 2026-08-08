@@ -103,14 +103,15 @@ dependencies {
     implementation("com.android.volley:volley:1.2.1")
 
     // 🎧 Media3 ExoPlayer (UNIFICADO A 1.4.1)
-    implementation("androidx.media3:media3-exoplayer:1.4.1")
-    implementation("androidx.media3:media3-exoplayer-dash:1.4.1")
-    implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
-    implementation("androidx.media3:media3-ui:1.4.1")
-    implementation("androidx.media3:media3-extractor:1.4.1")
-    implementation("androidx.media3:media3-session:1.4.1")
-    implementation("androidx.media3:media3-common:1.4.1")
-
+    val media3Version = "1.5.1" // Versión estable más reciente
+    implementation("androidx.media3:media3-exoplayer:${media3Version}")
+    implementation("androidx.media3:media3-exoplayer-dash:${media3Version}")
+    implementation("androidx.media3:media3-exoplayer-hls:${media3Version}")
+    implementation("androidx.media3:media3-exoplayer-rtsp:${media3Version}")
+    implementation("androidx.media3:media3-ui:${media3Version}")
+    implementation("androidx.media3:media3-common:${media3Version}")
+    implementation("androidx.media3:media3-session:${media3Version}")
+    implementation("androidx.media3:media3-extractor:${media3Version}")
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.1")
