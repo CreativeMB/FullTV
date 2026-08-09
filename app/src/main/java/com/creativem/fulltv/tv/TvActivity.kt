@@ -1126,10 +1126,10 @@ fun EmbeddedPlayerView(
 
                         val loadControl = DefaultLoadControl.Builder()
                             .setBufferDurationsMs(
-                                8000,  // minBufferMs: Reducido a 8s. Evita que el reproductor espere datos que el servidor de IPTV en vivo aún no ha generado.
-                                15000, // maxBufferMs: Reducido a 15s. El límite máximo que intentará acumular.
-                                1500,  // bufferForPlaybackMs: Arranca rápido con solo 1.5s.
-                                2000   // bufferForPlaybackAfterRebufferMs: Se recupera con 2s en caso de un microcorte.
+                                12000, // minBufferMs: IGUAL al máximo. Activa la descarga constante y evita pausas inactivas.
+                                12000, // maxBufferMs: IGUAL al mínimo. Mantiene el puerto con el servidor IPTV abierto todo el tiempo.
+                                1500,  // bufferForPlaybackMs
+                                2000   // bufferForPlaybackAfterRebufferMs
                             )
                             .setPrioritizeTimeOverSizeThresholds(true)
                             .build()
