@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="CineParcheApp">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-07-16T22:17:18.842268300Z">
+        <DropdownSelection timestamp="2026-08-09T13:47:24.189565600Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\Oficina\.android\avd\Television_4K.avd" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\Oficina\.android\avd\Television_1080p.avd" />
             </handle>
           </Target>
         </DropdownSelection>

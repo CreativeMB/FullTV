@@ -103,7 +103,7 @@ dependencies {
     implementation("com.android.volley:volley:1.2.1")
 
     // 🎧 Media3 ExoPlayer (UNIFICADO A 1.4.1)
-    val media3Version = "1.5.1" // Versión estable más reciente
+    val media3Version = "1.9.1" // Versión estable más reciente
     implementation("androidx.media3:media3-exoplayer:${media3Version}")
     implementation("androidx.media3:media3-exoplayer-dash:${media3Version}")
     implementation("androidx.media3:media3-exoplayer-hls:${media3Version}")

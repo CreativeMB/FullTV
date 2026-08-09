@@ -24,9 +24,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -238,10 +240,10 @@ class PlayerTv : ComponentActivity() {
 
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                15000, // minBufferMs
-                30000, // maxBufferMs
-                2500,  // bufferForPlaybackMs
-                5000   // bufferForPlaybackAfterRebufferMs
+                8000,  // minBufferMs: Reducido a 8s. Evita que el reproductor espere datos que el servidor de IPTV en vivo aún no ha generado.
+                15000, // maxBufferMs: Reducido a 15s. El límite máximo que intentará acumular.
+                1500,  // bufferForPlaybackMs: Arranca rápido con solo 1.5s.
+                2000   // bufferForPlaybackAfterRebufferMs: Se recupera con 2s en caso de un microcorte.
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
@@ -283,13 +285,22 @@ class PlayerTv : ComponentActivity() {
         isLoadingState.value = true
         bufferTextState.value = "Cargando señal..."
 
-        // Corrutina de seguridad para retrasar la preparación de video
-        // Esto permite que TvActivity libere por completo el chip decodificador físico de la TV
+// Corrutina de seguridad para retrasar la preparación de video
+// Esto permite que TvActivity libere por completo el chip decodificador físico de la TV
         lifecycleScope.launch(Dispatchers.Main) {
             delay(300) // Retraso de seguridad imperceptible pero clave para el hardware
 
             val uri = Uri.parse(streamUrl)
-            val mediaItemBuilder = MediaItem.Builder().setUri(uri)
+
+            // --- INTEGRACIÓN DEL RETRASO EN VIVO (LIVE CONFIGURATION) ---
+            val mediaItemBuilder = MediaItem.Builder().setUri(uri).setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(5000).build())
+                .setLiveConfiguration(
+                    MediaItem.LiveConfiguration.Builder()
+                        // Colchón de seguridad de 10 segundos (10000 ms) respecto al vivo real.
+                        // Ayuda a amortiguar fluctuaciones de red en transmisiones estables de IPTV.
+                        .setTargetOffsetMs(10000)
+                        .build()
+                )
 
             val isStrictHls = streamUrl.contains(".m3u8", ignoreCase = true) ||
                     streamUrl.contains("format=m3u8", ignoreCase = true)
@@ -324,7 +335,6 @@ class PlayerTv : ComponentActivity() {
             player.play()
         }
     }
-
     private fun cargarListaFavoritos() {
         val favIds = prefs.getStringSet("fav_ids", emptySet()) ?: emptySet()
         val masterList = TvRepository.channelListMaster
@@ -653,7 +663,7 @@ fun PlayerTvScreen(
 }
 
 // -------------------------------------------------------------
-// MENÚ OVERLAY FAVORITOS
+// MENÚ OVERLAY FAVORITOS (CON FOCO DINÁMICO EN CANAL ACTUAL)
 // -------------------------------------------------------------
 @Composable
 fun FavoritesOverlayMenu(
@@ -663,15 +673,31 @@ fun FavoritesOverlayMenu(
     onCloseMenu: () -> Unit,
     onSelectChannel: (Modelo) -> Unit
 ) {
-    val firstItemFocusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
+    val lazyListState = rememberLazyListState() // Estado de scroll vertical
 
-    LaunchedEffect(isMenuVisible) {
-        if (isMenuVisible && favoriteChannels.isNotEmpty()) {
+    // Generar una lista de Requesters únicos, uno para cada ítem de favoritos
+    val focusRequesters = remember(favoriteChannels) {
+        List(favoriteChannels.size) { FocusRequester() }
+    }
+
+    // Determinar qué canal es el que se está reproduciendo actualmente
+    val playingIndex = remember(favoriteChannels, currentStreamUrl) {
+        val index = favoriteChannels.indexOfFirst { it.streamUrl == currentStreamUrl }
+        if (index != -1) index else 0
+    }
+
+    // Forzar el scroll inicial y foco prioritario al canal reproduciéndose
+    LaunchedEffect(isMenuVisible, playingIndex) {
+        if (isMenuVisible && favoriteChannels.isNotEmpty() && playingIndex in focusRequesters.indices) {
             delay(150)
             try {
-                firstItemFocusRequester.requestFocus()
+                // Posicionar el scroll inicial sobre el canal activo para asegurar su composición
+                lazyListState.scrollToItem(playingIndex)
+                // Solicitar foco al canal reproduciéndose
+                focusRequesters[playingIndex].requestFocus()
             } catch (e: Exception) {
-                // Previene fallo por ciclo de foco no enlazado todavía
+                // Previene fallo si el ciclo de foco del framework no se ha acoplado completamente
             }
         }
     }
@@ -727,6 +753,7 @@ fun FavoritesOverlayMenu(
                 }
             } else {
                 LazyColumn(
+                    state = lazyListState, // Enlazado al estado de control de scroll
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -734,8 +761,11 @@ fun FavoritesOverlayMenu(
                         FavoriteMenuItem(
                             canal = canal,
                             isPlaying = canal.streamUrl == currentStreamUrl,
+                            onFocused = {
+                                lazyListState.animateScrollAndCentralizeMenuItem(index, coroutineScope)
+                            },
                             onSelect = { onSelectChannel(canal) },
-                            modifier = if (index == 0) Modifier.focusRequester(firstItemFocusRequester) else Modifier
+                            modifier = Modifier.focusRequester(focusRequesters[index]) // Asignación del Requester exacto
                         )
                     }
                 }
@@ -751,6 +781,7 @@ fun FavoritesOverlayMenu(
 fun FavoriteMenuItem(
     canal: Modelo,
     isPlaying: Boolean,
+    onFocused: () -> Unit, // Callback al recibir foco
     onSelect: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -782,7 +813,12 @@ fun FavoriteMenuItem(
             .clip(RoundedCornerShape(8.dp))
             .background(backgroundColor)
             .border(2.5.dp, borderColor, RoundedCornerShape(8.dp))
-            .onFocusChanged { isFocused = it.isFocused }
+            .onFocusChanged {
+                isFocused = it.isFocused
+                if (it.isFocused) {
+                    onFocused() // Disparar acción de centrado
+                }
+            }
             .focusable()
             .clickable { onSelect() }
             .padding(10.dp)
@@ -829,6 +865,27 @@ fun FavoriteMenuItem(
                     fontSize = 10.sp
                 )
             }
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// EXTENSIONES PARA CENTRAR ELEMENTOS EN FOCO (TV LAYOUTS)
+// Renombrada a 'animateScrollAndCentralizeMenuItem' para evitar colisiones globales
+// -------------------------------------------------------------
+private fun androidx.compose.foundation.lazy.LazyListState.animateScrollAndCentralizeMenuItem(
+    index: Int,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
+    val itemInfo = this.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+    scope.launch {
+        if (itemInfo != null) {
+            val center = (this@animateScrollAndCentralizeMenuItem.layoutInfo.viewportEndOffset -
+                    this@animateScrollAndCentralizeMenuItem.layoutInfo.viewportStartOffset) / 2
+            val childCenter = itemInfo.offset + itemInfo.size / 2
+            this@animateScrollAndCentralizeMenuItem.animateScrollBy((childCenter - center).toFloat())
+        } else {
+            this@animateScrollAndCentralizeMenuItem.animateScrollToItem(index)
         }
     }
 }

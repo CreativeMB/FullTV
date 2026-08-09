@@ -25,12 +25,15 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.animateScrollBy // Importado para centrado dinámico
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed // Modificado para obtener índices
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState // Control del scroll de la grilla
+import androidx.compose.foundation.lazy.itemsIndexed // Modificado para obtener índices
+import androidx.compose.foundation.lazy.rememberLazyListState // Control del scroll de la fila
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -106,7 +109,7 @@ import java.nio.charset.StandardCharsets
 import java.text.Normalizer
 
 val GoldAccent = Color(0xFFC5A059)
-val DeepDarkBg = Color(0xFF0A122A)
+val DeepDarkBg = Color(0xFF000000)
 val CardDarkBg = Color(0xFF161622)
 val RedLive = Color(0xFFFF2A2A)
 
@@ -221,6 +224,13 @@ fun TvInteractiveScreen(
     var filteredChannels by remember { mutableStateOf<List<Modelo>>(emptyList()) }
     var filteredFavorites by remember { mutableStateOf<List<Modelo>>(emptyList()) }
 
+    // Control de foco inicial único
+    var hasRequestedInitialFocus by remember { mutableStateOf(false) }
+
+    // Estados de scroll para controlar el centrado al recibir foco
+    val favoritesGridState = rememberLazyGridState()
+    val channelsRowState = rememberLazyListState()
+
     LaunchedEffect(searchQuery, masterChannels, favoriteIds) {
         delay(250)
         withContext(Dispatchers.Default) {
@@ -255,6 +265,8 @@ fun TvInteractiveScreen(
                 TvRepository.lastPlayedChannel?.let { canalActualizado ->
                     selectedChannel = canalActualizado
                     prefs.edit().putString("last_selected_channel_id", canalActualizado.id).apply()
+                    // Permitir que se vuelva a solicitar foco automático al regresar del reproductor
+                    hasRequestedInitialFocus = false
                 }
             }
         }
@@ -347,13 +359,12 @@ fun TvInteractiveScreen(
             ) {
                 var isSearching by remember { mutableStateOf(false) }
 
-                // Cabecera superior dinámica para evitar que el teclado se despliegue automáticamente
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp) // Altura estática para prevenir saltos de pantalla
+                        .height(56.dp)
                         .padding(horizontal = 4.dp)
                 ) {
                     if (isSearching) {
@@ -362,7 +373,7 @@ fun TvInteractiveScreen(
                             onQueryChange = { searchQuery = it },
                             onCloseSearch = {
                                 isSearching = false
-                                searchQuery = "" // Limpia búsqueda al replegar
+                                searchQuery = ""
                             },
                             modifier = Modifier.weight(1f)
                         )
@@ -431,16 +442,20 @@ fun TvInteractiveScreen(
                     }
                 } else {
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(2), // Dos columnas elegantes
+                        state = favoritesGridState,
+                        columns = GridCells.Fixed(2),
                         contentPadding = PaddingValues(8.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(filteredFavorites, key = { "fav_grid_${it.id}" }) { canal ->
+                        itemsIndexed(filteredFavorites, key = { _, it -> "fav_grid_${it.id}" }) { index, canal ->
                             FavoriteGridCard(
                                 canal = canal,
                                 isSelected = selectedChannel?.id == canal.id,
+                                onFocused = {
+                                    favoritesGridState.animateScrollAndCentralizeItem(index, coroutineScope)
+                                },
                                 onClick = {
                                     selectedChannel = canal
                                     TvRepository.lastPlayedChannel = canal
@@ -470,13 +485,11 @@ fun TvInteractiveScreen(
                     modifier = Modifier.padding(start = 2.dp)
                 )
 
-                // 1. REPRODUCTOR MINI
                 TvPlayerCard(
                     selectedChannel = selectedChannel,
                     onOpenFullScreen = { canal -> onOpenFullScreenPlayer(canal) }
                 )
 
-                // 2. LISTA DE TODOS LOS CANALES
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -502,27 +515,45 @@ fun TvInteractiveScreen(
                     }
                 } else {
                     LazyRow(
+                        state = channelsRowState,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        items(filteredChannels, key = { "all_${it.id}" }) { canal ->
+                        itemsIndexed(filteredChannels, key = { _, it -> "all_${it.id}" }) { index, canal ->
+                            // Enlazar FocusRequester dinámico para el elemento seleccionado
+                            val isCurrentSelected = selectedChannel?.id == canal.id
+                            val focusRequester = remember { FocusRequester() }
+
+                            LaunchedEffect(selectedChannel) {
+                                if (isCurrentSelected && !hasRequestedInitialFocus) {
+                                    delay(400) // Pequeño delay de renderizado
+                                    try {
+                                        focusRequester.requestFocus()
+                                        hasRequestedInitialFocus = true
+                                    } catch (e: Exception) {}
+                                }
+                            }
+
                             HorizontalChannelCard(
                                 canal = canal,
                                 isFavorite = favoriteIds.contains(canal.id),
-                                isSelected = selectedChannel?.id == canal.id,
+                                isSelected = isCurrentSelected,
+                                onFocused = {
+                                    channelsRowState.animateScrollAndCentralizeItem(index, coroutineScope)
+                                },
                                 onClick = {
                                     selectedChannel = canal
                                     TvRepository.lastPlayedChannel = canal
                                     prefs.edit().putString("last_selected_channel_id", canal.id).apply()
                                 },
-                                onLongClick = { toggleFavorite(canal) }
+                                onLongClick = { toggleFavorite(canal) },
+                                modifier = Modifier.focusRequester(focusRequester) // Pasar el requester
                             )
                         }
                     }
                 }
 
-                // 3. INFORMACIÓN DEL CANAL EN REPRODUCCIÓN (OPTIMIZADO PARA PANTALLAS COMPRIMIDAS)
                 selectedChannel?.let { canal ->
                     SelectedChannelDetailCard(
                         canal = canal,
@@ -546,11 +577,12 @@ fun TvInteractiveScreen(
 fun FavoriteGridCard(
     canal: Modelo,
     isSelected: Boolean,
+    onFocused: () -> Unit, // Callback al recibir foco
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
-    var pressStartTime by remember { mutableLongStateOf(0L) }
+    var pressStartTime by remember { mutableStateOf(0L) }
     var longPressTriggered by remember { mutableStateOf(false) }
 
     val scale by animateFloatAsState(
@@ -584,7 +616,12 @@ fun FavoriteGridCard(
                 color = borderColor,
                 shape = RoundedCornerShape(10.dp)
             )
-            .onFocusChanged { isFocused = it.isFocused }
+            .onFocusChanged {
+                isFocused = it.isFocused
+                if (it.isFocused) {
+                    onFocused() // Disparar el evento de centrado
+                }
+            }
             .focusable()
             .onKeyEvent { keyEvent ->
                 val keyCode = keyEvent.nativeKeyEvent.keyCode
@@ -847,17 +884,22 @@ fun TvSearchBar(
 // -------------------------------------------------------------
 // COMPOSABLE: TARJETA HORIZONTAL
 // -------------------------------------------------------------
+// -------------------------------------------------------------
+// COMPOSABLE: TARJETA HORIZONTAL (ACTUALIZADA CON MODIFIER EXTERNO)
+// -------------------------------------------------------------
 @kotlin.OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HorizontalChannelCard(
     canal: Modelo,
     isFavorite: Boolean,
     isSelected: Boolean,
+    onFocused: () -> Unit, // Callback al recibir foco
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier // Añadido soporte para modifier externo
 ) {
     var isFocused by remember { mutableStateOf(false) }
-    var pressStartTime by remember { mutableLongStateOf(0L) }
+    var pressStartTime by remember { mutableStateOf(0L) }
     var longPressTriggered by remember { mutableStateOf(false) }
 
     val scale by animateFloatAsState(
@@ -876,7 +918,7 @@ fun HorizontalChannelCard(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
+        modifier = modifier // Se encadena aquí el modifier recibido del LazyRow
             .width(130.dp)
             .height(115.dp)
             .graphicsLayer {
@@ -890,7 +932,12 @@ fun HorizontalChannelCard(
                 color = borderColor,
                 shape = RoundedCornerShape(10.dp)
             )
-            .onFocusChanged { isFocused = it.isFocused }
+            .onFocusChanged {
+                isFocused = it.isFocused
+                if (it.isFocused) {
+                    onFocused() // Disparar el evento de centrado
+                }
+            }
             .focusable()
             .onKeyEvent { keyEvent ->
                 val keyCode = keyEvent.nativeKeyEvent.keyCode
@@ -939,7 +986,6 @@ fun HorizontalChannelCard(
                 .height(55.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Reproductor de imagen inteligente con reemplazo de TV roja ante fallos o ausencia de logo
             coil.compose.SubcomposeAsyncImage(
                 model = canal.imageUrl,
                 contentDescription = canal.title,
@@ -953,8 +999,8 @@ fun HorizontalChannelCard(
                     Icon(
                         imageVector = Icons.Default.Tv,
                         contentDescription = null,
-                        tint = RedLive, // El TV ahora se ve en color rojo y es completamente visible
-                        modifier = Modifier.padding(10.dp) // Ajuste de tamaño para el contenedor de 55dp
+                        tint = RedLive,
+                        modifier = Modifier.padding(10.dp)
                     )
                 }
             }
@@ -1080,10 +1126,10 @@ fun EmbeddedPlayerView(
 
                         val loadControl = DefaultLoadControl.Builder()
                             .setBufferDurationsMs(
-                                15000, // minBufferMs
-                                30000, // maxBufferMs
-                                1500,  // bufferForPlaybackMs
-                                3000   // bufferForPlaybackAfterRebufferMs
+                                8000,  // minBufferMs: Reducido a 8s. Evita que el reproductor espere datos que el servidor de IPTV en vivo aún no ha generado.
+                                15000, // maxBufferMs: Reducido a 15s. El límite máximo que intentará acumular.
+                                1500,  // bufferForPlaybackMs: Arranca rápido con solo 1.5s.
+                                2000   // bufferForPlaybackAfterRebufferMs: Se recupera con 2s en caso de un microcorte.
                             )
                             .setPrioritizeTimeOverSizeThresholds(true)
                             .build()
@@ -1185,7 +1231,17 @@ fun EmbeddedPlayerView(
             val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
             val uri = Uri.parse(streamUrl)
-            val mediaItemBuilder = MediaItem.Builder().setUri(uri)
+
+            // --- AQUÍ SE AGREGA EL RETRASO EN VIVO (LIVE CONFIGURATION) ---
+            val mediaItemBuilder = MediaItem.Builder().setUri(uri).setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(5000).build())
+                .setLiveConfiguration(
+                    MediaItem.LiveConfiguration.Builder()
+                        // Define el retraso objetivo en milisegundos (10000 ms = 10 segundos).
+                        // Esto hace que el reproductor intente mantenerse 10 segundos por detrás de la señal
+                        // en vivo absoluta, creando un colchón de tiempo seguro frente a caídas de internet.
+                        .setTargetOffsetMs(10000)
+                        .build()
+                )
 
             val isStrictHls = streamUrl.contains(".m3u8", ignoreCase = true) ||
                     streamUrl.contains("format=m3u8", ignoreCase = true)
@@ -1221,7 +1277,6 @@ fun EmbeddedPlayerView(
             player.play()
         }
     }
-
     Box(modifier = androidx.compose.ui.Modifier.fillMaxSize().clickable { onPlayerClick() }) {
         AndroidView(
             factory = { ctx ->
@@ -1339,4 +1394,42 @@ private fun parseM3uBuffer(reader: BufferedReader): List<Modelo> {
         }
     }
     return channels
+}
+
+// -------------------------------------------------------------
+// EXTENSIONES PARA CENTRAR ELEMENTOS EN FOCO (TV LAYOUTS)
+// -------------------------------------------------------------
+fun androidx.compose.foundation.lazy.LazyListState.animateScrollAndCentralizeItem(
+    index: Int,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
+    val itemInfo = this.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+    scope.launch {
+        if (itemInfo != null) {
+            val center = (this@animateScrollAndCentralizeItem.layoutInfo.viewportEndOffset -
+                    this@animateScrollAndCentralizeItem.layoutInfo.viewportStartOffset) / 2
+            val childCenter = itemInfo.offset + itemInfo.size / 2
+            this@animateScrollAndCentralizeItem.animateScrollBy((childCenter - center).toFloat())
+        } else {
+            this@animateScrollAndCentralizeItem.animateScrollToItem(index)
+        }
+    }
+}
+
+fun androidx.compose.foundation.lazy.grid.LazyGridState.animateScrollAndCentralizeItem(
+    index: Int,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
+    val itemInfo = this.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+    scope.launch {
+        if (itemInfo != null) {
+            val center = (this@animateScrollAndCentralizeItem.layoutInfo.viewportEndOffset -
+                    this@animateScrollAndCentralizeItem.layoutInfo.viewportStartOffset) / 2
+            // Para LazyVerticalGrid, calculamos sobre el eje Y (vertical)
+            val childCenter = itemInfo.offset.y + itemInfo.size.height / 2
+            this@animateScrollAndCentralizeItem.animateScrollBy((childCenter - center).toFloat())
+        } else {
+            this@animateScrollAndCentralizeItem.animateScrollToItem(index)
+        }
+    }
 }
