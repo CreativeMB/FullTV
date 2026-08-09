@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.KeyEvent as AndroidKeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
@@ -15,7 +16,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.annotation.OptIn
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,9 +32,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
@@ -39,13 +43,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,6 +69,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
@@ -68,16 +81,20 @@ import androidx.media3.exoplayer.hls.DefaultHlsExtractorFactory
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImageContent
 import com.creativem.fulltv.principal.AudioFocusHelper
 import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Modelo
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -88,7 +105,6 @@ import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.text.Normalizer
 
-// 🎨 VALORES DE COLOR UNIFICADOS CON PELICULASACTIVITY
 val GoldAccent = Color(0xFFC5A059)
 val DeepDarkBg = Color(0xFF0A122A)
 val CardDarkBg = Color(0xFF161622)
@@ -157,6 +173,7 @@ class TvActivity : ComponentActivity() {
         return res
     }
 
+    @OptIn(UnstableApi::class)
     private fun abrirReproductor(modelo: Modelo) {
         val intent = Intent(this, PlayerTv::class.java).apply {
             putExtra("EXTRA_STREAM_URL", modelo.streamUrl)
@@ -201,7 +218,37 @@ fun TvInteractiveScreen(
     var selectedChannel by remember { mutableStateOf<Modelo?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // Sincronización al regresar de PlayerTv
+    var filteredChannels by remember { mutableStateOf<List<Modelo>>(emptyList()) }
+    var filteredFavorites by remember { mutableStateOf<List<Modelo>>(emptyList()) }
+
+    LaunchedEffect(searchQuery, masterChannels, favoriteIds) {
+        delay(250)
+        withContext(Dispatchers.Default) {
+            val normalizedQuery = searchQuery.normalizeSearch()
+
+            val filteredAll = if (normalizedQuery.isBlank()) {
+                masterChannels
+            } else {
+                masterChannels.filter { canal ->
+                    val normalizedTitle = canal.title.normalizeSearch()
+                    val queryWords = normalizedQuery.split("\\s+".toRegex())
+                    queryWords.all { word -> normalizedTitle.contains(word) }
+                }
+            }
+
+            val filteredFavs = if (normalizedQuery.isBlank()) {
+                masterChannels.filter { favoriteIds.contains(it.id) }
+            } else {
+                filteredAll.filter { favoriteIds.contains(it.id) }
+            }
+
+            withContext(Dispatchers.Main) {
+                filteredChannels = filteredAll
+                filteredFavorites = filteredFavs
+            }
+        }
+    }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -218,7 +265,6 @@ fun TvInteractiveScreen(
         }
     }
 
-    // Carga desde Firebase
     LaunchedEffect(Unit) {
         coroutineScope.launch(Dispatchers.IO) {
             val savedChannelId = prefs.getString("last_selected_channel_id", null)
@@ -268,27 +314,6 @@ fun TvInteractiveScreen(
         }
     }
 
-    val matchesSearch = remember<(String, String) -> Boolean> {
-        { title, query ->
-            if (query.isBlank()) true
-            else {
-                val normalizedTitle = title.normalizeSearch()
-                val queryWords = query.normalizeSearch().split("\\s+".toRegex())
-                queryWords.all { word -> normalizedTitle.contains(word) }
-            }
-        }
-    }
-
-    val favoriteChannels = remember(favoriteIds, masterChannels, searchQuery) {
-        masterChannels
-            .filter { favoriteIds.contains(it.id) }
-            .filter { matchesSearch(it.title, searchQuery) }
-    }
-
-    val allChannelsFiltered = remember(masterChannels, searchQuery) {
-        masterChannels.filter { matchesSearch(it.title, searchQuery) }
-    }
-
     val toggleFavorite = { canal: Modelo ->
         val newFavs = favoriteIds.toMutableSet()
         if (newFavs.contains(canal.id)) {
@@ -313,35 +338,83 @@ fun TvInteractiveScreen(
                 .padding(10.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // =========================================================================
-            // LADO IZQUIERDO (50%): MIS FAVORITOS
-            // =========================================================================
+            // LADO IZQUIERDO (50%): MIS FAVORITOS (DOS COLUMNAS HORIZONTALES)
             Column(
                 modifier = Modifier
                     .weight(0.5f)
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                TvSearchBar(
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it }
-                )
+                var isSearching by remember { mutableStateOf(false) }
 
+                // Cabecera superior dinámica para evitar que el teclado se despliegue automáticamente
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(start = 4.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp) // Altura estática para prevenir saltos de pantalla
+                        .padding(horizontal = 4.dp)
                 ) {
-                    Icon(Icons.Default.Favorite, contentDescription = null, tint = RedLive)
-                    Text(
-                        text = "MIS FAVORITOS (${favoriteChannels.size})",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GoldAccent
-                    )
+                    if (isSearching) {
+                        TvSearchBar(
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            onCloseSearch = {
+                                isSearching = false
+                                searchQuery = "" // Limpia búsqueda al replegar
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Favorite, contentDescription = null, tint = RedLive)
+                            Text(
+                                text = "MIS FAVORITOS (${filteredFavorites.size})",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GoldAccent
+                            )
+                        }
+
+                        var isSearchButtonFocused by remember { mutableStateOf(false) }
+                        val searchScale by animateFloatAsState(targetValue = if (isSearchButtonFocused) 1.12f else 1.0f, label = "searchScale")
+
+                        IconButton(
+                            onClick = { isSearching = true },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .graphicsLayer {
+                                    scaleX = searchScale
+                                    scaleY = searchScale
+                                }
+                                .onFocusChanged { isSearchButtonFocused = it.isFocused }
+                                .focusable()
+                                .border(
+                                    width = 2.dp,
+                                    color = if (isSearchButtonFocused) GoldAccent else Color.Transparent,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .background(
+                                    color = if (isSearchButtonFocused) Color(0xFF282836) else Color.Transparent,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Buscar",
+                                tint = GoldAccent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
 
-                if (favoriteChannels.isEmpty()) {
+                if (filteredFavorites.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -358,16 +431,15 @@ fun TvInteractiveScreen(
                     }
                 } else {
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
+                        columns = GridCells.Fixed(2), // Dos columnas elegantes
                         contentPadding = PaddingValues(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(favoriteChannels, key = { "fav_grid_${it.id}" }) { canal ->
-                            ChannelCard(
+                        items(filteredFavorites, key = { "fav_grid_${it.id}" }) { canal ->
+                            FavoriteGridCard(
                                 canal = canal,
-                                isFavorite = true,
                                 isSelected = selectedChannel?.id == canal.id,
                                 onClick = {
                                     selectedChannel = canal
@@ -381,9 +453,7 @@ fun TvInteractiveScreen(
                 }
             }
 
-            // =========================================================================
             // LADO DERECHO (50%): REPRODUCTOR + CANALES + INFORMACIÓN
-            // =========================================================================
             Column(
                 modifier = Modifier
                     .weight(0.5f)
@@ -414,14 +484,14 @@ fun TvInteractiveScreen(
                 ) {
                     Icon(Icons.Default.Tv, contentDescription = null, tint = GoldAccent)
                     Text(
-                        text = "Todos los Canales (${allChannelsFiltered.size})",
+                        text = "Todos los Canales (${filteredChannels.size})",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.LightGray
                     )
                 }
 
-                if (allChannelsFiltered.isEmpty()) {
+                if (filteredChannels.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -432,11 +502,11 @@ fun TvInteractiveScreen(
                     }
                 } else {
                     LazyRow(
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        items(allChannelsFiltered, key = { "all_${it.id}" }) { canal ->
+                        items(filteredChannels, key = { "all_${it.id}" }) { canal ->
                             HorizontalChannelCard(
                                 canal = canal,
                                 isFavorite = favoriteIds.contains(canal.id),
@@ -452,7 +522,7 @@ fun TvInteractiveScreen(
                     }
                 }
 
-                // 3. INFORMACIÓN DEL CANAL EN REPRODUCCIÓN
+                // 3. INFORMACIÓN DEL CANAL EN REPRODUCCIÓN (OPTIMIZADO PARA PANTALLAS COMPRIMIDAS)
                 selectedChannel?.let { canal ->
                     SelectedChannelDetailCard(
                         canal = canal,
@@ -469,7 +539,153 @@ fun TvInteractiveScreen(
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: FICHA DE INFORMACIÓN DEL CANAL ACTIVO (ESTILO CINEPARCHE)
+// COMPOSABLE: NUEVA TARJETA FAVORITA HORIZONTAL ELEGANTE (2 COLUMNAS) CON CONTROL DE FOCO OK
+// -------------------------------------------------------------
+@kotlin.OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun FavoriteGridCard(
+    canal: Modelo,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    var pressStartTime by remember { mutableLongStateOf(0L) }
+    var longPressTriggered by remember { mutableStateOf(false) }
+
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.08f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow),
+        label = "scale"
+    )
+
+    val borderColor = when {
+        isFocused -> GoldAccent
+        isSelected -> RedLive
+        else -> Color.Transparent
+    }
+
+    val backgroundColor = if (isFocused) Color(0xFF282836) else Color(0xFF1B1B24)
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(65.dp) // Altura elegante y fija para la grilla de dos columnas
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(10.dp))
+            .background(backgroundColor)
+            .border(
+                width = if (isFocused) 3.dp else 2.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(10.dp)
+            )
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                val keyCode = keyEvent.nativeKeyEvent.keyCode
+                val isSelectKey = keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
+                        keyCode == AndroidKeyEvent.KEYCODE_ENTER
+
+                if (isSelectKey) {
+                    when (keyEvent.type) {
+                        KeyEventType.KeyDown -> {
+                            if (pressStartTime == 0L) {
+                                pressStartTime = System.currentTimeMillis()
+                                longPressTriggered = false
+                            } else {
+                                val elapsed = System.currentTimeMillis() - pressStartTime
+                                if (elapsed > 800L && !longPressTriggered) {
+                                    longPressTriggered = true
+                                    onLongClick()
+                                }
+                            }
+                        }
+                        KeyEventType.KeyUp -> {
+                            val elapsed = System.currentTimeMillis() - pressStartTime
+                            pressStartTime = 0L
+                            if (!longPressTriggered) {
+                                if (elapsed < 800L) {
+                                    onClick()
+                                }
+                            }
+                            longPressTriggered = false
+                        }
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+            .padding(8.dp)
+    ) {
+        // Imagen al inicio (izquierda) con indicador de favorito (corazón) encima
+        Box(
+            modifier = Modifier.size(45.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Reproductor de imagen inteligente con reemplazo de TV roja ante fallos o ausencia de logo
+            coil.compose.SubcomposeAsyncImage(
+                model = canal.imageUrl,
+                contentDescription = canal.title,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                val state = painter.state
+                if (state is coil.compose.AsyncImagePainter.State.Success) {
+                    SubcomposeAsyncImageContent()
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Tv,
+                        contentDescription = null,
+                        tint = RedLive, // El TV ahora se ve en color rojo y es completamente visible
+                        modifier = Modifier.padding(6.dp) // Ajuste de tamaño para el contenedor de 45dp
+                    )
+                }
+            }
+
+            // Indicador de corazón flotante sobre la imagen
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(1.dp)
+                    .size(18.dp)
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(9.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = null,
+                    tint = RedLive,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+        }
+
+        // Nombre del canal grande y visible de lejos (derecha)
+        Text(
+            text = canal.title,
+            color = Color.White,
+            fontSize = 14.sp, // Tamaño de letra agrandado
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            lineHeight = 16.sp,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+// -------------------------------------------------------------
+// COMPOSABLE: DETALLE DEL CANAL
 // -------------------------------------------------------------
 @Composable
 fun SelectedChannelDetailCard(
@@ -478,16 +694,19 @@ fun SelectedChannelDetailCard(
     onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isFavFocused by remember { mutableStateOf(false) }
+    val favScale by animateFloatAsState(targetValue = if (isFavFocused) 1.1f else 1.0f, label = "favScale")
+
     Card(
         colors = CardDefaults.cardColors(containerColor = CardDarkBg),
-        shape = RoundedCornerShape(12.dp),
-        modifier = modifier.border(1.dp, GoldAccent.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+        shape = RoundedCornerShape(8.dp),
+        modifier = modifier.border(1.dp, GoldAccent.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
@@ -495,49 +714,74 @@ fun SelectedChannelDetailCard(
                 contentDescription = canal.title,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
-                    .size(75.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(4.dp))
                     .background(Color.Black)
-                    .padding(4.dp)
+                    .padding(2.dp)
             )
 
             Column(
-                modifier = Modifier.fillMaxHeight(),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
                 verticalArrangement = Arrangement.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = canal.title,
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = onToggleFavorite, modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.Favorite,
-                            contentDescription = null,
-                            tint = if (isFavorite) RedLive else Color.Gray,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-
                 Text(
-                    text = "🔴 TRANSMISIÓN EN VIVO",
-                    color = RedLive,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
+                    text = canal.title,
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(1.dp))
 
-                Text(
-                    text = "Presiona OK en el reproductor para Pantalla Completa.",
-                    color = Color.LightGray,
-                    fontSize = 10.sp
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "🔴 EN VIVO",
+                        color = RedLive,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "• OK: Pantalla Completa",
+                        color = Color.LightGray,
+                        fontSize = 8.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            IconButton(
+                onClick = onToggleFavorite,
+                modifier = Modifier
+                    .size(30.dp)
+                    .graphicsLayer {
+                        scaleX = favScale
+                        scaleY = favScale
+                    }
+                    .onFocusChanged { isFavFocused = it.isFocused }
+                    .focusable()
+                    .border(
+                        width = 1.dp,
+                        color = if (isFavFocused) GoldAccent else Color.Transparent,
+                        shape = RoundedCornerShape(4.dp)
+                    )
+                    .background(
+                        color = if (isFavFocused) Color(0xFF282836) else Color.Transparent,
+                        shape = RoundedCornerShape(4.dp)
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = "Favorito",
+                    tint = if (isFavorite) RedLive else Color.Gray,
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
@@ -545,26 +789,52 @@ fun SelectedChannelDetailCard(
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: BUSCADOR TV (DORADO CINEPARCHE)
+// COMPOSABLE: BUSCADOR TV (EXPANDIBLE AUTO-ENFOCABLE)
 // -------------------------------------------------------------
 @Composable
-fun TvSearchBar(query: String, onQueryChange: (String) -> Unit) {
+fun TvSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onCloseSearch: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     var isFocused by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+
+    // Solicita el foco de forma automática al aparecer en pantalla para abrir el teclado
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
 
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
+            .focusRequester(focusRequester)
             .onFocusChanged { isFocused = it.isFocused }
             .border(
                 width = 2.dp,
                 color = if (isFocused) GoldAccent else Color.Transparent,
                 shape = RoundedCornerShape(10.dp)
             ),
-        placeholder = { Text("Buscar canal por nombre...", fontSize = 13.sp) },
+        placeholder = { Text("Buscar canal...", fontSize = 13.sp) },
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = GoldAccent) },
+        trailingIcon = {
+            IconButton(onClick = onCloseSearch) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Cerrar búsqueda",
+                    tint = Color.Gray
+                )
+            }
+        },
         singleLine = true,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Text,
+            imeAction = ImeAction.Search,
+            autoCorrect = false
+        ),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = GoldAccent,
             unfocusedBorderColor = Color(0xFF2A2A38),
@@ -575,90 +845,8 @@ fun TvSearchBar(query: String, onQueryChange: (String) -> Unit) {
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: TARJETA GRILLA (DORADO EN FOCO / ROJO EN SELECCIÓN)
-// -------------------------------------------------------------
-
-@kotlin.OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun ChannelCard(
-    canal: Modelo,
-    isFavorite: Boolean,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit
-) {
-    var isFocused by remember { mutableStateOf(false) }
-
-    val scale by animateFloatAsState(targetValue = if (isFocused) 1.08f else 1.0f, label = "scale")
-
-    val borderColor = when {
-        isFocused -> GoldAccent
-        isSelected -> RedLive
-        else -> Color.Transparent
-    }
-
-    val backgroundColor = if (isFocused) Color(0xFF282836) else Color(0xFF1B1B24)
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clip(RoundedCornerShape(10.dp))
-            .background(backgroundColor)
-            .border(2.5.dp, borderColor, RoundedCornerShape(10.dp))
-            .onFocusChanged { isFocused = it.isFocused }
-            .focusable()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            )
-            .padding(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(55.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            AsyncImage(
-                model = canal.imageUrl,
-                contentDescription = canal.title,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize()
-            )
-
-            if (isFavorite) {
-                Icon(
-                    imageVector = Icons.Default.Favorite,
-                    contentDescription = null,
-                    tint = RedLive,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .size(14.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = canal.title,
-            color = Color.White,
-            fontSize = 11.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Normal
-        )
-    }
-}
-
-// -------------------------------------------------------------
 // COMPOSABLE: TARJETA HORIZONTAL
 // -------------------------------------------------------------
-
 @kotlin.OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HorizontalChannelCard(
@@ -669,8 +857,14 @@ fun HorizontalChannelCard(
     onLongClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    var pressStartTime by remember { mutableLongStateOf(0L) }
+    var longPressTriggered by remember { mutableStateOf(false) }
 
-    val scale by animateFloatAsState(targetValue = if (isFocused) 1.08f else 1.0f, label = "scale")
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.12f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow),
+        label = "scale"
+    )
 
     val borderColor = when {
         isFocused -> GoldAccent
@@ -683,16 +877,56 @@ fun HorizontalChannelCard(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .width(105.dp)
+            .width(130.dp)
+            .height(115.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
             .clip(RoundedCornerShape(10.dp))
             .background(backgroundColor)
-            .border(2.5.dp, borderColor, RoundedCornerShape(10.dp))
+            .border(
+                width = if (isFocused) 3.dp else 2.5.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(10.dp)
+            )
             .onFocusChanged { isFocused = it.isFocused }
             .focusable()
+            .onKeyEvent { keyEvent ->
+                val keyCode = keyEvent.nativeKeyEvent.keyCode
+                val isSelectKey = keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
+                        keyCode == AndroidKeyEvent.KEYCODE_ENTER
+
+                if (isSelectKey) {
+                    when (keyEvent.type) {
+                        KeyEventType.KeyDown -> {
+                            if (pressStartTime == 0L) {
+                                pressStartTime = System.currentTimeMillis()
+                                longPressTriggered = false
+                            } else {
+                                val elapsed = System.currentTimeMillis() - pressStartTime
+                                if (elapsed > 800L && !longPressTriggered) {
+                                    longPressTriggered = true
+                                    onLongClick()
+                                }
+                            }
+                        }
+                        KeyEventType.KeyUp -> {
+                            val elapsed = System.currentTimeMillis() - pressStartTime
+                            pressStartTime = 0L
+                            if (!longPressTriggered) {
+                                if (elapsed < 800L) {
+                                    onClick()
+                                }
+                            }
+                            longPressTriggered = false
+                        }
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
@@ -702,37 +936,62 @@ fun HorizontalChannelCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(45.dp),
+                .height(55.dp),
             contentAlignment = Alignment.Center
         ) {
-            AsyncImage(
+            // Reproductor de imagen inteligente con reemplazo de TV roja ante fallos o ausencia de logo
+            coil.compose.SubcomposeAsyncImage(
                 model = canal.imageUrl,
                 contentDescription = canal.title,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
-            )
+            ) {
+                val state = painter.state
+                if (state is coil.compose.AsyncImagePainter.State.Success) {
+                    SubcomposeAsyncImageContent()
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Tv,
+                        contentDescription = null,
+                        tint = RedLive, // El TV ahora se ve en color rojo y es completamente visible
+                        modifier = Modifier.padding(10.dp) // Ajuste de tamaño para el contenedor de 55dp
+                    )
+                }
+            }
 
             if (isFavorite) {
-                Icon(
-                    imageVector = Icons.Default.Favorite,
-                    contentDescription = null,
-                    tint = RedLive,
+                Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .size(12.dp)
-                )
+                        .padding(2.dp)
+                        .size(28.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Favorite,
+                        contentDescription = null,
+                        tint = RedLive,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         Text(
             text = canal.title,
             color = Color.White,
-            fontSize = 10.sp,
-            maxLines = 1,
+            fontSize = 11.sp,
+            maxLines = 2,
+            lineHeight = 13.sp,
+            textAlign = TextAlign.Center,
             overflow = TextOverflow.Ellipsis,
-            fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Normal
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp)
         )
     }
 }
@@ -777,7 +1036,7 @@ fun TvPlayerCard(
 }
 
 // -------------------------------------------------------------
-// REPRODUCTOR EMBEBIDO MEDIA3 EXOPLAYER (SIN TEXTO SOBREPUESTO)
+// REPRODUCTOR EMBEBIDO MEDIA3 EXOPLAYER (CON RESOLUCIÓN OPTIMIZADA A 480P)
 // -------------------------------------------------------------
 @OptIn(UnstableApi::class)
 @Composable
@@ -788,60 +1047,85 @@ fun EmbeddedPlayerView(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    val exoPlayer = remember(context) {
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
-            .setConnectTimeoutMs(20000)
-            .setReadTimeoutMs(20000)
+    // Estado reactivo para el reproductor embebido
+    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
 
-        val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+    // Las tres banderas TS requeridas para la estabilidad de IPTV
+    val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+            DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
+            DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
 
-        val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-                DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
-
-        val extractorsFactory = DefaultExtractorsFactory().apply {
-            setTsExtractorFlags(tsFlags)
-        }
-        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
-
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(10000, 40000, 1500, 3000)
-            .setPrioritizeTimeOverSizeThresholds(true)
-            .build()
-
-        val trackSelector = DefaultTrackSelector(context).apply {
-            setParameters(
-                buildUponParameters()
-                    .setMaxVideoSize(1920, 1080)
-                    .setForceHighestSupportedBitrate(false)
-            )
-        }
-
-        val renderersFactory = DefaultRenderersFactory(context).apply {
-            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
-            setEnableDecoderFallback(true)
-        }
-
-        ExoPlayer.Builder(context, renderersFactory)
-            .setTrackSelector(trackSelector)
-            .setLoadControl(loadControl)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .build().apply {
-                playWhenReady = true
-            }
-    }
-
-    DisposableEffect(lifecycleOwner, exoPlayer) {
+    // CONTROL DE CICLO DE VIDA ACTIVO: Destruye el player al salir para liberar el decodificador de hardware
+    DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
-                    exoPlayer.pause()
-                }
                 Lifecycle.Event.ON_RESUME -> {
-                    if (exoPlayer.playbackState == Player.STATE_READY || exoPlayer.playbackState == Player.STATE_BUFFERING) {
-                        exoPlayer.play()
+                    if (exoPlayer == null) {
+                        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+                            .setAllowCrossProtocolRedirects(true)
+                            .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
+                            .setConnectTimeoutMs(15000)
+                            .setReadTimeoutMs(15000)
+
+                        val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+
+                        val extractorsFactory = DefaultExtractorsFactory().apply {
+                            setTsExtractorFlags(tsFlags)
+                        }
+
+                        val errorHandlingPolicy = DefaultLoadErrorHandlingPolicy(100)
+
+                        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+                            .setLoadErrorHandlingPolicy(errorHandlingPolicy)
+
+                        val loadControl = DefaultLoadControl.Builder()
+                            .setBufferDurationsMs(
+                                15000, // minBufferMs
+                                30000, // maxBufferMs
+                                1500,  // bufferForPlaybackMs
+                                3000   // bufferForPlaybackAfterRebufferMs
+                            )
+                            .setPrioritizeTimeOverSizeThresholds(true)
+                            .build()
+
+                        val trackSelector = DefaultTrackSelector(context).apply {
+                            setParameters(
+                                buildUponParameters()
+                                    .setMaxVideoSize(854, 480) // 480p máximo para ahorrar recursos
+                                    .setForceHighestSupportedBitrate(false)
+                            )
+                        }
+
+                        val renderersFactory = DefaultRenderersFactory(context).apply {
+                            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+                            setEnableDecoderFallback(true)
+                        }
+
+                        val player = ExoPlayer.Builder(context, renderersFactory)
+                            .setTrackSelector(trackSelector)
+                            .setLoadControl(loadControl)
+                            .setMediaSourceFactory(mediaSourceFactory)
+                            .build().apply {
+                                playWhenReady = true
+                            }
+
+                        player.addListener(object : Player.Listener {
+                            override fun onPlayerError(error: PlaybackException) {
+                                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                                    player.seekToDefaultPosition()
+                                }
+                                player.prepare()
+                                player.play()
+                            }
+                        })
+
+                        exoPlayer = player
                     }
+                }
+                Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
+                    // LIBERACIÓN CRÍTICA: Cerramos el reproductor por completo para liberar códecs
+                    exoPlayer?.release()
+                    exoPlayer = null
                 }
                 else -> {}
             }
@@ -850,23 +1134,55 @@ fun EmbeddedPlayerView(
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            exoPlayer.release()
+            exoPlayer?.release()
+            exoPlayer = null
         }
     }
 
-    LaunchedEffect(streamUrl) {
+    // Watchdog contra el congelamiento de imagen silencioso
+    LaunchedEffect(exoPlayer) {
+        val player = exoPlayer ?: return@LaunchedEffect
+        var lastRenderedFrames = -1
+        var secondsFrozen = 0
+
+        while (true) {
+            delay(1000)
+
+            val isPlayingAndReady = player.playbackState == Player.STATE_READY && player.playWhenReady
+            if (isPlayingAndReady) {
+                val counters = player.videoDecoderCounters
+                if (counters != null) {
+                    val currentFrames = counters.renderedOutputBufferCount
+
+                    if (currentFrames == lastRenderedFrames) {
+                        secondsFrozen++
+                        if (secondsFrozen >= 4) {
+                            secondsFrozen = 0
+                            player.prepare()
+                            player.play()
+                        }
+                    } else {
+                        lastRenderedFrames = currentFrames
+                        secondsFrozen = 0
+                    }
+                }
+            } else {
+                secondsFrozen = 0
+            }
+        }
+    }
+
+    // Carga del stream reactiva al cambiar URL o recrear el reproductor
+    LaunchedEffect(streamUrl, exoPlayer) {
+        val player = exoPlayer ?: return@LaunchedEffect
         if (streamUrl.isNotEmpty()) {
             val httpDataSourceFactory = DefaultHttpDataSource.Factory()
                 .setAllowCrossProtocolRedirects(true)
                 .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
-                .setConnectTimeoutMs(20000)
-                .setReadTimeoutMs(20000)
-            val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+                .setConnectTimeoutMs(15000)
+                .setReadTimeoutMs(15000)
 
-            val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-                    DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
-            val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
-            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+            val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
             val uri = Uri.parse(streamUrl)
             val mediaItemBuilder = MediaItem.Builder().setUri(uri)
@@ -878,26 +1194,35 @@ fun EmbeddedPlayerView(
                     streamUrl.contains("/live/", ignoreCase = true) ||
                     streamUrl.contains("/stream/", ignoreCase = true)
 
+            val errorHandlingPolicy = DefaultLoadErrorHandlingPolicy(100)
+
             val mediaSource = if (isStrictHls) {
                 mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
+                val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
                 HlsMediaSource.Factory(dataSourceFactory)
                     .setExtractorFactory(hlsExtractorFactory)
                     .setAllowChunklessPreparation(false)
+                    .setLoadErrorHandlingPolicy(errorHandlingPolicy)
                     .createMediaSource(mediaItemBuilder.build())
-            } else if (isTsStream) {
-                mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP2T)
-                mediaSourceFactory.createMediaSource(mediaItemBuilder.build())
             } else {
-                mediaSourceFactory.createMediaSource(mediaItemBuilder.build())
+                val extractorsFactory = DefaultExtractorsFactory().apply {
+                    setTsExtractorFlags(tsFlags)
+                }
+                if (isTsStream) {
+                    mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP2T)
+                }
+                DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+                    .setLoadErrorHandlingPolicy(errorHandlingPolicy)
+                    .createMediaSource(mediaItemBuilder.build())
             }
 
-            exoPlayer.setMediaSource(mediaSource)
-            exoPlayer.prepare()
-            exoPlayer.play()
+            player.setMediaSource(mediaSource)
+            player.prepare()
+            player.play()
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = androidx.compose.ui.Modifier.fillMaxSize().clickable { onPlayerClick() }) {
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
@@ -906,7 +1231,11 @@ fun EmbeddedPlayerView(
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            update = { view ->
+                // Actualiza dinámicamente la instancia del player cuando se destruye/recrea
+                view.player = exoPlayer
+            },
+            modifier = androidx.compose.ui.Modifier.fillMaxSize()
         )
     }
 }

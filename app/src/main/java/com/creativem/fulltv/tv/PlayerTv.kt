@@ -1,6 +1,7 @@
 package com.creativem.fulltv.tv
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.net.Uri
@@ -30,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,6 +52,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
@@ -58,6 +62,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.DefaultHlsExtractorFactory
@@ -74,7 +79,12 @@ import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Modelo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import androidx.lifecycle.lifecycleScope
+import coil.compose.SubcomposeAsyncImageContent
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 
+@UnstableApi
 class PlayerTv : ComponentActivity() {
 
     private lateinit var prefs: SharedPreferences
@@ -86,13 +96,32 @@ class PlayerTv : ComponentActivity() {
     private var bufferTextState = mutableStateOf("Iniciando señal...")
     private var isOfflineState = mutableStateOf(false)
 
-    private var exoPlayerInstance: ExoPlayer? = null
+    // El reproductor es un MutableState observable por Compose.
+    private var exoPlayerInstance = mutableStateOf<ExoPlayer?>(null)
 
+    // Banderas TS persistentes en la clase para su uso global en HLS y TS
+    @OptIn(UnstableApi::class)
+    private val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+            DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
+            DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
+
+    // Factorías de red globales persistentes para evitar la recolección de basura constante del sistema
+    private lateinit var httpDataSourceFactory: DefaultHttpDataSource.Factory
+    private lateinit var dataSourceFactory: DefaultDataSource.Factory
+    private lateinit var hlsExtractorFactory: DefaultHlsExtractorFactory
+    private lateinit var mediaSourceFactory: DefaultMediaSourceFactory
+
+    @OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        configurarTransicionInstantanea()
         configurarPantallaTvFull()
+
         prefs = getSharedPreferences("TV_PREFS", Context.MODE_PRIVATE)
+
+        // Inicialización de componentes reutilizables de red
+        inicializarComponentesDeRed()
 
         val streamUrl = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
         val movieTitle = intent.getStringExtra("EXTRA_MOVIE_TITLE") ?: "TV en Vivo"
@@ -110,6 +139,10 @@ class PlayerTv : ComponentActivity() {
 
         cargarListaFavoritos()
 
+        // Inicializa el reproductor de forma inmediata al instanciarse la pantalla
+        inicializarExoPlayerAnticipado()
+        prepararYReproducirCanal(canalInicial.streamUrl)
+
         onBackPressedDispatcher.addCallback(this) {
             if (isMenuVisibleState.value) {
                 isMenuVisibleState.value = false
@@ -124,20 +157,171 @@ class PlayerTv : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = Color.Black
                 ) {
-                    PlayerTvScreen(
-                        currentChannel = currentChannelState.value,
-                        favoriteChannels = favoriteChannelsState.value,
-                        isMenuVisible = isMenuVisibleState.value,
-                        isLoading = isLoadingState.value,
-                        bufferText = bufferTextState.value,
-                        isOffline = isOfflineState.value,
-                        onCloseMenu = { isMenuVisibleState.value = false },
-                        onSelectFavoriteChannel = { canal -> cambiarCanalDirecto(canal) },
-                        onToggleMenu = { isMenuVisibleState.value = !isMenuVisibleState.value },
-                        onPlayerCreated = { player -> exoPlayerInstance = player }
-                    )
+                    val player = exoPlayerInstance.value
+                    if (player != null) {
+                        PlayerTvScreen(
+                            exoPlayer = player,
+                            currentChannel = currentChannelState.value,
+                            favoriteChannels = favoriteChannelsState.value,
+                            isMenuVisible = isMenuVisibleState.value,
+                            isLoading = isLoadingState.value,
+                            bufferText = bufferTextState.value,
+                            isOffline = isOfflineState.value,
+                            onCloseMenu = { isMenuVisibleState.value = false },
+                            onSelectFavoriteChannel = { canal -> cambiarCanalDirecto(canal) },
+                            onToggleMenu = { isMenuVisibleState.value = !isMenuVisibleState.value }
+                        )
+                    }
                 }
             }
+        }
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun inicializarComponentesDeRed() {
+        httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
+            .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
+            .setConnectTimeoutMs(15000)
+            .setReadTimeoutMs(15000)
+
+        dataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
+
+        hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
+
+        val extractorsFactory = DefaultExtractorsFactory().apply {
+            setTsExtractorFlags(tsFlags)
+        }
+
+        mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+            .setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(100))
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+
+        val streamUrl = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
+        val movieTitle = intent.getStringExtra("EXTRA_MOVIE_TITLE") ?: "TV en Vivo"
+        val movieImageUrl = intent.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
+
+        val nuevoCanal = Modelo(
+            id = "canal_actual",
+            title = movieTitle,
+            streamUrl = streamUrl,
+            imageUrl = movieImageUrl
+        )
+
+        currentChannelState.value = nuevoCanal
+        TvRepository.lastPlayedChannel = nuevoCanal
+        isOfflineState.value = false
+
+        if (exoPlayerInstance.value == null) {
+            inicializarExoPlayerAnticipado()
+        }
+        prepararYReproducirCanal(streamUrl)
+    }
+
+    private fun configurarTransicionInstantanea() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, 0, 0)
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun inicializarExoPlayerAnticipado() {
+        if (exoPlayerInstance.value != null) return
+
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                15000, // minBufferMs
+                30000, // maxBufferMs
+                2500,  // bufferForPlaybackMs
+                5000   // bufferForPlaybackAfterRebufferMs
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
+        val trackSelector = DefaultTrackSelector(this).apply {
+            setParameters(
+                buildUponParameters()
+                    .setMaxVideoSize(1920, 1080)
+                    .setForceHighestSupportedBitrate(false)
+            )
+        }
+
+        val renderersFactory = DefaultRenderersFactory(this).apply {
+            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+            setEnableDecoderFallback(true)
+        }
+
+        exoPlayerInstance.value = ExoPlayer.Builder(this, renderersFactory)
+            .setTrackSelector(trackSelector)
+            .setLoadControl(loadControl)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                true
+            )
+            .build().apply {
+                playWhenReady = true
+            }
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun prepararYReproducirCanal(streamUrl: String) {
+        val player = exoPlayerInstance.value ?: return
+        if (streamUrl.isEmpty()) return
+
+        isLoadingState.value = true
+        bufferTextState.value = "Cargando señal..."
+
+        // Corrutina de seguridad para retrasar la preparación de video
+        // Esto permite que TvActivity libere por completo el chip decodificador físico de la TV
+        lifecycleScope.launch(Dispatchers.Main) {
+            delay(300) // Retraso de seguridad imperceptible pero clave para el hardware
+
+            val uri = Uri.parse(streamUrl)
+            val mediaItemBuilder = MediaItem.Builder().setUri(uri)
+
+            val isStrictHls = streamUrl.contains(".m3u8", ignoreCase = true) ||
+                    streamUrl.contains("format=m3u8", ignoreCase = true)
+
+            val isTsStream = streamUrl.contains(".ts", ignoreCase = true) ||
+                    streamUrl.contains("/live/", ignoreCase = true) ||
+                    streamUrl.contains("/stream/", ignoreCase = true)
+
+            val errorHandlingPolicy = DefaultLoadErrorHandlingPolicy(100)
+
+            val mediaSource = if (isStrictHls) {
+                mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
+                HlsMediaSource.Factory(dataSourceFactory)
+                    .setExtractorFactory(hlsExtractorFactory)
+                    .setAllowChunklessPreparation(false)
+                    .setLoadErrorHandlingPolicy(errorHandlingPolicy)
+                    .createMediaSource(mediaItemBuilder.build())
+            } else {
+                val extractorsFactory = DefaultExtractorsFactory().apply {
+                    setTsExtractorFlags(tsFlags)
+                }
+                if (isTsStream) {
+                    mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP2T)
+                }
+                DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+                    .setLoadErrorHandlingPolicy(errorHandlingPolicy)
+                    .createMediaSource(mediaItemBuilder.build())
+            }
+
+            player.setMediaSource(mediaSource)
+            player.prepare()
+            player.play()
         }
     }
 
@@ -154,8 +338,7 @@ class PlayerTv : ComponentActivity() {
         TvRepository.lastPlayedChannel = canal
         isMenuVisibleState.value = false
         isOfflineState.value = false
-        isLoadingState.value = true
-        bufferTextState.value = "Cargando canal..."
+        prepararYReproducirCanal(canal.streamUrl)
     }
 
     private fun cambiarCanalSiguienteAnterior(siguiente: Boolean) {
@@ -253,19 +436,57 @@ class PlayerTv : ComponentActivity() {
         return res
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Si el player fue liberado preventivamente en segundo plano, lo re-inicializamos
+        if (exoPlayerInstance.value == null) {
+            inicializarExoPlayerAnticipado()
+            currentChannelState.value?.let { canal ->
+                prepararYReproducirCanal(canal.streamUrl)
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         configurarPantallaTvFull()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             AudioFocusHelper.requestAudioFocus(this)
         }
+        exoPlayerInstance.value?.playWhenReady = true
+        exoPlayerInstance.value?.play()
     }
 
     override fun onPause() {
         super.onPause()
+        if (isFinishing) {
+            exoPlayerInstance.value?.release()
+            exoPlayerInstance.value = null
+        } else {
+            exoPlayerInstance.value?.pause()
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             AudioFocusHelper.abandonAudioFocus()
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Liberación de recursos inmediata al quedar en segundo plano para liberar decodificadores de hardware
+        exoPlayerInstance.value?.release()
+        exoPlayerInstance.value = null
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        exoPlayerInstance.value?.release()
+        exoPlayerInstance.value = null
+    }
+
+    override fun finish() {
+        super.finish()
+        configurarTransicionInstantanea()
     }
 }
 
@@ -275,6 +496,7 @@ class PlayerTv : ComponentActivity() {
 @OptIn(UnstableApi::class)
 @Composable
 fun PlayerTvScreen(
+    exoPlayer: ExoPlayer,
     currentChannel: Modelo?,
     favoriteChannels: List<Modelo>,
     isMenuVisible: Boolean,
@@ -283,139 +505,72 @@ fun PlayerTvScreen(
     isOffline: Boolean,
     onCloseMenu: () -> Unit,
     onSelectFavoriteChannel: (Modelo) -> Unit,
-    onToggleMenu: () -> Unit,
-    onPlayerCreated: (ExoPlayer) -> Unit
+    onToggleMenu: () -> Unit
 ) {
-    val context = LocalContext.current
-
     var currentBufferText by remember { mutableStateOf(bufferText) }
     var isBuffering by remember { mutableStateOf(isLoading) }
 
-    val exoPlayer = remember(context) {
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
-            .setConnectTimeoutMs(20000)
-            .setReadTimeoutMs(20000)
+    LaunchedEffect(isLoading) {
+        isBuffering = isLoading
+    }
 
-        val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+    LaunchedEffect(bufferText) {
+        currentBufferText = bufferText
+    }
 
-        val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-                DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
-
-        val extractorsFactory = DefaultExtractorsFactory().apply {
-            setTsExtractorFlags(tsFlags)
-        }
-        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
-
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(10000, 40000, 1500, 3000)
-            .setPrioritizeTimeOverSizeThresholds(true)
-            .build()
-
-        val trackSelector = DefaultTrackSelector(context).apply {
-            setParameters(
-                buildUponParameters()
-                    .setMaxVideoSize(1920, 1080)
-                    .setForceHighestSupportedBitrate(false)
-            )
-        }
-
-        val renderersFactory = DefaultRenderersFactory(context).apply {
-            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
-            setEnableDecoderFallback(true)
-        }
-
-        ExoPlayer.Builder(context, renderersFactory)
-            .setTrackSelector(trackSelector)
-            .setLoadControl(loadControl)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .build().apply {
-                playWhenReady = true
-                onPlayerCreated(this)
-            }
+    // FORZADO DE INICIO DE DECODIFICADOR: Lanza la orden de reproducción en cuanto el player
+    // se vincula de forma activa al árbol de renderizado de Compose.
+    LaunchedEffect(exoPlayer) {
+        exoPlayer.playWhenReady = true
+        exoPlayer.play()
     }
 
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
-                when (playbackState) {
-                    Player.STATE_BUFFERING -> isBuffering = true
-                    Player.STATE_READY -> isBuffering = false
-                    else -> {}
-                }
+                isBuffering = playbackState == Player.STATE_BUFFERING
             }
 
             override fun onPlayerError(error: PlaybackException) {
                 isBuffering = true
                 currentBufferText = "Error de señal. Reintentando..."
+
+                // Recuperación si el búfer en vivo queda rezagado en tiempo real
+                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                    exoPlayer.seekToDefaultPosition()
+                }
+
+                exoPlayer.prepare()
+                exoPlayer.play()
             }
         }
         exoPlayer.addListener(listener)
+        isBuffering = exoPlayer.playbackState == Player.STATE_BUFFERING
 
         onDispose {
             exoPlayer.removeListener(listener)
-            exoPlayer.release()
         }
     }
 
-    LaunchedEffect(exoPlayer) {
-        while (isActive) {
-            if (isBuffering) {
+    // Watchdog anti-congelamiento que refresca la conexión si queda atascado por más de 12 segundos
+    LaunchedEffect(isBuffering, exoPlayer) {
+        if (isBuffering) {
+            var secondsBuffering = 0
+            while (isActive) {
                 val percentage = exoPlayer.bufferedPercentage
                 val estimatedKb = exoPlayer.bufferedPosition / 1024
                 currentBufferText = "Búfer: $percentage% (${estimatedKb} KB)"
+
+                delay(1000)
+                secondsBuffering++
+
+                if (secondsBuffering >= 12) {
+                    secondsBuffering = 0
+                    currentBufferText = "Señal lenta. Restableciendo conexión..."
+                    exoPlayer.prepare()
+                    exoPlayer.play()
+                }
             }
-            delay(500)
-        }
-    }
-
-    LaunchedEffect(currentChannel?.streamUrl) {
-        val streamUrl = currentChannel?.streamUrl ?: ""
-        if (streamUrl.isNotEmpty()) {
-            isBuffering = true
-            currentBufferText = "Cargando señal..."
-
-            val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-                .setAllowCrossProtocolRedirects(true)
-                .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
-                .setConnectTimeoutMs(20000)
-                .setReadTimeoutMs(20000)
-
-            val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
-
-            val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-                    DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS
-
-            val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
-            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
-
-            val uri = Uri.parse(streamUrl)
-            val mediaItemBuilder = MediaItem.Builder().setUri(uri)
-
-            val isStrictHls = streamUrl.contains(".m3u8", ignoreCase = true) ||
-                    streamUrl.contains("format=m3u8", ignoreCase = true)
-
-            val isTsStream = streamUrl.contains(".ts", ignoreCase = true) ||
-                    streamUrl.contains("/live/", ignoreCase = true) ||
-                    streamUrl.contains("/stream/", ignoreCase = true)
-
-            val mediaSource = if (isStrictHls) {
-                mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
-                HlsMediaSource.Factory(dataSourceFactory)
-                    .setExtractorFactory(hlsExtractorFactory)
-                    .setAllowChunklessPreparation(false)
-                    .createMediaSource(mediaItemBuilder.build())
-            } else if (isTsStream) {
-                mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP2T)
-                mediaSourceFactory.createMediaSource(mediaItemBuilder.build())
-            } else {
-                mediaSourceFactory.createMediaSource(mediaItemBuilder.build())
-            }
-
-            exoPlayer.setMediaSource(mediaSource)
-            exoPlayer.prepare()
-            exoPlayer.play()
         }
     }
 
@@ -435,7 +590,7 @@ fun PlayerTvScreen(
                 .clickable { onToggleMenu() }
         )
 
-        // 2. BUFFER DE CARGA OVERLAY (CINEPARCHE STYLE)
+        // 2. BUFFER DE CARGA OVERLAY
         if (isBuffering || isOffline) {
             Box(
                 modifier = Modifier
@@ -498,7 +653,7 @@ fun PlayerTvScreen(
 }
 
 // -------------------------------------------------------------
-// MENÚ OVERLAY FAVORITOS (ESTILO CINEPARCHE)
+// MENÚ OVERLAY FAVORITOS
 // -------------------------------------------------------------
 @Composable
 fun FavoritesOverlayMenu(
@@ -516,7 +671,7 @@ fun FavoritesOverlayMenu(
             try {
                 firstItemFocusRequester.requestFocus()
             } catch (e: Exception) {
-                // Captura si la vista aún no está lista
+                // Previene fallo por ciclo de foco no enlazado todavía
             }
         }
     }
@@ -557,7 +712,7 @@ fun FavoritesOverlayMenu(
                 }
             }
 
-            Divider(color = Color(0xFF2A2A38))
+            HorizontalDivider(color = Color(0xFF2A2A38))
 
             if (favoriteChannels.isEmpty()) {
                 Box(
@@ -632,7 +787,8 @@ fun FavoriteMenuItem(
             .clickable { onSelect() }
             .padding(10.dp)
     ) {
-        AsyncImage(
+        // Reproductor de imagen inteligente y dinámico
+        coil.compose.SubcomposeAsyncImage(
             model = canal.imageUrl,
             contentDescription = canal.title,
             contentScale = ContentScale.Fit,
@@ -641,7 +797,20 @@ fun FavoriteMenuItem(
                 .clip(RoundedCornerShape(6.dp))
                 .background(Color.Black)
                 .padding(2.dp)
-        )
+        ) {
+            val state = painter.state
+            // Si el estado no es Success (cargando, vacío o error), muestra el ícono de TV rojo
+            if (state is coil.compose.AsyncImagePainter.State.Success) {
+                SubcomposeAsyncImageContent()
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Tv,
+                    contentDescription = null,
+                    tint = RedLive, // El TV ahora es rojo y completamente visible
+                    modifier = Modifier.padding(6.dp) // Margen interno para que luzca centrado
+                )
+            }
+        }
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
