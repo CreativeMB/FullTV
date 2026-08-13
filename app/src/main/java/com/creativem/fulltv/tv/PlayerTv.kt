@@ -98,16 +98,13 @@ class PlayerTv : ComponentActivity() {
     private var bufferTextState = mutableStateOf("Iniciando señal...")
     private var isOfflineState = mutableStateOf(false)
 
-    // El reproductor es un MutableState observable por Compose.
     private var exoPlayerInstance = mutableStateOf<ExoPlayer?>(null)
 
-    // Banderas TS persistentes en la clase para su uso global en HLS y TS
     @OptIn(UnstableApi::class)
     private val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
             DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
             DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
 
-    // Factorías de red globales persistentes para evitar la recolección de basura constante del sistema
     private lateinit var httpDataSourceFactory: DefaultHttpDataSource.Factory
     private lateinit var dataSourceFactory: DefaultDataSource.Factory
     private lateinit var hlsExtractorFactory: DefaultHlsExtractorFactory
@@ -122,15 +119,15 @@ class PlayerTv : ComponentActivity() {
 
         prefs = getSharedPreferences("TV_PREFS", Context.MODE_PRIVATE)
 
-        // Inicialización de componentes reutilizables de red
         inicializarComponentesDeRed()
 
         val streamUrl = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
         val movieTitle = intent.getStringExtra("EXTRA_MOVIE_TITLE") ?: "TV en Vivo"
         val movieImageUrl = intent.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
 
+        // Modificado: El id ahora utiliza 'movieTitle' para alinearse con los IDs por nombre de TvActivity
         val canalInicial = Modelo(
-            id = "canal_actual",
+            id = movieTitle,
             title = movieTitle,
             streamUrl = streamUrl,
             imageUrl = movieImageUrl
@@ -141,7 +138,6 @@ class PlayerTv : ComponentActivity() {
 
         cargarListaFavoritos()
 
-        // Inicializa el reproductor de forma inmediata al instanciarse la pantalla
         inicializarExoPlayerAnticipado()
         prepararYReproducirCanal(canalInicial.streamUrl)
 
@@ -207,8 +203,9 @@ class PlayerTv : ComponentActivity() {
         val movieTitle = intent.getStringExtra("EXTRA_MOVIE_TITLE") ?: "TV en Vivo"
         val movieImageUrl = intent.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
 
+        // Modificado: Al igual que en onCreate, usamos el título como id estable
         val nuevoCanal = Modelo(
-            id = "canal_actual",
+            id = movieTitle,
             title = movieTitle,
             streamUrl = streamUrl,
             imageUrl = movieImageUrl
@@ -240,10 +237,10 @@ class PlayerTv : ComponentActivity() {
 
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                12000, // minBufferMs: IGUAL al máximo. Activa la descarga constante y evita pausas inactivas.
-                12000, // maxBufferMs: IGUAL al mínimo. Mantiene el puerto con el servidor IPTV abierto todo el tiempo.
-                1500,  // bufferForPlaybackMs
-                2000   // bufferForPlaybackAfterRebufferMs
+                12000,
+                12000,
+                1500,
+                2000
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
@@ -285,19 +282,14 @@ class PlayerTv : ComponentActivity() {
         isLoadingState.value = true
         bufferTextState.value = "Cargando señal..."
 
-// Corrutina de seguridad para retrasar la preparación de video
-// Esto permite que TvActivity libere por completo el chip decodificador físico de la TV
         lifecycleScope.launch(Dispatchers.Main) {
-            delay(300) // Retraso de seguridad imperceptible pero clave para el hardware
+            delay(300)
 
             val uri = Uri.parse(streamUrl)
 
-            // --- INTEGRACIÓN DEL RETRASO EN VIVO (LIVE CONFIGURATION) ---
             val mediaItemBuilder = MediaItem.Builder().setUri(uri).setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(5000).build())
                 .setLiveConfiguration(
                     MediaItem.LiveConfiguration.Builder()
-                        // Colchón de seguridad de 10 segundos (10000 ms) respecto al vivo real.
-                        // Ayuda a amortiguar fluctuaciones de red en transmisiones estables de IPTV.
                         .setTargetOffsetMs(10000)
                         .build()
                 )
@@ -448,7 +440,6 @@ class PlayerTv : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // Si el player fue liberado preventivamente en segundo plano, lo re-inicializamos
         if (exoPlayerInstance.value == null) {
             inicializarExoPlayerAnticipado()
             currentChannelState.value?.let { canal ->
@@ -483,7 +474,6 @@ class PlayerTv : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        // Liberación de recursos inmediata al quedar en segundo plano para liberar decodificadores de hardware
         exoPlayerInstance.value?.release()
         exoPlayerInstance.value = null
     }
@@ -528,8 +518,6 @@ fun PlayerTvScreen(
         currentBufferText = bufferText
     }
 
-    // FORZADO DE INICIO DE DECODIFICADOR: Lanza la orden de reproducción en cuanto el player
-    // se vincula de forma activa al árbol de renderizado de Compose.
     LaunchedEffect(exoPlayer) {
         exoPlayer.playWhenReady = true
         exoPlayer.play()
@@ -545,7 +533,6 @@ fun PlayerTvScreen(
                 isBuffering = true
                 currentBufferText = "Error de señal. Reintentando..."
 
-                // Recuperación si el búfer en vivo queda rezagado en tiempo real
                 if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
                     exoPlayer.seekToDefaultPosition()
                 }
@@ -562,7 +549,6 @@ fun PlayerTvScreen(
         }
     }
 
-    // Watchdog anti-congelamiento que refresca la conexión si queda atascado por más de 12 segundos
     LaunchedEffect(isBuffering, exoPlayer) {
         if (isBuffering) {
             var secondsBuffering = 0
@@ -585,7 +571,6 @@ fun PlayerTvScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. REPRODUCTOR DE VIDEO
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
@@ -600,7 +585,6 @@ fun PlayerTvScreen(
                 .clickable { onToggleMenu() }
         )
 
-        // 2. BUFFER DE CARGA OVERLAY
         if (isBuffering || isOffline) {
             Box(
                 modifier = Modifier
@@ -644,7 +628,6 @@ fun PlayerTvScreen(
             }
         }
 
-        // 3. OVERLAY MENÚ LATERAL DE FAVORITOS
         AnimatedVisibility(
             visible = isMenuVisible,
             enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
@@ -674,31 +657,24 @@ fun FavoritesOverlayMenu(
     onSelectChannel: (Modelo) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val lazyListState = rememberLazyListState() // Estado de scroll vertical
+    val lazyListState = rememberLazyListState()
 
-    // Generar una lista de Requesters únicos, uno para cada ítem de favoritos
     val focusRequesters = remember(favoriteChannels) {
         List(favoriteChannels.size) { FocusRequester() }
     }
 
-    // Determinar qué canal es el que se está reproduciendo actualmente
     val playingIndex = remember(favoriteChannels, currentStreamUrl) {
         val index = favoriteChannels.indexOfFirst { it.streamUrl == currentStreamUrl }
         if (index != -1) index else 0
     }
 
-    // Forzar el scroll inicial y foco prioritario al canal reproduciéndose
     LaunchedEffect(isMenuVisible, playingIndex) {
         if (isMenuVisible && favoriteChannels.isNotEmpty() && playingIndex in focusRequesters.indices) {
             delay(150)
             try {
-                // Posicionar el scroll inicial sobre el canal activo para asegurar su composición
                 lazyListState.scrollToItem(playingIndex)
-                // Solicitar foco al canal reproduciéndose
                 focusRequesters[playingIndex].requestFocus()
-            } catch (e: Exception) {
-                // Previene fallo si el ciclo de foco del framework no se ha acoplado completamente
-            }
+            } catch (e: Exception) {}
         }
     }
 
@@ -753,11 +729,12 @@ fun FavoritesOverlayMenu(
                 }
             } else {
                 LazyColumn(
-                    state = lazyListState, // Enlazado al estado de control de scroll
+                    state = lazyListState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    itemsIndexed(favoriteChannels, key = { _, canal -> "menu_fav_${canal.id}" }) { index, canal ->
+                    // Modificado: Agregado el índice a la clave para evitar cierres ante duplicados
+                    itemsIndexed(favoriteChannels, key = { index, canal -> "menu_fav_${canal.id}_$index" }) { index, canal ->
                         FavoriteMenuItem(
                             canal = canal,
                             isPlaying = canal.streamUrl == currentStreamUrl,
@@ -765,7 +742,7 @@ fun FavoritesOverlayMenu(
                                 lazyListState.animateScrollAndCentralizeMenuItem(index, coroutineScope)
                             },
                             onSelect = { onSelectChannel(canal) },
-                            modifier = Modifier.focusRequester(focusRequesters[index]) // Asignación del Requester exacto
+                            modifier = Modifier.focusRequester(focusRequesters[index])
                         )
                     }
                 }
@@ -781,7 +758,7 @@ fun FavoritesOverlayMenu(
 fun FavoriteMenuItem(
     canal: Modelo,
     isPlaying: Boolean,
-    onFocused: () -> Unit, // Callback al recibir foco
+    onFocused: () -> Unit,
     onSelect: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -816,14 +793,13 @@ fun FavoriteMenuItem(
             .onFocusChanged {
                 isFocused = it.isFocused
                 if (it.isFocused) {
-                    onFocused() // Disparar acción de centrado
+                    onFocused()
                 }
             }
             .focusable()
             .clickable { onSelect() }
             .padding(10.dp)
     ) {
-        // Reproductor de imagen inteligente y dinámico
         coil.compose.SubcomposeAsyncImage(
             model = canal.imageUrl,
             contentDescription = canal.title,
@@ -835,15 +811,14 @@ fun FavoriteMenuItem(
                 .padding(2.dp)
         ) {
             val state = painter.state
-            // Si el estado no es Success (cargando, vacío o error), muestra el ícono de TV rojo
             if (state is coil.compose.AsyncImagePainter.State.Success) {
                 SubcomposeAsyncImageContent()
             } else {
                 Icon(
                     imageVector = Icons.Default.Tv,
                     contentDescription = null,
-                    tint = RedLive, // El TV ahora es rojo y completamente visible
-                    modifier = Modifier.padding(6.dp) // Margen interno para que luzca centrado
+                    tint = RedLive,
+                    modifier = Modifier.padding(6.dp)
                 )
             }
         }
@@ -870,8 +845,7 @@ fun FavoriteMenuItem(
 }
 
 // -------------------------------------------------------------
-// EXTENSIONES PARA CENTRAR ELEMENTOS EN FOCO (TV LAYOUTS)
-// Renombrada a 'animateScrollAndCentralizeMenuItem' para evitar colisiones globales
+// EXTENSIONES PARA CENTRAR ELEMENTOS EN FOCO
 // -------------------------------------------------------------
 private fun androidx.compose.foundation.lazy.LazyListState.animateScrollAndCentralizeMenuItem(
     index: Int,
