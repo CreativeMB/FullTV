@@ -1,865 +1,1834 @@
-package com.creativem.fulltv.tv
-
-import android.content.Context
-import android.content.Intent
-import android.content.SharedPreferences
-import android.content.pm.ActivityInfo
-import android.net.Uri
-import android.os.Build
-import android.os.Bundle
-import android.view.KeyEvent
-import android.view.View
-import android.view.WindowManager
-import androidx.activity.ComponentActivity
-import androidx.activity.addCallback
-import androidx.activity.compose.setContent
-import androidx.annotation.OptIn
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MimeTypes
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
-import androidx.media3.exoplayer.DefaultRenderersFactory
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.hls.DefaultHlsExtractorFactory
-import androidx.media3.exoplayer.hls.HlsMediaSource
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
-import androidx.media3.extractor.DefaultExtractorsFactory
-import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
-import coil.compose.AsyncImage
-import com.creativem.fulltv.principal.AudioFocusHelper
-import com.creativem.fulltv.principal.CastvHelper
-import com.creativem.fulltv.principal.Modelo
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import androidx.lifecycle.lifecycleScope
-import coil.compose.SubcomposeAsyncImageContent
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-
-@UnstableApi
-class PlayerTv : ComponentActivity() {
-
-    private lateinit var prefs: SharedPreferences
-
-    private var currentChannelState = mutableStateOf<Modelo?>(null)
-    private var isMenuVisibleState = mutableStateOf(false)
-    private var favoriteChannelsState = mutableStateOf<List<Modelo>>(emptyList())
-    private var isLoadingState = mutableStateOf(true)
-    private var bufferTextState = mutableStateOf("Iniciando señal...")
-    private var isOfflineState = mutableStateOf(false)
-
-    private var exoPlayerInstance = mutableStateOf<ExoPlayer?>(null)
-
-    @OptIn(UnstableApi::class)
-    private val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-            DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
-            DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
-
-    private lateinit var httpDataSourceFactory: DefaultHttpDataSource.Factory
-    private lateinit var dataSourceFactory: DefaultDataSource.Factory
-    private lateinit var hlsExtractorFactory: DefaultHlsExtractorFactory
-    private lateinit var mediaSourceFactory: DefaultMediaSourceFactory
-
-    @OptIn(UnstableApi::class)
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        configurarTransicionInstantanea()
-        configurarPantallaTvFull()
-
-        prefs = getSharedPreferences("TV_PREFS", Context.MODE_PRIVATE)
-
-        inicializarComponentesDeRed()
-
-        val streamUrl = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
-        val movieTitle = intent.getStringExtra("EXTRA_MOVIE_TITLE") ?: "TV en Vivo"
-        val movieImageUrl = intent.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
-
-        // Modificado: El id ahora utiliza 'movieTitle' para alinearse con los IDs por nombre de TvActivity
-        val canalInicial = Modelo(
-            id = movieTitle,
-            title = movieTitle,
-            streamUrl = streamUrl,
-            imageUrl = movieImageUrl
-        )
-
-        currentChannelState.value = canalInicial
-        TvRepository.lastPlayedChannel = canalInicial
-
-        cargarListaFavoritos()
-
-        inicializarExoPlayerAnticipado()
-        prepararYReproducirCanal(canalInicial.streamUrl)
-
-        onBackPressedDispatcher.addCallback(this) {
-            if (isMenuVisibleState.value) {
-                isMenuVisibleState.value = false
-            } else {
-                finish()
-            }
-        }
-
-        setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = Color.Black
-                ) {
-                    val player = exoPlayerInstance.value
-                    if (player != null) {
-                        PlayerTvScreen(
-                            exoPlayer = player,
-                            currentChannel = currentChannelState.value,
-                            favoriteChannels = favoriteChannelsState.value,
-                            isMenuVisible = isMenuVisibleState.value,
-                            isLoading = isLoadingState.value,
-                            bufferText = bufferTextState.value,
-                            isOffline = isOfflineState.value,
-                            onCloseMenu = { isMenuVisibleState.value = false },
-                            onSelectFavoriteChannel = { canal -> cambiarCanalDirecto(canal) },
-                            onToggleMenu = { isMenuVisibleState.value = !isMenuVisibleState.value }
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    @OptIn(UnstableApi::class)
-    private fun inicializarComponentesDeRed() {
-        httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
-            .setConnectTimeoutMs(15000)
-            .setReadTimeoutMs(15000)
-
-        dataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
-
-        hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
-
-        val extractorsFactory = DefaultExtractorsFactory().apply {
-            setTsExtractorFlags(tsFlags)
-        }
-
-        mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
-            .setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(100))
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-
-        val streamUrl = intent.getStringExtra("EXTRA_STREAM_URL") ?: ""
-        val movieTitle = intent.getStringExtra("EXTRA_MOVIE_TITLE") ?: "TV en Vivo"
-        val movieImageUrl = intent.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
-
-        // Modificado: Al igual que en onCreate, usamos el título como id estable
-        val nuevoCanal = Modelo(
-            id = movieTitle,
-            title = movieTitle,
-            streamUrl = streamUrl,
-            imageUrl = movieImageUrl
-        )
-
-        currentChannelState.value = nuevoCanal
-        TvRepository.lastPlayedChannel = nuevoCanal
-        isOfflineState.value = false
-
-        if (exoPlayerInstance.value == null) {
-            inicializarExoPlayerAnticipado()
-        }
-        prepararYReproducirCanal(streamUrl)
-    }
-
-    private fun configurarTransicionInstantanea() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, 0, 0)
-            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
-        } else {
-            @Suppress("DEPRECATION")
-            overridePendingTransition(0, 0)
-        }
-    }
-
-    @OptIn(UnstableApi::class)
-    private fun inicializarExoPlayerAnticipado() {
-        if (exoPlayerInstance.value != null) return
-
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                12000,
-                12000,
-                1500,
-                2000
-            )
-            .setPrioritizeTimeOverSizeThresholds(true)
-            .build()
-
-        val trackSelector = DefaultTrackSelector(this).apply {
-            setParameters(
-                buildUponParameters()
-                    .setMaxVideoSize(1920, 1080)
-                    .setForceHighestSupportedBitrate(false)
-            )
-        }
-
-        val renderersFactory = DefaultRenderersFactory(this).apply {
-            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
-            setEnableDecoderFallback(true)
-        }
-
-        exoPlayerInstance.value = ExoPlayer.Builder(this, renderersFactory)
-            .setTrackSelector(trackSelector)
-            .setLoadControl(loadControl)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-                    .build(),
-                true
-            )
-            .build().apply {
-                playWhenReady = true
-            }
-    }
-
-    @OptIn(UnstableApi::class)
-    private fun prepararYReproducirCanal(streamUrl: String) {
-        val player = exoPlayerInstance.value ?: return
-        if (streamUrl.isEmpty()) return
-
-        isLoadingState.value = true
-        bufferTextState.value = "Cargando señal..."
-
-        lifecycleScope.launch(Dispatchers.Main) {
-            delay(300)
-
-            val uri = Uri.parse(streamUrl)
-
-            val mediaItemBuilder = MediaItem.Builder().setUri(uri).setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(5000).build())
-                .setLiveConfiguration(
-                    MediaItem.LiveConfiguration.Builder()
-                        .setTargetOffsetMs(10000)
-                        .build()
-                )
-
-            val isStrictHls = streamUrl.contains(".m3u8", ignoreCase = true) ||
-                    streamUrl.contains("format=m3u8", ignoreCase = true)
-
-            val isTsStream = streamUrl.contains(".ts", ignoreCase = true) ||
-                    streamUrl.contains("/live/", ignoreCase = true) ||
-                    streamUrl.contains("/stream/", ignoreCase = true)
-
-            val errorHandlingPolicy = DefaultLoadErrorHandlingPolicy(100)
-
-            val mediaSource = if (isStrictHls) {
-                mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
-                HlsMediaSource.Factory(dataSourceFactory)
-                    .setExtractorFactory(hlsExtractorFactory)
-                    .setAllowChunklessPreparation(false)
-                    .setLoadErrorHandlingPolicy(errorHandlingPolicy)
-                    .createMediaSource(mediaItemBuilder.build())
-            } else {
-                val extractorsFactory = DefaultExtractorsFactory().apply {
-                    setTsExtractorFlags(tsFlags)
-                }
-                if (isTsStream) {
-                    mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP2T)
-                }
-                DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
-                    .setLoadErrorHandlingPolicy(errorHandlingPolicy)
-                    .createMediaSource(mediaItemBuilder.build())
-            }
-
-            player.setMediaSource(mediaSource)
-            player.prepare()
-            player.play()
-        }
-    }
-    private fun cargarListaFavoritos() {
-        val favIds = prefs.getStringSet("fav_ids", emptySet()) ?: emptySet()
-        val masterList = TvRepository.channelListMaster
-
-        val favsList = masterList.filter { favIds.contains(it.id) }
-        favoriteChannelsState.value = if (favsList.isNotEmpty()) favsList else masterList
-    }
-
-    private fun cambiarCanalDirecto(canal: Modelo) {
-        currentChannelState.value = canal
-        TvRepository.lastPlayedChannel = canal
-        isMenuVisibleState.value = false
-        isOfflineState.value = false
-        prepararYReproducirCanal(canal.streamUrl)
-    }
-
-    private fun cambiarCanalSiguienteAnterior(siguiente: Boolean) {
-        val lista = favoriteChannelsState.value
-        if (lista.isEmpty()) return
-
-        val canalActual = currentChannelState.value
-        val indexActual = lista.indexOfFirst { it.streamUrl == canalActual?.streamUrl }
-
-        val nuevoIndex = if (siguiente) {
-            if (indexActual == -1 || indexActual >= lista.size - 1) 0 else indexActual + 1
-        } else {
-            if (indexActual <= 0) lista.size - 1 else indexActual - 1
-        }
-
-        cambiarCanalDirecto(lista[nuevoIndex])
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        return when (keyCode) {
-            KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                cambiarCanalSiguienteAnterior(siguiente = true)
-                true
-            }
-            KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                cambiarCanalSiguienteAnterior(siguiente = false)
-                true
-            }
-            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_INFO,
-            KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_PAGE_DOWN -> {
-                isMenuVisibleState.value = !isMenuVisibleState.value
-                true
-            }
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                if (!isMenuVisibleState.value) {
-                    isMenuVisibleState.value = true
-                    true
-                } else {
-                    super.onKeyDown(keyCode, event)
-                }
-            }
-            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_DPAD_LEFT -> {
-                if (isMenuVisibleState.value) {
-                    isMenuVisibleState.value = false
-                    true
-                } else if (keyCode == KeyEvent.KEYCODE_BACK) {
-                    finish()
-                    true
-                } else {
-                    super.onKeyDown(keyCode, event)
-                }
-            }
-            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                if (!isMenuVisibleState.value) {
-                    isMenuVisibleState.value = true
-                    true
-                } else {
-                    super.onKeyDown(keyCode, event)
-                }
-            }
-            else -> super.onKeyDown(keyCode, event)
-        }
-    }
-
-    private fun configurarPantallaTvFull() {
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        val controller = WindowInsetsControllerCompat(window, window.decorView)
-        controller.hide(WindowInsetsCompat.Type.systemBars())
-        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-
-        @Suppress("DEPRECATION")
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            window.setFlags(
-                WindowManager.LayoutParams.FLAG_FULLSCREEN,
-                WindowManager.LayoutParams.FLAG_FULLSCREEN
-            )
-            window.decorView.systemUiVisibility = (
-                    View.SYSTEM_UI_FLAG_FULLSCREEN
-                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    )
-        }
-    }
-
-    override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(CastvHelper.ajustarContexto(newBase))
-    }
-
-    override fun getResources(): android.content.res.Resources {
-        val res = super.getResources()
-        CastvHelper.ajustarRecursos(res, this)
-        return res
-    }
-
-    override fun onStart() {
-        super.onStart()
-        if (exoPlayerInstance.value == null) {
-            inicializarExoPlayerAnticipado()
-            currentChannelState.value?.let { canal ->
-                prepararYReproducirCanal(canal.streamUrl)
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        configurarPantallaTvFull()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioFocusHelper.requestAudioFocus(this)
-        }
-        exoPlayerInstance.value?.playWhenReady = true
-        exoPlayerInstance.value?.play()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        if (isFinishing) {
-            exoPlayerInstance.value?.release()
-            exoPlayerInstance.value = null
-        } else {
-            exoPlayerInstance.value?.pause()
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioFocusHelper.abandonAudioFocus()
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        exoPlayerInstance.value?.release()
-        exoPlayerInstance.value = null
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        exoPlayerInstance.value?.release()
-        exoPlayerInstance.value = null
-    }
-
-    override fun finish() {
-        super.finish()
-        configurarTransicionInstantanea()
-    }
-}
-
-// -------------------------------------------------------------
-// COMPOSABLE PANTALLA REPRODUCTOR MEDIA3 EXOPLAYER
-// -------------------------------------------------------------
-@OptIn(UnstableApi::class)
-@Composable
-fun PlayerTvScreen(
-    exoPlayer: ExoPlayer,
-    currentChannel: Modelo?,
-    favoriteChannels: List<Modelo>,
-    isMenuVisible: Boolean,
-    isLoading: Boolean,
-    bufferText: String,
-    isOffline: Boolean,
-    onCloseMenu: () -> Unit,
-    onSelectFavoriteChannel: (Modelo) -> Unit,
-    onToggleMenu: () -> Unit
-) {
-    var currentBufferText by remember { mutableStateOf(bufferText) }
-    var isBuffering by remember { mutableStateOf(isLoading) }
-
-    LaunchedEffect(isLoading) {
-        isBuffering = isLoading
-    }
-
-    LaunchedEffect(bufferText) {
-        currentBufferText = bufferText
-    }
-
-    LaunchedEffect(exoPlayer) {
-        exoPlayer.playWhenReady = true
-        exoPlayer.play()
-    }
-
-    DisposableEffect(exoPlayer) {
-        val listener = object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                isBuffering = playbackState == Player.STATE_BUFFERING
-            }
-
-            override fun onPlayerError(error: PlaybackException) {
-                isBuffering = true
-                currentBufferText = "Error de señal. Reintentando..."
-
-                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
-                    exoPlayer.seekToDefaultPosition()
-                }
-
-                exoPlayer.prepare()
-                exoPlayer.play()
-            }
-        }
-        exoPlayer.addListener(listener)
-        isBuffering = exoPlayer.playbackState == Player.STATE_BUFFERING
-
-        onDispose {
-            exoPlayer.removeListener(listener)
-        }
-    }
-
-    LaunchedEffect(isBuffering, exoPlayer) {
-        if (isBuffering) {
-            var secondsBuffering = 0
-            while (isActive) {
-                val percentage = exoPlayer.bufferedPercentage
-                val estimatedKb = exoPlayer.bufferedPosition / 1024
-                currentBufferText = "Búfer: $percentage% (${estimatedKb} KB)"
-
-                delay(1000)
-                secondsBuffering++
-
-                if (secondsBuffering >= 12) {
-                    secondsBuffering = 0
-                    currentBufferText = "Señal lenta. Restableciendo conexión..."
-                    exoPlayer.prepare()
-                    exoPlayer.play()
-                }
-            }
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    keepScreenOn = true
-                }
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable { onToggleMenu() }
-        )
-
-        if (isBuffering || isOffline) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF0A122A).copy(alpha = 0.85f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    AsyncImage(
-                        model = currentChannel?.imageUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .size(100.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.Black)
-                            .border(1.dp, GoldAccent, RoundedCornerShape(12.dp))
-                            .padding(8.dp)
-                    )
-
-                    Text(
-                        text = currentChannel?.title ?: "",
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    if (!isOffline) {
-                        CircularProgressIndicator(color = GoldAccent)
-                    }
-
-                    Text(
-                        text = if (isOffline) "CANAL FUERA DE LÍNEA" else currentBufferText,
-                        color = if (isOffline) RedLive else Color.LightGray,
-                        fontSize = 14.sp
-                    )
-                }
-            }
-        }
-
-        AnimatedVisibility(
-            visible = isMenuVisible,
-            enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-            exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
-            modifier = Modifier.align(Alignment.CenterEnd)
-        ) {
-            FavoritesOverlayMenu(
-                favoriteChannels = favoriteChannels,
-                currentStreamUrl = currentChannel?.streamUrl ?: "",
-                isMenuVisible = isMenuVisible,
-                onCloseMenu = onCloseMenu,
-                onSelectChannel = onSelectFavoriteChannel
-            )
-        }
-    }
-}
-
-// -------------------------------------------------------------
-// MENÚ OVERLAY FAVORITOS (CON FOCO DINÁMICO EN CANAL ACTUAL)
-// -------------------------------------------------------------
-@Composable
-fun FavoritesOverlayMenu(
-    favoriteChannels: List<Modelo>,
-    currentStreamUrl: String,
-    isMenuVisible: Boolean,
-    onCloseMenu: () -> Unit,
-    onSelectChannel: (Modelo) -> Unit
-) {
-    val coroutineScope = rememberCoroutineScope()
-    val lazyListState = rememberLazyListState()
-
-    val focusRequesters = remember(favoriteChannels) {
-        List(favoriteChannels.size) { FocusRequester() }
-    }
-
-    val playingIndex = remember(favoriteChannels, currentStreamUrl) {
-        val index = favoriteChannels.indexOfFirst { it.streamUrl == currentStreamUrl }
-        if (index != -1) index else 0
-    }
-
-    LaunchedEffect(isMenuVisible, playingIndex) {
-        if (isMenuVisible && favoriteChannels.isNotEmpty() && playingIndex in focusRequesters.indices) {
-            delay(150)
-            try {
-                lazyListState.scrollToItem(playingIndex)
-                focusRequesters[playingIndex].requestFocus()
-            } catch (e: Exception) {}
-        }
-    }
-
-    Surface(
-        modifier = Modifier
-            .fillMaxHeight()
-            .width(320.dp),
-        color = Color(0xFF0A122A).copy(alpha = 0.96f),
-        shadowElevation = 16.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(Icons.Default.Favorite, contentDescription = null, tint = RedLive)
-                    Text(
-                        text = "MIS FAVORITOS",
-                        color = GoldAccent,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                IconButton(onClick = onCloseMenu) {
-                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
-                }
-            }
-
-            HorizontalDivider(color = Color(0xFF2A2A38))
-
-            if (favoriteChannels.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No tienes canales en favoritos",
-                        color = Color.Gray,
-                        fontSize = 13.sp
-                    )
-                }
-            } else {
-                LazyColumn(
-                    state = lazyListState,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    // Modificado: Agregado el índice a la clave para evitar cierres ante duplicados
-                    itemsIndexed(favoriteChannels, key = { index, canal -> "menu_fav_${canal.id}_$index" }) { index, canal ->
-                        FavoriteMenuItem(
-                            canal = canal,
-                            isPlaying = canal.streamUrl == currentStreamUrl,
-                            onFocused = {
-                                lazyListState.animateScrollAndCentralizeMenuItem(index, coroutineScope)
-                            },
-                            onSelect = { onSelectChannel(canal) },
-                            modifier = Modifier.focusRequester(focusRequesters[index])
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// -------------------------------------------------------------
-// ÍTEM DEL MENÚ DE FAVORITOS
-// -------------------------------------------------------------
-@Composable
-fun FavoriteMenuItem(
-    canal: Modelo,
-    isPlaying: Boolean,
-    onFocused: () -> Unit,
-    onSelect: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var isFocused by remember { mutableStateOf(false) }
-
-    val scale by animateFloatAsState(targetValue = if (isFocused) 1.05f else 1.0f, label = "scale")
-
-    val borderColor = when {
-        isFocused -> GoldAccent
-        isPlaying -> RedLive
-        else -> Color.Transparent
-    }
-
-    val backgroundColor = when {
-        isFocused -> Color(0xFF282836)
-        isPlaying -> Color(0xFF2D1515)
-        else -> Color(0xFF161622)
-    }
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clip(RoundedCornerShape(8.dp))
-            .background(backgroundColor)
-            .border(2.5.dp, borderColor, RoundedCornerShape(8.dp))
-            .onFocusChanged {
-                isFocused = it.isFocused
-                if (it.isFocused) {
-                    onFocused()
-                }
-            }
-            .focusable()
-            .clickable { onSelect() }
-            .padding(10.dp)
-    ) {
-        coil.compose.SubcomposeAsyncImage(
-            model = canal.imageUrl,
-            contentDescription = canal.title,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .size(45.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color.Black)
-                .padding(2.dp)
-        ) {
-            val state = painter.state
-            if (state is coil.compose.AsyncImagePainter.State.Success) {
-                SubcomposeAsyncImageContent()
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Tv,
-                    contentDescription = null,
-                    tint = RedLive,
-                    modifier = Modifier.padding(6.dp)
-                )
-            }
-        }
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = canal.title,
-                color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = if (isPlaying || isFocused) FontWeight.Bold else FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            if (isPlaying) {
-                Text(
-                    text = "🔴 Reproduciendo ahora",
-                    color = RedLive,
-                    fontSize = 10.sp
-                )
-            }
-        }
-    }
-}
-
-// -------------------------------------------------------------
-// EXTENSIONES PARA CENTRAR ELEMENTOS EN FOCO
-// -------------------------------------------------------------
-private fun androidx.compose.foundation.lazy.LazyListState.animateScrollAndCentralizeMenuItem(
-    index: Int,
-    scope: kotlinx.coroutines.CoroutineScope
-) {
-    val itemInfo = this.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
-    scope.launch {
-        if (itemInfo != null) {
-            val center = (this@animateScrollAndCentralizeMenuItem.layoutInfo.viewportEndOffset -
-                    this@animateScrollAndCentralizeMenuItem.layoutInfo.viewportStartOffset) / 2
-            val childCenter = itemInfo.offset + itemInfo.size / 2
-            this@animateScrollAndCentralizeMenuItem.animateScrollBy((childCenter - center).toFloat())
-        } else {
-            this@animateScrollAndCentralizeMenuItem.animateScrollToItem(index)
-        }
-    }
-}
+//package com.creativem.fulltv.tv
+//
+//import android.content.Context
+//import android.content.SharedPreferences
+//import android.content.pm.ActivityInfo
+//import android.net.Uri
+//import android.os.Build
+//import android.os.Bundle
+//import android.util.Log
+//import android.view.KeyEvent as AndroidKeyEvent
+//import android.view.View
+//import android.view.WindowManager
+//import android.widget.Toast
+//import androidx.activity.ComponentActivity
+//import androidx.activity.addCallback
+//import androidx.activity.compose.setContent
+//import androidx.annotation.OptIn
+//import androidx.compose.animation.AnimatedVisibility
+//import androidx.compose.animation.core.Spring
+//import androidx.compose.animation.core.animateFloatAsState
+//import androidx.compose.animation.core.spring
+//import androidx.compose.animation.fadeIn
+//import androidx.compose.animation.fadeOut
+//import androidx.compose.animation.slideInHorizontally
+//import androidx.compose.animation.slideOutHorizontally
+//import androidx.compose.foundation.ExperimentalFoundationApi
+//import androidx.compose.foundation.background
+//import androidx.compose.foundation.border
+//import androidx.compose.foundation.clickable
+//import androidx.compose.foundation.combinedClickable
+//import androidx.compose.foundation.focusable
+//import androidx.compose.foundation.gestures.animateScrollBy
+//import androidx.compose.foundation.layout.*
+//import androidx.compose.foundation.lazy.LazyColumn
+//import androidx.compose.foundation.lazy.LazyRow
+//import androidx.compose.foundation.lazy.grid.GridCells
+//import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+//import androidx.compose.foundation.lazy.grid.itemsIndexed
+//import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+//import androidx.compose.foundation.lazy.itemsIndexed
+//import androidx.compose.foundation.lazy.rememberLazyListState
+//import androidx.compose.foundation.shape.RoundedCornerShape
+//import androidx.compose.foundation.text.KeyboardOptions
+//import androidx.compose.material.icons.Icons
+//import androidx.compose.material.icons.filled.Close
+//import androidx.compose.material.icons.filled.Favorite
+//import androidx.compose.material.icons.filled.Search
+//import androidx.compose.material.icons.filled.Tv
+//import androidx.compose.material3.*
+//import androidx.compose.runtime.*
+//import androidx.compose.ui.Alignment
+//import androidx.compose.ui.Modifier
+//import androidx.compose.ui.draw.clip
+//import androidx.compose.ui.focus.FocusRequester
+//import androidx.compose.ui.focus.focusRequester
+//import androidx.compose.ui.focus.onFocusChanged
+//import androidx.compose.ui.graphics.Color
+//import androidx.compose.ui.graphics.graphicsLayer
+//import androidx.compose.ui.input.key.KeyEventType
+//import androidx.compose.ui.input.key.onKeyEvent
+//import androidx.compose.ui.input.key.type
+//import androidx.compose.ui.layout.ContentScale
+//import androidx.compose.ui.platform.LocalContext
+//import androidx.compose.ui.platform.LocalLifecycleOwner
+//import androidx.compose.ui.text.font.FontWeight
+//import androidx.compose.ui.text.input.ImeAction
+//import androidx.compose.ui.text.input.KeyboardType
+//import androidx.compose.ui.text.style.TextAlign
+//import androidx.compose.ui.text.style.TextOverflow
+//import androidx.compose.ui.unit.dp
+//import androidx.compose.ui.unit.sp
+//import androidx.compose.ui.viewinterop.AndroidView
+//import androidx.core.view.WindowCompat
+//import androidx.core.view.WindowInsetsCompat
+//import androidx.core.view.WindowInsetsControllerCompat
+//import androidx.lifecycle.Lifecycle
+//import androidx.lifecycle.LifecycleEventObserver
+//import androidx.media3.common.AudioAttributes
+//import androidx.media3.common.C
+//import androidx.media3.common.MediaItem
+//import androidx.media3.common.MimeTypes
+//import androidx.media3.common.PlaybackException
+//import androidx.media3.common.Player
+//import androidx.media3.common.util.UnstableApi
+//import androidx.media3.datasource.DefaultDataSource
+//import androidx.media3.datasource.DefaultHttpDataSource
+//import androidx.media3.exoplayer.DefaultLoadControl
+//import androidx.media3.exoplayer.DefaultRenderersFactory
+//import androidx.media3.exoplayer.ExoPlayer
+//import androidx.media3.exoplayer.hls.DefaultHlsExtractorFactory
+//import androidx.media3.exoplayer.hls.HlsMediaSource
+//import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+//import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+//import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
+//import androidx.media3.extractor.DefaultExtractorsFactory
+//import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
+//import androidx.media3.ui.AspectRatioFrameLayout
+//import androidx.media3.ui.PlayerView
+//import coil.compose.AsyncImage
+//import coil.compose.SubcomposeAsyncImageContent
+//import com.creativem.fulltv.principal.AudioFocusHelper
+//import com.creativem.fulltv.principal.CastvHelper
+//import com.creativem.fulltv.principal.Modelo
+//import com.google.firebase.database.FirebaseDatabase
+//import kotlinx.coroutines.Dispatchers
+//import kotlinx.coroutines.delay
+//import kotlinx.coroutines.isActive
+//import kotlinx.coroutines.launch
+//import kotlinx.coroutines.tasks.await
+//import kotlinx.coroutines.withContext
+//import java.io.BufferedReader
+//import java.io.InputStreamReader
+//import java.net.HttpURLConnection
+//import java.net.URL
+//import java.nio.charset.StandardCharsets
+//import java.text.Normalizer
+//
+//val GoldAccent = Color(0xFFC5A059)
+//val DeepDarkBg = Color(0xFF000000)
+//val CardDarkBg = Color(0xFF161622)
+//val RedLive = Color(0xFFFF2A2A)
+//
+//@UnstableApi
+//class TvActivity : ComponentActivity() {
+//
+//    private lateinit var prefs: SharedPreferences
+//
+//    // Estado global de pantalla completa y menú lateral
+//    var isFullScreenState = mutableStateOf(false)
+//    var isSideMenuVisibleState = mutableStateOf(false)
+//    var onNextPreviousChannel: ((Boolean) -> Unit)? = null
+//
+//    override fun onCreate(savedInstanceState: Bundle?) {
+//        super.onCreate(savedInstanceState)
+//
+//        configurarModoTv()
+//        prefs = getSharedPreferences("TV_PREFS", Context.MODE_PRIVATE)
+//
+//        // Manejo jerárquico del botón Atrás
+//        onBackPressedDispatcher.addCallback(this) {
+//            if (isSideMenuVisibleState.value) {
+//                isSideMenuVisibleState.value = false
+//            } else if (isFullScreenState.value) {
+//                isFullScreenState.value = false
+//            } else {
+//                CastvHelper.regresarAPeliculas(this@TvActivity)
+//            }
+//        }
+//
+//        setContent {
+//            MaterialTheme(colorScheme = darkColorScheme()) {
+//                Surface(
+//                    modifier = Modifier.fillMaxSize(),
+//                    color = DeepDarkBg
+//                ) {
+//                    TvInteractiveScreen(
+//                        prefs = prefs,
+//                        isFullScreen = isFullScreenState.value,
+//                        isSideMenuVisible = isSideMenuVisibleState.value,
+//                        onToggleFullScreen = { full -> isFullScreenState.value = full },
+//                        onToggleSideMenu = { visible -> isSideMenuVisibleState.value = visible },
+//                        setNextPreviousChannelHandler = { handler -> onNextPreviousChannel = handler }
+//                    )
+//                }
+//            }
+//        }
+//    }
+//
+//    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+//        if (isFullScreenState.value) {
+//            when (keyCode) {
+//                AndroidKeyEvent.KEYCODE_CHANNEL_UP,
+//                AndroidKeyEvent.KEYCODE_MEDIA_NEXT,
+//                AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+//                    onNextPreviousChannel?.invoke(true)
+//                    return true
+//                }
+//                AndroidKeyEvent.KEYCODE_CHANNEL_DOWN,
+//                AndroidKeyEvent.KEYCODE_MEDIA_PREVIOUS,
+//                AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
+//                    onNextPreviousChannel?.invoke(false)
+//                    return true
+//                }
+//                AndroidKeyEvent.KEYCODE_MENU,
+//                AndroidKeyEvent.KEYCODE_SETTINGS,
+//                AndroidKeyEvent.KEYCODE_INFO,
+//                AndroidKeyEvent.KEYCODE_PAGE_UP,
+//                AndroidKeyEvent.KEYCODE_PAGE_DOWN -> {
+//                    isSideMenuVisibleState.value = !isSideMenuVisibleState.value
+//                    return true
+//                }
+//                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+//                AndroidKeyEvent.KEYCODE_ENTER -> {
+//                    if (!isSideMenuVisibleState.value) {
+//                        isSideMenuVisibleState.value = true
+//                        return true
+//                    }
+//                }
+//                AndroidKeyEvent.KEYCODE_DPAD_UP,
+//                AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+//                AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
+//                    if (!isSideMenuVisibleState.value) {
+//                        isSideMenuVisibleState.value = true
+//                        return true
+//                    }
+//                }
+//                AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
+//                    if (isSideMenuVisibleState.value) {
+//                        isSideMenuVisibleState.value = false
+//                        return true
+//                    }
+//                }
+//            }
+//        }
+//        return super.onKeyDown(keyCode, event)
+//    }
+//
+//    private fun configurarModoTv() {
+//        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+//        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+//
+//        WindowCompat.setDecorFitsSystemWindows(window, false)
+//        val controller = WindowInsetsControllerCompat(window, window.decorView)
+//        controller.hide(WindowInsetsCompat.Type.systemBars())
+//        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+//
+//        @Suppress("DEPRECATION")
+//        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+//            window.setFlags(
+//                WindowManager.LayoutParams.FLAG_FULLSCREEN,
+//                WindowManager.LayoutParams.FLAG_FULLSCREEN
+//            )
+//            window.decorView.systemUiVisibility = (
+//                    View.SYSTEM_UI_FLAG_FULLSCREEN
+//                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+//                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+//                    )
+//        }
+//    }
+//
+//    override fun attachBaseContext(newBase: Context) {
+//        super.attachBaseContext(CastvHelper.ajustarContexto(newBase))
+//    }
+//
+//    override fun getResources(): android.content.res.Resources {
+//        val res = super.getResources()
+//        CastvHelper.ajustarRecursos(res, this)
+//        return res
+//    }
+//
+//    override fun onResume() {
+//        super.onResume()
+//        configurarModoTv()
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+//            AudioFocusHelper.requestAudioFocus(this)
+//        }
+//    }
+//
+//    override fun onPause() {
+//        super.onPause()
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+//            AudioFocusHelper.abandonAudioFocus()
+//        }
+//    }
+//}
+//
+//// -------------------------------------------------------------
+//// COMPOSABLE PRINCIPAL UNIFICADO
+//// -------------------------------------------------------------
+//@OptIn(UnstableApi::class)
+//@Composable
+//fun TvInteractiveScreen(
+//    prefs: SharedPreferences,
+//    isFullScreen: Boolean,
+//    isSideMenuVisible: Boolean,
+//    onToggleFullScreen: (Boolean) -> Unit,
+//    onToggleSideMenu: (Boolean) -> Unit,
+//    setNextPreviousChannelHandler: (((Boolean) -> Unit)?) -> Unit
+//) {
+//    val context = LocalContext.current
+//    val coroutineScope = rememberCoroutineScope()
+//    val lifecycleOwner = LocalLifecycleOwner.current
+//
+//    var masterChannels by remember { mutableStateOf<List<Modelo>>(emptyList()) }
+//    var favoriteIds by remember { mutableStateOf(prefs.getStringSet("fav_ids", emptySet()) ?: emptySet()) }
+//    var searchQuery by remember { mutableStateOf("") }
+//    var selectedChannel by remember { mutableStateOf<Modelo?>(null) }
+//    var isLoading by remember { mutableStateOf(true) }
+//
+//    // Listas reactivas sincronizadas instantáneamente
+//    val filteredChannels = remember(searchQuery, masterChannels) {
+//        if (searchQuery.isBlank()) {
+//            masterChannels
+//        } else {
+//            val normalizedQuery = searchQuery.normalizeSearch()
+//            val queryWords = normalizedQuery.split("\\s+".toRegex())
+//            masterChannels.filter { canal ->
+//                val normalizedTitle = canal.title.normalizeSearch()
+//                queryWords.all { word -> normalizedTitle.contains(word) }
+//            }
+//        }
+//    }
+//
+//    val filteredFavorites = remember(searchQuery, masterChannels, favoriteIds) {
+//        if (searchQuery.isBlank()) {
+//            masterChannels.filter { favoriteIds.contains(it.id) }
+//        } else {
+//            filteredChannels.filter { favoriteIds.contains(it.id) }
+//        }
+//    }
+//
+//    // Lista activa para navegar canal +/- (si no hay favoritos, usa la lista completa)
+//    val activeChannelsList = remember(filteredFavorites, masterChannels) {
+//        if (filteredFavorites.isNotEmpty()) filteredFavorites else masterChannels
+//    }
+//
+//    // Instancia única y persistente de ExoPlayer
+//    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
+//
+//    val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+//            DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
+//            DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
+//
+//    // Inicialización del reproductor
+//    DisposableEffect(lifecycleOwner) {
+//        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+//            .setAllowCrossProtocolRedirects(true)
+//            .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
+//            .setConnectTimeoutMs(15000)
+//            .setReadTimeoutMs(15000)
+//
+//        val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+//        val extractorsFactory = DefaultExtractorsFactory().apply { setTsExtractorFlags(tsFlags) }
+//        val errorHandlingPolicy = DefaultLoadErrorHandlingPolicy(100)
+//
+//        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+//            .setLoadErrorHandlingPolicy(errorHandlingPolicy)
+//
+//        val loadControl = DefaultLoadControl.Builder()
+//            .setBufferDurationsMs(12000, 12000, 1500, 2000)
+//            .setPrioritizeTimeOverSizeThresholds(true)
+//            .build()
+//
+//        val trackSelector = DefaultTrackSelector(context).apply {
+//            setParameters(
+//                buildUponParameters()
+//                    .setMaxVideoSize(1920, 1080)
+//                    .setForceHighestSupportedBitrate(false)
+//            )
+//        }
+//
+//        val renderersFactory = DefaultRenderersFactory(context).apply {
+//            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+//            setEnableDecoderFallback(true)
+//        }
+//
+//        val player = ExoPlayer.Builder(context, renderersFactory)
+//            .setTrackSelector(trackSelector)
+//            .setLoadControl(loadControl)
+//            .setMediaSourceFactory(mediaSourceFactory)
+//            .setAudioAttributes(
+//                AudioAttributes.Builder()
+//                    .setUsage(C.USAGE_MEDIA)
+//                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+//                    .build(),
+//                true
+//            )
+//            .build().apply {
+//                playWhenReady = true
+//            }
+//
+//        player.addListener(object : Player.Listener {
+//            override fun onPlayerError(error: PlaybackException) {
+//                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+//                    player.seekToDefaultPosition()
+//                }
+//                player.prepare()
+//                player.play()
+//            }
+//        })
+//
+//        exoPlayer = player
+//
+//        val observer = LifecycleEventObserver { _, event ->
+//            when (event) {
+//                Lifecycle.Event.ON_RESUME -> {
+//                    player.playWhenReady = true
+//                    player.play()
+//                }
+//                Lifecycle.Event.ON_PAUSE -> {
+//                    player.pause()
+//                }
+//                else -> {}
+//            }
+//        }
+//        lifecycleOwner.lifecycle.addObserver(observer)
+//
+//        onDispose {
+//            lifecycleOwner.lifecycle.removeObserver(observer)
+//            player.release()
+//            exoPlayer = null
+//        }
+//    }
+//
+//    // Cargar / cambiar canal en el ExoPlayer existente
+//    LaunchedEffect(selectedChannel, exoPlayer) {
+//        val player = exoPlayer ?: return@LaunchedEffect
+//        val canal = selectedChannel ?: return@LaunchedEffect
+//        if (canal.streamUrl.isNotEmpty()) {
+//            val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+//                .setAllowCrossProtocolRedirects(true)
+//                .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
+//                .setConnectTimeoutMs(15000)
+//                .setReadTimeoutMs(15000)
+//
+//            val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+//            val uri = Uri.parse(canal.streamUrl)
+//
+//            val mediaItemBuilder = MediaItem.Builder()
+//                .setUri(uri)
+//                .setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(10000).build())
+//
+//            val isStrictHls = canal.streamUrl.contains(".m3u8", ignoreCase = true) ||
+//                    canal.streamUrl.contains("format=m3u8", ignoreCase = true)
+//
+//            val isTsStream = canal.streamUrl.contains(".ts", ignoreCase = true) ||
+//                    canal.streamUrl.contains("/live/", ignoreCase = true) ||
+//                    canal.streamUrl.contains("/stream/", ignoreCase = true)
+//
+//            val errorHandlingPolicy = DefaultLoadErrorHandlingPolicy(100)
+//
+//            val mediaSource = if (isStrictHls) {
+//                mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
+//                val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
+//                HlsMediaSource.Factory(dataSourceFactory)
+//                    .setExtractorFactory(hlsExtractorFactory)
+//                    .setAllowChunklessPreparation(false)
+//                    .setLoadErrorHandlingPolicy(errorHandlingPolicy)
+//                    .createMediaSource(mediaItemBuilder.build())
+//            } else {
+//                val extractorsFactory = DefaultExtractorsFactory().apply {
+//                    setTsExtractorFlags(tsFlags)
+//                }
+//                if (isTsStream) {
+//                    mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP2T)
+//                }
+//                DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+//                    .setLoadErrorHandlingPolicy(errorHandlingPolicy)
+//                    .createMediaSource(mediaItemBuilder.build())
+//            }
+//
+//            player.setMediaSource(mediaSource)
+//            player.prepare()
+//            player.play()
+//        }
+//    }
+//
+//    // Configurar handler para avanzar/retroceder de canal con el control
+//    DisposableEffect(activeChannelsList, selectedChannel) {
+//        val handler: (Boolean) -> Unit = { siguiente ->
+//            if (activeChannelsList.isNotEmpty()) {
+//                val indexActual = activeChannelsList.indexOfFirst { it.streamUrl == selectedChannel?.streamUrl }
+//                val nuevoIndex = if (siguiente) {
+//                    if (indexActual == -1 || indexActual >= activeChannelsList.size - 1) 0 else indexActual + 1
+//                } else {
+//                    if (indexActual <= 0) activeChannelsList.size - 1 else indexActual - 1
+//                }
+//                val nuevoCanal = activeChannelsList[nuevoIndex]
+//                selectedChannel = nuevoCanal
+//                TvRepository.lastPlayedChannel = nuevoCanal
+//                prefs.edit().putString("last_selected_channel_id", nuevoCanal.id).apply()
+//            }
+//        }
+//        setNextPreviousChannelHandler(handler)
+//        onDispose { setNextPreviousChannelHandler(null) }
+//    }
+//
+//    // Control de foco inicial
+//    var hasRequestedInitialFocus by remember { mutableStateOf(false) }
+//    val favoritesGridState = rememberLazyGridState()
+//    val channelsRowState = rememberLazyListState()
+//
+//    // Carga de datos inicial
+//    LaunchedEffect(Unit) {
+//        coroutineScope.launch(Dispatchers.IO) {
+//            val savedChannelId = prefs.getString("last_selected_channel_id", null)
+//
+//            if (TvRepository.channelListMaster.isNotEmpty()) {
+//                val list = TvRepository.channelListMaster
+//                val canalASelec = TvRepository.lastPlayedChannel
+//                    ?: list.firstOrNull { it.id == savedChannelId }
+//                    ?: list.firstOrNull { favoriteIds.contains(it.id) }
+//                    ?: list.firstOrNull()
+//
+//                withContext(Dispatchers.Main) {
+//                    masterChannels = list
+//                    selectedChannel = canalASelec
+//                    TvRepository.lastPlayedChannel = canalASelec
+//                    isLoading = false
+//                }
+//                return@launch
+//            }
+//
+//            try {
+//                val snapshot = FirebaseDatabase.getInstance(TvRepository.FIREBASE_DB_URL)
+//                    .getReference(TvRepository.FIREBASE_PATH)
+//                    .get().await()
+//
+//                val m3uUrl = snapshot.value?.toString()?.trim()
+//                if (!m3uUrl.isNullOrEmpty()) {
+//                    val downloaded = descargarM3uStream(m3uUrl)
+//                    withContext(Dispatchers.Main) {
+//                        masterChannels = downloaded
+//                        TvRepository.channelListMaster = downloaded
+//
+//                        val canalASelec = TvRepository.lastPlayedChannel
+//                            ?: downloaded.firstOrNull { it.id == savedChannelId }
+//                            ?: downloaded.firstOrNull { favoriteIds.contains(it.id) }
+//                            ?: downloaded.firstOrNull()
+//
+//                        selectedChannel = canalASelec
+//                        TvRepository.lastPlayedChannel = canalASelec
+//                        isLoading = false
+//                    }
+//                } else {
+//                    withContext(Dispatchers.Main) { isLoading = false }
+//                }
+//            } catch (e: Exception) {
+//                Log.e("TV_ACTIVITY", "Error Firebase", e)
+//                withContext(Dispatchers.Main) { isLoading = false }
+//            }
+//        }
+//    }
+//
+//    val toggleFavorite = { canal: Modelo ->
+//        val newFavs = favoriteIds.toMutableSet()
+//        if (newFavs.contains(canal.id)) {
+//            newFavs.remove(canal.id)
+//            Toast.makeText(context, "${canal.title} quitado de Favoritos", Toast.LENGTH_SHORT).show()
+//        } else {
+//            newFavs.add(canal.id)
+//            Toast.makeText(context, "${canal.title} añadido a Favoritos", Toast.LENGTH_SHORT).show()
+//        }
+//        favoriteIds = newFavs
+//        prefs.edit().putStringSet("fav_ids", newFavs).apply()
+//    }
+//
+//    if (isLoading) {
+//        Box(
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .background(DeepDarkBg),
+//            contentAlignment = Alignment.Center
+//        ) {
+//            Column(
+//                horizontalAlignment = Alignment.CenterHorizontally,
+//                verticalArrangement = Arrangement.spacedBy(16.dp)
+//            ) {
+//                CircularProgressIndicator(
+//                    color = GoldAccent,
+//                    modifier = Modifier.size(50.dp),
+//                    strokeWidth = 4.dp
+//                )
+//                Text(
+//                    text = "Cargando canales...",
+//                    color = Color.White,
+//                    fontSize = 16.sp,
+//                    fontWeight = FontWeight.Medium
+//                )
+//            }
+//        }
+//    } else {
+//        Box(modifier = Modifier.fillMaxSize()) {
+//            if (isFullScreen) {
+//                // =========================================================
+//                // MODO PANTALLA COMPLETA CONTINUO (SIN RECARGAS)
+//                // =========================================================
+//                FullScreenPlayerContainer(
+//                    exoPlayer = exoPlayer,
+//                    selectedChannel = selectedChannel,
+//                    favoriteChannels = if (filteredFavorites.isNotEmpty()) filteredFavorites else masterChannels,
+//                    isMenuVisible = isSideMenuVisible,
+//                    onCloseMenu = { onToggleSideMenu(false) },
+//                    onSelectFavoriteChannel = { canal ->
+//                        selectedChannel = canal
+//                        TvRepository.lastPlayedChannel = canal
+//                        prefs.edit().putString("last_selected_channel_id", canal.id).apply()
+//                        onToggleSideMenu(false)
+//                    },
+//                    onToggleMenu = { onToggleSideMenu(!isSideMenuVisible) }
+//                )
+//            } else {
+//                // =========================================================
+//                // MODO INTERACTIVO DIVIDIDO (50% / 50%)
+//                // =========================================================
+//                Row(
+//                    modifier = Modifier
+//                        .fillMaxSize()
+//                        .padding(10.dp),
+//                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+//                ) {
+//                    // LADO IZQUIERDO: FAVORITOS
+//                    Column(
+//                        modifier = Modifier
+//                            .weight(0.5f)
+//                            .fillMaxHeight(),
+//                        verticalArrangement = Arrangement.spacedBy(8.dp)
+//                    ) {
+//                        var isSearching by remember { mutableStateOf(false) }
+//
+//                        Row(
+//                            verticalAlignment = Alignment.CenterVertically,
+//                            horizontalArrangement = Arrangement.SpaceBetween,
+//                            modifier = Modifier
+//                                .fillMaxWidth()
+//                                .height(56.dp)
+//                                .padding(horizontal = 4.dp)
+//                        ) {
+//                            if (isSearching) {
+//                                TvSearchBar(
+//                                    query = searchQuery,
+//                                    onQueryChange = { searchQuery = it },
+//                                    onCloseSearch = {
+//                                        isSearching = false
+//                                        searchQuery = ""
+//                                    },
+//                                    modifier = Modifier.weight(1f)
+//                                )
+//                            } else {
+//                                Row(
+//                                    verticalAlignment = Alignment.CenterVertically,
+//                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+//                                    modifier = Modifier.weight(1f)
+//                                ) {
+//                                    Icon(Icons.Default.Favorite, contentDescription = null, tint = RedLive)
+//                                    Text(
+//                                        text = "MIS FAVORITOS (${filteredFavorites.size})",
+//                                        fontSize = 15.sp,
+//                                        fontWeight = FontWeight.Bold,
+//                                        color = GoldAccent
+//                                    )
+//                                }
+//
+//                                var isSearchButtonFocused by remember { mutableStateOf(false) }
+//                                val searchScale by animateFloatAsState(
+//                                    targetValue = if (isSearchButtonFocused) 1.12f else 1.0f,
+//                                    label = "searchScale"
+//                                )
+//
+//                                IconButton(
+//                                    onClick = { isSearching = true },
+//                                    modifier = Modifier
+//                                        .size(36.dp)
+//                                        .graphicsLayer {
+//                                            scaleX = searchScale
+//                                            scaleY = searchScale
+//                                        }
+//                                        .onFocusChanged { isSearchButtonFocused = it.isFocused }
+//                                        .focusable()
+//                                        .border(
+//                                            width = 2.dp,
+//                                            color = if (isSearchButtonFocused) GoldAccent else Color.Transparent,
+//                                            shape = RoundedCornerShape(8.dp)
+//                                        )
+//                                        .background(
+//                                            color = if (isSearchButtonFocused) Color(0xFF282836) else Color.Transparent,
+//                                            shape = RoundedCornerShape(8.dp)
+//                                        )
+//                                ) {
+//                                    Icon(
+//                                        imageVector = Icons.Default.Search,
+//                                        contentDescription = "Buscar",
+//                                        tint = GoldAccent,
+//                                        modifier = Modifier.size(20.dp)
+//                                    )
+//                                }
+//                            }
+//                        }
+//
+//                        if (filteredFavorites.isEmpty()) {
+//                            Box(
+//                                modifier = Modifier
+//                                    .fillMaxSize()
+//                                    .clip(RoundedCornerShape(12.dp))
+//                                    .background(CardDarkBg),
+//                                contentAlignment = Alignment.Center
+//                            ) {
+//                                Text(
+//                                    text = if (searchQuery.isNotBlank()) "Sin coincidencias en Favoritos"
+//                                    else "Aún no tienes favoritos.\nMantén presionado OK en un canal a la derecha para agregar.",
+//                                    color = Color.Gray,
+//                                    fontSize = 13.sp,
+//                                    textAlign = TextAlign.Center,
+//                                    modifier = Modifier.padding(16.dp)
+//                                )
+//                            }
+//                        } else {
+//                            LazyVerticalGrid(
+//                                state = favoritesGridState,
+//                                columns = GridCells.Fixed(2),
+//                                contentPadding = PaddingValues(8.dp),
+//                                verticalArrangement = Arrangement.spacedBy(12.dp),
+//                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+//                                modifier = Modifier.fillMaxSize()
+//                            ) {
+//                                itemsIndexed(filteredFavorites, key = { index, it -> "fav_grid_${it.id}_$index" }) { index, canal ->
+//                                    FavoriteGridCard(
+//                                        canal = canal,
+//                                        isSelected = selectedChannel?.id == canal.id,
+//                                        onFocused = {
+//                                            favoritesGridState.animateScrollAndCentralizeItem(index, coroutineScope)
+//                                        },
+//                                        onClick = {
+//                                            selectedChannel = canal
+//                                            TvRepository.lastPlayedChannel = canal
+//                                            prefs.edit().putString("last_selected_channel_id", canal.id).apply()
+//                                        },
+//                                        onLongClick = { toggleFavorite(canal) }
+//                                    )
+//                                }
+//                            }
+//                        }
+//                    }
+//
+//                    // LADO DERECHO: MINI REPRODUCTOR + LISTA DE CANALES
+//                    Column(
+//                        modifier = Modifier
+//                            .weight(0.5f)
+//                            .fillMaxHeight(),
+//                        verticalArrangement = Arrangement.spacedBy(8.dp)
+//                    ) {
+//                        Text(
+//                            text = selectedChannel?.title ?: "Selecciona un canal",
+//                            fontSize = 15.sp,
+//                            fontWeight = FontWeight.Bold,
+//                            color = Color.White,
+//                            maxLines = 1,
+//                            overflow = TextOverflow.Ellipsis,
+//                            modifier = Modifier.padding(start = 2.dp)
+//                        )
+//
+//                        // REPRODUCTOR MINI
+//                        TvMiniPlayerBox(
+//                            exoPlayer = exoPlayer,
+//                            selectedChannel = selectedChannel,
+//                            onOpenFullScreen = { onToggleFullScreen(true) }
+//                        )
+//
+//                        Row(
+//                            verticalAlignment = Alignment.CenterVertically,
+//                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+//                            modifier = Modifier.padding(start = 2.dp)
+//                        ) {
+//                            Icon(Icons.Default.Tv, contentDescription = null, tint = GoldAccent)
+//                            Text(
+//                                text = "Todos los Canales (${filteredChannels.size})",
+//                                fontSize = 14.sp,
+//                                fontWeight = FontWeight.Bold,
+//                                color = Color.LightGray
+//                            )
+//                        }
+//
+//                        if (filteredChannels.isEmpty()) {
+//                            Box(
+//                                modifier = Modifier
+//                                    .fillMaxWidth()
+//                                    .height(80.dp),
+//                                contentAlignment = Alignment.Center
+//                            ) {
+//                                Text("No se encontraron canales", color = Color.Gray, fontSize = 13.sp)
+//                            }
+//                        } else {
+//                            LazyRow(
+//                                state = channelsRowState,
+//                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+//                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+//                                modifier = Modifier.fillMaxWidth()
+//                            ) {
+//                                itemsIndexed(filteredChannels, key = { index, it -> "all_${it.id}_$index" }) { index, canal ->
+//                                    val isCurrentSelected = selectedChannel?.id == canal.id
+//                                    val focusRequester = remember { FocusRequester() }
+//
+//                                    LaunchedEffect(selectedChannel) {
+//                                        if (isCurrentSelected && !hasRequestedInitialFocus) {
+//                                            delay(400)
+//                                            try {
+//                                                focusRequester.requestFocus()
+//                                                hasRequestedInitialFocus = true
+//                                            } catch (e: Exception) {}
+//                                        }
+//                                    }
+//
+//                                    HorizontalChannelCard(
+//                                        canal = canal,
+//                                        isFavorite = favoriteIds.contains(canal.id),
+//                                        isSelected = isCurrentSelected,
+//                                        onFocused = {
+//                                            channelsRowState.animateScrollAndCentralizeItem(index, coroutineScope)
+//                                        },
+//                                        onClick = {
+//                                            selectedChannel = canal
+//                                            TvRepository.lastPlayedChannel = canal
+//                                            prefs.edit().putString("last_selected_channel_id", canal.id).apply()
+//                                        },
+//                                        onLongClick = { toggleFavorite(canal) },
+//                                        modifier = Modifier.focusRequester(focusRequester)
+//                                    )
+//                                }
+//                            }
+//                        }
+//
+//                        selectedChannel?.let { canal ->
+//                            SelectedChannelDetailCard(
+//                                canal = canal,
+//                                isFavorite = favoriteIds.contains(canal.id),
+//                                onToggleFavorite = { toggleFavorite(canal) },
+//                                modifier = Modifier
+//                                    .fillMaxWidth()
+//                                    .weight(1f)
+//                            )
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
+//
+//// -------------------------------------------------------------
+//// CONTENEDOR DE PANTALLA COMPLETA CON MENÚ LATERAL Y BÚFER
+//// -------------------------------------------------------------
+//@OptIn(UnstableApi::class)
+//@Composable
+//fun FullScreenPlayerContainer(
+//    exoPlayer: ExoPlayer?,
+//    selectedChannel: Modelo?,
+//    favoriteChannels: List<Modelo>,
+//    isMenuVisible: Boolean,
+//    onCloseMenu: () -> Unit,
+//    onSelectFavoriteChannel: (Modelo) -> Unit,
+//    onToggleMenu: () -> Unit
+//) {
+//    var isBuffering by remember { mutableStateOf(false) }
+//    var bufferText by remember { mutableStateOf("Cargando señal...") }
+//
+//    DisposableEffect(exoPlayer) {
+//        val player = exoPlayer ?: return@DisposableEffect onDispose {}
+//        val listener = object : Player.Listener {
+//            override fun onPlaybackStateChanged(playbackState: Int) {
+//                isBuffering = playbackState == Player.STATE_BUFFERING
+//            }
+//
+//            override fun onPlayerError(error: PlaybackException) {
+//                isBuffering = true
+//                bufferText = "Error de señal. Reintentando..."
+//                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+//                    player.seekToDefaultPosition()
+//                }
+//                player.prepare()
+//                player.play()
+//            }
+//        }
+//        player.addListener(listener)
+//        isBuffering = player.playbackState == Player.STATE_BUFFERING
+//
+//        onDispose {
+//            player.removeListener(listener)
+//        }
+//    }
+//
+//    LaunchedEffect(isBuffering, exoPlayer) {
+//        val player = exoPlayer ?: return@LaunchedEffect
+//        if (isBuffering) {
+//            var secondsBuffering = 0
+//            while (isActive) {
+//                val percentage = player.bufferedPercentage
+//                val estimatedKb = player.bufferedPosition / 1024
+//                bufferText = "Búfer: $percentage% (${estimatedKb} KB)"
+//
+//                delay(1000)
+//                secondsBuffering++
+//
+//                if (secondsBuffering >= 12) {
+//                    secondsBuffering = 0
+//                    bufferText = "Señal lenta. Restableciendo conexión..."
+//                    player.prepare()
+//                    player.play()
+//                }
+//            }
+//        }
+//    }
+//
+//    Box(modifier = Modifier.fillMaxSize()) {
+//        AndroidView(
+//            factory = { ctx ->
+//                PlayerView(ctx).apply {
+//                    this.player = exoPlayer
+//                    useController = false
+//                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+//                    keepScreenOn = true
+//                }
+//            },
+//            update = { view ->
+//                view.player = exoPlayer
+//            },
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .clickable { onToggleMenu() }
+//        )
+//
+//        if (isBuffering) {
+//            Box(
+//                modifier = Modifier
+//                    .fillMaxSize()
+//                    .background(Color(0xFF0A122A).copy(alpha = 0.85f)),
+//                contentAlignment = Alignment.Center
+//            ) {
+//                Column(
+//                    horizontalAlignment = Alignment.CenterHorizontally,
+//                    verticalArrangement = Arrangement.spacedBy(12.dp)
+//                ) {
+//                    AsyncImage(
+//                        model = selectedChannel?.imageUrl,
+//                        contentDescription = null,
+//                        contentScale = ContentScale.Fit,
+//                        modifier = Modifier
+//                            .size(100.dp)
+//                            .clip(RoundedCornerShape(12.dp))
+//                            .background(Color.Black)
+//                            .border(1.dp, GoldAccent, RoundedCornerShape(12.dp))
+//                            .padding(8.dp)
+//                    )
+//
+//                    Text(
+//                        text = selectedChannel?.title ?: "",
+//                        color = Color.White,
+//                        fontSize = 20.sp,
+//                        fontWeight = FontWeight.Bold
+//                    )
+//
+//                    CircularProgressIndicator(color = GoldAccent)
+//
+//                    Text(
+//                        text = bufferText,
+//                        color = Color.LightGray,
+//                        fontSize = 14.sp
+//                    )
+//                }
+//            }
+//        }
+//
+//        AnimatedVisibility(
+//            visible = isMenuVisible,
+//            enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+//            exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+//            modifier = Modifier.align(Alignment.CenterEnd)
+//        ) {
+//            FavoritesOverlayMenu(
+//                favoriteChannels = favoriteChannels,
+//                currentStreamUrl = selectedChannel?.streamUrl ?: "",
+//                isMenuVisible = isMenuVisible,
+//                onCloseMenu = onCloseMenu,
+//                onSelectChannel = onSelectFavoriteChannel
+//            )
+//        }
+//    }
+//}
+//
+//// -------------------------------------------------------------
+//// MINI REPRODUCTOR EN VISTA DIVIDIDA
+//// -------------------------------------------------------------
+//@OptIn(UnstableApi::class)
+//@Composable
+//fun TvMiniPlayerBox(
+//    exoPlayer: ExoPlayer?,
+//    selectedChannel: Modelo?,
+//    onOpenFullScreen: () -> Unit
+//) {
+//    var isFocused by remember { mutableStateOf(false) }
+//    val borderColor = if (isFocused) GoldAccent else RedLive.copy(alpha = 0.8f)
+//
+//    Box(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .aspectRatio(16f / 9f)
+//            .clip(RoundedCornerShape(12.dp))
+//            .background(Color.Black)
+//            .border(3.dp, borderColor, RoundedCornerShape(12.dp))
+//            .onFocusChanged { isFocused = it.isFocused }
+//            .focusable()
+//            .onKeyEvent { keyEvent ->
+//                val keyCode = keyEvent.nativeKeyEvent.keyCode
+//                if (keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER || keyCode == AndroidKeyEvent.KEYCODE_ENTER) {
+//                    if (keyEvent.type == KeyEventType.KeyUp) {
+//                        onOpenFullScreen()
+//                    }
+//                    true
+//                } else {
+//                    false
+//                }
+//            }
+//            .clickable { onOpenFullScreen() }
+//    ) {
+//        AndroidView(
+//            factory = { ctx ->
+//                PlayerView(ctx).apply {
+//                    this.player = exoPlayer
+//                    useController = false
+//                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+//                }
+//            },
+//            update = { view ->
+//                view.player = exoPlayer
+//            },
+//            modifier = Modifier.fillMaxSize()
+//        )
+//    }
+//}
+//
+//// -------------------------------------------------------------
+//// MENÚ LATERAL OVERLAY DE FAVORITOS
+//// -------------------------------------------------------------
+//@Composable
+//fun FavoritesOverlayMenu(
+//    favoriteChannels: List<Modelo>,
+//    currentStreamUrl: String,
+//    isMenuVisible: Boolean,
+//    onCloseMenu: () -> Unit,
+//    onSelectChannel: (Modelo) -> Unit
+//) {
+//    val coroutineScope = rememberCoroutineScope()
+//    val lazyListState = rememberLazyListState()
+//
+//    val focusRequesters = remember(favoriteChannels) {
+//        List(favoriteChannels.size) { FocusRequester() }
+//    }
+//
+//    val playingIndex = remember(favoriteChannels, currentStreamUrl) {
+//        val index = favoriteChannels.indexOfFirst { it.streamUrl == currentStreamUrl }
+//        if (index != -1) index else 0
+//    }
+//
+//    LaunchedEffect(isMenuVisible, playingIndex) {
+//        if (isMenuVisible && favoriteChannels.isNotEmpty() && playingIndex in focusRequesters.indices) {
+//            delay(150)
+//            try {
+//                lazyListState.scrollToItem(playingIndex)
+//                focusRequesters[playingIndex].requestFocus()
+//            } catch (e: Exception) {}
+//        }
+//    }
+//
+//    Surface(
+//        modifier = Modifier
+//            .fillMaxHeight()
+//            .width(320.dp),
+//        color = Color(0xFF0A122A).copy(alpha = 0.96f),
+//        shadowElevation = 16.dp
+//    ) {
+//        Column(
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .padding(16.dp),
+//            verticalArrangement = Arrangement.spacedBy(12.dp)
+//        ) {
+//            Row(
+//                modifier = Modifier.fillMaxWidth(),
+//                horizontalArrangement = Arrangement.SpaceBetween,
+//                verticalAlignment = Alignment.CenterVertically
+//            ) {
+//                Row(
+//                    verticalAlignment = Alignment.CenterVertically,
+//                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+//                ) {
+//                    Icon(Icons.Default.Favorite, contentDescription = null, tint = RedLive)
+//                    Text(
+//                        text = "MIS FAVORITOS",
+//                        color = GoldAccent,
+//                        fontSize = 16.sp,
+//                        fontWeight = FontWeight.Bold
+//                    )
+//                }
+//
+//                IconButton(onClick = onCloseMenu) {
+//                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
+//                }
+//            }
+//
+//            HorizontalDivider(color = Color(0xFF2A2A38))
+//
+//            if (favoriteChannels.isEmpty()) {
+//                Box(
+//                    modifier = Modifier.fillMaxSize(),
+//                    contentAlignment = Alignment.Center
+//                ) {
+//                    Text(
+//                        text = "No tienes canales en favoritos",
+//                        color = Color.Gray,
+//                        fontSize = 13.sp
+//                    )
+//                }
+//            } else {
+//                LazyColumn(
+//                    state = lazyListState,
+//                    verticalArrangement = Arrangement.spacedBy(8.dp),
+//                    modifier = Modifier.fillMaxSize()
+//                ) {
+//                    itemsIndexed(favoriteChannels, key = { index, canal -> "menu_fav_${canal.id}_$index" }) { index, canal ->
+//                        FavoriteMenuItem(
+//                            canal = canal,
+//                            isPlaying = canal.streamUrl == currentStreamUrl,
+//                            onFocused = {
+//                                lazyListState.animateScrollAndCentralizeMenuItem(index, coroutineScope)
+//                            },
+//                            onSelect = { onSelectChannel(canal) },
+//                            modifier = Modifier.focusRequester(focusRequesters[index])
+//                        )
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
+//
+//// -------------------------------------------------------------
+//// ITEM DEL MENÚ DE FAVORITOS
+//// -------------------------------------------------------------
+//@Composable
+//fun FavoriteMenuItem(
+//    canal: Modelo,
+//    isPlaying: Boolean,
+//    onFocused: () -> Unit,
+//    onSelect: () -> Unit,
+//    modifier: Modifier = Modifier
+//) {
+//    var isFocused by remember { mutableStateOf(false) }
+//    val scale by animateFloatAsState(targetValue = if (isFocused) 1.05f else 1.0f, label = "scale")
+//
+//    val borderColor = when {
+//        isFocused -> GoldAccent
+//        isPlaying -> RedLive
+//        else -> Color.Transparent
+//    }
+//
+//    val backgroundColor = when {
+//        isFocused -> Color(0xFF282836)
+//        isPlaying -> Color(0xFF2D1515)
+//        else -> Color(0xFF161622)
+//    }
+//
+//    Row(
+//        verticalAlignment = Alignment.CenterVertically,
+//        horizontalArrangement = Arrangement.spacedBy(12.dp),
+//        modifier = modifier
+//            .fillMaxWidth()
+//            .graphicsLayer {
+//                scaleX = scale
+//                scaleY = scale
+//            }
+//            .clip(RoundedCornerShape(8.dp))
+//            .background(backgroundColor)
+//            .border(2.5.dp, borderColor, RoundedCornerShape(8.dp))
+//            .onFocusChanged {
+//                isFocused = it.isFocused
+//                if (it.isFocused) {
+//                    onFocused()
+//                }
+//            }
+//            .focusable()
+//            .clickable { onSelect() }
+//            .padding(10.dp)
+//    ) {
+//        coil.compose.SubcomposeAsyncImage(
+//            model = canal.imageUrl,
+//            contentDescription = canal.title,
+//            contentScale = ContentScale.Fit,
+//            modifier = Modifier
+//                .size(45.dp)
+//                .clip(RoundedCornerShape(6.dp))
+//                .background(Color.Black)
+//                .padding(2.dp)
+//        ) {
+//            val state = painter.state
+//            if (state is coil.compose.AsyncImagePainter.State.Success) {
+//                SubcomposeAsyncImageContent()
+//            } else {
+//                Icon(
+//                    imageVector = Icons.Default.Tv,
+//                    contentDescription = null,
+//                    tint = RedLive,
+//                    modifier = Modifier.padding(6.dp)
+//                )
+//            }
+//        }
+//
+//        Column(modifier = Modifier.weight(1f)) {
+//            Text(
+//                text = canal.title,
+//                color = Color.White,
+//                fontSize = 13.sp,
+//                fontWeight = if (isPlaying || isFocused) FontWeight.Bold else FontWeight.Normal,
+//                maxLines = 1,
+//                overflow = TextOverflow.Ellipsis
+//            )
+//
+//            if (isPlaying) {
+//                Text(
+//                    text = "🔴 Reproduciendo ahora",
+//                    color = RedLive,
+//                    fontSize = 10.sp
+//                )
+//            }
+//        }
+//    }
+//}
+//
+//// -------------------------------------------------------------
+//// COMPOSABLE: TARJETA FAVORITA HORIZONTAL
+//// -------------------------------------------------------------
+//@kotlin.OptIn(ExperimentalFoundationApi::class)
+//@Composable
+//fun FavoriteGridCard(
+//    canal: Modelo,
+//    isSelected: Boolean,
+//    onFocused: () -> Unit,
+//    onClick: () -> Unit,
+//    onLongClick: () -> Unit
+//) {
+//    var isFocused by remember { mutableStateOf(false) }
+//    var pressStartTime by remember { mutableStateOf(0L) }
+//    var longPressTriggered by remember { mutableStateOf(false) }
+//
+//    val scale by animateFloatAsState(
+//        targetValue = if (isFocused) 1.08f else 1.0f,
+//        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow),
+//        label = "scale"
+//    )
+//
+//    val borderColor = when {
+//        isFocused -> GoldAccent
+//        isSelected -> RedLive
+//        else -> Color.Transparent
+//    }
+//
+//    val backgroundColor = if (isFocused) Color(0xFF282836) else Color(0xFF1B1B24)
+//
+//    Row(
+//        verticalAlignment = Alignment.CenterVertically,
+//        horizontalArrangement = Arrangement.spacedBy(10.dp),
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .height(65.dp)
+//            .graphicsLayer {
+//                scaleX = scale
+//                scaleY = scale
+//            }
+//            .clip(RoundedCornerShape(10.dp))
+//            .background(backgroundColor)
+//            .border(
+//                width = if (isFocused) 3.dp else 2.dp,
+//                color = borderColor,
+//                shape = RoundedCornerShape(10.dp)
+//            )
+//            .onFocusChanged {
+//                isFocused = it.isFocused
+//                if (it.isFocused) {
+//                    onFocused()
+//                }
+//            }
+//            .focusable()
+//            .onKeyEvent { keyEvent ->
+//                val keyCode = keyEvent.nativeKeyEvent.keyCode
+//                val isSelectKey = keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
+//                        keyCode == AndroidKeyEvent.KEYCODE_ENTER
+//
+//                if (isSelectKey) {
+//                    when (keyEvent.type) {
+//                        KeyEventType.KeyDown -> {
+//                            if (pressStartTime == 0L) {
+//                                pressStartTime = System.currentTimeMillis()
+//                                longPressTriggered = false
+//                            } else {
+//                                val elapsed = System.currentTimeMillis() - pressStartTime
+//                                if (elapsed > 800L && !longPressTriggered) {
+//                                    longPressTriggered = true
+//                                    onLongClick()
+//                                }
+//                            }
+//                        }
+//                        KeyEventType.KeyUp -> {
+//                            val elapsed = System.currentTimeMillis() - pressStartTime
+//                            pressStartTime = 0L
+//                            if (!longPressTriggered) {
+//                                if (elapsed < 800L) {
+//                                    onClick()
+//                                }
+//                            }
+//                            longPressTriggered = false
+//                        }
+//                    }
+//                    true
+//                } else {
+//                    false
+//                }
+//            }
+//            .combinedClickable(
+//                onClick = onClick,
+//                onLongClick = onLongClick
+//            )
+//            .padding(8.dp)
+//    ) {
+//        Box(
+//            modifier = Modifier.size(45.dp),
+//            contentAlignment = Alignment.Center
+//        ) {
+//            coil.compose.SubcomposeAsyncImage(
+//                model = canal.imageUrl,
+//                contentDescription = canal.title,
+//                contentScale = ContentScale.Fit,
+//                modifier = Modifier.fillMaxSize()
+//            ) {
+//                val state = painter.state
+//                if (state is coil.compose.AsyncImagePainter.State.Success) {
+//                    SubcomposeAsyncImageContent()
+//                } else {
+//                    Icon(
+//                        imageVector = Icons.Default.Tv,
+//                        contentDescription = null,
+//                        tint = RedLive,
+//                        modifier = Modifier.padding(6.dp)
+//                    )
+//                }
+//            }
+//
+//            Box(
+//                modifier = Modifier
+//                    .align(Alignment.TopEnd)
+//                    .padding(1.dp)
+//                    .size(18.dp)
+//                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(9.dp)),
+//                contentAlignment = Alignment.Center
+//            ) {
+//                Icon(
+//                    imageVector = Icons.Default.Favorite,
+//                    contentDescription = null,
+//                    tint = RedLive,
+//                    modifier = Modifier.size(12.dp)
+//                )
+//            }
+//        }
+//
+//        Text(
+//            text = canal.title,
+//            color = Color.White,
+//            fontSize = 14.sp,
+//            fontWeight = FontWeight.Bold,
+//            maxLines = 2,
+//            lineHeight = 16.sp,
+//            overflow = TextOverflow.Ellipsis,
+//            modifier = Modifier.weight(1f)
+//        )
+//    }
+//}
+//
+//// -------------------------------------------------------------
+//// COMPOSABLE: DETALLE DEL CANAL SELECCIONADO
+//// -------------------------------------------------------------
+//@Composable
+//fun SelectedChannelDetailCard(
+//    canal: Modelo,
+//    isFavorite: Boolean,
+//    onToggleFavorite: () -> Unit,
+//    modifier: Modifier = Modifier
+//) {
+//    var isFavFocused by remember { mutableStateOf(false) }
+//    val favScale by animateFloatAsState(targetValue = if (isFavFocused) 1.1f else 1.0f, label = "favScale")
+//
+//    Card(
+//        colors = CardDefaults.cardColors(containerColor = CardDarkBg),
+//        shape = RoundedCornerShape(8.dp),
+//        modifier = modifier.border(1.dp, GoldAccent.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+//    ) {
+//        Row(
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .padding(horizontal = 8.dp, vertical = 4.dp),
+//            horizontalArrangement = Arrangement.spacedBy(8.dp),
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//            AsyncImage(
+//                model = canal.imageUrl,
+//                contentDescription = canal.title,
+//                contentScale = ContentScale.Fit,
+//                modifier = Modifier
+//                    .size(36.dp)
+//                    .clip(RoundedCornerShape(4.dp))
+//                    .background(Color.Black)
+//                    .padding(2.dp)
+//            )
+//
+//            Column(
+//                modifier = Modifier
+//                    .weight(1f)
+//                    .fillMaxHeight(),
+//                verticalArrangement = Arrangement.Center
+//            ) {
+//                Text(
+//                    text = canal.title,
+//                    color = Color.White,
+//                    fontSize = 11.sp,
+//                    fontWeight = FontWeight.Bold,
+//                    maxLines = 1,
+//                    overflow = TextOverflow.Ellipsis
+//                )
+//
+//                Spacer(modifier = Modifier.height(1.dp))
+//
+//                Row(
+//                    verticalAlignment = Alignment.CenterVertically,
+//                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+//                ) {
+//                    Text(
+//                        text = "🔴 EN VIVO",
+//                        color = RedLive,
+//                        fontSize = 8.sp,
+//                        fontWeight = FontWeight.Bold
+//                    )
+//                    Text(
+//                        text = "• OK: Pantalla Completa",
+//                        color = Color.LightGray,
+//                        fontSize = 8.sp,
+//                        maxLines = 1,
+//                        overflow = TextOverflow.Ellipsis
+//                    )
+//                }
+//            }
+//
+//            IconButton(
+//                onClick = onToggleFavorite,
+//                modifier = Modifier
+//                    .size(30.dp)
+//                    .graphicsLayer {
+//                        scaleX = favScale
+//                        scaleY = favScale
+//                    }
+//                    .onFocusChanged { isFavFocused = it.isFocused }
+//                    .focusable()
+//                    .border(
+//                        width = 1.dp,
+//                        color = if (isFavFocused) GoldAccent else Color.Transparent,
+//                        shape = RoundedCornerShape(4.dp)
+//                    )
+//                    .background(
+//                        color = if (isFavFocused) Color(0xFF282836) else Color.Transparent,
+//                        shape = RoundedCornerShape(4.dp)
+//                    )
+//            ) {
+//                Icon(
+//                    imageVector = Icons.Default.Favorite,
+//                    contentDescription = "Favorito",
+//                    tint = if (isFavorite) RedLive else Color.Gray,
+//                    modifier = Modifier.size(16.dp)
+//                )
+//            }
+//        }
+//    }
+//}
+//
+//// -------------------------------------------------------------
+//// COMPOSABLE: BARRA DE BÚSQUEDA TV
+//// -------------------------------------------------------------
+//@Composable
+//fun TvSearchBar(
+//    query: String,
+//    onQueryChange: (String) -> Unit,
+//    onCloseSearch: () -> Unit,
+//    modifier: Modifier = Modifier
+//) {
+//    var isFocused by remember { mutableStateOf(false) }
+//    val focusRequester = remember { FocusRequester() }
+//
+//    LaunchedEffect(Unit) {
+//        focusRequester.requestFocus()
+//    }
+//
+//    OutlinedTextField(
+//        value = query,
+//        onValueChange = onQueryChange,
+//        modifier = modifier
+//            .fillMaxWidth()
+//            .focusRequester(focusRequester)
+//            .onFocusChanged { isFocused = it.isFocused }
+//            .border(
+//                width = 2.dp,
+//                color = if (isFocused) GoldAccent else Color.Transparent,
+//                shape = RoundedCornerShape(10.dp)
+//            ),
+//        placeholder = { Text("Buscar canal...", fontSize = 13.sp) },
+//        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = GoldAccent) },
+//        trailingIcon = {
+//            IconButton(onClick = onCloseSearch) {
+//                Icon(
+//                    imageVector = Icons.Default.Close,
+//                    contentDescription = "Cerrar búsqueda",
+//                    tint = Color.Gray
+//                )
+//            }
+//        },
+//        singleLine = true,
+//        keyboardOptions = KeyboardOptions(
+//            keyboardType = KeyboardType.Text,
+//            imeAction = ImeAction.Search,
+//            autoCorrect = false
+//        ),
+//        colors = OutlinedTextFieldDefaults.colors(
+//            focusedBorderColor = GoldAccent,
+//            unfocusedBorderColor = Color(0xFF2A2A38),
+//            focusedContainerColor = Color(0xFF1E1E28),
+//            unfocusedContainerColor = CardDarkBg
+//        )
+//    )
+//}
+//
+//// -------------------------------------------------------------
+//// COMPOSABLE: TARJETA DE CANAL HORIZONTAL
+//// -------------------------------------------------------------
+//@kotlin.OptIn(ExperimentalFoundationApi::class)
+//@Composable
+//fun HorizontalChannelCard(
+//    canal: Modelo,
+//    isFavorite: Boolean,
+//    isSelected: Boolean,
+//    onFocused: () -> Unit,
+//    onClick: () -> Unit,
+//    onLongClick: () -> Unit,
+//    modifier: Modifier = Modifier
+//) {
+//    var isFocused by remember { mutableStateOf(false) }
+//    var pressStartTime by remember { mutableStateOf(0L) }
+//    var longPressTriggered by remember { mutableStateOf(false) }
+//
+//    val scale by animateFloatAsState(
+//        targetValue = if (isFocused) 1.12f else 1.0f,
+//        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow),
+//        label = "scale"
+//    )
+//
+//    val borderColor = when {
+//        isFocused -> GoldAccent
+//        isSelected -> RedLive
+//        else -> Color(0xFF2A2A38)
+//    }
+//
+//    val backgroundColor = if (isFocused) Color(0xFF282836) else Color(0xFF1B1B24)
+//
+//    Column(
+//        horizontalAlignment = Alignment.CenterHorizontally,
+//        modifier = modifier
+//            .width(130.dp)
+//            .height(115.dp)
+//            .graphicsLayer {
+//                scaleX = scale
+//                scaleY = scale
+//            }
+//            .clip(RoundedCornerShape(10.dp))
+//            .background(backgroundColor)
+//            .border(
+//                width = if (isFocused) 3.dp else 2.5.dp,
+//                color = borderColor,
+//                shape = RoundedCornerShape(10.dp)
+//            )
+//            .onFocusChanged {
+//                isFocused = it.isFocused
+//                if (it.isFocused) {
+//                    onFocused()
+//                }
+//            }
+//            .focusable()
+//            .onKeyEvent { keyEvent ->
+//                val keyCode = keyEvent.nativeKeyEvent.keyCode
+//                val isSelectKey = keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
+//                        keyCode == AndroidKeyEvent.KEYCODE_ENTER
+//
+//                if (isSelectKey) {
+//                    when (keyEvent.type) {
+//                        KeyEventType.KeyDown -> {
+//                            if (pressStartTime == 0L) {
+//                                pressStartTime = System.currentTimeMillis()
+//                                longPressTriggered = false
+//                            } else {
+//                                val elapsed = System.currentTimeMillis() - pressStartTime
+//                                if (elapsed > 800L && !longPressTriggered) {
+//                                    longPressTriggered = true
+//                                    onLongClick()
+//                                }
+//                            }
+//                        }
+//                        KeyEventType.KeyUp -> {
+//                            val elapsed = System.currentTimeMillis() - pressStartTime
+//                            pressStartTime = 0L
+//                            if (!longPressTriggered) {
+//                                if (elapsed < 800L) {
+//                                    onClick()
+//                                }
+//                            }
+//                            longPressTriggered = false
+//                        }
+//                    }
+//                    true
+//                } else {
+//                    false
+//                }
+//            }
+//            .combinedClickable(
+//                onClick = onClick,
+//                onLongClick = onLongClick
+//            )
+//            .padding(6.dp)
+//    ) {
+//        Box(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .height(55.dp),
+//            contentAlignment = Alignment.Center
+//        ) {
+//            coil.compose.SubcomposeAsyncImage(
+//                model = canal.imageUrl,
+//                contentDescription = canal.title,
+//                contentScale = ContentScale.Fit,
+//                modifier = Modifier.fillMaxSize()
+//            ) {
+//                val state = painter.state
+//                if (state is coil.compose.AsyncImagePainter.State.Success) {
+//                    SubcomposeAsyncImageContent()
+//                } else {
+//                    Icon(
+//                        imageVector = Icons.Default.Tv,
+//                        contentDescription = null,
+//                        tint = RedLive,
+//                        modifier = Modifier.padding(10.dp)
+//                    )
+//                }
+//            }
+//
+//            if (isFavorite) {
+//                Box(
+//                    modifier = Modifier
+//                        .align(Alignment.TopEnd)
+//                        .padding(2.dp)
+//                        .size(28.dp)
+//                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(14.dp)),
+//                    contentAlignment = Alignment.Center
+//                ) {
+//                    Icon(
+//                        imageVector = Icons.Default.Favorite,
+//                        contentDescription = null,
+//                        tint = RedLive,
+//                        modifier = Modifier.size(18.dp)
+//                    )
+//                }
+//            }
+//        }
+//
+//        Spacer(modifier = Modifier.height(4.dp))
+//
+//        Text(
+//            text = canal.title,
+//            color = Color.White,
+//            fontSize = 11.sp,
+//            maxLines = 2,
+//            lineHeight = 13.sp,
+//            textAlign = TextAlign.Center,
+//            overflow = TextOverflow.Ellipsis,
+//            fontWeight = FontWeight.Bold,
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(horizontal = 4.dp)
+//        )
+//    }
+//}
+//
+//// -------------------------------------------------------------
+//// NORMALIZADOR DE BÚSQUEDA
+//// -------------------------------------------------------------
+//private fun String.normalizeSearch(): String {
+//    val temp = Normalizer.normalize(this, Normalizer.Form.NFD)
+//    return temp.replace("[\\p{InCombiningDiacriticalMarks}]".toRegex(), "")
+//        .lowercase()
+//        .replace("-", " ")
+//        .replace("_", " ")
+//        .trim()
+//}
+//
+//// -------------------------------------------------------------
+//// DESCARGA Y PARSEO M3U
+//// -------------------------------------------------------------
+//private fun descargarM3uStream(urlString: String): List<Modelo> {
+//    var currentUrl = urlString.trim()
+//    var redirects = 0
+//    val maxRedirects = 5
+//
+//    while (redirects < maxRedirects) {
+//        var connection: HttpURLConnection? = null
+//        try {
+//            val url = URL(currentUrl)
+//            connection = url.openConnection() as HttpURLConnection
+//            connection.connectTimeout = 15000
+//            connection.readTimeout = 15000
+//            connection.requestMethod = "GET"
+//            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+//            connection.instanceFollowRedirects = true
+//
+//            val status = connection.responseCode
+//            if (status == HttpURLConnection.HTTP_MOVED_TEMP || status == HttpURLConnection.HTTP_MOVED_PERM || status == 307 || status == 308) {
+//                val newUrl = connection.getHeaderField("Location")
+//                if (newUrl.isNullOrEmpty()) break
+//                currentUrl = newUrl
+//                redirects++
+//                connection.disconnect()
+//                continue
+//            }
+//
+//            if (status == HttpURLConnection.HTTP_OK) {
+//                val reader = BufferedReader(InputStreamReader(connection.inputStream, StandardCharsets.UTF_8))
+//                return parseM3uBuffer(reader)
+//            } else {
+//                return emptyList()
+//            }
+//        } catch (e: Exception) {
+//            return emptyList()
+//        } finally {
+//            connection?.disconnect()
+//        }
+//    }
+//    return emptyList()
+//}
+//
+//private fun parseM3uBuffer(reader: BufferedReader): List<Modelo> {
+//    val channels = mutableListOf<Modelo>()
+//    var currentName = ""
+//    var currentLogo = ""
+//
+//    reader.useLines { lines ->
+//        lines.forEach { line ->
+//            val trimmed = line.trim()
+//            if (trimmed.isEmpty()) return@forEach
+//
+//            if (trimmed.startsWith("#EXTINF:", ignoreCase = true)) {
+//                val logoMatch = Regex("""tvg-logo="([^"]*)"""", RegexOption.IGNORE_CASE).find(trimmed)
+//                currentLogo = logoMatch?.groupValues?.get(1)?.trim() ?: ""
+//
+//                val tvgNameMatch = Regex("""tvg-name="([^"]*)"""", RegexOption.IGNORE_CASE).find(trimmed)
+//                val tvgName = tvgNameMatch?.groupValues?.get(1)?.trim()
+//                val nameAfterComma = trimmed.substringAfterLast(",", "").trim()
+//
+//                currentName = when {
+//                    nameAfterComma.isNotEmpty() -> nameAfterComma
+//                    !tvgName.isNullOrEmpty() -> tvgName
+//                    else -> ""
+//                }
+//            } else if (!trimmed.startsWith("#")) {
+//                if (trimmed.contains("://") || trimmed.startsWith("rtmp", ignoreCase = true) || trimmed.startsWith("udp", ignoreCase = true)) {
+//                    val finalName = if (currentName.isNotEmpty()) currentName else "Canal ${channels.size + 1}"
+//
+//                    channels.add(
+//                        Modelo(
+//                            id = finalName,
+//                            title = finalName,
+//                            streamUrl = trimmed,
+//                            imageUrl = currentLogo
+//                        )
+//                    )
+//                }
+//                currentName = ""
+//                currentLogo = ""
+//            }
+//        }
+//    }
+//    return channels
+//}
+//
+//// -------------------------------------------------------------
+//// EXTENSIONES PARA CENTRAR ELEMENTOS EN FOCO
+//// -------------------------------------------------------------
+//fun androidx.compose.foundation.lazy.LazyListState.animateScrollAndCentralizeItem(
+//    index: Int,
+//    scope: kotlinx.coroutines.CoroutineScope
+//) {
+//    val itemInfo = this.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+//    scope.launch {
+//        if (itemInfo != null) {
+//            val center = (this@animateScrollAndCentralizeItem.layoutInfo.viewportEndOffset -
+//                    this@animateScrollAndCentralizeItem.layoutInfo.viewportStartOffset) / 2
+//            val childCenter = itemInfo.offset + itemInfo.size / 2
+//            this@animateScrollAndCentralizeItem.animateScrollBy((childCenter - center).toFloat())
+//        } else {
+//            this@animateScrollAndCentralizeItem.animateScrollToItem(index)
+//        }
+//    }
+//}
+//
+//fun androidx.compose.foundation.lazy.grid.LazyGridState.animateScrollAndCentralizeItem(
+//    index: Int,
+//    scope: kotlinx.coroutines.CoroutineScope
+//) {
+//    val itemInfo = this.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+//    scope.launch {
+//        if (itemInfo != null) {
+//            val center = (this@animateScrollAndCentralizeItem.layoutInfo.viewportEndOffset -
+//                    this@animateScrollAndCentralizeItem.layoutInfo.viewportStartOffset) / 2
+//            val childCenter = itemInfo.offset.y + itemInfo.size.height / 2
+//            this@animateScrollAndCentralizeItem.animateScrollBy((childCenter - center).toFloat())
+//        } else {
+//            this@animateScrollAndCentralizeItem.animateScrollToItem(index)
+//        }
+//    }
+//}
+//
+//private fun androidx.compose.foundation.lazy.LazyListState.animateScrollAndCentralizeMenuItem(
+//    index: Int,
+//    scope: kotlinx.coroutines.CoroutineScope
+//) {
+//    val itemInfo = this.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+//    scope.launch {
+//        if (itemInfo != null) {
+//            val center = (this@animateScrollAndCentralizeMenuItem.layoutInfo.viewportEndOffset -
+//                    this@animateScrollAndCentralizeMenuItem.layoutInfo.viewportStartOffset) / 2
+//            val childCenter = itemInfo.offset + itemInfo.size / 2
+//            this@animateScrollAndCentralizeMenuItem.animateScrollBy((childCenter - center).toFloat())
+//        } else {
+//            this@animateScrollAndCentralizeMenuItem.animateScrollToItem(index)
+//        }
+//    }
+//}

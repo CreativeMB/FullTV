@@ -8,8 +8,8 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="com.creativem.tvfullurl" />
-                  <option name="mobileSdkAppId" value="1:942582178550:android:e3992fe9a0d29f96cd02d7" />
+                  <option name="appId" value="com.creativem.fulltv" />
+                  <option name="mobileSdkAppId" value="1:942582178550:android:f1b78c7731834262cd02d7" />
                   <option name="projectId" value="corario-16991" />
                   <option name="projectNumber" value="942582178550" />
                 </ConnectionSetting>

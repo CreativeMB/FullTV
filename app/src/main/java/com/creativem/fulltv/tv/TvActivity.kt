@@ -1,7 +1,6 @@
 package com.creativem.fulltv.tv
 
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.net.Uri
@@ -10,15 +9,21 @@ import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,6 +32,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -70,6 +76,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
@@ -112,19 +120,30 @@ val DeepDarkBg = Color(0xFF000000)
 val CardDarkBg = Color(0xFF161622)
 val RedLive = Color(0xFFFF2A2A)
 
+@UnstableApi
 class TvActivity : ComponentActivity() {
 
     private lateinit var prefs: SharedPreferences
+
+    var isFullScreenState = mutableStateOf(false)
+    var isSideMenuVisibleState = mutableStateOf(false)
+    var onNextPreviousChannel: ((Boolean) -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         configurarModoTv()
-
         prefs = getSharedPreferences("TV_PREFS", Context.MODE_PRIVATE)
 
+        // Manejo ordenado del botón Atrás en TV
         onBackPressedDispatcher.addCallback(this) {
-            CastvHelper.regresarAPeliculas(this@TvActivity)
+            if (isSideMenuVisibleState.value) {
+                isSideMenuVisibleState.value = false
+            } else if (isFullScreenState.value) {
+                isFullScreenState.value = false
+            } else {
+                CastvHelper.regresarAPeliculas(this@TvActivity)
+            }
         }
 
         setContent {
@@ -135,11 +154,64 @@ class TvActivity : ComponentActivity() {
                 ) {
                     TvInteractiveScreen(
                         prefs = prefs,
-                        onOpenFullScreenPlayer = { canal -> abrirReproductor(canal) }
+                        isFullScreen = isFullScreenState.value,
+                        isSideMenuVisible = isSideMenuVisibleState.value,
+                        onToggleFullScreen = { full -> isFullScreenState.value = full },
+                        onToggleSideMenu = { visible -> isSideMenuVisibleState.value = visible },
+                        setNextPreviousChannelHandler = { handler -> onNextPreviousChannel = handler }
                     )
                 }
             }
         }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (isFullScreenState.value) {
+            when (keyCode) {
+                AndroidKeyEvent.KEYCODE_CHANNEL_UP,
+                AndroidKeyEvent.KEYCODE_MEDIA_NEXT,
+                AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                    onNextPreviousChannel?.invoke(true)
+                    return true
+                }
+                AndroidKeyEvent.KEYCODE_CHANNEL_DOWN,
+                AndroidKeyEvent.KEYCODE_MEDIA_PREVIOUS,
+                AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
+                    onNextPreviousChannel?.invoke(false)
+                    return true
+                }
+                AndroidKeyEvent.KEYCODE_MENU,
+                AndroidKeyEvent.KEYCODE_SETTINGS,
+                AndroidKeyEvent.KEYCODE_INFO,
+                AndroidKeyEvent.KEYCODE_PAGE_UP,
+                AndroidKeyEvent.KEYCODE_PAGE_DOWN -> {
+                    isSideMenuVisibleState.value = !isSideMenuVisibleState.value
+                    return true
+                }
+                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                AndroidKeyEvent.KEYCODE_ENTER -> {
+                    if (!isSideMenuVisibleState.value) {
+                        isSideMenuVisibleState.value = true
+                        return true
+                    }
+                }
+                AndroidKeyEvent.KEYCODE_DPAD_UP,
+                AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+                AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (!isSideMenuVisibleState.value) {
+                        isSideMenuVisibleState.value = true
+                        return true
+                    }
+                }
+                AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (isSideMenuVisibleState.value) {
+                        isSideMenuVisibleState.value = false
+                        return true
+                    }
+                }
+            }
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     private fun configurarModoTv() {
@@ -175,17 +247,6 @@ class TvActivity : ComponentActivity() {
         return res
     }
 
-    @OptIn(UnstableApi::class)
-    private fun abrirReproductor(modelo: Modelo) {
-        val intent = Intent(this, PlayerTv::class.java).apply {
-            putExtra("EXTRA_STREAM_URL", modelo.streamUrl)
-            putExtra("EXTRA_MOVIE_TITLE", modelo.title)
-            putExtra("EXTRA_MOVIE_IMAGE_URL", modelo.imageUrl)
-            putExtra("EXTRA_IS_LIVE", true)
-        }
-        startActivity(intent)
-    }
-
     override fun onResume() {
         super.onResume()
         configurarModoTv()
@@ -205,10 +266,15 @@ class TvActivity : ComponentActivity() {
 // -------------------------------------------------------------
 // COMPOSABLE PRINCIPAL
 // -------------------------------------------------------------
+@OptIn(UnstableApi::class)
 @Composable
 fun TvInteractiveScreen(
     prefs: SharedPreferences,
-    onOpenFullScreenPlayer: (Modelo) -> Unit
+    isFullScreen: Boolean,
+    isSideMenuVisible: Boolean,
+    onToggleFullScreen: (Boolean) -> Unit,
+    onToggleSideMenu: (Boolean) -> Unit,
+    setNextPreviousChannelHandler: (((Boolean) -> Unit)?) -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -220,76 +286,228 @@ fun TvInteractiveScreen(
     var selectedChannel by remember { mutableStateOf<Modelo?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
-    var filteredChannels by remember { mutableStateOf<List<Modelo>>(emptyList()) }
-    var filteredFavorites by remember { mutableStateOf<List<Modelo>>(emptyList()) }
-
-    // Control de foco inicial único
-    var hasRequestedInitialFocus by remember { mutableStateOf(false) }
-
-    // Estados de scroll para controlar el centrado al recibir foco
-    val favoritesGridState = rememberLazyGridState()
-    val channelsRowState = rememberLazyListState()
-
-    LaunchedEffect(searchQuery, masterChannels, favoriteIds) {
-        delay(250)
-        withContext(Dispatchers.Default) {
+    val filteredChannels = remember(searchQuery, masterChannels) {
+        if (searchQuery.isBlank()) {
+            masterChannels
+        } else {
             val normalizedQuery = searchQuery.normalizeSearch()
-
-            val filteredAll = if (normalizedQuery.isBlank()) {
-                masterChannels
-            } else {
-                masterChannels.filter { canal ->
-                    val normalizedTitle = canal.title.normalizeSearch()
-                    val queryWords = normalizedQuery.split("\\s+".toRegex())
-                    queryWords.all { word -> normalizedTitle.contains(word) }
-                }
-            }
-
-            val filteredFavs = if (normalizedQuery.isBlank()) {
-                masterChannels.filter { favoriteIds.contains(it.id) }
-            } else {
-                filteredAll.filter { favoriteIds.contains(it.id) }
-            }
-
-            withContext(Dispatchers.Main) {
-                filteredChannels = filteredAll
-                filteredFavorites = filteredFavs
+            val queryWords = normalizedQuery.split("\\s+".toRegex())
+            masterChannels.filter { canal ->
+                val normalizedTitle = canal.title.normalizeSearch()
+                queryWords.all { word -> normalizedTitle.contains(word) }
             }
         }
     }
 
+    val filteredFavorites = remember(searchQuery, masterChannels, favoriteIds) {
+        if (searchQuery.isBlank()) {
+            masterChannels.filter { favoriteIds.contains(it.id) }
+        } else {
+            filteredChannels.filter { favoriteIds.contains(it.id) }
+        }
+    }
+
+    val activeChannelsList = remember(filteredFavorites, masterChannels) {
+        if (filteredFavorites.isNotEmpty()) filteredFavorites else masterChannels
+    }
+
+    // Instancia persistente del reproductor ExoPlayer
+    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
+
+    // Vista persistente única para evitar recreación de SurfaceView y pantalla negra
+    val persistentPlayerView = remember(context) {
+        PlayerView(context).apply {
+            useController = false
+            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            keepScreenOn = true
+            setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+    }
+
+    val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+            DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
+            DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
+
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                TvRepository.lastPlayedChannel?.let { canalActualizado ->
-                    selectedChannel = canalActualizado
-                    prefs.edit().putString("last_selected_channel_id", canalActualizado.id).apply()
-                    hasRequestedInitialFocus = false
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
+            .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
+            .setConnectTimeoutMs(15000)
+            .setReadTimeoutMs(15000)
+
+        val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+        val extractorsFactory = DefaultExtractorsFactory().apply { setTsExtractorFlags(tsFlags) }
+        val errorHandlingPolicy = DefaultLoadErrorHandlingPolicy(100)
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+            .setLoadErrorHandlingPolicy(errorHandlingPolicy)
+
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(12000, 12000, 1500, 2000)
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
+        val trackSelector = DefaultTrackSelector(context).apply {
+            setParameters(
+                buildUponParameters()
+                    .setMaxVideoSize(1920, 1080)
+                    .setForceHighestSupportedBitrate(false)
+            )
+        }
+
+        val renderersFactory = DefaultRenderersFactory(context).apply {
+            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+            setEnableDecoderFallback(true)
+        }
+
+        val player = ExoPlayer.Builder(context, renderersFactory)
+            .setTrackSelector(trackSelector)
+            .setLoadControl(loadControl)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                true
+            )
+            .build().apply {
+                playWhenReady = true
+            }
+
+        player.addListener(object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                    player.seekToDefaultPosition()
                 }
+                player.prepare()
+                player.play()
+            }
+        })
+
+        persistentPlayerView.player = player
+        exoPlayer = player
+
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    player.playWhenReady = true
+                    player.play()
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    player.pause()
+                }
+                else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            persistentPlayerView.player = null
+            player.release()
+            exoPlayer = null
         }
     }
+
+    // Actualizar señal en el reproductor
+    LaunchedEffect(selectedChannel, exoPlayer) {
+        val player = exoPlayer ?: return@LaunchedEffect
+        val canal = selectedChannel ?: return@LaunchedEffect
+        if (canal.streamUrl.isNotEmpty()) {
+            val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+                .setAllowCrossProtocolRedirects(true)
+                .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
+                .setConnectTimeoutMs(15000)
+                .setReadTimeoutMs(15000)
+
+            val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+            val uri = Uri.parse(canal.streamUrl)
+
+            val mediaItemBuilder = MediaItem.Builder()
+                .setUri(uri)
+                .setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(10000).build())
+
+            val isStrictHls = canal.streamUrl.contains(".m3u8", ignoreCase = true) ||
+                    canal.streamUrl.contains("format=m3u8", ignoreCase = true)
+
+            val isTsStream = canal.streamUrl.contains(".ts", ignoreCase = true) ||
+                    canal.streamUrl.contains("/live/", ignoreCase = true) ||
+                    canal.streamUrl.contains("/stream/", ignoreCase = true)
+
+            val errorHandlingPolicy = DefaultLoadErrorHandlingPolicy(100)
+
+            val mediaSource = if (isStrictHls) {
+                mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
+                val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
+                HlsMediaSource.Factory(dataSourceFactory)
+                    .setExtractorFactory(hlsExtractorFactory)
+                    .setAllowChunklessPreparation(false)
+                    .setLoadErrorHandlingPolicy(errorHandlingPolicy)
+                    .createMediaSource(mediaItemBuilder.build())
+            } else {
+                val extractorsFactory = DefaultExtractorsFactory().apply {
+                    setTsExtractorFlags(tsFlags)
+                }
+                if (isTsStream) {
+                    mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP2T)
+                }
+                DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+                    .setLoadErrorHandlingPolicy(errorHandlingPolicy)
+                    .createMediaSource(mediaItemBuilder.build())
+            }
+
+            player.setMediaSource(mediaSource)
+            player.prepare()
+            player.play()
+        }
+    }
+
+    // Handler para navegar canales con el control remoto
+    DisposableEffect(activeChannelsList, selectedChannel) {
+        val handler: (Boolean) -> Unit = { siguiente ->
+            if (activeChannelsList.isNotEmpty()) {
+                val indexActual = activeChannelsList.indexOfFirst { it.streamUrl == selectedChannel?.streamUrl }
+                val nuevoIndex = if (siguiente) {
+                    if (indexActual == -1 || indexActual >= activeChannelsList.size - 1) 0 else indexActual + 1
+                } else {
+                    if (indexActual <= 0) activeChannelsList.size - 1 else indexActual - 1
+                }
+                val nuevoCanal = activeChannelsList[nuevoIndex]
+                selectedChannel = nuevoCanal
+                TvRepository.lastPlayedChannel = nuevoCanal
+                prefs.edit().putString("last_selected_channel_id", nuevoCanal.id).apply()
+            }
+        }
+        setNextPreviousChannelHandler(handler)
+        onDispose { setNextPreviousChannelHandler(null) }
+    }
+
+    var hasRequestedInitialFocus by remember { mutableStateOf(false) }
+    val favoritesGridState = rememberLazyGridState()
+    val channelsRowState = rememberLazyListState()
 
     LaunchedEffect(Unit) {
         coroutineScope.launch(Dispatchers.IO) {
             val savedChannelId = prefs.getString("last_selected_channel_id", null)
 
             if (TvRepository.channelListMaster.isNotEmpty()) {
-                masterChannels = TvRepository.channelListMaster
-
+                val list = TvRepository.channelListMaster
                 val canalASelec = TvRepository.lastPlayedChannel
-                    ?: masterChannels.firstOrNull { it.id == savedChannelId }
-                    ?: masterChannels.firstOrNull { favoriteIds.contains(it.id) }
-                    ?: masterChannels.firstOrNull()
+                    ?: list.firstOrNull { it.id == savedChannelId }
+                    ?: list.firstOrNull { favoriteIds.contains(it.id) }
+                    ?: list.firstOrNull()
 
-                selectedChannel = canalASelec
-                TvRepository.lastPlayedChannel = canalASelec
-                isLoading = false
+                withContext(Dispatchers.Main) {
+                    masterChannels = list
+                    selectedChannel = canalASelec
+                    TvRepository.lastPlayedChannel = canalASelec
+                    isLoading = false
+                }
                 return@launch
             }
 
@@ -338,228 +556,279 @@ fun TvInteractiveScreen(
     }
 
     if (isLoading) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = GoldAccent)
-        }
-    } else {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                .background(DeepDarkBg),
+            contentAlignment = Alignment.Center
         ) {
-            // LADO IZQUIERDO (50%): MIS FAVORITOS
             Column(
-                modifier = Modifier
-                    .weight(0.5f)
-                    .fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                var isSearching by remember { mutableStateOf(false) }
-
+                CircularProgressIndicator(
+                    color = GoldAccent,
+                    modifier = Modifier.size(50.dp),
+                    strokeWidth = 4.dp
+                )
+                Text(
+                    text = "Cargando canales...",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    } else {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (isFullScreen) {
+                // =========================================================
+                // 1. MODO PANTALLA COMPLETA CONTINUO (SIN PANTALLA NEGRA)
+                // =========================================================
+                FullScreenPlayerContainer(
+                    playerView = persistentPlayerView,
+                    exoPlayer = exoPlayer,
+                    selectedChannel = selectedChannel,
+                    favoriteChannels = if (filteredFavorites.isNotEmpty()) filteredFavorites else masterChannels,
+                    isMenuVisible = isSideMenuVisible,
+                    onCloseMenu = { onToggleSideMenu(false) },
+                    onSelectFavoriteChannel = { canal ->
+                        selectedChannel = canal
+                        TvRepository.lastPlayedChannel = canal
+                        prefs.edit().putString("last_selected_channel_id", canal.id).apply()
+                        onToggleSideMenu(false)
+                    },
+                    onToggleMenu = { onToggleSideMenu(!isSideMenuVisible) }
+                )
+            } else {
+                // =========================================================
+                // 2. MODO INTERACTIVO DIVIDIDO (50% / 50%)
+                // =========================================================
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .padding(horizontal = 4.dp)
+                        .fillMaxSize()
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    if (isSearching) {
-                        TvSearchBar(
-                            query = searchQuery,
-                            onQueryChange = { searchQuery = it },
-                            onCloseSearch = {
-                                isSearching = false
-                                searchQuery = ""
-                            },
-                            modifier = Modifier.weight(1f)
+                    // LADO IZQUIERDO: FAVORITOS
+                    Column(
+                        modifier = Modifier
+                            .weight(0.5f)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        var isSearching by remember { mutableStateOf(false) }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .padding(horizontal = 4.dp)
+                        ) {
+                            if (isSearching) {
+                                TvSearchBar(
+                                    query = searchQuery,
+                                    onQueryChange = { searchQuery = it },
+                                    onCloseSearch = {
+                                        isSearching = false
+                                        searchQuery = ""
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            } else {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Favorite, contentDescription = null, tint = RedLive)
+                                    Text(
+                                        text = "MIS FAVORITOS (${filteredFavorites.size})",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = GoldAccent
+                                    )
+                                }
+
+                                var isSearchButtonFocused by remember { mutableStateOf(false) }
+                                val searchScale by animateFloatAsState(
+                                    targetValue = if (isSearchButtonFocused) 1.12f else 1.0f,
+                                    label = "searchScale"
+                                )
+
+                                IconButton(
+                                    onClick = { isSearching = true },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .graphicsLayer {
+                                            scaleX = searchScale
+                                            scaleY = searchScale
+                                        }
+                                        .onFocusChanged { isSearchButtonFocused = it.isFocused }
+                                        .focusable()
+                                        .border(
+                                            width = 2.dp,
+                                            color = if (isSearchButtonFocused) GoldAccent else Color.Transparent,
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .background(
+                                            color = if (isSearchButtonFocused) Color(0xFF282836) else Color.Transparent,
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = "Buscar",
+                                        tint = GoldAccent,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (filteredFavorites.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(CardDarkBg),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (searchQuery.isNotBlank()) "Sin coincidencias en Favoritos"
+                                    else "Aún no tienes favoritos.\nMantén presionado OK en un canal a la derecha para agregar.",
+                                    color = Color.Gray,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+                        } else {
+                            LazyVerticalGrid(
+                                state = favoritesGridState,
+                                columns = GridCells.Fixed(2),
+                                contentPadding = PaddingValues(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                itemsIndexed(filteredFavorites, key = { index, it -> "fav_grid_${it.id}_$index" }) { index, canal ->
+                                    FavoriteGridCard(
+                                        canal = canal,
+                                        isSelected = selectedChannel?.id == canal.id,
+                                        onFocused = {
+                                            favoritesGridState.animateScrollAndCentralizeItem(index, coroutineScope)
+                                        },
+                                        onClick = {
+                                            selectedChannel = canal
+                                            TvRepository.lastPlayedChannel = canal
+                                            prefs.edit().putString("last_selected_channel_id", canal.id).apply()
+                                        },
+                                        onLongClick = { toggleFavorite(canal) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // LADO DERECHO: MINI REPRODUCTOR + LISTA DE CANALES
+                    Column(
+                        modifier = Modifier
+                            .weight(0.5f)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = selectedChannel?.title ?: "Selecciona un canal",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(start = 2.dp)
                         )
-                    } else {
+
+                        TvMiniPlayerBox(
+                            playerView = persistentPlayerView,
+                            onOpenFullScreen = { onToggleFullScreen(true) }
+                        )
+
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.padding(start = 2.dp)
                         ) {
-                            Icon(Icons.Default.Favorite, contentDescription = null, tint = RedLive)
+                            Icon(Icons.Default.Tv, contentDescription = null, tint = GoldAccent)
                             Text(
-                                text = "MIS FAVORITOS (${filteredFavorites.size})",
-                                fontSize = 15.sp,
+                                text = "Todos los Canales (${filteredChannels.size})",
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = GoldAccent
+                                color = Color.LightGray
                             )
                         }
 
-                        var isSearchButtonFocused by remember { mutableStateOf(false) }
-                        val searchScale by animateFloatAsState(targetValue = if (isSearchButtonFocused) 1.12f else 1.0f, label = "searchScale")
+                        if (filteredChannels.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(80.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("No se encontraron canales", color = Color.Gray, fontSize = 13.sp)
+                            }
+                        } else {
+                            LazyRow(
+                                state = channelsRowState,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                itemsIndexed(filteredChannels, key = { index, it -> "all_${it.id}_$index" }) { index, canal ->
+                                    val isCurrentSelected = selectedChannel?.id == canal.id
+                                    val focusRequester = remember { FocusRequester() }
 
-                        IconButton(
-                            onClick = { isSearching = true },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .graphicsLayer {
-                                    scaleX = searchScale
-                                    scaleY = searchScale
-                                }
-                                .onFocusChanged { isSearchButtonFocused = it.isFocused }
-                                .focusable()
-                                .border(
-                                    width = 2.dp,
-                                    color = if (isSearchButtonFocused) GoldAccent else Color.Transparent,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .background(
-                                    color = if (isSearchButtonFocused) Color(0xFF282836) else Color.Transparent,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Buscar",
-                                tint = GoldAccent,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
+                                    LaunchedEffect(selectedChannel) {
+                                        if (isCurrentSelected && !hasRequestedInitialFocus) {
+                                            delay(400)
+                                            try {
+                                                focusRequester.requestFocus()
+                                                hasRequestedInitialFocus = true
+                                            } catch (e: Exception) {}
+                                        }
+                                    }
 
-                if (filteredFavorites.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(CardDarkBg),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (searchQuery.isNotBlank()) "Sin coincidencias en Favoritos" else "Aún no tienes favoritos.\nMantén presionado OK en un canal a la derecha para agregar.",
-                            color = Color.Gray,
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
-                } else {
-                    LazyVerticalGrid(
-                        state = favoritesGridState,
-                        columns = GridCells.Fixed(2),
-                        contentPadding = PaddingValues(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        itemsIndexed(filteredFavorites, key = { index, it -> "fav_grid_${it.id}_$index" }) { index, canal ->
-                            FavoriteGridCard(
-                                canal = canal,
-                                isSelected = selectedChannel?.id == canal.id,
-                                onFocused = {
-                                    favoritesGridState.animateScrollAndCentralizeItem(index, coroutineScope)
-                                },
-                                onClick = {
-                                    selectedChannel = canal
-                                    TvRepository.lastPlayedChannel = canal
-                                    prefs.edit().putString("last_selected_channel_id", canal.id).apply()
-                                },
-                                onLongClick = { toggleFavorite(canal) }
-                            )
-                        }
-                    }
-                }
-            }
-
-            // LADO DERECHO (50%): REPRODUCTOR + CANALES + INFORMACIÓN
-            Column(
-                modifier = Modifier
-                    .weight(0.5f)
-                    .fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = selectedChannel?.title ?: "Selecciona un canal",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 2.dp)
-                )
-
-                TvPlayerCard(
-                    selectedChannel = selectedChannel,
-                    onOpenFullScreen = { canal -> onOpenFullScreenPlayer(canal) }
-                )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(start = 2.dp)
-                ) {
-                    Icon(Icons.Default.Tv, contentDescription = null, tint = GoldAccent)
-                    Text(
-                        text = "Todos los Canales (${filteredChannels.size})",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.LightGray
-                    )
-                }
-
-                if (filteredChannels.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(80.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("No se encontraron canales", color = Color.Gray, fontSize = 13.sp)
-                    }
-                } else {
-                    LazyRow(
-                        state = channelsRowState,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        itemsIndexed(filteredChannels, key = { index, it -> "all_${it.id}_$index" }) { index, canal ->
-                            val isCurrentSelected = selectedChannel?.id == canal.id
-                            val focusRequester = remember { FocusRequester() }
-
-                            LaunchedEffect(selectedChannel) {
-                                if (isCurrentSelected && !hasRequestedInitialFocus) {
-                                    delay(400)
-                                    try {
-                                        focusRequester.requestFocus()
-                                        hasRequestedInitialFocus = true
-                                    } catch (e: Exception) {}
+                                    HorizontalChannelCard(
+                                        canal = canal,
+                                        isFavorite = favoriteIds.contains(canal.id),
+                                        isSelected = isCurrentSelected,
+                                        onFocused = {
+                                            channelsRowState.animateScrollAndCentralizeItem(index, coroutineScope)
+                                        },
+                                        onClick = {
+                                            selectedChannel = canal
+                                            TvRepository.lastPlayedChannel = canal
+                                            prefs.edit().putString("last_selected_channel_id", canal.id).apply()
+                                        },
+                                        onLongClick = { toggleFavorite(canal) },
+                                        modifier = Modifier.focusRequester(focusRequester)
+                                    )
                                 }
                             }
+                        }
 
-                            HorizontalChannelCard(
+                        selectedChannel?.let { canal ->
+                            SelectedChannelDetailCard(
                                 canal = canal,
                                 isFavorite = favoriteIds.contains(canal.id),
-                                isSelected = isCurrentSelected,
-                                onFocused = {
-                                    channelsRowState.animateScrollAndCentralizeItem(index, coroutineScope)
-                                },
-                                onClick = {
-                                    selectedChannel = canal
-                                    TvRepository.lastPlayedChannel = canal
-                                    prefs.edit().putString("last_selected_channel_id", canal.id).apply()
-                                },
-                                onLongClick = { toggleFavorite(canal) },
-                                modifier = Modifier.focusRequester(focusRequester)
+                                onToggleFavorite = { toggleFavorite(canal) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
                             )
                         }
                     }
-                }
-
-                selectedChannel?.let { canal ->
-                    SelectedChannelDetailCard(
-                        canal = canal,
-                        isFavorite = favoriteIds.contains(canal.id),
-                        onToggleFavorite = { toggleFavorite(canal) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    )
                 }
             }
         }
@@ -567,7 +836,360 @@ fun TvInteractiveScreen(
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: NUEVA TARJETA FAVORITA HORIZONTAL ELEGANTE
+// CONTENEDOR DE PANTALLA COMPLETA CON MENÚ LATERAL
+// -------------------------------------------------------------
+@OptIn(UnstableApi::class)
+@Composable
+fun FullScreenPlayerContainer(
+    playerView: PlayerView,
+    exoPlayer: ExoPlayer?,
+    selectedChannel: Modelo?,
+    favoriteChannels: List<Modelo>,
+    isMenuVisible: Boolean,
+    onCloseMenu: () -> Unit,
+    onSelectFavoriteChannel: (Modelo) -> Unit,
+    onToggleMenu: () -> Unit
+) {
+    var isBuffering by remember { mutableStateOf(false) }
+
+    DisposableEffect(exoPlayer) {
+        val player = exoPlayer ?: return@DisposableEffect onDispose {}
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                isBuffering = playbackState == Player.STATE_BUFFERING
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                    player.seekToDefaultPosition()
+                }
+                player.prepare()
+                player.play()
+            }
+        }
+        player.addListener(listener)
+        isBuffering = player.playbackState == Player.STATE_BUFFERING
+
+        onDispose {
+            player.removeListener(listener)
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            factory = {
+                (playerView.parent as? ViewGroup)?.removeView(playerView)
+                playerView.player = exoPlayer
+                playerView
+            },
+            update = { view ->
+                if (view.player != exoPlayer) {
+                    view.player = exoPlayer
+                }
+                exoPlayer?.let { p ->
+                    if (!p.isPlaying && p.playWhenReady) {
+                        p.play()
+                    }
+                }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable { onToggleMenu() }
+        )
+
+        // Spinner flotante no invasivo (no tapa el video)
+        if (isBuffering) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                contentAlignment = Alignment.TopEnd
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    CircularProgressIndicator(
+                        color = GoldAccent,
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Text(
+                        text = "Cargando señal...",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = isMenuVisible,
+            enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+            exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+            modifier = Modifier.align(Alignment.CenterEnd)
+        ) {
+            FavoritesOverlayMenu(
+                favoriteChannels = favoriteChannels,
+                currentStreamUrl = selectedChannel?.streamUrl ?: "",
+                isMenuVisible = isMenuVisible,
+                onCloseMenu = onCloseMenu,
+                onSelectChannel = onSelectFavoriteChannel
+            )
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// MINI REPRODUCTOR EN MODO VISTA DIVIDIDA
+// -------------------------------------------------------------
+@OptIn(UnstableApi::class)
+@Composable
+fun TvMiniPlayerBox(
+    playerView: PlayerView,
+    onOpenFullScreen: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    val borderColor = if (isFocused) GoldAccent else RedLive.copy(alpha = 0.8f)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(16f / 9f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.Black)
+            .border(3.dp, borderColor, RoundedCornerShape(12.dp))
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                val keyCode = keyEvent.nativeKeyEvent.keyCode
+                if (keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER || keyCode == AndroidKeyEvent.KEYCODE_ENTER) {
+                    if (keyEvent.type == KeyEventType.KeyUp) {
+                        onOpenFullScreen()
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+            .clickable { onOpenFullScreen() }
+    ) {
+        AndroidView(
+            factory = {
+                (playerView.parent as? ViewGroup)?.removeView(playerView)
+                playerView
+            },
+            update = { view ->
+                view.invalidate()
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+// -------------------------------------------------------------
+// MENÚ LATERAL OVERLAY DE FAVORITOS
+// -------------------------------------------------------------
+@Composable
+fun FavoritesOverlayMenu(
+    favoriteChannels: List<Modelo>,
+    currentStreamUrl: String,
+    isMenuVisible: Boolean,
+    onCloseMenu: () -> Unit,
+    onSelectChannel: (Modelo) -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val lazyListState = rememberLazyListState()
+
+    val focusRequesters = remember(favoriteChannels) {
+        List(favoriteChannels.size) { FocusRequester() }
+    }
+
+    val playingIndex = remember(favoriteChannels, currentStreamUrl) {
+        val index = favoriteChannels.indexOfFirst { it.streamUrl == currentStreamUrl }
+        if (index != -1) index else 0
+    }
+
+    LaunchedEffect(isMenuVisible, playingIndex) {
+        if (isMenuVisible && favoriteChannels.isNotEmpty() && playingIndex in focusRequesters.indices) {
+            delay(150)
+            try {
+                lazyListState.scrollToItem(playingIndex)
+                focusRequesters[playingIndex].requestFocus()
+            } catch (e: Exception) {}
+        }
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(320.dp),
+        color = Color(0xFF0A122A).copy(alpha = 0.96f),
+        shadowElevation = 16.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.Favorite, contentDescription = null, tint = RedLive)
+                    Text(
+                        text = "MIS FAVORITOS",
+                        color = GoldAccent,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                IconButton(onClick = onCloseMenu) {
+                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
+                }
+            }
+
+            HorizontalDivider(color = Color(0xFF2A2A38))
+
+            if (favoriteChannels.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No tienes canales en favoritos",
+                        color = Color.Gray,
+                        fontSize = 13.sp
+                    )
+                }
+            } else {
+                LazyColumn(
+                    state = lazyListState,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    itemsIndexed(favoriteChannels, key = { index, canal -> "menu_fav_${canal.id}_$index" }) { index, canal ->
+                        FavoriteMenuItem(
+                            canal = canal,
+                            isPlaying = canal.streamUrl == currentStreamUrl,
+                            onFocused = {
+                                lazyListState.animateScrollAndCentralizeMenuItem(index, coroutineScope)
+                            },
+                            onSelect = { onSelectChannel(canal) },
+                            modifier = Modifier.focusRequester(focusRequesters[index])
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// ITEM DEL MENÚ DE FAVORITOS
+// -------------------------------------------------------------
+@Composable
+fun FavoriteMenuItem(
+    canal: Modelo,
+    isPlaying: Boolean,
+    onFocused: () -> Unit,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(targetValue = if (isFocused) 1.05f else 1.0f, label = "scale")
+
+    val borderColor = when {
+        isFocused -> GoldAccent
+        isPlaying -> RedLive
+        else -> Color.Transparent
+    }
+
+    val backgroundColor = when {
+        isFocused -> Color(0xFF282836)
+        isPlaying -> Color(0xFF2D1515)
+        else -> Color(0xFF161622)
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(8.dp))
+            .background(backgroundColor)
+            .border(2.5.dp, borderColor, RoundedCornerShape(8.dp))
+            .onFocusChanged {
+                isFocused = it.isFocused
+                if (it.isFocused) {
+                    onFocused()
+                }
+            }
+            .focusable()
+            .clickable { onSelect() }
+            .padding(10.dp)
+    ) {
+        coil.compose.SubcomposeAsyncImage(
+            model = canal.imageUrl,
+            contentDescription = canal.title,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .size(45.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.Black)
+                .padding(2.dp)
+        ) {
+            val state = painter.state
+            if (state is coil.compose.AsyncImagePainter.State.Success) {
+                SubcomposeAsyncImageContent()
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Tv,
+                    contentDescription = null,
+                    tint = RedLive,
+                    modifier = Modifier.padding(6.dp)
+                )
+            }
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = canal.title,
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = if (isPlaying || isFocused) FontWeight.Bold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            if (isPlaying) {
+                Text(
+                    text = "🔴 Reproduciendo ahora",
+                    color = RedLive,
+                    fontSize = 10.sp
+                )
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// TARJETA FAVORITA HORIZONTAL ELEGANTE
 // -------------------------------------------------------------
 @kotlin.OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -715,7 +1337,7 @@ fun FavoriteGridCard(
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: DETALLE DEL CANAL
+// DETALLE DEL CANAL
 // -------------------------------------------------------------
 @Composable
 fun SelectedChannelDetailCard(
@@ -819,7 +1441,7 @@ fun SelectedChannelDetailCard(
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: BUSCADOR TV
+// BUSCADOR TV
 // -------------------------------------------------------------
 @Composable
 fun TvSearchBar(
@@ -874,7 +1496,7 @@ fun TvSearchBar(
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: TARJETA HORIZONTAL (CON SOPORTE PARA MODIFIER)
+// TARJETA DE CANAL HORIZONTAL
 // -------------------------------------------------------------
 @kotlin.OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -1032,248 +1654,6 @@ fun HorizontalChannelCard(
 }
 
 // -------------------------------------------------------------
-// COMPOSABLE: REPRODUCTOR MINI CON FOCO
-// -------------------------------------------------------------
-@Composable
-fun TvPlayerCard(
-    selectedChannel: Modelo?,
-    onOpenFullScreen: (Modelo) -> Unit
-) {
-    var isFocused by remember { mutableStateOf(false) }
-
-    val borderColor = if (isFocused) GoldAccent else RedLive.copy(alpha = 0.8f)
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(16f / 9f)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.Black)
-            .border(3.dp, borderColor, RoundedCornerShape(12.dp))
-            .onFocusChanged { isFocused = it.isFocused }
-            .focusable()
-            .clickable {
-                selectedChannel?.let { onOpenFullScreen(it) }
-            }
-    ) {
-        selectedChannel?.let { canal ->
-            EmbeddedPlayerView(
-                streamUrl = canal.streamUrl,
-                onPlayerClick = { onOpenFullScreen(canal) }
-            )
-        } ?: Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Sin señal seleccionada", color = Color.Gray)
-        }
-    }
-}
-
-// -------------------------------------------------------------
-// REPRODUCTOR EMBEBIDO MEDIA3 EXOPLAYER
-// -------------------------------------------------------------
-@OptIn(UnstableApi::class)
-@Composable
-fun EmbeddedPlayerView(
-    streamUrl: String,
-    onPlayerClick: () -> Unit
-) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
-
-    val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-            DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
-            DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> {
-                    if (exoPlayer == null) {
-                        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-                            .setAllowCrossProtocolRedirects(true)
-                            .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
-                            .setConnectTimeoutMs(15000)
-                            .setReadTimeoutMs(15000)
-
-                        val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
-
-                        val extractorsFactory = DefaultExtractorsFactory().apply {
-                            setTsExtractorFlags(tsFlags)
-                        }
-
-                        val errorHandlingPolicy = DefaultLoadErrorHandlingPolicy(100)
-
-                        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
-                            .setLoadErrorHandlingPolicy(errorHandlingPolicy)
-
-                        val loadControl = DefaultLoadControl.Builder()
-                            .setBufferDurationsMs(
-                                12000,
-                                12000,
-                                1500,
-                                2000
-                            )
-                            .setPrioritizeTimeOverSizeThresholds(true)
-                            .build()
-
-                        val trackSelector = DefaultTrackSelector(context).apply {
-                            setParameters(
-                                buildUponParameters()
-                                    .setMaxVideoSize(854, 480)
-                                    .setForceHighestSupportedBitrate(false)
-                            )
-                        }
-
-                        val renderersFactory = DefaultRenderersFactory(context).apply {
-                            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
-                            setEnableDecoderFallback(true)
-                        }
-
-                        val player = ExoPlayer.Builder(context, renderersFactory)
-                            .setTrackSelector(trackSelector)
-                            .setLoadControl(loadControl)
-                            .setMediaSourceFactory(mediaSourceFactory)
-                            .build().apply {
-                                playWhenReady = true
-                            }
-
-                        player.addListener(object : Player.Listener {
-                            override fun onPlayerError(error: PlaybackException) {
-                                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
-                                    player.seekToDefaultPosition()
-                                }
-                                player.prepare()
-                                player.play()
-                            }
-                        })
-
-                        exoPlayer = player
-                    }
-                }
-                Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
-                    exoPlayer?.release()
-                    exoPlayer = null
-                }
-                else -> {}
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            exoPlayer?.release()
-            exoPlayer = null
-        }
-    }
-
-    LaunchedEffect(exoPlayer) {
-        val player = exoPlayer ?: return@LaunchedEffect
-        var lastRenderedFrames = -1
-        var secondsFrozen = 0
-
-        while (true) {
-            delay(1000)
-
-            val isPlayingAndReady = player.playbackState == Player.STATE_READY && player.playWhenReady
-            if (isPlayingAndReady) {
-                val counters = player.videoDecoderCounters
-                if (counters != null) {
-                    val currentFrames = counters.renderedOutputBufferCount
-
-                    if (currentFrames == lastRenderedFrames) {
-                        secondsFrozen++
-                        if (secondsFrozen >= 4) {
-                            secondsFrozen = 0
-                            player.prepare()
-                            player.play()
-                        }
-                    } else {
-                        lastRenderedFrames = currentFrames
-                        secondsFrozen = 0
-                    }
-                }
-            } else {
-                secondsFrozen = 0
-            }
-        }
-    }
-
-    LaunchedEffect(streamUrl, exoPlayer) {
-        val player = exoPlayer ?: return@LaunchedEffect
-        if (streamUrl.isNotEmpty()) {
-            val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-                .setAllowCrossProtocolRedirects(true)
-                .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
-                .setConnectTimeoutMs(15000)
-                .setReadTimeoutMs(15000)
-
-            val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
-
-            val uri = Uri.parse(streamUrl)
-
-            val mediaItemBuilder = MediaItem.Builder().setUri(uri).setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(5000).build())
-                .setLiveConfiguration(
-                    MediaItem.LiveConfiguration.Builder()
-                        .setTargetOffsetMs(10000)
-                        .build()
-                )
-
-            val isStrictHls = streamUrl.contains(".m3u8", ignoreCase = true) ||
-                    streamUrl.contains("format=m3u8", ignoreCase = true)
-
-            val isTsStream = streamUrl.contains(".ts", ignoreCase = true) ||
-                    streamUrl.contains("/live/", ignoreCase = true) ||
-                    streamUrl.contains("/stream/", ignoreCase = true)
-
-            val errorHandlingPolicy = DefaultLoadErrorHandlingPolicy(100)
-
-            val mediaSource = if (isStrictHls) {
-                mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
-                val hlsExtractorFactory = DefaultHlsExtractorFactory(tsFlags, true)
-                HlsMediaSource.Factory(dataSourceFactory)
-                    .setExtractorFactory(hlsExtractorFactory)
-                    .setAllowChunklessPreparation(false)
-                    .setLoadErrorHandlingPolicy(errorHandlingPolicy)
-                    .createMediaSource(mediaItemBuilder.build())
-            } else {
-                val extractorsFactory = DefaultExtractorsFactory().apply {
-                    setTsExtractorFlags(tsFlags)
-                }
-                if (isTsStream) {
-                    mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP2T)
-                }
-                DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
-                    .setLoadErrorHandlingPolicy(errorHandlingPolicy)
-                    .createMediaSource(mediaItemBuilder.build())
-            }
-
-            player.setMediaSource(mediaSource)
-            player.prepare()
-            player.play()
-        }
-    }
-    Box(modifier = androidx.compose.ui.Modifier.fillMaxSize().clickable { onPlayerClick() }) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                }
-            },
-            update = { view ->
-                view.player = exoPlayer
-            },
-            modifier = androidx.compose.ui.Modifier.fillMaxSize()
-        )
-    }
-}
-
-// -------------------------------------------------------------
 // NORMALIZADOR DE BÚSQUEDA
 // -------------------------------------------------------------
 private fun String.normalizeSearch(): String {
@@ -1286,7 +1666,7 @@ private fun String.normalizeSearch(): String {
 }
 
 // -------------------------------------------------------------
-// DESCARGA Y PARSEO M3U (ID ESTABLE BASADO EN EL NOMBRE ESPECÍFICO)
+// DESCARGA Y PARSEO M3U
 // -------------------------------------------------------------
 private fun descargarM3uStream(urlString: String): List<Modelo> {
     var currentUrl = urlString.trim()
@@ -1356,8 +1736,6 @@ private fun parseM3uBuffer(reader: BufferedReader): List<Modelo> {
                 if (trimmed.contains("://") || trimmed.startsWith("rtmp", ignoreCase = true) || trimmed.startsWith("udp", ignoreCase = true)) {
                     val finalName = if (currentName.isNotEmpty()) currentName else "Canal ${channels.size + 1}"
 
-                    // Asignamos finalName como ID. Al guardar favoritos con base en 'id',
-                    // se estarán guardando directamente por su nombre específico.
                     channels.add(
                         Modelo(
                             id = finalName,
@@ -1376,7 +1754,7 @@ private fun parseM3uBuffer(reader: BufferedReader): List<Modelo> {
 }
 
 // -------------------------------------------------------------
-// EXTENSIONES PARA CENTRAR ELEMENTOS EN FOCO (TV LAYOUTS)
+// EXTENSIONES PARA CENTRAR ELEMENTOS EN FOCO
 // -------------------------------------------------------------
 fun androidx.compose.foundation.lazy.LazyListState.animateScrollAndCentralizeItem(
     index: Int,
@@ -1408,6 +1786,23 @@ fun androidx.compose.foundation.lazy.grid.LazyGridState.animateScrollAndCentrali
             this@animateScrollAndCentralizeItem.animateScrollBy((childCenter - center).toFloat())
         } else {
             this@animateScrollAndCentralizeItem.animateScrollToItem(index)
+        }
+    }
+}
+
+private fun androidx.compose.foundation.lazy.LazyListState.animateScrollAndCentralizeMenuItem(
+    index: Int,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
+    val itemInfo = this.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+    scope.launch {
+        if (itemInfo != null) {
+            val center = (this@animateScrollAndCentralizeMenuItem.layoutInfo.viewportEndOffset -
+                    this@animateScrollAndCentralizeMenuItem.layoutInfo.viewportStartOffset) / 2
+            val childCenter = itemInfo.offset + itemInfo.size / 2
+            this@animateScrollAndCentralizeMenuItem.animateScrollBy((childCenter - center).toFloat())
+        } else {
+            this@animateScrollAndCentralizeMenuItem.animateScrollToItem(index)
         }
     }
 }
