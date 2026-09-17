@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="CineParcheApp">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-09-17T20:10:59.403740300Z">
+        <DropdownSelection timestamp="2026-09-17T21:39:45.859033700Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="Default" identifier="serial=emulator-5558;connection=ae86f17e" />
+              <DeviceId pluginId="Default" identifier="serial=emulator-5558;connection=aa7de351" />
             </handle>
           </Target>
         </DropdownSelection>

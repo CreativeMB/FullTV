@@ -8,9 +8,11 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent as AndroidKeyEvent
+import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
@@ -73,6 +75,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -97,10 +100,7 @@ import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
-import coil.compose.SubcomposeAsyncImageContent
 import com.creativem.fulltv.principal.AudioFocusHelper
 import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Modelo
@@ -137,7 +137,6 @@ class TvActivity : ComponentActivity() {
         configurarModoTv()
         prefs = getSharedPreferences("TV_PREFS", Context.MODE_PRIVATE)
 
-        // Manejo ordenado del botón Atrás en TV
         onBackPressedDispatcher.addCallback(this) {
             if (isSideMenuVisibleState.value) {
                 isSideMenuVisibleState.value = false
@@ -181,35 +180,6 @@ class TvActivity : ComponentActivity() {
                 AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
                     onNextPreviousChannel?.invoke(false)
                     return true
-                }
-                AndroidKeyEvent.KEYCODE_MENU,
-                AndroidKeyEvent.KEYCODE_SETTINGS,
-                AndroidKeyEvent.KEYCODE_INFO,
-                AndroidKeyEvent.KEYCODE_PAGE_UP,
-                AndroidKeyEvent.KEYCODE_PAGE_DOWN -> {
-                    isSideMenuVisibleState.value = !isSideMenuVisibleState.value
-                    return true
-                }
-                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                AndroidKeyEvent.KEYCODE_ENTER -> {
-                    if (!isSideMenuVisibleState.value) {
-                        isSideMenuVisibleState.value = true
-                        return true
-                    }
-                }
-                AndroidKeyEvent.KEYCODE_DPAD_UP,
-                AndroidKeyEvent.KEYCODE_DPAD_DOWN,
-                AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (!isSideMenuVisibleState.value) {
-                        isSideMenuVisibleState.value = true
-                        return true
-                    }
-                }
-                AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
-                    if (isSideMenuVisibleState.value) {
-                        isSideMenuVisibleState.value = false
-                        return true
-                    }
                 }
             }
         }
@@ -288,7 +258,6 @@ fun TvInteractiveScreen(
     var selectedChannel by remember { mutableStateOf<Modelo?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // Estados de reproducción del canal activo
     var isChannelLoading by remember { mutableStateOf(true) }
     var isChannelOffline by remember { mutableStateOf(false) }
 
@@ -317,21 +286,7 @@ fun TvInteractiveScreen(
         if (filteredFavorites.isNotEmpty()) filteredFavorites else masterChannels
     }
 
-    // Instancia persistente del reproductor
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
-
-    val persistentPlayerView = remember(context) {
-        PlayerView(context).apply {
-            useController = false
-            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-            keepScreenOn = true
-            setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        }
-    }
 
     val tsFlags = DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
             DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
@@ -410,7 +365,6 @@ fun TvInteractiveScreen(
             }
         })
 
-        persistentPlayerView.player = player
         exoPlayer = player
 
         val observer = LifecycleEventObserver { _, event ->
@@ -429,18 +383,15 @@ fun TvInteractiveScreen(
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            persistentPlayerView.player = null
             player.release()
             exoPlayer = null
         }
     }
 
-    // Actualizar señal y verificar timeout/error del canal
     LaunchedEffect(selectedChannel, exoPlayer) {
         val player = exoPlayer ?: return@LaunchedEffect
         val canal = selectedChannel ?: return@LaunchedEffect
 
-        // Limpiar el canal previo para que no quede la imagen congelada
         player.stop()
         player.clearMediaItems()
         isChannelLoading = true
@@ -493,7 +444,6 @@ fun TvInteractiveScreen(
             player.prepare()
             player.play()
 
-            // Detector de timeout (si no conecta en 8 segundos, marcar como canal caído)
             launch {
                 delay(8000)
                 if (isChannelLoading && !player.isPlaying && player.playbackState != Player.STATE_READY) {
@@ -605,7 +555,6 @@ fun TvInteractiveScreen(
         prefs.edit().putStringSet("fav_ids", newFavs).apply()
     }
 
-    // 1. PANTALLA DE CARGA
     if (isLoading) {
         Box(
             modifier = Modifier
@@ -630,270 +579,408 @@ fun TvInteractiveScreen(
                 )
             }
         }
-    }
-    // 2. PANTALLA DE MANTENIMIENTO
-    else if (masterChannels.isEmpty()) {
+    } else if (masterChannels.isEmpty()) {
         TvMaintenanceScreen(
             onRetry = {
                 TvRepository.channelListMaster = emptyList()
                 cargarCanales()
             }
         )
-    }
-    // 3. INTERFAZ NORMAL CON CANALES
-    else {
+    } else {
         Box(modifier = Modifier.fillMaxSize()) {
+
+            // 1. PANTALLA COMPLETA
             if (isFullScreen) {
-                FullScreenPlayerContainer(
-                    playerView = persistentPlayerView,
-                    exoPlayer = exoPlayer,
-                    selectedChannel = selectedChannel,
-                    isChannelLoading = isChannelLoading,
-                    isChannelOffline = isChannelOffline,
-                    favoriteChannels = if (filteredFavorites.isNotEmpty()) filteredFavorites else masterChannels,
-                    isMenuVisible = isSideMenuVisible,
-                    onCloseMenu = { onToggleSideMenu(false) },
-                    onSelectFavoriteChannel = { canal ->
-                        selectedChannel = canal
-                        TvRepository.lastPlayedChannel = canal
-                        prefs.edit().putString("last_selected_channel_id", canal.id).apply()
-                        onToggleSideMenu(false)
-                    },
-                    onToggleMenu = { onToggleSideMenu(!isSideMenuVisible) }
-                )
-            } else {
-                Row(
+                val fullScreenFocusRequester = remember { FocusRequester() }
+
+                // Garantiza foco siempre que se entre o se cierre el menú lateral
+                LaunchedEffect(isSideMenuVisible) {
+                    if (!isSideMenuVisible) {
+                        delay(100)
+                        try {
+                            fullScreenFocusRequester.requestFocus()
+                        } catch (e: Exception) {}
+                    }
+                }
+
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        .background(Color.Black)
+                        .zIndex(20f)
                 ) {
-                    // LADO IZQUIERDO: FAVORITOS
-                    Column(
+                    RobustTexturePlayer(
+                        exoPlayer = exoPlayer,
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    // CAPA TÁCTIL Y DE CONTROL REMOTO
+                    Box(
                         modifier = Modifier
-                            .weight(0.5f)
-                            .fillMaxHeight(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .fillMaxSize()
+                            .zIndex(1f)
+                            .focusRequester(fullScreenFocusRequester)
+                            .focusable()
+                            .onKeyEvent { keyEvent ->
+                                val keyCode = keyEvent.nativeKeyEvent.keyCode
+                                val isOkKey = keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
+                                        keyCode == AndroidKeyEvent.KEYCODE_ENTER ||
+                                        keyCode == AndroidKeyEvent.KEYCODE_NUMPAD_ENTER ||
+                                        keyCode == AndroidKeyEvent.KEYCODE_BUTTON_A ||
+                                        keyCode == AndroidKeyEvent.KEYCODE_MENU
+
+                                if (isOkKey && keyEvent.type == KeyEventType.KeyUp) {
+                                    if (!isSideMenuVisible) {
+                                        onToggleSideMenu(true)
+                                    }
+                                    true
+                                } else if (keyCode == AndroidKeyEvent.KEYCODE_DPAD_LEFT && keyEvent.type == KeyEventType.KeyUp) {
+                                    if (isSideMenuVisible) {
+                                        onToggleSideMenu(false)
+                                    }
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                            .clickable {
+                                onToggleSideMenu(!isSideMenuVisible)
+                            }
+                    )
+
+                    ChannelStatusOverlay(
+                        channel = selectedChannel,
+                        isOffline = isChannelOffline,
+                        isLoading = isChannelLoading,
+                        isMini = false
+                    )
+
+                    AnimatedVisibility(
+                        visible = isSideMenuVisible,
+                        enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+                        exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .zIndex(100f)
                     ) {
-                        var isSearching by remember { mutableStateOf(false) }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                                .padding(horizontal = 4.dp)
-                        ) {
-                            if (isSearching) {
-                                TvSearchBar(
-                                    query = searchQuery,
-                                    onQueryChange = { searchQuery = it },
-                                    onCloseSearch = {
-                                        isSearching = false
-                                        searchQuery = ""
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            } else {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.Favorite, contentDescription = null, tint = RedLive)
-                                    Text(
-                                        text = "MIS FAVORITOS (${filteredFavorites.size})",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = GoldAccent
-                                    )
-                                }
-
-                                var isSearchButtonFocused by remember { mutableStateOf(false) }
-                                val searchScale by animateFloatAsState(
-                                    targetValue = if (isSearchButtonFocused) 1.12f else 1.0f,
-                                    label = "searchScale"
-                                )
-
-                                IconButton(
-                                    onClick = { isSearching = true },
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .graphicsLayer {
-                                            scaleX = searchScale
-                                            scaleY = searchScale
-                                        }
-                                        .onFocusChanged { isSearchButtonFocused = it.isFocused }
-                                        .focusable()
-                                        .border(
-                                            width = 2.dp,
-                                            color = if (isSearchButtonFocused) GoldAccent else Color.Transparent,
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                        .background(
-                                            color = if (isSearchButtonFocused) Color(0xFF282836) else Color.Transparent,
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = "Buscar",
-                                        tint = GoldAccent,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
+                        FavoritesOverlayMenu(
+                            favoriteChannels = if (filteredFavorites.isNotEmpty()) filteredFavorites else masterChannels,
+                            currentStreamUrl = selectedChannel?.streamUrl ?: "",
+                            isMenuVisible = isSideMenuVisible,
+                            onCloseMenu = { onToggleSideMenu(false) },
+                            onSelectChannel = { canal ->
+                                selectedChannel = canal
+                                TvRepository.lastPlayedChannel = canal
+                                prefs.edit().putString("last_selected_channel_id", canal.id).apply()
+                                onToggleSideMenu(false)
                             }
-                        }
+                        )
+                    }
+                }
+            }
 
-                        if (filteredFavorites.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(CardDarkBg),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (searchQuery.isNotBlank()) "Sin coincidencias en Favoritos"
-                                    else "Aún no tienes favoritos.\nMantén presionado OK en un canal a la derecha para agregar.",
-                                    color = Color.Gray,
-                                    fontSize = 13.sp,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(16.dp)
-                                )
-                            }
+            // 2. MODO VISTA DIVIDIDA (UI PRINCIPAL)
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // LADO IZQUIERDO: FAVORITOS
+                Column(
+                    modifier = Modifier
+                        .weight(0.5f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    var isSearching by remember { mutableStateOf(false) }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .padding(horizontal = 4.dp)
+                    ) {
+                        if (isSearching) {
+                            TvSearchBar(
+                                query = searchQuery,
+                                onQueryChange = { searchQuery = it },
+                                onCloseSearch = {
+                                    isSearching = false
+                                    searchQuery = ""
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
                         } else {
-                            LazyVerticalGrid(
-                                state = favoritesGridState,
-                                columns = GridCells.Fixed(2),
-                                contentPadding = PaddingValues(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.fillMaxSize()
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.weight(1f)
                             ) {
-                                itemsIndexed(filteredFavorites, key = { index, it -> "fav_grid_${it.id}_$index" }) { index, canal ->
-                                    FavoriteGridCard(
-                                        canal = canal,
-                                        isSelected = selectedChannel?.id == canal.id,
-                                        onFocused = {
-                                            favoritesGridState.animateScrollAndCentralizeItem(index, coroutineScope)
-                                        },
-                                        onClick = {
-                                            selectedChannel = canal
-                                            TvRepository.lastPlayedChannel = canal
-                                            prefs.edit().putString("last_selected_channel_id", canal.id).apply()
-                                        },
-                                        onLongClick = { toggleFavorite(canal) }
+                                Icon(Icons.Default.Favorite, contentDescription = null, tint = RedLive)
+                                Text(
+                                    text = "MIS FAVORITOS (${filteredFavorites.size})",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GoldAccent
+                                )
+                            }
+
+                            var isSearchButtonFocused by remember { mutableStateOf(false) }
+                            val searchScale by animateFloatAsState(
+                                targetValue = if (isSearchButtonFocused) 1.12f else 1.0f,
+                                label = "searchScale"
+                            )
+
+                            IconButton(
+                                onClick = { isSearching = true },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .graphicsLayer {
+                                        scaleX = searchScale
+                                        scaleY = searchScale
+                                    }
+                                    .onFocusChanged { isSearchButtonFocused = it.isFocused }
+                                    .focusable()
+                                    .border(
+                                        width = 2.dp,
+                                        color = if (isSearchButtonFocused) GoldAccent else Color.Transparent,
+                                        shape = RoundedCornerShape(8.dp)
                                     )
-                                }
+                                    .background(
+                                        color = if (isSearchButtonFocused) Color(0xFF282836) else Color.Transparent,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Buscar",
+                                    tint = GoldAccent,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                         }
                     }
 
-                    // LADO DERECHO: MINI REPRODUCTOR + LISTA DE CANALES
-                    Column(
-                        modifier = Modifier
-                            .weight(0.5f)
-                            .fillMaxHeight(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = selectedChannel?.title ?: "Selecciona un canal",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(start = 2.dp)
-                        )
-
-                        TvMiniPlayerBox(
-                            playerView = persistentPlayerView,
-                            selectedChannel = selectedChannel,
-                            isChannelLoading = isChannelLoading,
-                            isChannelOffline = isChannelOffline,
-                            onOpenFullScreen = { onToggleFullScreen(true) }
-                        )
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.padding(start = 2.dp)
+                    if (filteredFavorites.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(CardDarkBg),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Tv, contentDescription = null, tint = GoldAccent)
                             Text(
-                                text = "Todos los Canales (${filteredChannels.size})",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.LightGray
+                                text = if (searchQuery.isNotBlank()) "Sin coincidencias en Favoritos"
+                                else "Aún no tienes favoritos.\nMantén presionado OK en un canal a la derecha para agregar.",
+                                color = Color.Gray,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(16.dp)
                             )
                         }
-
-                        if (filteredChannels.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(80.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("No se encontraron canales", color = Color.Gray, fontSize = 13.sp)
+                    } else {
+                        LazyVerticalGrid(
+                            state = favoritesGridState,
+                            columns = GridCells.Fixed(2),
+                            contentPadding = PaddingValues(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            itemsIndexed(filteredFavorites, key = { index, it -> "fav_grid_${it.id}_$index" }) { index, canal ->
+                                FavoriteGridCard(
+                                    canal = canal,
+                                    isSelected = selectedChannel?.id == canal.id,
+                                    onFocused = {
+                                        favoritesGridState.animateScrollAndCentralizeItem(index, coroutineScope)
+                                    },
+                                    onClick = {
+                                        selectedChannel = canal
+                                        TvRepository.lastPlayedChannel = canal
+                                        prefs.edit().putString("last_selected_channel_id", canal.id).apply()
+                                    },
+                                    onLongClick = { toggleFavorite(canal) }
+                                )
                             }
-                        } else {
-                            LazyRow(
-                                state = channelsRowState,
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                itemsIndexed(filteredChannels, key = { index, it -> "all_${it.id}_$index" }) { index, canal ->
-                                    val isCurrentSelected = selectedChannel?.id == canal.id
-                                    val focusRequester = remember { FocusRequester() }
+                        }
+                    }
+                }
 
-                                    LaunchedEffect(selectedChannel) {
-                                        if (isCurrentSelected && !hasRequestedInitialFocus) {
-                                            delay(400)
-                                            try {
-                                                focusRequester.requestFocus()
-                                                hasRequestedInitialFocus = true
-                                            } catch (e: Exception) {}
-                                        }
-                                    }
+                // LADO DERECHO: MINI REPRODUCTOR Y LISTA DE CANALES
+                Column(
+                    modifier = Modifier
+                        .weight(0.5f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = selectedChannel?.title ?: "Selecciona un canal",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 2.dp)
+                    )
 
-                                    HorizontalChannelCard(
-                                        canal = canal,
-                                        isFavorite = favoriteIds.contains(canal.id),
-                                        isSelected = isCurrentSelected,
-                                        onFocused = {
-                                            channelsRowState.animateScrollAndCentralizeItem(index, coroutineScope)
-                                        },
-                                        onClick = {
-                                            selectedChannel = canal
-                                            TvRepository.lastPlayedChannel = canal
-                                            prefs.edit().putString("last_selected_channel_id", canal.id).apply()
-                                        },
-                                        onLongClick = { toggleFavorite(canal) },
-                                        modifier = Modifier.focusRequester(focusRequester)
-                                    )
+                    var isMiniFocused by remember { mutableStateOf(false) }
+                    val borderColor = if (isMiniFocused) GoldAccent else if (isChannelOffline) RedLive else RedLive.copy(alpha = 0.8f)
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.Black)
+                            .border(3.dp, borderColor, RoundedCornerShape(12.dp))
+                            .onFocusChanged { isMiniFocused = it.isFocused }
+                            .focusable()
+                            .onKeyEvent { keyEvent ->
+                                val keyCode = keyEvent.nativeKeyEvent.keyCode
+                                val isOkKey = keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
+                                        keyCode == AndroidKeyEvent.KEYCODE_ENTER ||
+                                        keyCode == AndroidKeyEvent.KEYCODE_NUMPAD_ENTER ||
+                                        keyCode == AndroidKeyEvent.KEYCODE_BUTTON_A
+
+                                if (isOkKey && keyEvent.type == KeyEventType.KeyUp) {
+                                    onToggleFullScreen(true)
+                                    true
+                                } else {
+                                    false
                                 }
                             }
-                        }
-
-                        selectedChannel?.let { canal ->
-                            SelectedChannelDetailCard(
-                                canal = canal,
-                                isFavorite = favoriteIds.contains(canal.id),
-                                onToggleFavorite = { toggleFavorite(canal) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f)
+                            .clickable { onToggleFullScreen(true) }
+                    ) {
+                        if (!isFullScreen) {
+                            RobustTexturePlayer(
+                                exoPlayer = exoPlayer,
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
+
+                        ChannelStatusOverlay(
+                            channel = selectedChannel,
+                            isOffline = isChannelOffline,
+                            isLoading = isChannelLoading,
+                            isMini = true
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(start = 2.dp)
+                    ) {
+                        Icon(Icons.Default.Tv, contentDescription = null, tint = GoldAccent)
+                        Text(
+                            text = "Todos los Canales (${filteredChannels.size})",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.LightGray
+                        )
+                    }
+
+                    if (filteredChannels.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(80.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("No se encontraron canales", color = Color.Gray, fontSize = 13.sp)
+                        }
+                    } else {
+                        LazyRow(
+                            state = channelsRowState,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            itemsIndexed(filteredChannels, key = { index, it -> "all_${it.id}_$index" }) { index, canal ->
+                                val isCurrentSelected = selectedChannel?.id == canal.id
+                                val focusRequester = remember { FocusRequester() }
+
+                                LaunchedEffect(selectedChannel) {
+                                    if (isCurrentSelected && !hasRequestedInitialFocus) {
+                                        delay(400)
+                                        try {
+                                            focusRequester.requestFocus()
+                                            hasRequestedInitialFocus = true
+                                        } catch (e: Exception) {}
+                                    }
+                                }
+
+                                HorizontalChannelCard(
+                                    canal = canal,
+                                    isFavorite = favoriteIds.contains(canal.id),
+                                    isSelected = isCurrentSelected,
+                                    onFocused = {
+                                        channelsRowState.animateScrollAndCentralizeItem(index, coroutineScope)
+                                    },
+                                    onClick = {
+                                        selectedChannel = canal
+                                        TvRepository.lastPlayedChannel = canal
+                                        prefs.edit().putString("last_selected_channel_id", canal.id).apply()
+                                    },
+                                    onLongClick = { toggleFavorite(canal) },
+                                    modifier = Modifier.focusRequester(focusRequester)
+                                )
+                            }
+                        }
+                    }
+
+                    selectedChannel?.let { canal ->
+                        SelectedChannelDetailCard(
+                            canal = canal,
+                            isFavorite = favoriteIds.contains(canal.id),
+                            onToggleFavorite = { toggleFavorite(canal) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        )
                     }
                 }
             }
         }
     }
+}
+
+// -------------------------------------------------------------
+// REPRODUCTOR FLUIDO BASADO EN TEXTURE_VIEW (SIN PANTALLA NEGRA)
+// -------------------------------------------------------------
+@Composable
+fun RobustTexturePlayer(
+    exoPlayer: ExoPlayer?,
+    modifier: Modifier = Modifier
+) {
+    AndroidView(
+        factory = { context ->
+            FrameLayout(context).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                val textureView = TextureView(context).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                }
+                addView(textureView)
+                exoPlayer?.setVideoTextureView(textureView)
+            }
+        },
+        update = { frameLayout ->
+            val textureView = frameLayout.getChildAt(0) as? TextureView
+            if (textureView != null && exoPlayer != null) {
+                exoPlayer.setVideoTextureView(textureView)
+            }
+        },
+        modifier = modifier
+    )
 }
 
 // -------------------------------------------------------------
@@ -1015,7 +1102,7 @@ fun ChannelStatusOverlay(
             modifier = Modifier.padding(8.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                coil.compose.SubcomposeAsyncImage(
+                AsyncImage(
                     model = channel?.imageUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
@@ -1024,19 +1111,7 @@ fun ChannelStatusOverlay(
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color.Black)
                         .padding(4.dp)
-                ) {
-                    val state = painter.state
-                    if (state is coil.compose.AsyncImagePainter.State.Success) {
-                        SubcomposeAsyncImageContent()
-                    } else {
-                        Icon(
-                            imageVector = if (isOffline) Icons.Default.TvOff else Icons.Default.Tv,
-                            contentDescription = null,
-                            tint = if (isOffline) RedLive else GoldAccent,
-                            modifier = Modifier.size(if (isMini) 28.dp else 50.dp)
-                        )
-                    }
-                }
+                )
             }
 
             if (isOffline) {
@@ -1072,128 +1147,6 @@ fun ChannelStatusOverlay(
                 }
             }
         }
-    }
-}
-
-// -------------------------------------------------------------
-// CONTENEDOR DE PANTALLA COMPLETA CON MENÚ LATERAL
-// -------------------------------------------------------------
-@OptIn(UnstableApi::class)
-@Composable
-fun FullScreenPlayerContainer(
-    playerView: PlayerView,
-    exoPlayer: ExoPlayer?,
-    selectedChannel: Modelo?,
-    isChannelLoading: Boolean,
-    isChannelOffline: Boolean,
-    favoriteChannels: List<Modelo>,
-    isMenuVisible: Boolean,
-    onCloseMenu: () -> Unit,
-    onSelectFavoriteChannel: (Modelo) -> Unit,
-    onToggleMenu: () -> Unit
-) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        AndroidView(
-            factory = {
-                (playerView.parent as? ViewGroup)?.removeView(playerView)
-                playerView.player = exoPlayer
-                playerView
-            },
-            update = { view ->
-                if (view.player != exoPlayer) {
-                    view.player = exoPlayer
-                }
-                exoPlayer?.let { p ->
-                    if (!p.isPlaying && p.playWhenReady) {
-                        p.play()
-                    }
-                }
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable { onToggleMenu() }
-        )
-
-        // Overlay de carga o canal caído en pantalla completa
-        ChannelStatusOverlay(
-            channel = selectedChannel,
-            isOffline = isChannelOffline,
-            isLoading = isChannelLoading,
-            isMini = false
-        )
-
-        AnimatedVisibility(
-            visible = isMenuVisible,
-            enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-            exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
-            modifier = Modifier.align(Alignment.CenterEnd)
-        ) {
-            FavoritesOverlayMenu(
-                favoriteChannels = favoriteChannels,
-                currentStreamUrl = selectedChannel?.streamUrl ?: "",
-                isMenuVisible = isMenuVisible,
-                onCloseMenu = onCloseMenu,
-                onSelectChannel = onSelectFavoriteChannel
-            )
-        }
-    }
-}
-
-// -------------------------------------------------------------
-// MINI REPRODUCTOR EN MODO VISTA DIVIDIDA
-// -------------------------------------------------------------
-@OptIn(UnstableApi::class)
-@Composable
-fun TvMiniPlayerBox(
-    playerView: PlayerView,
-    selectedChannel: Modelo?,
-    isChannelLoading: Boolean,
-    isChannelOffline: Boolean,
-    onOpenFullScreen: () -> Unit
-) {
-    var isFocused by remember { mutableStateOf(false) }
-    val borderColor = if (isFocused) GoldAccent else if (isChannelOffline) RedLive else RedLive.copy(alpha = 0.8f)
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(16f / 9f)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.Black)
-            .border(3.dp, borderColor, RoundedCornerShape(12.dp))
-            .onFocusChanged { isFocused = it.isFocused }
-            .focusable()
-            .onKeyEvent { keyEvent ->
-                val keyCode = keyEvent.nativeKeyEvent.keyCode
-                if (keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER || keyCode == AndroidKeyEvent.KEYCODE_ENTER) {
-                    if (keyEvent.type == KeyEventType.KeyUp) {
-                        onOpenFullScreen()
-                    }
-                    true
-                } else {
-                    false
-                }
-            }
-            .clickable { onOpenFullScreen() }
-    ) {
-        AndroidView(
-            factory = {
-                (playerView.parent as? ViewGroup)?.removeView(playerView)
-                playerView
-            },
-            update = { view ->
-                view.invalidate()
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-
-        // Overlay de carga o canal caído en modo mini
-        ChannelStatusOverlay(
-            channel = selectedChannel,
-            isOffline = isChannelOffline,
-            isLoading = isChannelLoading,
-            isMini = true
-        )
     }
 }
 
@@ -1350,7 +1303,7 @@ fun FavoriteMenuItem(
             .clickable { onSelect() }
             .padding(10.dp)
     ) {
-        coil.compose.SubcomposeAsyncImage(
+        AsyncImage(
             model = canal.imageUrl,
             contentDescription = canal.title,
             contentScale = ContentScale.Fit,
@@ -1359,19 +1312,7 @@ fun FavoriteMenuItem(
                 .clip(RoundedCornerShape(6.dp))
                 .background(Color.Black)
                 .padding(2.dp)
-        ) {
-            val state = painter.state
-            if (state is coil.compose.AsyncImagePainter.State.Success) {
-                SubcomposeAsyncImageContent()
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Tv,
-                    contentDescription = null,
-                    tint = RedLive,
-                    modifier = Modifier.padding(6.dp)
-                )
-            }
-        }
+        )
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -1451,7 +1392,9 @@ fun FavoriteGridCard(
             .onKeyEvent { keyEvent ->
                 val keyCode = keyEvent.nativeKeyEvent.keyCode
                 val isSelectKey = keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
-                        keyCode == AndroidKeyEvent.KEYCODE_ENTER
+                        keyCode == AndroidKeyEvent.KEYCODE_ENTER ||
+                        keyCode == AndroidKeyEvent.KEYCODE_NUMPAD_ENTER ||
+                        keyCode == AndroidKeyEvent.KEYCODE_BUTTON_A
 
                 if (isSelectKey) {
                     when (keyEvent.type) {
@@ -1493,24 +1436,12 @@ fun FavoriteGridCard(
             modifier = Modifier.size(45.dp),
             contentAlignment = Alignment.Center
         ) {
-            coil.compose.SubcomposeAsyncImage(
+            AsyncImage(
                 model = canal.imageUrl,
                 contentDescription = canal.title,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
-            ) {
-                val state = painter.state
-                if (state is coil.compose.AsyncImagePainter.State.Success) {
-                    SubcomposeAsyncImageContent()
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Tv,
-                        contentDescription = null,
-                        tint = RedLive,
-                        modifier = Modifier.padding(6.dp)
-                    )
-                }
-            }
+            )
 
             Box(
                 modifier = Modifier
@@ -1759,7 +1690,9 @@ fun HorizontalChannelCard(
             .onKeyEvent { keyEvent ->
                 val keyCode = keyEvent.nativeKeyEvent.keyCode
                 val isSelectKey = keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
-                        keyCode == AndroidKeyEvent.KEYCODE_ENTER
+                        keyCode == AndroidKeyEvent.KEYCODE_ENTER ||
+                        keyCode == AndroidKeyEvent.KEYCODE_NUMPAD_ENTER ||
+                        keyCode == AndroidKeyEvent.KEYCODE_BUTTON_A
 
                 if (isSelectKey) {
                     when (keyEvent.type) {
@@ -1803,24 +1736,12 @@ fun HorizontalChannelCard(
                 .height(55.dp),
             contentAlignment = Alignment.Center
         ) {
-            coil.compose.SubcomposeAsyncImage(
+            AsyncImage(
                 model = canal.imageUrl,
                 contentDescription = canal.title,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
-            ) {
-                val state = painter.state
-                if (state is coil.compose.AsyncImagePainter.State.Success) {
-                    SubcomposeAsyncImageContent()
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Tv,
-                        contentDescription = null,
-                        tint = RedLive,
-                        modifier = Modifier.padding(10.dp)
-                    )
-                }
-            }
+            )
 
             if (isFavorite) {
                 Box(
