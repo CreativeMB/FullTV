@@ -45,8 +45,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.TvOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -286,6 +288,10 @@ fun TvInteractiveScreen(
     var selectedChannel by remember { mutableStateOf<Modelo?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
+    // Estados de reproducción del canal activo
+    var isChannelLoading by remember { mutableStateOf(true) }
+    var isChannelOffline by remember { mutableStateOf(false) }
+
     val filteredChannels = remember(searchQuery, masterChannels) {
         if (searchQuery.isBlank()) {
             masterChannels
@@ -311,10 +317,9 @@ fun TvInteractiveScreen(
         if (filteredFavorites.isNotEmpty()) filteredFavorites else masterChannels
     }
 
-    // Instancia persistente del reproductor ExoPlayer
+    // Instancia persistente del reproductor
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
 
-    // Vista persistente única para evitar recreación de SurfaceView y pantalla negra
     val persistentPlayerView = remember(context) {
         PlayerView(context).apply {
             useController = false
@@ -380,12 +385,28 @@ fun TvInteractiveScreen(
             }
 
         player.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) {
+                    isChannelLoading = false
+                    isChannelOffline = false
+                }
+            }
+
+            override fun onRenderedFirstFrame() {
+                isChannelLoading = false
+                isChannelOffline = false
+            }
+
             override fun onPlayerError(error: PlaybackException) {
+                Log.e("TV_PLAYER", "Playback Error: ${error.errorCodeName}", error)
+                isChannelLoading = false
+                isChannelOffline = true
+
                 if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
                     player.seekToDefaultPosition()
+                    player.prepare()
+                    player.play()
                 }
-                player.prepare()
-                player.play()
             }
         })
 
@@ -414,16 +435,23 @@ fun TvInteractiveScreen(
         }
     }
 
-    // Actualizar señal en el reproductor
+    // Actualizar señal y verificar timeout/error del canal
     LaunchedEffect(selectedChannel, exoPlayer) {
         val player = exoPlayer ?: return@LaunchedEffect
         val canal = selectedChannel ?: return@LaunchedEffect
+
+        // Limpiar el canal previo para que no quede la imagen congelada
+        player.stop()
+        player.clearMediaItems()
+        isChannelLoading = true
+        isChannelOffline = false
+
         if (canal.streamUrl.isNotEmpty()) {
             val httpDataSourceFactory = DefaultHttpDataSource.Factory()
                 .setAllowCrossProtocolRedirects(true)
                 .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
-                .setConnectTimeoutMs(15000)
-                .setReadTimeoutMs(15000)
+                .setConnectTimeoutMs(10000)
+                .setReadTimeoutMs(10000)
 
             val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
             val uri = Uri.parse(canal.streamUrl)
@@ -464,10 +492,21 @@ fun TvInteractiveScreen(
             player.setMediaSource(mediaSource)
             player.prepare()
             player.play()
+
+            // Detector de timeout (si no conecta en 8 segundos, marcar como canal caído)
+            launch {
+                delay(8000)
+                if (isChannelLoading && !player.isPlaying && player.playbackState != Player.STATE_READY) {
+                    isChannelLoading = false
+                    isChannelOffline = true
+                }
+            }
+        } else {
+            isChannelLoading = false
+            isChannelOffline = true
         }
     }
 
-    // Handler para navegar canales con el control remoto
     DisposableEffect(activeChannelsList, selectedChannel) {
         val handler: (Boolean) -> Unit = { siguiente ->
             if (activeChannelsList.isNotEmpty()) {
@@ -491,7 +530,8 @@ fun TvInteractiveScreen(
     val favoritesGridState = rememberLazyGridState()
     val channelsRowState = rememberLazyListState()
 
-    LaunchedEffect(Unit) {
+    val cargarCanales: () -> Unit = {
+        isLoading = true
         coroutineScope.launch(Dispatchers.IO) {
             val savedChannelId = prefs.getString("last_selected_channel_id", null)
 
@@ -533,13 +573,23 @@ fun TvInteractiveScreen(
                         isLoading = false
                     }
                 } else {
-                    withContext(Dispatchers.Main) { isLoading = false }
+                    withContext(Dispatchers.Main) {
+                        masterChannels = emptyList()
+                        isLoading = false
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("TV_ACTIVITY", "Error Firebase", e)
-                withContext(Dispatchers.Main) { isLoading = false }
+                withContext(Dispatchers.Main) {
+                    masterChannels = emptyList()
+                    isLoading = false
+                }
             }
         }
+    }
+
+    LaunchedEffect(Unit) {
+        cargarCanales()
     }
 
     val toggleFavorite = { canal: Modelo ->
@@ -555,6 +605,7 @@ fun TvInteractiveScreen(
         prefs.edit().putStringSet("fav_ids", newFavs).apply()
     }
 
+    // 1. PANTALLA DE CARGA
     if (isLoading) {
         Box(
             modifier = Modifier
@@ -579,16 +630,26 @@ fun TvInteractiveScreen(
                 )
             }
         }
-    } else {
+    }
+    // 2. PANTALLA DE MANTENIMIENTO
+    else if (masterChannels.isEmpty()) {
+        TvMaintenanceScreen(
+            onRetry = {
+                TvRepository.channelListMaster = emptyList()
+                cargarCanales()
+            }
+        )
+    }
+    // 3. INTERFAZ NORMAL CON CANALES
+    else {
         Box(modifier = Modifier.fillMaxSize()) {
             if (isFullScreen) {
-                // =========================================================
-                // 1. MODO PANTALLA COMPLETA CONTINUO (SIN PANTALLA NEGRA)
-                // =========================================================
                 FullScreenPlayerContainer(
                     playerView = persistentPlayerView,
                     exoPlayer = exoPlayer,
                     selectedChannel = selectedChannel,
+                    isChannelLoading = isChannelLoading,
+                    isChannelOffline = isChannelOffline,
                     favoriteChannels = if (filteredFavorites.isNotEmpty()) filteredFavorites else masterChannels,
                     isMenuVisible = isSideMenuVisible,
                     onCloseMenu = { onToggleSideMenu(false) },
@@ -601,9 +662,6 @@ fun TvInteractiveScreen(
                     onToggleMenu = { onToggleSideMenu(!isSideMenuVisible) }
                 )
             } else {
-                // =========================================================
-                // 2. MODO INTERACTIVO DIVIDIDO (50% / 50%)
-                // =========================================================
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
@@ -752,6 +810,9 @@ fun TvInteractiveScreen(
 
                         TvMiniPlayerBox(
                             playerView = persistentPlayerView,
+                            selectedChannel = selectedChannel,
+                            isChannelLoading = isChannelLoading,
+                            isChannelOffline = isChannelOffline,
                             onOpenFullScreen = { onToggleFullScreen(true) }
                         )
 
@@ -836,6 +897,185 @@ fun TvInteractiveScreen(
 }
 
 // -------------------------------------------------------------
+// PANTALLA DE MANTENIMIENTO
+// -------------------------------------------------------------
+@Composable
+fun TvMaintenanceScreen(
+    onRetry: () -> Unit
+) {
+    var isRetryFocused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(targetValue = if (isRetryFocused) 1.1f else 1.0f, label = "retryScale")
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(200)
+        try {
+            focusRequester.requestFocus()
+        } catch (e: Exception) {}
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DeepDarkBg),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Tv,
+                contentDescription = null,
+                tint = GoldAccent,
+                modifier = Modifier.size(72.dp)
+            )
+
+            Text(
+                text = "ESTAMOS EN MANTENIMIENTO",
+                color = Color.White,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = "Estamos actualizando y mejorando nuestra lista de canales para brindarte una mejor experiencia.\nPor favor, vuelve a intentar en unos momentos.",
+                color = Color.LightGray,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 20.sp,
+                modifier = Modifier.widthIn(max = 550.dp)
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(containerColor = GoldAccent),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .focusRequester(focusRequester)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                    .onFocusChanged { isRetryFocused = it.isFocused }
+                    .border(
+                        width = 2.5.dp,
+                        color = if (isRetryFocused) Color.White else Color.Transparent,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        tint = Color.Black,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "REINTENTAR CONEXIÓN",
+                        color = Color.Black,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// CONTENEDOR DE ESTADO DEL CANAL (CONECTANDO / FUERA DE LÍNEA)
+// -------------------------------------------------------------
+@Composable
+fun ChannelStatusOverlay(
+    channel: Modelo?,
+    isOffline: Boolean,
+    isLoading: Boolean,
+    isMini: Boolean = false
+) {
+    if (!isOffline && !isLoading) return
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0C0C14).copy(alpha = 0.94f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(if (isMini) 6.dp else 12.dp),
+            modifier = Modifier.padding(8.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                coil.compose.SubcomposeAsyncImage(
+                    model = channel?.imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .size(if (isMini) 45.dp else 80.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Black)
+                        .padding(4.dp)
+                ) {
+                    val state = painter.state
+                    if (state is coil.compose.AsyncImagePainter.State.Success) {
+                        SubcomposeAsyncImageContent()
+                    } else {
+                        Icon(
+                            imageVector = if (isOffline) Icons.Default.TvOff else Icons.Default.Tv,
+                            contentDescription = null,
+                            tint = if (isOffline) RedLive else GoldAccent,
+                            modifier = Modifier.size(if (isMini) 28.dp else 50.dp)
+                        )
+                    }
+                }
+            }
+
+            if (isOffline) {
+                Text(
+                    text = "SEÑAL NO DISPONIBLE",
+                    color = RedLive,
+                    fontSize = if (isMini) 12.sp else 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "Canal temporalmente fuera de línea",
+                    color = Color.LightGray,
+                    fontSize = if (isMini) 10.sp else 13.sp,
+                    textAlign = TextAlign.Center
+                )
+            } else if (isLoading) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CircularProgressIndicator(
+                        color = GoldAccent,
+                        modifier = Modifier.size(if (isMini) 16.dp else 24.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Text(
+                        text = "Conectando señal...",
+                        color = Color.White,
+                        fontSize = if (isMini) 11.sp else 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------
 // CONTENEDOR DE PANTALLA COMPLETA CON MENÚ LATERAL
 // -------------------------------------------------------------
 @OptIn(UnstableApi::class)
@@ -844,37 +1084,14 @@ fun FullScreenPlayerContainer(
     playerView: PlayerView,
     exoPlayer: ExoPlayer?,
     selectedChannel: Modelo?,
+    isChannelLoading: Boolean,
+    isChannelOffline: Boolean,
     favoriteChannels: List<Modelo>,
     isMenuVisible: Boolean,
     onCloseMenu: () -> Unit,
     onSelectFavoriteChannel: (Modelo) -> Unit,
     onToggleMenu: () -> Unit
 ) {
-    var isBuffering by remember { mutableStateOf(false) }
-
-    DisposableEffect(exoPlayer) {
-        val player = exoPlayer ?: return@DisposableEffect onDispose {}
-        val listener = object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                isBuffering = playbackState == Player.STATE_BUFFERING
-            }
-
-            override fun onPlayerError(error: PlaybackException) {
-                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
-                    player.seekToDefaultPosition()
-                }
-                player.prepare()
-                player.play()
-            }
-        }
-        player.addListener(listener)
-        isBuffering = player.playbackState == Player.STATE_BUFFERING
-
-        onDispose {
-            player.removeListener(listener)
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             factory = {
@@ -897,35 +1114,13 @@ fun FullScreenPlayerContainer(
                 .clickable { onToggleMenu() }
         )
 
-        // Spinner flotante no invasivo (no tapa el video)
-        if (isBuffering) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                contentAlignment = Alignment.TopEnd
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    CircularProgressIndicator(
-                        color = GoldAccent,
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp
-                    )
-                    Text(
-                        text = "Cargando señal...",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
+        // Overlay de carga o canal caído en pantalla completa
+        ChannelStatusOverlay(
+            channel = selectedChannel,
+            isOffline = isChannelOffline,
+            isLoading = isChannelLoading,
+            isMini = false
+        )
 
         AnimatedVisibility(
             visible = isMenuVisible,
@@ -951,10 +1146,13 @@ fun FullScreenPlayerContainer(
 @Composable
 fun TvMiniPlayerBox(
     playerView: PlayerView,
+    selectedChannel: Modelo?,
+    isChannelLoading: Boolean,
+    isChannelOffline: Boolean,
     onOpenFullScreen: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
-    val borderColor = if (isFocused) GoldAccent else RedLive.copy(alpha = 0.8f)
+    val borderColor = if (isFocused) GoldAccent else if (isChannelOffline) RedLive else RedLive.copy(alpha = 0.8f)
 
     Box(
         modifier = Modifier
@@ -987,6 +1185,14 @@ fun TvMiniPlayerBox(
                 view.invalidate()
             },
             modifier = Modifier.fillMaxSize()
+        )
+
+        // Overlay de carga o canal caído en modo mini
+        ChannelStatusOverlay(
+            channel = selectedChannel,
+            isOffline = isChannelOffline,
+            isLoading = isChannelLoading,
+            isMini = true
         )
     }
 }
