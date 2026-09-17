@@ -116,6 +116,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.text.Normalizer
+import androidx.compose.ui.res.painterResource
+import com.creativem.fulltv.R
+
+
 
 val GoldAccent = Color(0xFFC5A059)
 val DeepDarkBg = Color(0xFF000000)
@@ -1105,6 +1109,9 @@ fun ChannelStatusOverlay(
                 AsyncImage(
                     model = channel?.imageUrl,
                     contentDescription = null,
+                    error = painterResource(id = R.drawable.pelifondo),
+                    placeholder = painterResource(id = R.drawable.pelifondo),
+                    fallback = painterResource(id = R.drawable.pelifondo),
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .size(if (isMini) 45.dp else 80.dp)
@@ -1306,6 +1313,9 @@ fun FavoriteMenuItem(
         AsyncImage(
             model = canal.imageUrl,
             contentDescription = canal.title,
+            error = painterResource(id = R.drawable.pelifondo),
+            placeholder = painterResource(id = R.drawable.pelifondo),
+            fallback = painterResource(id = R.drawable.pelifondo),
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .size(45.dp)
@@ -1439,6 +1449,9 @@ fun FavoriteGridCard(
             AsyncImage(
                 model = canal.imageUrl,
                 contentDescription = canal.title,
+                error = painterResource(id = R.drawable.pelifondo),
+                placeholder = painterResource(id = R.drawable.pelifondo),
+                fallback = painterResource(id = R.drawable.pelifondo),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
             )
@@ -1501,6 +1514,9 @@ fun SelectedChannelDetailCard(
             AsyncImage(
                 model = canal.imageUrl,
                 contentDescription = canal.title,
+                error = painterResource(id = R.drawable.pelifondo),
+                placeholder = painterResource(id = R.drawable.pelifondo),
+                fallback = painterResource(id = R.drawable.pelifondo),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .size(36.dp)
@@ -1576,7 +1592,6 @@ fun SelectedChannelDetailCard(
         }
     }
 }
-
 // -------------------------------------------------------------
 // BUSCADOR TV
 // -------------------------------------------------------------
@@ -1739,6 +1754,9 @@ fun HorizontalChannelCard(
             AsyncImage(
                 model = canal.imageUrl,
                 contentDescription = canal.title,
+                error = painterResource(id = R.drawable.pelifondo),
+                placeholder = painterResource(id = R.drawable.pelifondo),
+                fallback = painterResource(id = R.drawable.pelifondo),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
             )
