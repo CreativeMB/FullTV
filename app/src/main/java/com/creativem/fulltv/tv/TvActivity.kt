@@ -28,6 +28,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -67,6 +68,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -101,6 +103,8 @@ import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.AudioFocusHelper
 import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Modelo
@@ -116,10 +120,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.text.Normalizer
-import androidx.compose.ui.res.painterResource
-import com.creativem.fulltv.R
-
-
 
 val GoldAccent = Color(0xFFC5A059)
 val DeepDarkBg = Color(0xFF000000)
@@ -240,6 +240,36 @@ class TvActivity : ComponentActivity() {
 }
 
 // -------------------------------------------------------------
+// COMPOSABLE LOGO DE CANAL OPTIMIZADO
+// -------------------------------------------------------------
+@Composable
+fun ChannelLogoImage(
+    imageUrl: String?,
+    contentDescription: String?,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val imageRequest = remember(imageUrl) {
+        val finalUrl = imageUrl?.trim().orEmpty()
+        ImageRequest.Builder(context)
+            .data(if (finalUrl.isEmpty()) R.drawable.pelifondo else finalUrl)
+            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .crossfade(true)
+            .error(R.drawable.pelifondo)
+            .placeholder(R.drawable.pelifondo)
+            .fallback(R.drawable.pelifondo)
+            .build()
+    }
+
+    AsyncImage(
+        model = imageRequest,
+        contentDescription = contentDescription,
+        contentScale = ContentScale.FillBounds,
+        modifier = modifier
+    )
+}
+
+// -------------------------------------------------------------
 // COMPOSABLE PRINCIPAL
 // -------------------------------------------------------------
 @OptIn(UnstableApi::class)
@@ -262,6 +292,7 @@ fun TvInteractiveScreen(
     var selectedChannel by remember { mutableStateOf<Modelo?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
+    var reloadTrigger by remember { mutableLongStateOf(0L) }
     var isChannelLoading by remember { mutableStateOf(true) }
     var isChannelOffline by remember { mutableStateOf(false) }
 
@@ -286,8 +317,8 @@ fun TvInteractiveScreen(
         }
     }
 
-    val activeChannelsList = remember(filteredFavorites, masterChannels) {
-        if (filteredFavorites.isNotEmpty()) filteredFavorites else masterChannels
+    val activeChannelsList = remember(filteredChannels, masterChannels) {
+        if (filteredChannels.isNotEmpty()) filteredChannels else masterChannels
     }
 
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
@@ -310,22 +341,31 @@ fun TvInteractiveScreen(
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
             .setLoadErrorHandlingPolicy(errorHandlingPolicy)
 
+        // Búfer optimizado para evitar pérdida de paquetes y artefactos en video
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(12000, 12000, 1500, 2000)
+            .setBufferDurationsMs(
+                15000, // Min buffer
+                30000, // Max buffer
+                1500,  // Buffer playback
+                2500   // Buffer rebuffer
+            )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
+        // 🟢 FORZAR LA MÁXIMA CALIDAD HD Y EVITAR PIXELACIÓN
         val trackSelector = DefaultTrackSelector(context).apply {
             setParameters(
                 buildUponParameters()
-                    .setMaxVideoSize(1920, 1080)
-                    .setForceHighestSupportedBitrate(false)
+                    .setMaxVideoSize(3840, 2160) // Hasta 4K / 1080p
+                    .setForceHighestSupportedBitrate(true) // 🟢 Fuerza la pista de mayor resolución y bitrate disponible
+                    .setAllowVideoMixedMimeTypeAdaptiveness(true)
             )
         }
 
+        // 🟢 DECODIFICACIÓN POR HARDWARE NATIVA (Elimina los bloques pixelados)
         val renderersFactory = DefaultRenderersFactory(context).apply {
-            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
-            setEnableDecoderFallback(true)
+            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            setEnableDecoderFallback(true) // Si un códec falla, busca automáticamente el nativo del sistema
         }
 
         val player = ExoPlayer.Builder(context, renderersFactory)
@@ -341,30 +381,65 @@ fun TvInteractiveScreen(
             )
             .build().apply {
                 playWhenReady = true
+                videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT // Mantiene la relación de aspecto nítida sin deformar
             }
+
+        var retryCount = 0
 
         player.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_READY) {
-                    isChannelLoading = false
-                    isChannelOffline = false
+                when (playbackState) {
+                    Player.STATE_READY -> {
+                        retryCount = 0
+                        isChannelLoading = false
+                        isChannelOffline = false
+                    }
+                    Player.STATE_BUFFERING -> {
+                        isChannelLoading = true
+                    }
+                    Player.STATE_ENDED -> {
+                        player.seekToDefaultPosition()
+                        player.prepare()
+                        player.play()
+                    }
+                    else -> {}
                 }
             }
 
             override fun onRenderedFirstFrame() {
+                retryCount = 0
                 isChannelLoading = false
                 isChannelOffline = false
             }
 
             override fun onPlayerError(error: PlaybackException) {
                 Log.e("TV_PLAYER", "Playback Error: ${error.errorCodeName}", error)
-                isChannelLoading = false
-                isChannelOffline = true
+                retryCount++
 
-                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
-                    player.seekToDefaultPosition()
-                    player.prepare()
-                    player.play()
+                if (retryCount <= 2) {
+                    isChannelLoading = true
+                    coroutineScope.launch {
+                        delay(1000)
+                        player.seekToDefaultPosition()
+                        player.prepare()
+                        player.play()
+                    }
+                } else {
+                    retryCount = 0
+                    isChannelLoading = false
+                    isChannelOffline = true
+                    coroutineScope.launch {
+                        delay(1000)
+                        if (activeChannelsList.isNotEmpty()) {
+                            val indexActual = activeChannelsList.indexOfFirst { it.streamUrl == selectedChannel?.streamUrl }
+                            val nuevoIndex = if (indexActual == -1 || indexActual >= activeChannelsList.size - 1) 0 else indexActual + 1
+                            val siguienteCanal = activeChannelsList[nuevoIndex]
+                            selectedChannel = siguienteCanal
+                            TvRepository.lastPlayedChannel = siguienteCanal
+                            prefs.edit().putString("last_selected_channel_id", siguienteCanal.id).apply()
+                            reloadTrigger = System.currentTimeMillis()
+                        }
+                    }
                 }
             }
         })
@@ -392,7 +467,7 @@ fun TvInteractiveScreen(
         }
     }
 
-    LaunchedEffect(selectedChannel, exoPlayer) {
+    LaunchedEffect(selectedChannel, reloadTrigger, exoPlayer) {
         val player = exoPlayer ?: return@LaunchedEffect
         val canal = selectedChannel ?: return@LaunchedEffect
 
@@ -401,12 +476,27 @@ fun TvInteractiveScreen(
         isChannelLoading = true
         isChannelOffline = false
 
-        if (canal.streamUrl.isNotEmpty()) {
+        // 🟢 Salto inteligente al siguiente canal en la lista general actual
+        fun pasarAlSiguienteCanal() {
+            val listaActual = if (filteredChannels.isNotEmpty()) filteredChannels else masterChannels
+            if (listaActual.isNotEmpty()) {
+                val indexActual = listaActual.indexOfFirst { it.id == selectedChannel?.id || it.streamUrl == selectedChannel?.streamUrl }
+                val nuevoIndex = if (indexActual == -1 || indexActual >= listaActual.size - 1) 0 else indexActual + 1
+                val siguienteCanal = listaActual[nuevoIndex]
+
+                selectedChannel = siguienteCanal
+                TvRepository.lastPlayedChannel = siguienteCanal
+                prefs.edit().putString("last_selected_channel_id", siguienteCanal.id).apply()
+                reloadTrigger = System.currentTimeMillis()
+            }
+        }
+
+        if (canal.streamUrl.isNotBlank()) {
             val httpDataSourceFactory = DefaultHttpDataSource.Factory()
                 .setAllowCrossProtocolRedirects(true)
                 .setUserAgent("VLC/3.0.18 LibVLC/3.0.18")
-                .setConnectTimeoutMs(10000)
-                .setReadTimeoutMs(10000)
+                .setConnectTimeoutMs(8000)
+                .setReadTimeoutMs(8000)
 
             val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
             val uri = Uri.parse(canal.streamUrl)
@@ -448,16 +538,21 @@ fun TvInteractiveScreen(
             player.prepare()
             player.play()
 
+            // 🟢 Si tras 5 segundos no conecta, muestra aviso y pasa al canal contiguo en la lista
             launch {
-                delay(8000)
-                if (isChannelLoading && !player.isPlaying && player.playbackState != Player.STATE_READY) {
+                delay(5000)
+                if (!player.isPlaying && player.playbackState != Player.STATE_READY) {
                     isChannelLoading = false
                     isChannelOffline = true
+                    delay(1000)
+                    pasarAlSiguienteCanal()
                 }
             }
         } else {
             isChannelLoading = false
             isChannelOffline = true
+            delay(800)
+            pasarAlSiguienteCanal()
         }
     }
 
@@ -474,15 +569,36 @@ fun TvInteractiveScreen(
                 selectedChannel = nuevoCanal
                 TvRepository.lastPlayedChannel = nuevoCanal
                 prefs.edit().putString("last_selected_channel_id", nuevoCanal.id).apply()
+                reloadTrigger = System.currentTimeMillis()
             }
         }
         setNextPreviousChannelHandler(handler)
         onDispose { setNextPreviousChannelHandler(null) }
     }
 
-    var hasRequestedInitialFocus by remember { mutableStateOf(false) }
     val favoritesGridState = rememberLazyGridState()
     val channelsRowState = rememberLazyListState()
+    val miniPlayerFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(isFullScreen, isLoading) {
+        if (!isFullScreen && !isLoading) {
+            delay(300)
+            try {
+                miniPlayerFocusRequester.requestFocus()
+            } catch (e: Exception) {}
+        }
+    }
+
+    val seleccionarCanalConRecarga: (Modelo) -> Unit = { canal ->
+        if (selectedChannel?.id == canal.id) {
+            reloadTrigger = System.currentTimeMillis()
+        } else {
+            selectedChannel = canal
+            TvRepository.lastPlayedChannel = canal
+            prefs.edit().putString("last_selected_channel_id", canal.id).apply()
+            reloadTrigger = System.currentTimeMillis()
+        }
+    }
 
     val cargarCanales: () -> Unit = {
         isLoading = true
@@ -501,6 +617,7 @@ fun TvInteractiveScreen(
                     selectedChannel = canalASelec
                     TvRepository.lastPlayedChannel = canalASelec
                     isLoading = false
+                    reloadTrigger = System.currentTimeMillis()
                 }
                 return@launch
             }
@@ -525,6 +642,7 @@ fun TvInteractiveScreen(
                         selectedChannel = canalASelec
                         TvRepository.lastPlayedChannel = canalASelec
                         isLoading = false
+                        reloadTrigger = System.currentTimeMillis()
                     }
                 } else {
                     withContext(Dispatchers.Main) {
@@ -597,7 +715,6 @@ fun TvInteractiveScreen(
             if (isFullScreen) {
                 val fullScreenFocusRequester = remember { FocusRequester() }
 
-                // Garantiza foco siempre que se entre o se cierre el menú lateral
                 LaunchedEffect(isSideMenuVisible) {
                     if (!isSideMenuVisible) {
                         delay(100)
@@ -618,7 +735,7 @@ fun TvInteractiveScreen(
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    // CAPA TÁCTIL Y DE CONTROL REMOTO
+                    // CAPA TÁCTIL Y CONTROL REMOTO
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -673,9 +790,7 @@ fun TvInteractiveScreen(
                             isMenuVisible = isSideMenuVisible,
                             onCloseMenu = { onToggleSideMenu(false) },
                             onSelectChannel = { canal ->
-                                selectedChannel = canal
-                                TvRepository.lastPlayedChannel = canal
-                                prefs.edit().putString("last_selected_channel_id", canal.id).apply()
+                                seleccionarCanalConRecarga(canal)
                                 onToggleSideMenu(false)
                             }
                         )
@@ -801,11 +916,7 @@ fun TvInteractiveScreen(
                                     onFocused = {
                                         favoritesGridState.animateScrollAndCentralizeItem(index, coroutineScope)
                                     },
-                                    onClick = {
-                                        selectedChannel = canal
-                                        TvRepository.lastPlayedChannel = canal
-                                        prefs.edit().putString("last_selected_channel_id", canal.id).apply()
-                                    },
+                                    onClick = { seleccionarCanalConRecarga(canal) },
                                     onLongClick = { toggleFavorite(canal) }
                                 )
                             }
@@ -840,6 +951,7 @@ fun TvInteractiveScreen(
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color.Black)
                             .border(3.dp, borderColor, RoundedCornerShape(12.dp))
+                            .focusRequester(miniPlayerFocusRequester)
                             .onFocusChanged { isMiniFocused = it.isFocused }
                             .focusable()
                             .onKeyEvent { keyEvent ->
@@ -905,17 +1017,6 @@ fun TvInteractiveScreen(
                         ) {
                             itemsIndexed(filteredChannels, key = { index, it -> "all_${it.id}_$index" }) { index, canal ->
                                 val isCurrentSelected = selectedChannel?.id == canal.id
-                                val focusRequester = remember { FocusRequester() }
-
-                                LaunchedEffect(selectedChannel) {
-                                    if (isCurrentSelected && !hasRequestedInitialFocus) {
-                                        delay(400)
-                                        try {
-                                            focusRequester.requestFocus()
-                                            hasRequestedInitialFocus = true
-                                        } catch (e: Exception) {}
-                                    }
-                                }
 
                                 HorizontalChannelCard(
                                     canal = canal,
@@ -924,13 +1025,8 @@ fun TvInteractiveScreen(
                                     onFocused = {
                                         channelsRowState.animateScrollAndCentralizeItem(index, coroutineScope)
                                     },
-                                    onClick = {
-                                        selectedChannel = canal
-                                        TvRepository.lastPlayedChannel = canal
-                                        prefs.edit().putString("last_selected_channel_id", canal.id).apply()
-                                    },
-                                    onLongClick = { toggleFavorite(canal) },
-                                    modifier = Modifier.focusRequester(focusRequester)
+                                    onClick = { seleccionarCanalConRecarga(canal) },
+                                    onLongClick = { toggleFavorite(canal) }
                                 )
                             }
                         }
@@ -953,7 +1049,7 @@ fun TvInteractiveScreen(
 }
 
 // -------------------------------------------------------------
-// REPRODUCTOR FLUIDO BASADO EN TEXTURE_VIEW (SIN PANTALLA NEGRA)
+// REPRODUCTOR BASADO EN TEXTURE_VIEW
 // -------------------------------------------------------------
 @Composable
 fun RobustTexturePlayer(
@@ -1083,7 +1179,10 @@ fun TvMaintenanceScreen(
 }
 
 // -------------------------------------------------------------
-// CONTENEDOR DE ESTADO DEL CANAL (CONECTANDO / FUERA DE LÍNEA)
+// CONTENEDOR DE ESTADO DEL CANAL
+// -------------------------------------------------------------
+// -------------------------------------------------------------
+// OVERLAY DISCRETO Y MODERNO EN ESQUINA SUPERIOR DERECHA
 // -------------------------------------------------------------
 @Composable
 fun ChannelStatusOverlay(
@@ -1097,68 +1196,58 @@ fun ChannelStatusOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0C0C14).copy(alpha = 0.94f)),
-        contentAlignment = Alignment.Center
+            .padding(if (isMini) 8.dp else 20.dp),
+        contentAlignment = Alignment.TopEnd // 🟢 Posicionado discretamente en la esquina superior derecha
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(if (isMini) 6.dp else 12.dp),
-            modifier = Modifier.padding(8.dp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(if (isMini) 6.dp else 10.dp),
+            modifier = Modifier
+                .clip(RoundedCornerShape(30.dp))
+                .background(Color.Black.copy(alpha = 0.70f)) // Efecto translúcido elegante
+                .border(
+                    width = 1.dp,
+                    color = if (isOffline) RedLive.copy(alpha = 0.8f) else GoldAccent.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(30.dp)
+                )
+                .padding(
+                    horizontal = if (isMini) 8.dp else 14.dp,
+                    vertical = if (isMini) 4.dp else 7.dp
+                )
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                AsyncImage(
-                    model = channel?.imageUrl,
-                    contentDescription = null,
-                    error = painterResource(id = R.drawable.pelifondo),
-                    placeholder = painterResource(id = R.drawable.pelifondo),
-                    fallback = painterResource(id = R.drawable.pelifondo),
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .size(if (isMini) 45.dp else 80.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.Black)
-                        .padding(4.dp)
-                )
-            }
-
             if (isOffline) {
-                Text(
-                    text = "SEÑAL NO DISPONIBLE",
-                    color = RedLive,
-                    fontSize = if (isMini) 12.sp else 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                // Punto rojo pulsante para canal sin señal
+                Box(
+                    modifier = Modifier
+                        .size(if (isMini) 8.dp else 10.dp)
+                        .background(RedLive, RoundedCornerShape(5.dp))
                 )
                 Text(
-                    text = "Canal temporalmente fuera de línea",
-                    color = Color.LightGray,
-                    fontSize = if (isMini) 10.sp else 13.sp,
-                    textAlign = TextAlign.Center
+                    text = if (isMini) "Sin señal..." else "Sin señal • Saltando...",
+                    color = RedLive,
+                    fontSize = if (isMini) 10.sp else 12.5.sp,
+                    fontWeight = FontWeight.Bold
                 )
             } else if (isLoading) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    CircularProgressIndicator(
-                        color = GoldAccent,
-                        modifier = Modifier.size(if (isMini) 16.dp else 24.dp),
-                        strokeWidth = 2.dp
-                    )
-                    Text(
-                        text = "Conectando señal...",
-                        color = Color.White,
-                        fontSize = if (isMini) 11.sp else 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                // Spinner circular discreto y moderno en esquina
+                CircularProgressIndicator(
+                    color = GoldAccent,
+                    modifier = Modifier.size(if (isMini) 12.dp else 16.dp),
+                    strokeWidth = 2.dp
+                )
+                Text(
+                    text = if (isMini) "Conectando..." else "Sintonizando señal...",
+                    color = Color.White,
+                    fontSize = if (isMini) 10.sp else 12.5.sp,
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
     }
 }
 
 // -------------------------------------------------------------
-// MENÚ LATERAL OVERLAY DE FAVORITOS
+// MENÚ LATERAL OVERLAY DE FAVORITOS (SEMITRANSPARENTE GLASS)
 // -------------------------------------------------------------
 @Composable
 fun FavoritesOverlayMenu(
@@ -1194,8 +1283,8 @@ fun FavoritesOverlayMenu(
         modifier = Modifier
             .fillMaxHeight()
             .width(320.dp),
-        color = Color(0xFF0A122A).copy(alpha = 0.96f),
-        shadowElevation = 16.dp
+        color = Color(0xFF070B18).copy(alpha = 0.72f), // 🟢 Semitransparente para ver el video de fondo
+        shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
@@ -1226,7 +1315,7 @@ fun FavoritesOverlayMenu(
                 }
             }
 
-            HorizontalDivider(color = Color(0xFF2A2A38))
+            HorizontalDivider(color = Color(0xFF333348).copy(alpha = 0.6f))
 
             if (favoriteChannels.isEmpty()) {
                 Box(
@@ -1283,9 +1372,9 @@ fun FavoriteMenuItem(
     }
 
     val backgroundColor = when {
-        isFocused -> Color(0xFF282836)
-        isPlaying -> Color(0xFF2D1515)
-        else -> Color(0xFF161622)
+        isFocused -> Color(0xFF28283E).copy(alpha = 0.90f)
+        isPlaying -> Color(0xFF3B1515).copy(alpha = 0.85f)
+        else -> Color(0xFF161622).copy(alpha = 0.65f) // 🟢 Translúcido
     }
 
     Row(
@@ -1310,19 +1399,19 @@ fun FavoriteMenuItem(
             .clickable { onSelect() }
             .padding(10.dp)
     ) {
-        AsyncImage(
-            model = canal.imageUrl,
-            contentDescription = canal.title,
-            error = painterResource(id = R.drawable.pelifondo),
-            placeholder = painterResource(id = R.drawable.pelifondo),
-            fallback = painterResource(id = R.drawable.pelifondo),
-            contentScale = ContentScale.Fit,
+        Box(
             modifier = Modifier
                 .size(45.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(Color.Black)
-                .padding(2.dp)
-        )
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            ChannelLogoImage(
+                imageUrl = canal.imageUrl,
+                contentDescription = canal.title,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -1443,16 +1532,15 @@ fun FavoriteGridCard(
             .padding(8.dp)
     ) {
         Box(
-            modifier = Modifier.size(45.dp),
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
-            AsyncImage(
-                model = canal.imageUrl,
+            ChannelLogoImage(
+                imageUrl = canal.imageUrl,
                 contentDescription = canal.title,
-                error = painterResource(id = R.drawable.pelifondo),
-                placeholder = painterResource(id = R.drawable.pelifondo),
-                fallback = painterResource(id = R.drawable.pelifondo),
-                contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -1460,28 +1548,44 @@ fun FavoriteGridCard(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(1.dp)
-                    .size(18.dp)
-                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(9.dp)),
+                    .size(16.dp)
+                    .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Favorite,
                     contentDescription = null,
                     tint = RedLive,
-                    modifier = Modifier.size(12.dp)
+                    modifier = Modifier.size(11.dp)
                 )
             }
         }
 
         Text(
             text = canal.title,
-            color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 2,
-            lineHeight = 16.sp,
+            color = when {
+                isFocused -> GoldAccent
+                isSelected -> Color.White
+                else -> Color(0xFFD0D0DC)
+            },
+            fontSize = 13.5.sp,
+            fontWeight = if (isFocused || isSelected) FontWeight.Bold else FontWeight.Medium,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .then(
+                    if (isFocused || isSelected) {
+                        Modifier.basicMarquee(
+                            iterations = Int.MAX_VALUE,
+                            delayMillis = 1000,
+                            initialDelayMillis = 1000,
+                            velocity = 35.dp
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
         )
     }
 }
@@ -1511,13 +1615,9 @@ fun SelectedChannelDetailCard(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = canal.imageUrl,
+            ChannelLogoImage(
+                imageUrl = canal.imageUrl,
                 contentDescription = canal.title,
-                error = painterResource(id = R.drawable.pelifondo),
-                placeholder = painterResource(id = R.drawable.pelifondo),
-                fallback = painterResource(id = R.drawable.pelifondo),
-                contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(4.dp))
@@ -1592,6 +1692,7 @@ fun SelectedChannelDetailCard(
         }
     }
 }
+
 // -------------------------------------------------------------
 // BUSCADOR TV
 // -------------------------------------------------------------
@@ -1666,8 +1767,8 @@ fun HorizontalChannelCard(
     var longPressTriggered by remember { mutableStateOf(false) }
 
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.12f else 1.0f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow),
+        targetValue = if (isFocused) 1.10f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessLow),
         label = "scale"
     )
 
@@ -1677,23 +1778,23 @@ fun HorizontalChannelCard(
         else -> Color(0xFF2A2A38)
     }
 
-    val backgroundColor = if (isFocused) Color(0xFF282836) else Color(0xFF1B1B24)
+    val backgroundColor = if (isFocused) Color(0xFF232332) else Color(0xFF12121A)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .width(130.dp)
-            .height(115.dp)
+            .width(135.dp)
+            .height(118.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
             .border(
-                width = if (isFocused) 3.dp else 2.5.dp,
+                width = if (isFocused) 3.dp else 1.5.dp,
                 color = borderColor,
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(12.dp)
             )
             .onFocusChanged {
                 isFocused = it.isFocused
@@ -1743,21 +1844,18 @@ fun HorizontalChannelCard(
                 onClick = onClick,
                 onLongClick = onLongClick
             )
-            .padding(6.dp)
     ) {
+        // ÁREA DEL LOGO EXPANDIDO AL MÁXIMO
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(55.dp),
+                .weight(1f)
+                .background(Color(0xFF08080C)),
             contentAlignment = Alignment.Center
         ) {
-            AsyncImage(
-                model = canal.imageUrl,
+            ChannelLogoImage(
+                imageUrl = canal.imageUrl,
                 contentDescription = canal.title,
-                error = painterResource(id = R.drawable.pelifondo),
-                placeholder = painterResource(id = R.drawable.pelifondo),
-                fallback = painterResource(id = R.drawable.pelifondo),
-                contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -1765,36 +1863,56 @@ fun HorizontalChannelCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(2.dp)
-                        .size(28.dp)
-                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(14.dp)),
+                        .padding(4.dp)
+                        .size(20.dp)
+                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Favorite,
                         contentDescription = null,
                         tint = RedLive,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(12.dp)
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = canal.title,
-            color = Color.White,
-            fontSize = 11.sp,
-            maxLines = 2,
-            lineHeight = 13.sp,
-            textAlign = TextAlign.Center,
-            overflow = TextOverflow.Ellipsis,
-            fontWeight = FontWeight.Bold,
+        // TÍTULO PEGADO AL FONDO CON MARQUESINA DINÁMICA
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp)
-        )
+                .background(if (isFocused) Color(0xFF1E1E2C) else Color(0xFF0D0D14))
+                .padding(horizontal = 6.dp, vertical = 5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = canal.title,
+                color = when {
+                    isFocused -> GoldAccent
+                    isSelected -> Color.White
+                    else -> Color(0xFFD0D0DC)
+                },
+                fontSize = 11.5.sp,
+                fontWeight = if (isFocused || isSelected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (isFocused || isSelected) {
+                            Modifier.basicMarquee(
+                                iterations = Int.MAX_VALUE,
+                                delayMillis = 1000,
+                                initialDelayMillis = 1000,
+                                velocity = 35.dp
+                            )
+                        } else {
+                            Modifier
+                        }
+                    )
+            )
+        }
     }
 }
 
@@ -1859,16 +1977,19 @@ private fun parseM3uBuffer(reader: BufferedReader): List<Modelo> {
     var currentName = ""
     var currentLogo = ""
 
+    val logoRegex = Regex("""(?:tvg-logo|logo|tvg-icon)=["']?([^"'\s,]+)["']?""", RegexOption.IGNORE_CASE)
+    val tvgNameRegex = Regex("""tvg-name=["']?([^"']+)["']?""", RegexOption.IGNORE_CASE)
+
     reader.useLines { lines ->
         lines.forEach { line ->
             val trimmed = line.trim()
             if (trimmed.isEmpty()) return@forEach
 
             if (trimmed.startsWith("#EXTINF:", ignoreCase = true)) {
-                val logoMatch = Regex("""tvg-logo="([^"]*)"""", RegexOption.IGNORE_CASE).find(trimmed)
+                val logoMatch = logoRegex.find(trimmed)
                 currentLogo = logoMatch?.groupValues?.get(1)?.trim() ?: ""
 
-                val tvgNameMatch = Regex("""tvg-name="([^"]*)"""", RegexOption.IGNORE_CASE).find(trimmed)
+                val tvgNameMatch = tvgNameRegex.find(trimmed)
                 val tvgName = tvgNameMatch?.groupValues?.get(1)?.trim()
                 val nameAfterComma = trimmed.substringAfterLast(",", "").trim()
 
@@ -1883,7 +2004,7 @@ private fun parseM3uBuffer(reader: BufferedReader): List<Modelo> {
 
                     channels.add(
                         Modelo(
-                            id = finalName,
+                            id = "tv_${channels.size}_$finalName",
                             title = finalName,
                             streamUrl = trimmed,
                             imageUrl = currentLogo
