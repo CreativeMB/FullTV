@@ -51,7 +51,6 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material.icons.filled.TvOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -68,7 +67,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -108,6 +106,7 @@ import com.creativem.fulltv.R
 import com.creativem.fulltv.principal.AudioFocusHelper
 import com.creativem.fulltv.principal.CastvHelper
 import com.creativem.fulltv.principal.Modelo
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -254,7 +253,7 @@ fun ChannelLogoImage(
         ImageRequest.Builder(context)
             .data(if (finalUrl.isEmpty()) R.drawable.pelifondo else finalUrl)
             .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            .crossfade(true)
+            .crossfade(false) // Desactivado para ahorrar GPU en TVs lentos
             .error(R.drawable.pelifondo)
             .placeholder(R.drawable.pelifondo)
             .fallback(R.drawable.pelifondo)
@@ -286,8 +285,13 @@ fun TvInteractiveScreen(
     val coroutineScope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    val userEmail = remember { FirebaseAuth.getInstance().currentUser?.email }
+    val correoKey = remember(userEmail) {
+        userEmail?.replace(".", "_")?.replace("@", "_")
+    }
+
     var masterChannels by remember { mutableStateOf<List<Modelo>>(emptyList()) }
-    var favoriteIds by remember { mutableStateOf(prefs.getStringSet("fav_ids", emptySet()) ?: emptySet()) }
+    var favoriteTitles by remember { mutableStateOf<Set<String>>(emptySet()) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedChannel by remember { mutableStateOf<Modelo?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -309,11 +313,18 @@ fun TvInteractiveScreen(
         }
     }
 
-    val filteredFavorites = remember(searchQuery, masterChannels, favoriteIds) {
+    // 🟢 Vínculo reactivo: los favoritos toman siempre la info actualizada del M3U
+    val filteredFavorites = remember(searchQuery, masterChannels, favoriteTitles) {
+        val favs = masterChannels.filter { favoriteTitles.contains(it.title.trim().lowercase()) }
         if (searchQuery.isBlank()) {
-            masterChannels.filter { favoriteIds.contains(it.id) }
+            favs
         } else {
-            filteredChannels.filter { favoriteIds.contains(it.id) }
+            val normalizedQuery = searchQuery.normalizeSearch()
+            val queryWords = normalizedQuery.split("\\s+".toRegex())
+            favs.filter { canal ->
+                val normalizedTitle = canal.title.normalizeSearch()
+                queryWords.all { word -> normalizedTitle.contains(word) }
+            }
         }
     }
 
@@ -341,31 +352,23 @@ fun TvInteractiveScreen(
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
             .setLoadErrorHandlingPolicy(errorHandlingPolicy)
 
-        // Búfer optimizado para evitar pérdida de paquetes y artefactos en video
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                15000, // Min buffer
-                30000, // Max buffer
-                1500,  // Buffer playback
-                2500   // Buffer rebuffer
-            )
+            .setBufferDurationsMs(15000, 30000, 1500, 2500)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
-        // 🟢 FORZAR LA MÁXIMA CALIDAD HD Y EVITAR PIXELACIÓN
         val trackSelector = DefaultTrackSelector(context).apply {
             setParameters(
                 buildUponParameters()
-                    .setMaxVideoSize(3840, 2160) // Hasta 4K / 1080p
-                    .setForceHighestSupportedBitrate(true) // 🟢 Fuerza la pista de mayor resolución y bitrate disponible
+                    .setMaxVideoSize(3840, 2160)
+                    .setForceHighestSupportedBitrate(true)
                     .setAllowVideoMixedMimeTypeAdaptiveness(true)
             )
         }
 
-        // 🟢 DECODIFICACIÓN POR HARDWARE NATIVA (Elimina los bloques pixelados)
         val renderersFactory = DefaultRenderersFactory(context).apply {
             setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-            setEnableDecoderFallback(true) // Si un códec falla, busca automáticamente el nativo del sistema
+            setEnableDecoderFallback(true)
         }
 
         val player = ExoPlayer.Builder(context, renderersFactory)
@@ -381,7 +384,7 @@ fun TvInteractiveScreen(
             )
             .build().apply {
                 playWhenReady = true
-                videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT // Mantiene la relación de aspecto nítida sin deformar
+                videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT
             }
 
         var retryCount = 0
@@ -476,7 +479,6 @@ fun TvInteractiveScreen(
         isChannelLoading = true
         isChannelOffline = false
 
-        // 🟢 Salto inteligente al siguiente canal en la lista general actual
         fun pasarAlSiguienteCanal() {
             val listaActual = if (filteredChannels.isNotEmpty()) filteredChannels else masterChannels
             if (listaActual.isNotEmpty()) {
@@ -538,7 +540,6 @@ fun TvInteractiveScreen(
             player.prepare()
             player.play()
 
-            // 🟢 Si tras 5 segundos no conecta, muestra aviso y pasa al canal contiguo en la lista
             launch {
                 delay(5000)
                 if (!player.isPlaying && player.playbackState != Player.STATE_READY) {
@@ -600,28 +601,37 @@ fun TvInteractiveScreen(
         }
     }
 
+    // 🟢 CARGA Y SINCRONIZACIÓN INTELIGENTE (BARRIDO EN TIEMPO REAL)
     val cargarCanales: () -> Unit = {
         isLoading = true
         coroutineScope.launch(Dispatchers.IO) {
             val savedChannelId = prefs.getString("last_selected_channel_id", null)
 
-            if (TvRepository.channelListMaster.isNotEmpty()) {
-                val list = TvRepository.channelListMaster
-                val canalASelec = TvRepository.lastPlayedChannel
-                    ?: list.firstOrNull { it.id == savedChannelId }
-                    ?: list.firstOrNull { favoriteIds.contains(it.id) }
-                    ?: list.firstOrNull()
+            // 1. Obtener los favoritos desde Firebase
+            val userFavsSet = mutableSetOf<String>()
+            if (!correoKey.isNullOrEmpty()) {
+                try {
+                    val favSnapshot = FirebaseDatabase.getInstance().reference
+                        .child("usuarios")
+                        .child(correoKey)
+                        .child("favoritos_tv")
+                        .get().await()
 
-                withContext(Dispatchers.Main) {
-                    masterChannels = list
-                    selectedChannel = canalASelec
-                    TvRepository.lastPlayedChannel = canalASelec
-                    isLoading = false
-                    reloadTrigger = System.currentTimeMillis()
+                    for (child in favSnapshot.children) {
+                        child.key?.let { userFavsSet.add(it.trim().lowercase()) }
+                    }
+                } catch (e: Exception) {
+                    Log.e("TV_FAVS", "Error cargando favoritos desde Firebase", e)
                 }
-                return@launch
             }
 
+            // Fallback a preferencias locales si Firebase no arrojó o no hay internet
+            if (userFavsSet.isEmpty()) {
+                val localFavs = prefs.getStringSet("fav_titles", emptySet()) ?: emptySet()
+                userFavsSet.addAll(localFavs.map { it.trim().lowercase() })
+            }
+
+            // 2. Descargar o refrescar M3U Maestro
             try {
                 val snapshot = FirebaseDatabase.getInstance(TvRepository.FIREBASE_DB_URL)
                     .getReference(TvRepository.FIREBASE_PATH)
@@ -630,13 +640,15 @@ fun TvInteractiveScreen(
                 val m3uUrl = snapshot.value?.toString()?.trim()
                 if (!m3uUrl.isNullOrEmpty()) {
                     val downloaded = descargarM3uStream(m3uUrl)
+
                     withContext(Dispatchers.Main) {
                         masterChannels = downloaded
+                        favoriteTitles = userFavsSet
                         TvRepository.channelListMaster = downloaded
 
                         val canalASelec = TvRepository.lastPlayedChannel
                             ?: downloaded.firstOrNull { it.id == savedChannelId }
-                            ?: downloaded.firstOrNull { favoriteIds.contains(it.id) }
+                            ?: downloaded.firstOrNull { userFavsSet.contains(it.title.trim().lowercase()) }
                             ?: downloaded.firstOrNull()
 
                         selectedChannel = canalASelec
@@ -651,7 +663,7 @@ fun TvInteractiveScreen(
                     }
                 }
             } catch (e: Exception) {
-                Log.e("TV_ACTIVITY", "Error Firebase", e)
+                Log.e("TV_ACTIVITY", "Error descargando canales", e)
                 withContext(Dispatchers.Main) {
                     masterChannels = emptyList()
                     isLoading = false
@@ -664,17 +676,49 @@ fun TvInteractiveScreen(
         cargarCanales()
     }
 
+    // 🟢 ALTERNAR FAVORITO EN FIREBASE Y LOCAL
     val toggleFavorite = { canal: Modelo ->
-        val newFavs = favoriteIds.toMutableSet()
-        if (newFavs.contains(canal.id)) {
-            newFavs.remove(canal.id)
-            Toast.makeText(context, "${canal.title} quitado de Favoritos", Toast.LENGTH_SHORT).show()
-        } else {
-            newFavs.add(canal.id)
+        val titleKey = canal.title.trim().lowercase()
+        val firebaseSafeKey = titleKey.replace(".", "_")
+            .replace("$", "_")
+            .replace("#", "_")
+            .replace("[", "_")
+            .replace("]", "_")
+
+        val newFavs = favoriteTitles.toMutableSet()
+        val isAdding = !newFavs.contains(titleKey)
+
+        if (isAdding) {
+            newFavs.add(titleKey)
             Toast.makeText(context, "${canal.title} añadido a Favoritos", Toast.LENGTH_SHORT).show()
+        } else {
+            newFavs.remove(titleKey)
+            Toast.makeText(context, "${canal.title} quitado de Favoritos", Toast.LENGTH_SHORT).show()
         }
-        favoriteIds = newFavs
-        prefs.edit().putStringSet("fav_ids", newFavs).apply()
+
+        favoriteTitles = newFavs
+        prefs.edit().putStringSet("fav_titles", newFavs).apply()
+
+        // Sincronizar en Firebase en segundo plano
+        if (!correoKey.isNullOrEmpty()) {
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    val favNode = FirebaseDatabase.getInstance().reference
+                        .child("usuarios")
+                        .child(correoKey)
+                        .child("favoritos_tv")
+                        .child(firebaseSafeKey)
+
+                    if (isAdding) {
+                        favNode.setValue(true).await()
+                    } else {
+                        favNode.removeValue().await()
+                    }
+                } catch (e: Exception) {
+                    Log.e("TV_FAVS", "Error al sincronizar favorito en Firebase", e)
+                }
+            }
+        }
     }
 
     if (isLoading) {
@@ -694,7 +738,7 @@ fun TvInteractiveScreen(
                     strokeWidth = 4.dp
                 )
                 Text(
-                    text = "Cargando canales...",
+                    text = "Cargando y sincronizando canales...",
                     color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium
@@ -735,7 +779,6 @@ fun TvInteractiveScreen(
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    // CAPA TÁCTIL Y CONTROL REMOTO
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -893,7 +936,7 @@ fun TvInteractiveScreen(
                         ) {
                             Text(
                                 text = if (searchQuery.isNotBlank()) "Sin coincidencias en Favoritos"
-                                else "Aún no tienes favoritos.\nMantén presionado OK en un canal a la derecha para agregar.",
+                                else "Aún no tienes favoritos.\nMantén presionado OK en un canal a la derecha para sincronizarlo con tu perfil.",
                                 color = Color.Gray,
                                 fontSize = 13.sp,
                                 textAlign = TextAlign.Center,
@@ -909,7 +952,10 @@ fun TvInteractiveScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            itemsIndexed(filteredFavorites, key = { index, it -> "fav_grid_${it.id}_$index" }) { index, canal ->
+                            itemsIndexed(
+                                items = filteredFavorites,
+                                key = { _, it -> "fav_${it.title}" }
+                            ) { index, canal ->
                                 FavoriteGridCard(
                                     canal = canal,
                                     isSelected = selectedChannel?.id == canal.id,
@@ -1015,12 +1061,16 @@ fun TvInteractiveScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            itemsIndexed(filteredChannels, key = { index, it -> "all_${it.id}_$index" }) { index, canal ->
+                            itemsIndexed(
+                                items = filteredChannels,
+                                key = { _, it -> "all_${it.title}" }
+                            ) { index, canal ->
                                 val isCurrentSelected = selectedChannel?.id == canal.id
+                                val isFav = favoriteTitles.contains(canal.title.trim().lowercase())
 
                                 HorizontalChannelCard(
                                     canal = canal,
-                                    isFavorite = favoriteIds.contains(canal.id),
+                                    isFavorite = isFav,
                                     isSelected = isCurrentSelected,
                                     onFocused = {
                                         channelsRowState.animateScrollAndCentralizeItem(index, coroutineScope)
@@ -1033,9 +1083,10 @@ fun TvInteractiveScreen(
                     }
 
                     selectedChannel?.let { canal ->
+                        val isFav = favoriteTitles.contains(canal.title.trim().lowercase())
                         SelectedChannelDetailCard(
                             canal = canal,
-                            isFavorite = favoriteIds.contains(canal.id),
+                            isFavorite = isFav,
                             onToggleFavorite = { toggleFavorite(canal) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1179,9 +1230,6 @@ fun TvMaintenanceScreen(
 }
 
 // -------------------------------------------------------------
-// CONTENEDOR DE ESTADO DEL CANAL
-// -------------------------------------------------------------
-// -------------------------------------------------------------
 // OVERLAY DISCRETO Y MODERNO EN ESQUINA SUPERIOR DERECHA
 // -------------------------------------------------------------
 @Composable
@@ -1197,14 +1245,14 @@ fun ChannelStatusOverlay(
         modifier = Modifier
             .fillMaxSize()
             .padding(if (isMini) 8.dp else 20.dp),
-        contentAlignment = Alignment.TopEnd // 🟢 Posicionado discretamente en la esquina superior derecha
+        contentAlignment = Alignment.TopEnd
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(if (isMini) 6.dp else 10.dp),
             modifier = Modifier
                 .clip(RoundedCornerShape(30.dp))
-                .background(Color.Black.copy(alpha = 0.70f)) // Efecto translúcido elegante
+                .background(Color.Black.copy(alpha = 0.70f))
                 .border(
                     width = 1.dp,
                     color = if (isOffline) RedLive.copy(alpha = 0.8f) else GoldAccent.copy(alpha = 0.5f),
@@ -1216,7 +1264,6 @@ fun ChannelStatusOverlay(
                 )
         ) {
             if (isOffline) {
-                // Punto rojo pulsante para canal sin señal
                 Box(
                     modifier = Modifier
                         .size(if (isMini) 8.dp else 10.dp)
@@ -1229,7 +1276,6 @@ fun ChannelStatusOverlay(
                     fontWeight = FontWeight.Bold
                 )
             } else if (isLoading) {
-                // Spinner circular discreto y moderno en esquina
                 CircularProgressIndicator(
                     color = GoldAccent,
                     modifier = Modifier.size(if (isMini) 12.dp else 16.dp),
@@ -1283,7 +1329,7 @@ fun FavoritesOverlayMenu(
         modifier = Modifier
             .fillMaxHeight()
             .width(320.dp),
-        color = Color(0xFF070B18).copy(alpha = 0.72f), // 🟢 Semitransparente para ver el video de fondo
+        color = Color(0xFF070B18).copy(alpha = 0.72f),
         shadowElevation = 0.dp
     ) {
         Column(
@@ -1334,7 +1380,10 @@ fun FavoritesOverlayMenu(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    itemsIndexed(favoriteChannels, key = { index, canal -> "menu_fav_${canal.id}_$index" }) { index, canal ->
+                    itemsIndexed(
+                        items = favoriteChannels,
+                        key = { _, canal -> "menu_${canal.title}" }
+                    ) { index, canal ->
                         FavoriteMenuItem(
                             canal = canal,
                             isPlaying = canal.streamUrl == currentStreamUrl,
@@ -1374,7 +1423,7 @@ fun FavoriteMenuItem(
     val backgroundColor = when {
         isFocused -> Color(0xFF28283E).copy(alpha = 0.90f)
         isPlaying -> Color(0xFF3B1515).copy(alpha = 0.85f)
-        else -> Color(0xFF161622).copy(alpha = 0.65f) // 🟢 Translúcido
+        else -> Color(0xFF161622).copy(alpha = 0.65f)
     }
 
     Row(
@@ -1845,7 +1894,6 @@ fun HorizontalChannelCard(
                 onLongClick = onLongClick
             )
     ) {
-        // ÁREA DEL LOGO EXPANDIDO AL MÁXIMO
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1878,7 +1926,6 @@ fun HorizontalChannelCard(
             }
         }
 
-        // TÍTULO PEGADO AL FONDO CON MARQUESINA DINÁMICA
         Box(
             modifier = Modifier
                 .fillMaxWidth()
