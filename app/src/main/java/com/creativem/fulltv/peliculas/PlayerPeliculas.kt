@@ -1,538 +1,434 @@
+@file:OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.media3.common.util.UnstableApi::class
+)
+
 package com.creativem.fulltv.peliculas
 
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.net.ConnectivityManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.util.Log
-import android.view.KeyEvent
-import android.view.View
-import android.view.WindowManager
-import android.widget.ImageButton
-import android.widget.SeekBar
-import android.widget.TextView
-import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.recyclerview.widget.LinearLayoutManager
-import com.creativem.fulltv.principal.Reloj
-import com.google.firebase.Firebase
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.firestore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import android.text.format.DateUtils
-import androidx.media3.exoplayer.DefaultRenderersFactory
-import kotlinx.coroutines.MainScope
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.datasource.DefaultHttpDataSource
-import com.creativem.fulltv.R
-import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicLong
-import kotlin.math.pow
-import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.ColorDrawable
-import android.os.CountDownTimer
-import android.util.TypedValue
-import android.view.Gravity
+import android.util.Log
+import android.view.KeyEvent as AndroidKeyEvent
+import android.view.View
 import android.view.ViewGroup
-import android.view.animation.AnimationUtils
-import android.widget.Button
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.Toast
-import androidx.activity.addCallback
-import com.bumptech.glide.Glide
-
-import com.creativem.fulltv.databinding.PlayerBinding
-
-
-import androidx.annotation.OptIn
-import androidx.lifecycle.lifecycleScope
-import androidx.media3.common.Tracks
-
+import android.view.WindowManager
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import kotlin.OptIn
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.*
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.CaptionStyleCompat
-import androidx.recyclerview.widget.RecyclerView
-import java.util.concurrent.TimeUnit
-import com.creativem.fulltv.peliculasvalidas.PelisCarteleraAdapter
+import androidx.media3.ui.PlayerView
+import coil.compose.AsyncImage
+import com.creativem.fulltv.api.MovieResponse
+import com.creativem.fulltv.api.TMDbApiService
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
-import com.creativem.fulltv.principal.CastvHelper
-import com.creativem.fulltv.principal.Modelo
-import com.creativem.fulltv.principal.Perfil
-import com.creativem.fulltv.principal.PistaAudio
-import com.creativem.fulltv.principal.PistaSubtitulo
-
-
-import com.google.firebase.database.FirebaseDatabase
+import com.creativem.fulltv.principal.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import java.text.SimpleDateFormat
+import java.util.*
+import java.util.concurrent.TimeUnit
 
+// 🟢 PALETA DORADO PREMIUM
+private val DoradoBrillante = Color(0xFFEAD295)
+private val DegradadoDoradoPremiun = Brush.horizontalGradient(
+    listOf(Color(0xFFF3E0AA), Color(0xFFC5A059), Color(0xFF9E7B36))
+)
 
 @Suppress("DEPRECATION")
 class PlayerPeliculas : AppCompatActivity() {
-    private var pistasAudioDisponibles: List<PistaAudio> = emptyList()
-    private var pistasSubtulosDisponibles: List<PistaSubtitulo> = emptyList()
-    private var userAgent: String? = null
-    private var referer: String? = null
-    private var cookie: String? = null
-    private var player: ExoPlayer? = null
-    private var streamUrl: String = ""
-    private var movieImageUrl: String = ""
-    private var movieCastv: Int = 0
-    private lateinit var movieTitle: String
-    private var isLiveStream = false
-    private lateinit var binding: PlayerBinding
-    private lateinit var carteleraAdapter: PelisCarteleraAdapter
-    private lateinit var firestore: FirebaseFirestore
-    private lateinit var auth: FirebaseAuth
-    private var isProcessingOrder = false
-    private var reconnectionAttempts = 0
-    private val maxReconnectionAttempts = 10
-    private var isReconnecting = false
-    private var isPlaybackActive = false // Indica si la reproducción ha sido activa
-    private val playbackStartTime = AtomicLong(0) // Tiempo en que inicia la reproducción
-    private var lastKnownPosition: Long = 0 // Para guardar la última posición conocida
-    private var menuAbierto = false
-    private val handler = Handler(Looper.getMainLooper())
-    private val hideControlsDelay = 5000L // 5 segundos
-    private val updateInterval = 1000L    // 1 segundo
-    private var progresoSimulado = 0
-    private var gateoTicks = 0
-    private var lastInteractionTime = 0L
-    private var startPosition: Long = 0L
-    private val databaseRef by lazy { FirebaseDatabase.getInstance().reference }
-    val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-    private var runnableOcultar = Runnable {
-        binding.reproductor.findViewById<View>(R.id.controles_reproductor).visibility = View.GONE
-    }
 
-    private val runnableActualizar: Runnable = Runnable {
-        actualizarTiempo()
-    }
+    var onWakeUpControls: (() -> Unit)? = null
+    var onToggleMenuCartelera: (() -> Unit)? = null
+    var onUserInteraction: (() -> Unit)? = null
+    var areControlsVisibleState: () -> Boolean = { false }
+    var isMenuCarteleraOpenState: () -> Boolean = { false }
 
-    @SuppressLint("ClickableViewAccessibility")
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        binding = PlayerBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
-        initializeRecyclerView()
-        activarListenersEnControles()
-        setupControlTimers()
-        loadMovies()
-
-        auth = FirebaseAuth.getInstance()
-        firestore = FirebaseFirestore.getInstance()
-
-        binding.reproductor.useController = false
-
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-        val nombrePeliculaTextView: TextView = findViewById(R.id.nombrePelicula)
-        val imagenPeliculaImageView: ImageView = findViewById(R.id.imagenPelicula)
-
-
-
-        intent?.let {
-            streamUrl = it.getStringExtra("EXTRA_STREAM_URL") ?: ""
-            movieTitle = it.getStringExtra("EXTRA_MOVIE_TITLE") ?: "Título desconocido"
-            movieCastv = intent.getIntExtra("EXTRA_MOVIE_CASTV", 0)
-            movieImageUrl = it.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
-            startPosition = it.getIntExtra("EXTRA_POSITION", 0).toLong()
-
-
-
-            nombrePeliculaTextView.text = movieTitle
-
-            Glide.with(this)
-                .load(movieImageUrl)
-                .placeholder(R.drawable.icono)
-                .error(R.drawable.icono)
-                .into(imagenPeliculaImageView)
-
-            if (streamUrl.isEmpty()) {
-//                showErrorDialog(movieTitle, movieCastv, userId)
-
-
-                return@let
-            }
-
-        }
-
-        firestore = Firebase.firestore
-        // Inicializa el SeekBar desde el binding
-        actualizarTiempo()
-        player = ExoPlayer.Builder(this).build()
-        binding.reproductor.player = player
-        initializePlayer()
-
-        lifecycleScope.launch {
-            // Esperar a que las validaciones estén listas
-            Validacioneslista.esperarCarga()
-
-            // Luego cargar las películas al RecyclerView del menú
-            loadMovies()
-        }
-
-        // --- 1. LLAMAR AL RELOJ (Buscando dentro del reproductor) ---
-        val textHora = binding.reproductor.findViewById<TextView>(R.id.textHora)
-        val textfecha = binding.reproductor.findViewById<TextView>(R.id.textfecha)
-
-        if (textHora != null && textfecha != null) {
-            val reloj = Reloj(textHora, textfecha)
-            reloj.startClock()
-        }
-
-        val menupelis = binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis)
-        menupelis.setOnClickListener {
-            mostarpelis()
-
-        }
-        // Referencias a los botones
-
-        // Botón Play/Pause
-        val btnAudioSub: ImageButton = findViewById(R.id.btn_audio_sub)
-        btnAudioSub.setOnClickListener {
-            mostrarDialogoOpcionesPistas()
-        }
-
-        val playPauseButton: ImageButton = findViewById(R.id.play_pause)
-        playPauseButton.setOnClickListener {
-            togglePlayPause()
-        }
-
-        // Botón Shuffle
-        val shuffleButton: ImageButton = findViewById(R.id.home)
-        shuffleButton.setOnClickListener {
-            player?.let {
-                it.playWhenReady = false  // Detiene la reproducción inmediata
-                it.stop() // Asegura que el audio se detenga
-                it.clearMediaItems() // Limpia la lista de reproducción
-                it.release() // Libera los recursos
-            }
-            player = null // Elimina la referencia
-
-            finish()
-        }
-        // Botón pedidos
-        val pedidosButton: ImageButton = findViewById(R.id.pedidos)
-        pedidosButton.setOnClickListener {
-            // Creamos el Intent para ir a la Activity "Perfil"
-            val intent = Intent(this, Perfil::class.java)
-
-            // Si necesitas pasarle datos a esa nueva pantalla (como el userId), puedes hacerlo así:
-            // intent.putExtra("USER_ID", userId)
-
-            startActivity(intent)
-        }
-        // Botón Pantalla Completa
-        val renderButton: ImageButton = findViewById(R.id.render)
-        renderButton.setOnClickListener {
-            cycleAspectRatio()
-        }
-
-
-        val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
-        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    val duration = player?.duration ?: 1
-                    val newPosition = (progress / 100.0 * duration).toLong()
-                    player?.seekTo(newPosition)
-//                    seekBar?.progress = progress // Actualización de la SeekBar
-                }
-            }
-
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {
-                player?.pause()
-            }
-
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                player?.playWhenReady = true
-            }
-        })
-
-        // Referencia a los controles
-        val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
-
-// Define el runnable que revisa si debe ocultar los controles
-        runnableOcultar = object : Runnable {
-            override fun run() {
-                val tiempoActual = System.currentTimeMillis()
-                val tiempoInactivo = tiempoActual - lastInteractionTime
-
-                // Si ha pasado suficiente tiempo y no hay interacción visible
-                if (tiempoInactivo >= hideControlsDelay) {
-                    controles.visibility = View.GONE
-                } else {
-                    handler.postDelayed(this, 1000)
-                }
-            }
-        }
-// Listeners para reiniciar el temporizador con cualquier interacción
-        binding.reproductor.setOnTouchListener { _, _ ->
-            showControlsAndResetTimer()
-            true
-        }
-
-        binding.reproductor.setOnKeyListener { _, _, _ ->
-            showControlsAndResetTimer()
-            false
-        }
-
-// ✅ Inicia los controles y temporizador
-        showControlsAndResetTimer()
-
-        // 🕐 Iniciar temporizador de actualización
-        handler.postDelayed(runnableActualizar, updateInterval)
-
-        // 🕒 Primer tiempo inmediato
-        actualizarTiempo()
-
-        // ⬅️ Manejar botón "Atrás"
-        onBackPressedDispatcher.addCallback(this) {
-            val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
-            val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
-
-            when {
-                menuPelis.visibility == View.VISIBLE -> {
-                    menuPelis.animate()
-                        .alpha(0f)
-                        .setDuration(200)
-                        .withEndAction {
-                            menuPelis.visibility = View.GONE
-                            menuPelis.alpha = 1f
-                        }
-                        .start()
-                }
-
-                controles.visibility == View.VISIBLE -> {
-                    controles.visibility = View.GONE
-                }
-
-                else -> {
-                    finish()
-
-                }
-            }
-        }
-    }
-    override fun attachBaseContext(newBase: android.content.Context) {
+    override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(CastvHelper.ajustarContexto(newBase))
     }
 
     override fun getResources(): android.content.res.Resources {
         val res = super.getResources()
-        // 🟢 Pasamos 'this' (el contexto de la actividad) para autodetectar la pantalla
         CastvHelper.ajustarRecursos(res, this)
         return res
     }
-    private fun mostarpelis() {
-        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
 
-        if (menuAbierto) {
-            menuPelis.animate()
-                .alpha(0f)
-                .setDuration(200)
-                .withEndAction {
-                    menuPelis.visibility = View.GONE
-                    menuPelis.alpha = 1f
-                    menuAbierto = false
-                }
-                .start()
-        } else {
-            menuPelis.visibility = View.VISIBLE
-            menuPelis.alpha = 1f
-            menuPelis.requestFocus()
-            menuAbierto = true
-        }
-    }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
-    private fun initializeRecyclerView() {
-        carteleraAdapter = PelisCarteleraAdapter(mutableListOf()) { movie ->
-            startMoviePlayback(movie.streamUrl, movie.title, movie.castv, movie.imageUrl)
-        }
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
+        val streamUrl = intent?.getStringExtra("EXTRA_STREAM_URL") ?: ""
+        val movieTitle = intent?.getStringExtra("EXTRA_MOVIE_TITLE") ?: "Título desconocido"
+        val movieCastv = intent?.getIntExtra("EXTRA_MOVIE_CASTV", 0) ?: 0
+        val movieImageUrl = intent?.getStringExtra("EXTRA_MOVIE_IMAGE_URL") ?: ""
+        val movieSynopsis = intent?.getStringExtra("EXTRA_MOVIE_SYNOPSIS")
+            ?: intent?.getStringExtra("EXTRA_OVERVIEW")
+            ?: intent?.getStringExtra("EXTRA_SINOPSIS")
+            ?: ""
+        val startPosition = intent?.getIntExtra("EXTRA_POSITION", 0)?.toLong() ?: 0L
 
-        if (menuPelis != null) {
-            // 🟢 INYECCIÓN DINÁMICA DE MÁRGENES (Evita recortados sin usar XML):
-            val density = resources.displayMetrics.density
-            val paddingHorizontal = (8 * density).toInt() // 8dp de los lados
-            val paddingVertical = (22 * density).toInt()  // 22dp arriba y abajo (Amortiguación de escala)
-
-            // Forzamos el relleno y el comportamiento clipToPadding por código
-            menuPelis.setPadding(paddingHorizontal, paddingVertical, paddingHorizontal, paddingVertical)
-            menuPelis.clipToPadding = false
-        }
-
-        menuPelis.layoutManager = LinearLayoutManager(
-            this@PlayerPeliculas,
-            LinearLayoutManager.HORIZONTAL,
-            false
-        )
-
-        menuPelis.adapter = carteleraAdapter
-
-        loadMovies()
-    }
-
-    private fun loadMovies() {
-        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
-
-        // Función interna para filtrar las películas activas
-        fun filtrarActivas(lista: List<Modelo>): List<Modelo> {
-            return lista.filter { movie ->
-                val countdownDurationMillis =
-                    java.util.concurrent.TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
-                val timeElapsed = System.currentTimeMillis() - movie.createdAt
-                val remainingTimeMillis = countdownDurationMillis - timeElapsed
-
-                // Filtro: Debe tener contador mayor a 0 y aún no haber finalizado
-                movie.countdownMinutes > 0 && remainingTimeMillis > 0
-            }.sortedByDescending { it.createdAt }
-        }
-
-        lifecycleScope.launch {
-            while (isActive) {
-                val listaActualizada = Validacioneslista.obtenerPeliculasValidas()
-                val nuevasActivas = filtrarActivas(listaActualizada)
-
-                withContext(Dispatchers.Main) {
-                    if (nuevasActivas.isNotEmpty()) {
-                        // Si hay películas, actualizamos
-                        carteleraAdapter.updateMovies(nuevasActivas)
-
-                        // Si el menú estaba oculto por estar vacío, puedes decidir mostrarlo
-                        // menuPelis.visibility = View.VISIBLE
-                    } else {
-                        // 🟢 SI NO HAY PELÍCULAS, OCULTAMOS EL MENÚ CON ANIMACIÓN
-                        if (menuPelis.visibility == View.VISIBLE) {
-                            menuPelis.animate()
-                                .alpha(0f)
-                                .setDuration(300)
-                                .withEndAction {
-                                    menuPelis.visibility = View.GONE
-                                    menuPelis.alpha = 1f // Restauramos alpha para la próxima vez
-                                }
-                                .start()
-                            menuAbierto = false
-                        }
-                    }
-                }
-
-                // Si ya se cargó todo de la BD, terminamos el bucle
-                if (Validacioneslista.yaCargado()) break
-
-                delay(3000) // Revisión cada 3 segundos
+        setContent {
+            MaterialTheme {
+                PlayerPeliculasScreen(
+                    activity = this,
+                    initialStreamUrl = streamUrl,
+                    initialMovieTitle = movieTitle,
+                    initialMovieCastv = movieCastv,
+                    initialMovieImageUrl = movieImageUrl,
+                    initialMovieSynopsis = movieSynopsis,
+                    initialStartPosition = startPosition,
+                    onFinish = { finish() }
+                )
             }
         }
+
+        enterFullScreen()
     }
 
-
-    private fun startMoviePlayback(
-        streamUrl: String,
-        movieTitle: String,
-        movieCastv: Int,
-        movieImageUrl: String
-    ) {
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP) // Limpia la pila de actividades
-        // Envía la URL de transmisión y el título de la película como extras
-        intent.putExtra("EXTRA_STREAM_URL", streamUrl)
-        intent.putExtra("EXTRA_MOVIE_TITLE", movieTitle)
-        intent.putExtra("EXTRA_MOVIE_CASTV", movieCastv)
-        intent.putExtra("EXTRA_MOVIE_IMAGE_URL", movieImageUrl)
-        // Inicia la actividad de reproducción
-        startActivity(intent)
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) enterFullScreen()
     }
 
-    @SuppressLint("UnsafeOptInUsageError")
-    private fun initializePlayer() {
-        Log.d("Player", "Intentando preparar URL: $streamUrl")
-        if (streamUrl.isEmpty())
-            return
-        lifecycleScope.launch {
-            // Asegurar que la validación ocurra antes de preparar
-            withContext(Dispatchers.IO) {
-                if (!Validacioneslista.yaCargado()) {
-                    Validacioneslista.cargarPeliculas()
-                }
-            }
-
-            CoroutineScope(Dispatchers.Main).launch {
-                // 1. Verificamos localmente contra el objeto Validacioneslista
-                val isUrlValid = withContext(Dispatchers.IO) {
-                    // Si por alguna razón el objeto no ha cargado nada, le pedimos que lo haga
-                    if (!Validacioneslista.yaCargado()) {
-                        Validacioneslista.cargarPeliculas()
-                    }
-
-                    // Comprobamos si la URL de esta película está entre las que pasaron el ping
-                    Validacioneslista.obtenerPeliculasValidas().any { it.streamUrl == streamUrl }
-                }
-
-                // 2. Si no es válida, mostramos el diálogo de error (pedido)
-                if (!isUrlValid) {
-//                showErrorDialog(movieTitle, movieCastv, userId)
-                    return@launch
-                }
-
-                val progresoGuardado = obtenerProgresoGuardado()
-
-                if (progresoGuardado > 0) {
-                    mostrarDialogoContinuar(progresoGuardado)
-                } else {
-                    prepararReproductor(startPosition)
-
-                }
-            }
-        }
-    }
-    @OptIn(UnstableApi::class)
-    private fun prepararReproductor(posicionInicial: Long) {
+    private fun enterFullScreen() {
         try {
-            // 1. LIMPIEZA DE HARDWARE
-            binding.reproductor.player = null
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } catch (_: Exception) {
+            window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_FULLSCREEN
+                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    )
+        }
+    }
+
+    override fun dispatchKeyEvent(event: AndroidKeyEvent): Boolean {
+        if (event.action == AndroidKeyEvent.ACTION_DOWN) {
+            val code = event.keyCode
+
+            // Cada pulsación reinicia el temporizador de ocultar controles
+            onUserInteraction?.invoke()
+
+            if (code in listOf(AndroidKeyEvent.KEYCODE_MENU, AndroidKeyEvent.KEYCODE_PAGE_UP, AndroidKeyEvent.KEYCODE_PAGE_DOWN, 174)) {
+                onToggleMenuCartelera?.invoke()
+                return true
+            }
+
+            // Si la cartelera está abierta, no interferir con las teclas del D-Pad
+            if (isMenuCarteleraOpenState()) {
+                return super.dispatchKeyEvent(event)
+            }
+
+            // Si los controles están ocultos, cualquier botón de acción los despierta
+            if (!areControlsVisibleState()) {
+                val teclasDespertar = listOf(
+                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                    AndroidKeyEvent.KEYCODE_ENTER,
+                    AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                    AndroidKeyEvent.KEYCODE_DPAD_UP,
+                    AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+                    AndroidKeyEvent.KEYCODE_DPAD_LEFT,
+                    AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+                    AndroidKeyEvent.KEYCODE_MEDIA_PLAY,
+                    AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
+                    AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+                )
+                if (code in teclasDespertar) {
+                    onWakeUpControls?.invoke()
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+}
+
+// =========================================================================
+// 🟢 PANTALLA PRINCIPAL DEL REPRODUCTOR
+// =========================================================================
+@OptIn(UnstableApi::class)
+@Composable
+fun PlayerPeliculasScreen(
+    activity: PlayerPeliculas,
+    initialStreamUrl: String,
+    initialMovieTitle: String,
+    initialMovieCastv: Int,
+    initialMovieImageUrl: String,
+    initialMovieSynopsis: String,
+    initialStartPosition: Long,
+    onFinish: () -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var streamUrl by remember { mutableStateOf(initialStreamUrl) }
+    var movieTitle by remember { mutableStateOf(initialMovieTitle) }
+    var movieCastv by remember { mutableIntStateOf(initialMovieCastv) }
+    var movieImageUrl by remember { mutableStateOf(initialMovieImageUrl) }
+    var movieSynopsis by remember { mutableStateOf(initialMovieSynopsis) }
+
+    var player by remember { mutableStateOf<ExoPlayer?>(null) }
+    var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var currentPosition by remember { mutableLongStateOf(0L) }
+    var totalDuration by remember { mutableLongStateOf(0L) }
+    var bufferedPosition by remember { mutableLongStateOf(0L) }
+    var currentAspectRatioMode by remember { mutableIntStateOf(0) }
+
+    var pistasAudioDisponibles by remember { mutableStateOf<List<PistaAudio>>(emptyList()) }
+    var pistasSubtitulosDisponibles by remember { mutableStateOf<List<PistaSubtitulo>>(emptyList()) }
+    var mostrarDialogoPistas by remember { mutableStateOf(false) }
+
+    var controlesVisibles by remember { mutableStateOf(true) }
+    var menuPelisAbierto by remember { mutableStateOf(false) }
+    var estaDesplazandoProgreso by remember { mutableStateOf(false) }
+    var estaCargando by remember { mutableStateOf(true) }
+    var progresoSimulado by remember { mutableIntStateOf(0) }
+    var gateoTicks by remember { mutableIntStateOf(0) }
+    var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+
+    val peliculasActivas = remember { mutableStateListOf<Modelo>() }
+
+    var mostrarDialogoContinuar by remember { mutableStateOf(false) }
+    var progresoGuardadoEncontrado by remember { mutableLongStateOf(0L) }
+
+    var reconnectionAttempts by remember { mutableIntStateOf(0) }
+    val maxReconnectionAttempts = 10
+
+    // Cliente Retrofit para traer la sinopsis desde TMDb
+    val apiService = remember {
+        val client = OkHttpClient.Builder().hostnameVerifier { _, _ -> true }.build()
+        Retrofit.Builder()
+            .baseUrl("https://api.themoviedb.org/3/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(client)
+            .build()
+            .create(TMDbApiService::class.java)
+    }
+    val apiKey = "678193d2c735c6f37840cee035f4d69a"
+
+    // 🟢 CONSULTAR SINOPSIS DESDE TMDB (Con Unit al final para evitar errores de tipo)
+    LaunchedEffect(movieTitle) {
+        if (movieSynopsis.isBlank() || movieSynopsis.length < 15) {
+            val queryLimpia = movieTitle
+                .replace(Regex("\\(\\d{4}-\\d{2}-\\d{2}\\)"), "")
+                .replace(Regex("\\(\\d{4}\\)"), "")
+                .replace(Regex("\\[.*?\\]"), "")
+                .trim()
+
+            if (queryLimpia.isNotBlank()) {
+                withContext(Dispatchers.IO) {
+                    try {
+                        val response = apiService.searchMovie(apiKey, "es-MX", queryLimpia).execute()
+                        if (response.isSuccessful) {
+                            val primera = response.body()?.results?.firstOrNull()
+                            if (primera != null && !primera.overview.isNullOrBlank()) {
+                                movieSynopsis = primera.overview!!
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("PlayerTMDb", "Error al obtener sinopsis: ${e.message}")
+                    }
+                    Unit
+                }
+            }
+        }
+    }
+
+    // 🟢 VINCULACIÓN INTELIGENTE DE EVENTOS
+    DisposableEffect(menuPelisAbierto, controlesVisibles) {
+        activity.areControlsVisibleState = { controlesVisibles }
+        activity.isMenuCarteleraOpenState = { menuPelisAbierto }
+        activity.onUserInteraction = {
+            lastInteractionTime = System.currentTimeMillis()
+        }
+        activity.onWakeUpControls = {
+            if (!menuPelisAbierto) {
+                lastInteractionTime = System.currentTimeMillis()
+                controlesVisibles = true
+            }
+        }
+        activity.onToggleMenuCartelera = {
+            lastInteractionTime = System.currentTimeMillis()
+            menuPelisAbierto = !menuPelisAbierto
+            if (menuPelisAbierto) {
+                controlesVisibles = false
+            }
+        }
+        onDispose {
+            activity.onWakeUpControls = null
+            activity.onToggleMenuCartelera = null
+            activity.onUserInteraction = null
+            activity.isMenuCarteleraOpenState = { false }
+        }
+    }
+
+    fun generarClaveProgreso(url: String, titulo: String, castv: Int): String {
+        val urlLimpia = url.split("?")[0].split("|")[0].trim()
+        return if (urlLimpia.isNotEmpty()) {
+            "progreso_peli_" + urlLimpia.hashCode().toString()
+        } else {
+            val t = titulo.trim().ifBlank { "pelicula_sin_titulo" }
+            val anio = if (castv <= 0) "0" else castv.toString()
+            "progreso_peli_" + "$t-$anio".replace(Regex("[^A-Za-z0-9_-]"), "_")
+        }
+    }
+
+    fun obtenerProgresoGuardado(url: String, titulo: String, castv: Int): Long {
+        val clave = generarClaveProgreso(url, titulo, castv)
+        val prefs = context.getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
+        return try {
+            prefs.getLong(clave, 0L)
+        } catch (_: Exception) {
+            prefs.getInt(clave, 0).toLong()
+        }
+    }
+
+    fun guardarProgresoActual() {
+        val p = player ?: return
+        val pos = p.currentPosition
+        val dur = p.duration
+        if (pos > 10_000 && (dur <= 0 || (dur - pos) > 15_000)) {
+            val clave = generarClaveProgreso(streamUrl, movieTitle, movieCastv)
+            val prefs = context.getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
+            prefs.edit().putLong(clave, pos).commit()
+        }
+    }
+
+    fun borrarProgresoGuardado() {
+        val clave = generarClaveProgreso(streamUrl, movieTitle, movieCastv)
+        val prefs = context.getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
+        prefs.edit().remove(clave).commit()
+    }
+
+    fun procesarPistasDisponibles(tracks: Tracks) {
+        val listaAudios = mutableListOf<PistaAudio>()
+        val listaSubtitulos = mutableListOf<PistaSubtitulo>()
+        val groups = tracks.groups
+
+        for (groupIndex in groups.indices) {
+            val group = groups[groupIndex]
+            val tipoPista = group.type
+
+            for (trackIndex in 0 until group.length) {
+                val format = group.getTrackFormat(trackIndex)
+                val mimeType = format.sampleMimeType ?: ""
+                if (mimeType.contains("cea-608") || mimeType.contains("cea-708")) continue
+
+                val idiomaCodigo = format.language ?: "und"
+                val nombrePista = format.label ?: try {
+                    Locale(idiomaCodigo).getDisplayLanguage(Locale("es")).replaceFirstChar { it.uppercase() }
+                } catch (_: Exception) { idiomaCodigo.uppercase() }
+
+                val esForzado = (format.selectionFlags and C.SELECTION_FLAG_FORCED) != 0
+                val nombreFinal = if (esForzado) "$nombrePista (Forzado)" else nombrePista
+                val estaSeleccionada = group.isTrackSelected(trackIndex)
+
+                if (tipoPista == C.TRACK_TYPE_AUDIO) {
+                    listaAudios.add(PistaAudio(groupIndex, trackIndex, nombreFinal, idiomaCodigo, estaSeleccionada, group))
+                } else if (tipoPista == C.TRACK_TYPE_TEXT) {
+                    listaSubtitulos.add(PistaSubtitulo(groupIndex, trackIndex, nombreFinal, idiomaCodigo, estaSeleccionada, group))
+                }
+            }
+        }
+        pistasAudioDisponibles = listaAudios
+        pistasSubtitulosDisponibles = listaSubtitulos
+    }
+
+    fun prepararReproductor(posicionAIniciar: Long) {
+        try {
+            estaCargando = true
+            progresoSimulado = 0
+
             player?.stop()
             player?.clearMediaItems()
             player?.release()
             player = null
 
-            // --- EXTRACTOR INTELIGENTE DE CABECERAS PARA ENLACES ENCAPSULADOS ---
             var urlLimpia = streamUrl.trim()
-            var finalUserAgent = userAgent
-            var finalReferer = referer
-            var finalCookie = cookie
+            var finalUserAgent: String? = null
+            var finalReferer: String? = null
+            var finalCookie: String? = null
 
-            // Si el enlace viene con el formato de barra "|" de seguridad
             if (urlLimpia.contains("|")) {
                 val partes = urlLimpia.split("|")
-                urlLimpia = partes[0].trim() // Extraemos la URL pura sin los parámetros del agente
-
+                urlLimpia = partes[0].trim()
                 if (partes.size > 1) {
-                    val parametrosCabecera = partes[1].split("&")
-                    parametrosCabecera.forEach { parametro ->
-                        val llaveValor = parametro.split("=")
-                        if (llaveValor.size == 2) {
-                            val clave = llaveValor[0].trim()
-                            // DECODIFICACIÓN: Convierte el %20 de vuelta a espacio real para que la CDN lo acepte
-                            val valor = Uri.decode(llaveValor[1].trim())
-
+                    partes[1].split("&").forEach { parametro ->
+                        val kv = parametro.split("=")
+                        if (kv.size == 2) {
+                            val clave = kv[0].trim()
+                            val valor = Uri.decode(kv[1].trim())
                             when {
                                 clave.equals("User-Agent", ignoreCase = true) -> finalUserAgent = valor
                                 clave.equals("Referer", ignoreCase = true) -> finalReferer = valor
@@ -543,700 +439,157 @@ class PlayerPeliculas : AppCompatActivity() {
                 }
             }
 
-            // 2. CONSTRUCCIÓN DE PROPIEDADES DE RED DINÁMICAS (Se adapta a cada enlace)
             val requestProperties = HashMap<String, String>()
             requestProperties["Connection"] = "keep-alive"
             requestProperties["Accept"] = "*/*"
             requestProperties["ngrok-skip-browser-warning"] = "true"
 
-            // Si se capturó un referer, lo añadimos y generamos automáticamente la cabecera Origin
-            finalReferer?.let { ref ->
-                if (ref.isNotEmpty()) {
-                    requestProperties["Referer"] = ref
-                    try {
-                        val uri = Uri.parse(ref)
-                        requestProperties["Origin"] = "${uri.scheme}://${uri.host}"
-                    } catch (e: Exception) {}
-                }
+            // 🟢 CORREGIDO: Smart Cast seguro a través de variable inmutable 'ref'
+            val ref = finalReferer
+            if (!ref.isNullOrEmpty()) {
+                requestProperties["Referer"] = ref
+                try {
+                    val uri = Uri.parse(ref)
+                    requestProperties["Origin"] = "${uri.scheme}://${uri.host}"
+                } catch (_: Exception) {}
             }
 
-            // Si se capturó una cookie, la asignamos al canal de red de ExoPlayer
-            finalCookie?.let { coo ->
-                if (coo.isNotEmpty()) {
-                    requestProperties["Cookie"] = coo
-                }
+            val coo = finalCookie
+            if (!coo.isNullOrEmpty()) {
+                requestProperties["Cookie"] = coo
             }
 
-            // Definimos el User-Agent de manera dinámica (usamos el capturado o el de respaldo Safari macOS)
-            val userAgentExo = if (!finalUserAgent.isNullOrEmpty()) {
-                finalUserAgent!!
-            } else {
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15"
-            }
+            val userAgentExo = finalUserAgent ?: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15"
 
-            // 3. CONFIGURACIÓN DEL DATASOURCE FACTORY DINÁMICO
             val dataSourceFactory = DefaultHttpDataSource.Factory()
                 .setUserAgent(userAgentExo)
                 .setDefaultRequestProperties(requestProperties)
                 .setConnectTimeoutMs(30_000)
                 .setReadTimeoutMs(30_000)
-                .setAllowCrossProtocolRedirects(true) // Indispensable para evitar caídas en redirecciones
+                .setAllowCrossProtocolRedirects(true)
 
-            // 4. RENDERIZADORES PARA TV
-            val renderersFactory = DefaultRenderersFactory(this@PlayerPeliculas)
+            val renderersFactory = DefaultRenderersFactory(context)
                 .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
                 .setEnableDecoderFallback(true)
 
-            // 5. FACTORÍA DE MEDIA
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
-            // 6. LOAD CONTROL OPTIMIZADO (Evita desbordamiento de memoria - OOM en TV)
             val loadControl = DefaultLoadControl.Builder()
-                .setBufferDurationsMs(
-                    15_000,   // Mínimo buffer inicial (30s)
-                    300_000,  // Máximo buffer acumulado (5 min - Estilo YouTube)
-                    1_000,    // Buffer rápido de arranque (3s)
-                    4_500     // Buffer de reanudación (4.5s)
-                )
-                .setTargetBufferBytes(androidx.media3.common.C.LENGTH_UNSET)
+                .setBufferDurationsMs(15_000, 300_000, 1_000, 4_500)
+                .setTargetBufferBytes(C.LENGTH_UNSET)
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build()
 
-            // 7. CREAR EL REPRODUCTOR
-            player = ExoPlayer.Builder(this@PlayerPeliculas, renderersFactory)
+            val nuevoPlayer = ExoPlayer.Builder(context, renderersFactory)
                 .setMediaSourceFactory(mediaSourceFactory)
                 .setLoadControl(loadControl)
                 .build()
 
-            binding.reproductor.player = player
-            // --- BLINDAJE DE SUBTÍTULOS ESTILO VLC (SIN FONDO NEGRO) ---
             val estiloSubtitulos = CaptionStyleCompat(
-                Color.WHITE,                                // Color de la letra (Blanco)
-                Color.TRANSPARENT,                          // Color de fondo (Transparente - Elimina el cuadro negro)
-                Color.TRANSPARENT,                          // Color de la ventana del subtítulo (Transparente)
-                CaptionStyleCompat.EDGE_TYPE_OUTLINE,       // Tipo de borde (Borde exterior/Contorno)
-                Color.BLACK,                                // Color del borde (Negro para que se lea en fondos blancos)
-                null                                        // Fuente por defecto
+                android.graphics.Color.WHITE,
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT,
+                CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+                android.graphics.Color.BLACK,
+                null
             )
+            playerViewRef?.subtitleView?.setStyle(estiloSubtitulos)
+            playerViewRef?.subtitleView?.setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 20f)
 
-// Aplicamos el estilo personalizado a la vista de subtítulos
-            binding.reproductor.subtitleView?.setStyle(estiloSubtitulos)
+            val mediaItem = MediaItem.Builder().setUri(Uri.parse(urlLimpia)).build()
 
-// Opcional: Ajustamos el tamaño del texto para pantallas de TV (ej: 20sp)
-            binding.reproductor.subtitleView?.setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-
-            // 8. PROCESAMIENTO SEGURO DEL MEDIA ITEM Y FORZADO DE MIME TYPE UNIVERSAL
-            val uriLimpia = urlLimpia.trim() // Usamos la URL limpia sin el sufijo de las cabeceras "|"
-            if (uriLimpia.isEmpty()) {
-                mostrarCargando(false)
-                return
-            }
-
-            val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(uriLimpia))
-
-            // Aplicamos el resolvedor universal de formatos
-            val mimeTypeDetectado = obtenerMimeTypeSegunExtension(uriLimpia)
-            if (mimeTypeDetectado != null) {
-                mediaItemBuilder.setMimeType(mimeTypeDetectado)
-            }
-
-            val mediaItem = mediaItemBuilder.build()
-
-            // 9. ASIGNACIÓN DE LISTENERS
-
-            player?.addListener(object : Player.Listener {
-
-                override fun onTracksChanged(tracks: Tracks) {
-                    super.onTracksChanged(tracks)
-                    procesarPistasDisponibles(tracks)
+            nuevoPlayer.addListener(object : Player.Listener {
+                override fun onTracksChanged(tracks: Tracks) { procesarPistasDisponibles(tracks) }
+                override fun onPlaybackStateChanged(state: Int) {
+                    when (state) {
+                        Player.STATE_BUFFERING -> estaCargando = true
+                        Player.STATE_READY -> {
+                            estaCargando = false
+                            reconnectionAttempts = 0
+                        }
+                        Player.STATE_ENDED -> {
+                            borrarProgresoGuardado()
+                            estaCargando = false
+                        }
+                        else -> {}
+                    }
                 }
-
+                override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
                 override fun onPlayerError(error: PlaybackException) {
-                    Log.e("TV_ERROR", "Error detectado en reproducción: ${error.errorCodeName}")
-                    mostrarCargando(false)
-
+                    estaCargando = false
                     if (reconnectionAttempts < maxReconnectionAttempts) {
                         reconnectionAttempts++
-                        val ultimaPosicion = player?.currentPosition ?: posicionInicial
-
-                        when (error.errorCode) {
-                            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> {
-                                prepararReproductor(ultimaPosicion)
-                            }
-                            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-                            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> {
-                                handler.postDelayed({
-                                    prepararReproductor(ultimaPosicion)
-                                }, 3000)
-                            }
-                            else -> {
-                                handler.postDelayed({
-                                    prepararReproductor(ultimaPosicion)
-                                }, 3000)
-                            }
+                        val ultimaPos = nuevoPlayer.currentPosition.takeIf { it > 0 } ?: posicionAIniciar
+                        coroutineScope.launch {
+                            delay(3000)
+                            prepararReproductor(ultimaPos)
                         }
-                    } else {
-                        reconnectionAttempts = 0
                     }
                 }
             })
 
-            player?.addListener(playerListener)
+            nuevoPlayer.setMediaItem(mediaItem)
+            if (posicionAIniciar > 0) nuevoPlayer.seekTo(posicionAIniciar)
+            nuevoPlayer.playWhenReady = true
+            nuevoPlayer.prepare()
 
-            // 10. INICIALIZACIÓN
-            player?.setMediaItem(mediaItem)
-
-            if (posicionInicial > 0) {
-                player?.seekTo(posicionInicial)
-            }
-
-            player?.playWhenReady = true
-            player?.prepare()
+            player = nuevoPlayer
+            playerViewRef?.player = nuevoPlayer
 
         } catch (e: Exception) {
-            Log.e("TV_ERROR", "Error crítico en la inicialización: ${e.message}")
-            mostrarCargando(false)
+            estaCargando = false
         }
     }
 
-    @OptIn(UnstableApi::class)
-    private fun obtenerMimeTypeSegunExtension(url: String): String? {
-        val urlLower = url.lowercase().trim()
-
-        // Limpiamos la URL de parámetros (como ?token=... o |User-Agent=...) para obtener la extensión limpia
-        val urlLimpiaParaFiltro = urlLower.split("?")[0].split("|")[0]
-
-        return when {
-            // --- 1. STREAMING EN VIVO Y ADAPTATIVO ---
-            urlLimpiaParaFiltro.endsWith(".m3u8") || urlLimpiaParaFiltro.endsWith(".m3u") ->
-                androidx.media3.common.MimeTypes.APPLICATION_M3U8 // HLS
-            urlLimpiaParaFiltro.endsWith(".mpd") ->
-                androidx.media3.common.MimeTypes.APPLICATION_MPD // DASH
-            urlLimpiaParaFiltro.contains(".ism") ->
-                androidx.media3.common.MimeTypes.APPLICATION_SS // SmoothStreaming
-
-            // --- 2. CONTENEDORES DE VIDEO COMUNES ---
-            urlLimpiaParaFiltro.endsWith(".mp4") || urlLimpiaParaFiltro.endsWith(".m4v") ->
-                androidx.media3.common.MimeTypes.VIDEO_MP4
-            urlLimpiaParaFiltro.endsWith(".mkv") || urlLimpiaParaFiltro.endsWith(".mka") ->
-                androidx.media3.common.MimeTypes.VIDEO_MATROSKA
-            urlLimpiaParaFiltro.endsWith(".webm") ->
-                androidx.media3.common.MimeTypes.VIDEO_WEBM
-            urlLimpiaParaFiltro.endsWith(".ts") || urlLimpiaParaFiltro.endsWith(".tsv") ->
-                androidx.media3.common.MimeTypes.VIDEO_MP2T // Canales de TV / MPEG-TS
-            urlLimpiaParaFiltro.endsWith(".mov") || urlLimpiaParaFiltro.endsWith(".qt") ->
-                "video/quicktime" // Apple QuickTime
-            urlLimpiaParaFiltro.endsWith(".avi") ->
-                "video/x-msvideo" // AVI estándar
-            urlLimpiaParaFiltro.endsWith(".mpg") || urlLimpiaParaFiltro.endsWith(".mpeg") ->
-                "video/mpeg"
-            urlLimpiaParaFiltro.endsWith(".flv") ->
-                "video/x-flv"
-            urlLimpiaParaFiltro.endsWith(".3gp") || urlLimpiaParaFiltro.endsWith(".3gpp") ->
-                "video/3gpp"
-
-            // --- 3. CONTENEDORES DE AUDIO COMUNES (Por si se reproducen canciones) ---
-            urlLimpiaParaFiltro.endsWith(".mp3") ->
-                androidx.media3.common.MimeTypes.AUDIO_MPEG
-            urlLimpiaParaFiltro.endsWith(".aac") ->
-                androidx.media3.common.MimeTypes.AUDIO_AAC
-            urlLimpiaParaFiltro.endsWith(".wav") ->
-                androidx.media3.common.MimeTypes.AUDIO_WAV
-            urlLimpiaParaFiltro.endsWith(".flac") ->
-                androidx.media3.common.MimeTypes.AUDIO_FLAC
-            urlLimpiaParaFiltro.endsWith(".ogg") || urlLimpiaParaFiltro.endsWith(".oga") ->
-                androidx.media3.common.MimeTypes.AUDIO_OGG
-
-            else -> null // Deja que ExoPlayer intente analizar la cabecera (sniffing) de forma automática si no hay extensión
-        }
-    }
-    private fun procesarPistasDisponibles(tracks: Tracks) {
-        val listaAudios = mutableListOf<PistaAudio>()
-        val listaSubtitulos = mutableListOf<PistaSubtitulo>()
-
-        val groups = tracks.groups
-
-        for (groupIndex in groups.indices) {
-            val group = groups[groupIndex]
-            val tipoPista = group.type
-
-            for (trackIndex in 0 until group.length) {
-                // ELIMINADO: 'if (!group.isTrackSupported(trackIndex)) continue'
-                // Quitamos esta línea para que los audios AC3 se muestren siempre,
-                // permitiendo decodificación por software o passthrough en TVs sin licencia Dolby.
-
-                val format = group.getTrackFormat(trackIndex)
-
-                // 1. BLINDAJE: Omitir subtítulos "fantasma" CEA-608 y CEA-708
-                val mimeType = format.sampleMimeType ?: ""
-                if (mimeType.contains("cea-608") || mimeType.contains("cea-708")) {
-                    continue
-                }
-
-                val idiomaCodigo = format.language ?: "und"
-
-                // Obtener nombre completo legible
-                val idiomaCompleto = obtenerNombreCompletoIdioma(idiomaCodigo)
-                var nombrePista = format.label ?: idiomaCompleto
-
-                // Detectar si es pista forzada
-                val esForzado = (format.selectionFlags and androidx.media3.common.C.SELECTION_FLAG_FORCED) != 0
-                if (esForzado) {
-                    nombrePista += " (Forzado)"
-                }
-
-                val estaSeleccionada = group.isTrackSelected(trackIndex)
-
-                if (tipoPista == androidx.media3.common.C.TRACK_TYPE_AUDIO) {
-                    listaAudios.add(
-                        PistaAudio(
-                            indexGrupo = groupIndex,
-                            indexPista = trackIndex,
-                            nombre = nombrePista,
-                            idioma = idiomaCodigo,
-                            estaSeleccionada = estaSeleccionada,
-                            trackGroup = group
-                        )
-                    )
-                } else if (tipoPista == androidx.media3.common.C.TRACK_TYPE_TEXT) {
-                    listaSubtitulos.add(
-                        PistaSubtitulo(
-                            indexGrupo = groupIndex,
-                            indexPista = trackIndex,
-                            nombre = nombrePista,
-                            idioma = idiomaCodigo,
-                            estaSeleccionada = estaSeleccionada,
-                            trackGroup = group
-                        )
-                    )
-                }
+    LaunchedEffect(streamUrl) {
+        if (streamUrl.isNotBlank()) {
+            withContext(Dispatchers.IO) {
+                if (!Validacioneslista.yaCargado()) Validacioneslista.cargarPeliculas()
             }
-        }
-
-        // 2. EVITAR ELIMINACIÓN DE PISTAS REALES (Numeración inteligente)
-        val listaSubtitulosFinal = mutableListOf<PistaSubtitulo>()
-        val subtitulosAgrupados = listaSubtitulos.groupBy { it.nombre }
-
-        subtitulosAgrupados.forEach { (nombreBase, pistas) ->
-            if (pistas.size > 1) {
-                pistas.forEachIndexed { index, pista ->
-                    listaSubtitulosFinal.add(pista.copy(nombre = "$nombreBase ${index + 1}"))
-                }
+            val guardado = obtenerProgresoGuardado(streamUrl, movieTitle, movieCastv)
+            if (guardado > 0) {
+                progresoGuardadoEncontrado = guardado
+                mostrarDialogoContinuar = true
             } else {
-                listaSubtitulosFinal.addAll(pistas)
+                prepararReproductor(initialStartPosition)
             }
         }
-
-        val listaAudiosFinal = mutableListOf<PistaAudio>()
-        val audiosAgrupados = listaAudios.groupBy { it.nombre }
-
-        audiosAgrupados.forEach { (nombreBase, pistas) ->
-            if (pistas.size > 1) {
-                pistas.forEachIndexed { index, pista ->
-                    listaAudiosFinal.add(pista.copy(nombre = "$nombreBase ${index + 1}"))
-                }
-            } else {
-                listaAudiosFinal.addAll(pistas)
-            }
-        }
-
-        // Enviamos las listas completas de audio y video
-        actualizarInterfazDePistas(listaAudiosFinal, listaSubtitulosFinal)
     }
 
-    private fun actualizarInterfazDePistas(audios: List<PistaAudio>, subtitulos: List<PistaSubtitulo>) {
-        this.pistasAudioDisponibles = audios
-        this.pistasSubtulosDisponibles = subtitulos
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            val lista = Validacioneslista.obtenerPeliculasValidas()
+            val activas = lista.filter { movie ->
+                val durationMs = TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
+                val transcurrido = System.currentTimeMillis() - movie.createdAt
+                movie.countdownMinutes > 0 && (durationMs - transcurrido) > 0
+            }.sortedByDescending { it.createdAt }
 
-        Log.d("PlayerTracks", "Audios: ${audios.size}, Subtítulos: ${subtitulos.size}")
+            peliculasActivas.clear()
+            peliculasActivas.addAll(activas)
 
-        runOnUiThread {
-            val btnAudioSub = findViewById<ImageButton>(R.id.btn_audio_sub)
-
-            // El botón se deshabilita si solo hay 1 audio (o menos) y no hay subtítulos
-            val tieneOpcionesDeCambio = audios.size > 1 || subtitulos.isNotEmpty()
-            btnAudioSub?.isEnabled = tieneOpcionesDeCambio
-
-            // Opcional: Cambia la opacidad del botón para indicar visualmente si está deshabilitado
-            btnAudioSub?.alpha = if (tieneOpcionesDeCambio) 1.0f else 0.3f
+            if (activas.isEmpty() && menuPelisAbierto) menuPelisAbierto = false
+            if (Validacioneslista.yaCargado()) break
+            delay(3000)
         }
     }
 
-    private fun mostrarDialogoOpcionesPistas() {
-        val builder = android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-        val vistaDialogo = layoutInflater.inflate(R.layout.dialog_track_selector, null)
-        builder.setView(vistaDialogo)
+    LaunchedEffect(player, isPlaying) {
+        while (isActive) {
+            player?.let { p ->
+                currentPosition = p.currentPosition
+                totalDuration = p.duration.coerceAtLeast(0L)
+                bufferedPosition = p.bufferedPosition
 
-        val alerta = builder.create()
-        alerta.window?.setBackgroundDrawableResource(android.R.color.transparent)
+                if (estaCargando) {
+                    val milisCargados = maxOf(0L, p.bufferedPosition - p.currentPosition)
+                    val objetivo = if (p.currentPosition <= 1000L) 3000.0 else 4500.0
+                    val progresoReal = ((milisCargados / objetivo) * 100).toInt()
 
-        val contenedorAudio = vistaDialogo.findViewById<LinearLayout>(R.id.contenedor_audio)
-        val contenedorSubtitulos = vistaDialogo.findViewById<LinearLayout>(R.id.contenedor_subtitulos)
-
-        fun renderizarPistas() {
-            contenedorAudio?.removeAllViews()
-            contenedorSubtitulos?.removeAllViews()
-
-            // 1. RENDERIZAR AUDIOS
-            pistasAudioDisponibles.forEach { pista ->
-                val textView = TextView(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply { setMargins(0, 2, 0, 2) }
-
-                    if (pista.estaSeleccionada) {
-                        text = "➤  ${pista.nombre}"
-                        setTextColor(android.graphics.Color.parseColor("#C5A059"))
-                    } else {
-                        text = "    ${pista.nombre}"
-                        setTextColor(android.graphics.Color.parseColor("#FFFFFF"))
-                    }
-
-                    textSize = 13f
-                    setPadding(6, 6, 6, 6)
-                    isFocusable = true
-                    isClickable = true
-
-                    setOnFocusChangeListener { _, hasFocus ->
-                        if (hasFocus) {
-                            setBackgroundColor(android.graphics.Color.parseColor("#2C2214"))
-                            if (!pista.estaSeleccionada) setTextColor(android.graphics.Color.parseColor("#C5A059"))
-                        } else {
-                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                            if (!pista.estaSeleccionada) setTextColor(android.graphics.Color.parseColor("#FFFFFF"))
-                        }
-                    }
-
-                    setOnClickListener {
-                        seleccionarPistaAudio(pista)
-                        pistasAudioDisponibles = pistasAudioDisponibles.map {
-                            it.copy(estaSeleccionada = (it.indexGrupo == pista.indexGrupo && it.indexPista == pista.indexPista))
-                        }
-                        renderizarPistas()
-                    }
-                }
-                contenedorAudio?.addView(textView)
-            }
-
-            // LÓGICA DE SUBTÍTULOS DESACTIVADOS POR DEFECTO
-            val subtitulosDeshabilitadosSistema = player?.trackSelectionParameters?.disabledTrackTypes?.contains(
-                androidx.media3.common.C.TRACK_TYPE_TEXT
-            ) == true
-
-            val ningunaPistaActiva = pistasSubtulosDisponibles.none { it.estaSeleccionada }
-            val subtitulosEstanApagados = subtitulosDeshabilitadosSistema || ningunaPistaActiva
-
-            // Botón Desactivar Subtítulos
-            val textDesactivar = TextView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { setMargins(0, 2, 0, 2) }
-
-                if (subtitulosEstanApagados) {
-                    text = "➤  Desactivar Subtítulos"
-                    setTextColor(android.graphics.Color.parseColor("#C5A059"))
-                } else {
-                    text = "    Desactivar Subtítulos"
-                    setTextColor(android.graphics.Color.parseColor("#FFFFFF"))
-                }
-
-                textSize = 13f
-                setPadding(6, 6, 6, 6)
-                isFocusable = true
-                isClickable = true
-
-                setOnFocusChangeListener { _, hasFocus ->
-                    if (hasFocus) {
-                        setBackgroundColor(android.graphics.Color.parseColor("#2C2214"))
-                        if (!subtitulosEstanApagados) setTextColor(android.graphics.Color.parseColor("#C5A059"))
-                    } else {
-                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                        if (!subtitulosEstanApagados) setTextColor(android.graphics.Color.parseColor("#FFFFFF"))
-                    }
-                }
-
-                setOnClickListener {
-                    desactivarSubtitulos()
-                    pistasSubtulosDisponibles = pistasSubtulosDisponibles.map { it.copy(estaSeleccionada = false) }
-                    renderizarPistas()
-                }
-            }
-            contenedorSubtitulos?.addView(textDesactivar)
-
-            // Lista de subtítulos disponibles
-            pistasSubtulosDisponibles.forEach { pista ->
-                val textView = TextView(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply { setMargins(0, 2, 0, 2) }
-
-                    val mostrarFlechaActiva = pista.estaSeleccionada && !subtitulosEstanApagados
-
-                    if (mostrarFlechaActiva) {
-                        text = "➤  ${pista.nombre}"
-                        setTextColor(android.graphics.Color.parseColor("#C5A059"))
-                    } else {
-                        text = "    ${pista.nombre}"
-                        setTextColor(android.graphics.Color.parseColor("#FFFFFF"))
-                    }
-
-                    textSize = 13f
-                    setPadding(6, 6, 6, 6)
-                    isFocusable = true
-                    isClickable = true
-
-                    setOnFocusChangeListener { _, hasFocus ->
-                        if (hasFocus) {
-                            setBackgroundColor(android.graphics.Color.parseColor("#2C2214"))
-                            if (!mostrarFlechaActiva) setTextColor(android.graphics.Color.parseColor("#C5A059"))
-                        } else {
-                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                            if (!mostrarFlechaActiva) setTextColor(android.graphics.Color.parseColor("#FFFFFF"))
-                        }
-                    }
-
-                    setOnClickListener {
-                        seleccionarPistaSubtitulo(pista)
-                        pistasSubtulosDisponibles = pistasSubtulosDisponibles.map {
-                            it.copy(estaSeleccionada = (it.indexGrupo == pista.indexGrupo && it.indexPista == pista.indexPista))
-                        }
-                        renderizarPistas()
-                    }
-                }
-                contenedorSubtitulos?.addView(textView)
-            }
-        }
-
-        renderizarPistas()
-        alerta.show()
-    }
-    private fun obtenerNombreCompletoIdioma(codigo: String): String {
-        if (codigo.isEmpty() || codigo == "und") return "Desconocido"
-        return try {
-            val locale = java.util.Locale(codigo)
-            // Forzamos a que el nombre del idioma siempre se devuelva en español
-            val nombre = locale.getDisplayLanguage(java.util.Locale("es"))
-            // Capitalizamos la primera letra (ej: "español" -> "Español")
-            nombre.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
-        } catch (e: Exception) {
-            codigo.uppercase()
-        }
-    }
-
-      fun seleccionarPistaAudio(pista: PistaAudio) {
-        val reproductorActivo = player ?: return
-
-        reproductorActivo.trackSelectionParameters = reproductorActivo.trackSelectionParameters
-            .buildUpon()
-            .clearOverridesOfType(androidx.media3.common.C.TRACK_TYPE_AUDIO)
-            .addOverride(
-                androidx.media3.common.TrackSelectionOverride(
-                    pista.trackGroup.mediaTrackGroup,
-                    pista.indexPista
-                )
-            )
-            .build()
-    }
-
-    fun seleccionarPistaSubtitulo(pista: PistaSubtitulo) {
-        val reproductorActivo = player ?: return
-
-        reproductorActivo.trackSelectionParameters = reproductorActivo.trackSelectionParameters
-            .buildUpon()
-            .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, false)
-            .clearOverridesOfType(androidx.media3.common.C.TRACK_TYPE_TEXT)
-            .addOverride(
-                androidx.media3.common.TrackSelectionOverride(
-                    pista.trackGroup.mediaTrackGroup,
-                    pista.indexPista
-                )
-            )
-            .build()
-    }
-
-    fun desactivarSubtitulos() {
-        val reproductorActivo = player ?: return
-
-        reproductorActivo.trackSelectionParameters = reproductorActivo.trackSelectionParameters
-            .buildUpon()
-            .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true)
-            .build()
-    }
-//    @OptIn(UnstableApi::class)
-//    private fun prepararReproductor(posicionInicial: Long) {
-//        try {
-//            // 1. LIMPIEZA DE HARDWARE
-//            binding.reproductor.player = null
-//            player?.stop()
-//            player?.clearMediaItems()
-//            player?.release()
-//            player = null
-//
-//            // 2. CONFIGURACIÓN DE RED PARA TV
-//            val dataSourceFactory = DefaultHttpDataSource.Factory()
-//                .setUserAgent("Mozilla/5.0 (Linux; Android 10; BRAVIA 4K Build/QTG3.200305.006.A1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-//                .setDefaultRequestProperties(mapOf(
-//                    "Connection" to "close",
-//                    "ngrok-skip-browser-warning" to "true"
-//                ))
-//                .setConnectTimeoutMs(30_000)
-//                .setReadTimeoutMs(30_000)
-//                .setAllowCrossProtocolRedirects(true)
-//
-//            // 3. RENDERIZADORES PARA TV
-//            val renderersFactory = DefaultRenderersFactory(this@PlayerPeliculas)
-//                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-//                .setEnableDecoderFallback(true)
-//
-//            // 4. FACTORÍA DE MEDIA
-//            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
-//
-//            // 5. LOAD CONTROL ESTILO "YOUTUBE" (Búfer ultra-agresivo de precarga)
-//            val loadControl = DefaultLoadControl.Builder()
-//                .setBufferDurationsMs(
-//                    30_000,   // Mínimo buffer antes de evaluar pausar la descarga (7.5s)
-//                    300_000, // Máximo buffer: Almacena hasta 2 MINUTOS de video por adelantado (Estilo YouTube)
-//                    3_000,   // Buffer necesario para el arranque inicial rápido (3s)
-//                    4_500    // Buffer necesario para reanudar tras una pausa (4.5s)
-//                )
-//                .setTargetBufferBytes(128 * 1024 * 1024) // Aumentamos la memoria a 128MB para aguantar los 2 min de búfer en HD/4K
-//                .setPrioritizeTimeOverSizeThresholds(true) // Prioriza siempre acumular tiempo de reproducción (segundos) sobre bytes
-//                .build()
-//
-//            // 6. CREAR EL REPRODUCTOR CON BACK-BUFFER (Corregido para Media3)
-//            player = ExoPlayer.Builder(this@PlayerPeliculas, renderersFactory)
-//                .setMediaSourceFactory(mediaSourceFactory)
-//                .setLoadControl(loadControl)
-//                .build()
-//
-//            binding.reproductor.player = player
-//
-//            // 7. PROCESAMIENTO SEGURO DEL MEDIA ITEM
-//            val uriLimpia = streamUrl.trim()
-//            if (uriLimpia.isEmpty()) {
-//                mostrarCargando(false)
-//                return
-//            }
-//            val mediaItem = MediaItem.Builder()
-//                .setUri(Uri.parse(uriLimpia))
-//                .build()
-//
-//            // 8. ASIGNACIÓN DE LISTENERS
-//            player?.addListener(object : Player.Listener {
-//                override fun onPlayerError(error: PlaybackException) {
-//                    Log.e("TV_ERROR", "Error detectado en reproducción: ${error.errorCodeName}")
-//                    mostrarCargando(false)
-//
-//                    if (reconnectionAttempts < maxReconnectionAttempts) {
-//                        reconnectionAttempts++
-//                        val ultimaPosicion = player?.currentPosition ?: posicionInicial
-//
-//                        when (error.errorCode) {
-//                            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> {
-//                                prepararReproductor(ultimaPosicion)
-//                            }
-//                            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-//                            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> {
-//                                handler.postDelayed({
-//                                    prepararReproductor(ultimaPosicion)
-//                                }, 3000)
-//                            }
-//                            else -> {
-//                                handler.postDelayed({
-//                                    prepararReproductor(ultimaPosicion)
-//                                }, 3000)
-//                            }
-//                        }
-//                    } else {
-//                        reconnectionAttempts = 0
-//                    }
-//                }
-//            })
-//
-//            player?.addListener(playerListener)
-//
-//            // 9. INICIALIZACIÓN
-//            player?.setMediaItem(mediaItem)
-//
-//            if (posicionInicial > 0) {
-//                player?.seekTo(posicionInicial)
-//            }
-//
-//            player?.playWhenReady = true
-//            player?.prepare()
-//
-//        } catch (e: Exception) {
-//            Log.e("TV_ERROR", "Error crítico en la inicialización: ${e.message}")
-//            mostrarCargando(false)
-//        }
-//    }
-
-    // Función para activar/desactivar la animación de pulso_premium
-    @SuppressLint("ResourceType")
-    private fun mostrarCargando(mostrar: Boolean) {
-        val loadingIndicator = binding.loadingIndicator
-
-        if (mostrar) {
-            if (loadingIndicator.visibility != View.VISIBLE) {
-                // Reiniciamos el progreso a 0 cada vez que empieza a cargar
-                progresoSimulado = 0
-
-                val txtTitulo = loadingIndicator.findViewById<TextView>(R.id.loadingMovieTitle)
-                if (::movieTitle.isInitialized) {
-                    txtTitulo?.text = "Cargando: $movieTitle"
-                } else {
-                    txtTitulo?.text = "Cargando película..."
-                }
-
-                loadingIndicator.visibility = View.VISIBLE
-                val animacion = AnimationUtils.loadAnimation(this, R.anim.pulso_premium)
-                loadingIndicator.startAnimation(animacion)
-
-                // Iniciamos la simulación del progreso
-                handler.removeCallbacks(runnableBuffer)
-                handler.post(runnableBuffer)
-            }
-        } else {
-            handler.removeCallbacks(runnableBuffer)
-            loadingIndicator.clearAnimation()
-            loadingIndicator.visibility = View.GONE
-        }
-    }
-
-    private val runnableBuffer = object : Runnable {
-        override fun run() {
-            val loadingIndicator = binding.loadingIndicator
-
-            if (player != null && loadingIndicator.visibility == View.VISIBLE) {
-
-                // 1. Calculamos los milisegundos reales cargados en memoria
-                val posicionDescargada = player?.bufferedPosition ?: 0L
-                val posicionActual = player?.currentPosition ?: 0L
-                val milisegundosCargados = maxOf(0L, posicionDescargada - posicionActual)
-
-                // 2. DETECCIÓN DINÁMICA DEL OBJETIVO:
-                // Si la posición actual es muy cercana a 0 (está iniciando la película por primera vez),
-                // el LoadControl exige 3,000 ms para arrancar.
-                // Si ya pasó el inicio (posición > 1 segundo), exige 4,500 ms para reanudar.
-                val objetivoDespegueMs = if (posicionActual <= 1000L) {
-                    3000.0 // Objetivo inicial de tu LoadControl (3s)
-                } else {
-                    4500.0 // Objetivo de re-búfer de tu LoadControl (4.5s)
-                }
-
-                val progresoReal = ((milisegundosCargados / objetivoDespegueMs) * 100).toInt()
-
-                // 3. Lógica de movimiento continuo (gateo)
-                if (progresoReal > progresoSimulado) {
-                    // Si el búfer real avanza, el contador sube moderadamente para alcanzarlo
-                    progresoSimulado += 2
-                    gateoTicks = 0
-                } else {
-                    // Si el búfer se estanca esperando la red, gatea lentamente
-                    if (progresoSimulado < 99) {
+                    if (progresoReal > progresoSimulado) {
+                        progresoSimulado = minOf(99, progresoSimulado + 2)
+                        gateoTicks = 0
+                    } else if (progresoSimulado < 99) {
                         gateoTicks++
                         if (gateoTicks >= 3) {
                             progresoSimulado += 1
@@ -1244,966 +597,1098 @@ class PlayerPeliculas : AppCompatActivity() {
                         }
                     }
                 }
+            }
+            delay(1000)
+        }
+    }
 
-                // Límites de seguridad
-                if (progresoSimulado > 99) progresoSimulado = 99
-                if (progresoSimulado < 0) progresoSimulado = 0
+    // 🟢 CONTROL INTELIGENTE DE AUTO-OCULTAR: NO se oculta si se está manipulando o buscando en el slider
+    LaunchedEffect(controlesVisibles, lastInteractionTime, menuPelisAbierto, estaDesplazandoProgreso) {
+        if (controlesVisibles && !menuPelisAbierto && !estaDesplazandoProgreso) {
+            delay(6000)
+            controlesVisibles = false
+        }
+    }
 
-                val txtBuffer = loadingIndicator.findViewById<TextView>(R.id.loadingBufferText)
-                if (txtBuffer != null) {
-                    txtBuffer.text = "Optimizando conexión... $progresoSimulado%"
+    DisposableEffect(Unit) {
+        onDispose {
+            guardarProgresoActual()
+            player?.stop()
+            player?.release()
+            player = null
+        }
+    }
+
+    BackHandler {
+        when {
+            menuPelisAbierto -> {
+                menuPelisAbierto = false
+            }
+            controlesVisibles -> {
+                controlesVisibles = false
+            }
+            else -> {
+                guardarProgresoActual()
+                onFinish()
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .pointerInput(Unit) {
+                detectTapGestures {
+                    lastInteractionTime = System.currentTimeMillis()
+                    if (menuPelisAbierto) {
+                        menuPelisAbierto = false
+                    } else {
+                        controlesVisibles = !controlesVisibles
+                    }
                 }
-
-                handler.postDelayed(this, 150)
             }
+    ) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    useController = false
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    isFocusable = false
+                    isFocusableInTouchMode = false
+                    descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+                    playerViewRef = this
+                }
+            },
+            update = { pView ->
+                val aspectRatios = listOf(
+                    AspectRatioFrameLayout.RESIZE_MODE_FIT,
+                    AspectRatioFrameLayout.RESIZE_MODE_FILL,
+                    AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                )
+                pView.resizeMode = aspectRatios[currentAspectRatioMode]
+            }
+        )
+
+        // 🟢 INDICADOR DE BUFFER SUPERIOR DISCRETO (Aparece arriba si los controles están ocultos)
+        if (estaCargando && !controlesVisibles) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp, end = 24.dp),
+                contentAlignment = Alignment.TopEnd
+            ) {
+                IndicadorBufferSuperior(progreso = progresoSimulado)
+            }
+        }
+
+        // 🟢 CONTROLES CINEMATOGRÁFICOS
+        AnimatedVisibility(
+            visible = controlesVisibles && !menuPelisAbierto,
+            enter = fadeIn(animationSpec = tween(300)),
+            exit = fadeOut(animationSpec = tween(300))
+        ) {
+            OverlayCinematograficoTV(
+                movieTitle = movieTitle,
+                movieImageUrl = movieImageUrl,
+                movieSynopsis = movieSynopsis,
+                isPlaying = isPlaying,
+                estaCargando = estaCargando,
+                progresoSimulado = progresoSimulado,
+                currentPosition = currentPosition,
+                totalDuration = totalDuration,
+                bufferedPosition = bufferedPosition,
+                tieneOpcionesPistas = pistasAudioDisponibles.size > 1 || pistasSubtitulosDisponibles.isNotEmpty(),
+                onInteraction = { lastInteractionTime = System.currentTimeMillis() },
+                onSeekingStateChanged = { estaDesplazandoProgreso = it },
+                onTogglePlayPause = {
+                    lastInteractionTime = System.currentTimeMillis()
+                    player?.let { if (it.isPlaying) it.pause() else it.play() }
+                },
+                onSeekTo = { nuevaPos ->
+                    lastInteractionTime = System.currentTimeMillis()
+                    player?.seekTo(nuevaPos.coerceIn(0L, totalDuration))
+                },
+                onToggleMenuPelis = {
+                    lastInteractionTime = System.currentTimeMillis()
+                    controlesVisibles = false
+                    menuPelisAbierto = true
+                },
+                onAbrirPistas = {
+                    lastInteractionTime = System.currentTimeMillis()
+                    mostrarDialogoPistas = true
+                },
+                onCycleAspectRatio = {
+                    lastInteractionTime = System.currentTimeMillis()
+                    currentAspectRatioMode = (currentAspectRatioMode + 1) % 3
+                },
+                onHomeExit = {
+                    guardarProgresoActual()
+                    player?.stop()
+                    player?.release()
+                    player = null
+                    onFinish()
+                },
+                onAbrirPerfil = {
+                    context.startActivity(Intent(context, Perfil::class.java))
+                }
+            )
+        }
+
+        // 🟢 MENÚ CARTELERA
+        AnimatedVisibility(
+            visible = menuPelisAbierto,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            MenuCarteleraOverlay(
+                peliculas = peliculasActivas,
+                peliculaActualId = "",
+                onSelectMovie = { seleccionada ->
+                    guardarProgresoActual()
+                    streamUrl = seleccionada.streamUrl
+                    movieTitle = seleccionada.title
+                    movieCastv = seleccionada.castv
+                    movieImageUrl = seleccionada.imageUrl
+                    movieSynopsis = seleccionada.overview ?: ""
+                    menuPelisAbierto = false
+                }
+            )
         }
     }
 
-    private fun obtenerProgresoGuardado(): Long {
-        val clave = generarClaveProgreso()
-        val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
-        return try {
-            prefs.getLong(clave, 0L)
-        } catch (e: Exception) {
-            prefs.getInt(clave, 0).toLong() // Conversión de seguridad por registros antiguos
-        }
-    }
-
-    private fun mostrarDialogoContinuar(progresoGuardado: Long) {
-        // Colores de identidad CineParche
-        val colorDorado = Color.parseColor("#C5A059")
-        val colorFondo = Color.parseColor("#0A122A")
-
-        val horas = progresoGuardado / 3600000
-        val minutos = (progresoGuardado % 3600000) / 60000
-        val segundos = (progresoGuardado % 60000) / 1000
-        val tiempoFormateado = String.format("%02d:%02d:%02d", horas, minutos, segundos)
-
-        // Título elegante
-        val customTitle = TextView(this).apply {
-            text = "¿Deseas continuar?"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
-            setTextColor(colorDorado)
-            typeface = Typeface.DEFAULT_BOLD
-            setPadding(40, 30, 40, 10)
-        }
-
-        // Mensaje centralizado
-        val customMessage = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 20, 40, 30)
-            gravity = Gravity.CENTER_HORIZONTAL
-
-            val textoInfo = TextView(this@PlayerPeliculas).apply {
-                text = "Te quedaste en:"
-                textSize = 18f
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-            }
-
-            val textoTiempo = TextView(this@PlayerPeliculas).apply {
-                text = tiempoFormateado
-                textSize = 32f
-                setTextColor(Color.WHITE)
-                typeface = Typeface.MONOSPACE
-                setPadding(0, 10, 0, 10)
-                gravity = Gravity.CENTER
-            }
-
-            addView(textoInfo)
-            addView(textoTiempo)
-        }
-
-        val dialog = AlertDialog.Builder(this)
-            .setCustomTitle(customTitle)
-            .setView(customMessage)
-            .setNegativeButton("Reanudar (10s)", null)
-            .setPositiveButton("Reiniciar", null)
-            .setCancelable(false)
-            .create()
-
-        var contadorTimer: CountDownTimer? = null
-
-        dialog.setOnShowListener {
-            // Fondo inmersivo azul noche
-            dialog.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
-
-            val btnReiniciar = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            val btnReanudar = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
-            val focusSelector = R.drawable.focus_selector
-
-            listOf(btnReiniciar, btnReanudar).forEach { button ->
-                button.setTextColor(Color.RED)
-                button.textSize = 18f
-                button.setBackgroundResource(focusSelector)
-                button.isFocusable = true
-                button.isFocusableInTouchMode = true
-                button.setPadding(30, 15, 30, 15)
-            }
-
-            // Foco inicial en Reanudar para mayor comodidad
-            btnReanudar?.requestFocus()
-
-            btnReiniciar.setOnClickListener {
-                contadorTimer?.cancel()
+    if (mostrarDialogoContinuar) {
+        DialogoContinuarProgreso(
+            progresoGuardado = progresoGuardadoEncontrado,
+            onReiniciar = {
+                mostrarDialogoContinuar = false
                 prepararReproductor(0L)
-                dialog.dismiss()
+            },
+            onReanudar = {
+                mostrarDialogoContinuar = false
+                prepararReproductor(progresoGuardadoEncontrado)
             }
-
-            btnReanudar.setOnClickListener {
-                contadorTimer?.cancel()
-                prepararReproductor(progresoGuardado)
-                dialog.dismiss()
-            }
-
-            // Lógica del contador integrada en el botón
-            contadorTimer = object : CountDownTimer(10000, 1000) {
-                override fun onTick(millisUntilFinished: Long) {
-                    val seg = millisUntilFinished / 1000
-                    btnReanudar.text = "Reanudar (${seg}s)"
-                    // Efecto visual: el botón con el contador resalta en dorado
-                    btnReanudar.setTextColor(colorDorado)
-                }
-
-                override fun onFinish() {
-                    if (dialog.isShowing) {
-                        prepararReproductor(progresoGuardado)
-                        dialog.dismiss()
-                    }
-                }
-            }.start()
-        }
-
-        dialog.show()
+        )
     }
 
-    private fun generarClaveProgreso(): String {
-        // Extraemos la URL limpia (sin tokens dinámicos "?token=" ni cabeceras "|User-Agent=")
-        val urlLimpia = streamUrl.split("?")[0].split("|")[0].trim()
-        return if (urlLimpia.isNotEmpty()) {
-            "progreso_peli_" + urlLimpia.hashCode().toString()
-        } else {
-            val titulo = movieTitle.trim().ifBlank { "pelicula_sin_titulo" }
-            val anio = if (movieCastv <= 0) "0" else movieCastv.toString()
-            "progreso_peli_" + "$titulo-$anio".replace(Regex("[^A-Za-z0-9_-]"), "_")
-        }
-    }
-
-    private fun guardarProgresoActual() {
-        val activePlayer = player ?: return
-        val currentPosition = activePlayer.currentPosition
-        val duration = activePlayer.duration
-
-        // Guardamos progreso si se ha reproducido más de 10 segundos y no ha terminado por completo (con un margen de 15s)
-        if (currentPosition > 10_000 && (duracionTotalMs <= 0 || (duracionTotalMs - currentPosition) > 15_000)) {
-            val clave = generarClaveProgreso()
-            val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
-
-            // Usamos commit() en lugar de apply() para asegurar la escritura física inmediata en disco
-            prefs.edit().putLong(clave, currentPosition).commit()
-            Log.d("ProgresoPeliculas", "Progreso guardado de forma síncrona para $clave: $currentPosition ms")
-        }
-    }
-
-    // Variable de soporte para guardar la duración total
-    private val duracionTotalMs: Long
-        get() = player?.duration ?: 0L
-
-    private fun borrarProgresoGuardado() {
-        val clave = generarClaveProgreso()
-        val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
-        prefs.edit().remove(clave).commit()
-    }
-
-
-    override fun onPause() {
-        super.onPause()
-
-        val position = ultimaPosicionValida
-        if (position > 10_000) {
-            val clave = generarClaveProgreso()
-            val prefs = getSharedPreferences("progreso_peliculas", Context.MODE_PRIVATE)
-            prefs.edit().putLong(clave, position).apply()
-        }
-
-        guardarProgresoActual()
-        player?.pause()
-        handler.postDelayed(runnableActualizar, 1000)
-    }
-
-
-    private var ultimaPosicionValida: Long = 0L
-
-    // Listener para el reproductor
-    private val playerListener = object : Player.Listener {
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            val currentPosition = player?.contentPosition ?: 0L
-
-            when (playbackState) {
-                Player.STATE_BUFFERING -> {
-                    mostrarCargando(true)
-//                    mostrarBuffer()
-                    if (currentPosition > 0) {
-                        ultimaPosicionValida = currentPosition
-
-                    }
+    if (mostrarDialogoPistas) {
+        DialogoSelectorPistas(
+            audios = pistasAudioDisponibles,
+            subtitulos = pistasSubtitulosDisponibles,
+            onDismiss = { mostrarDialogoPistas = false },
+            onSelectAudio = { pista ->
+                player?.let { p ->
+                    p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+                        .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                        .addOverride(TrackSelectionOverride(pista.trackGroup.mediaTrackGroup, pista.indexPista))
+                        .build()
                 }
-
-                Player.STATE_READY -> {
-                    mostrarCargando(false)
-                    isPlaybackActive = true
-                    playbackStartTime.set(System.currentTimeMillis())
-                    reconnectionAttempts = 0
-                    isReconnecting = false
-
-                    if (lastKnownPosition > 0) {
-                        player?.seekTo(lastKnownPosition)
-                        lastKnownPosition = 0
-                    }
-
-                    actualizarTiempo()
-                    val pos = player?.contentPosition ?: 0L
-                    Log.d("PROGRESO", "📍 Posición detectada en estado $playbackState: $pos")
-
-// Guardamos la última posición válida
-                    val current = player?.contentPosition ?: 0L
-                    if (current > 10_000) {
-                        ultimaPosicionValida = current
-                        Log.d("PROGRESO", "🎯 Posición válida (READY): $ultimaPosicionValida ms")
-                    }
+            },
+            onSelectSubtitulo = { pista ->
+                player?.let { p ->
+                    p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                        .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                        .addOverride(TrackSelectionOverride(pista.trackGroup.mediaTrackGroup, pista.indexPista))
+                        .build()
                 }
-
-                Player.STATE_ENDED -> {
-                    borrarProgresoGuardado()
-                    mostrarCargando(false)
-                    isPlaybackActive = false
-//                    showErrorDialog(movieTitle, movieCastv, userId)
-
-                    if (isLiveStream) {
-                        intentarReconexion()
-                    } else {
-                        handler.postDelayed(runnableActualizar, 1000)
-                    }
-                }
-
-                Player.STATE_IDLE -> {
-                    isPlaybackActive = false
-
-                    if (isLiveStream) {
-                        intentarReconexion()
-                    } else {
-                        handler.postDelayed(runnableActualizar, 1000)
-                    }
-                }
-
-                else -> {
-                    if (!isPlaybackActive && reconnectionAttempts < maxReconnectionAttempts) {
-                        intentarReconexion()
-                    }
+            },
+            onDesactivarSubtitulos = {
+                player?.let { p ->
+                    p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                        .build()
                 }
             }
-        }
+        )
+    }
+}
 
+// =========================================================================
+// 🟢 OVERLAY CINEMATOGRÁFICO
+// =========================================================================
+@Composable
+fun OverlayCinematograficoTV(
+    movieTitle: String,
+    movieImageUrl: String,
+    movieSynopsis: String,
+    isPlaying: Boolean,
+    estaCargando: Boolean,
+    progresoSimulado: Int,
+    currentPosition: Long,
+    totalDuration: Long,
+    bufferedPosition: Long,
+    tieneOpcionesPistas: Boolean,
+    onInteraction: () -> Unit,
+    onSeekingStateChanged: (Boolean) -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onSeekTo: (Long) -> Unit,
+    onToggleMenuPelis: () -> Unit,
+    onAbrirPistas: () -> Unit,
+    onCycleAspectRatio: () -> Unit,
+    onHomeExit: () -> Unit,
+    onAbrirPerfil: () -> Unit
+) {
+    val playPauseFocusRequester = remember { FocusRequester() }
 
-        override fun onIsPlayingChanged(isPlaying: Boolean) {
-            val playPauseButton = findViewById<ImageButton>(R.id.play_pause)
-
-            if (isPlaying) {
-                handler.postDelayed(runnableOcultar, hideControlsDelay)
-                // Cambias a icono de PAUSA si está reproduciendo
-                playPauseButton.setImageResource(R.drawable.play)
-            } else {
-                handler.removeCallbacks(runnableOcultar)
-                // Cambias a icono de PLAY si está detenido
-                playPauseButton.setImageResource(R.drawable.stop)
-            }
-        }
-
-        override fun onPlayerError(error: PlaybackException) {
-
-
-            // Intenta la reconexión solo si el error es recuperable y la reproducción ha sido activa
-            if (isRecoverableError(error) && isPlaybackActive) {
-                intentarReconexion() // Llama al método de reconexión
-            } else if (!isPlaybackActive && reconnectionAttempts >= maxReconnectionAttempts) {
-//                showErrorDialog(movieTitle, movieCastv, userId) // Muestra un diálogo de error
-            }
-        }
+    LaunchedEffect(Unit) {
+        delay(150)
+        try { playPauseFocusRequester.requestFocus() } catch (_: Exception) {}
     }
 
-    // Método para determinar si el error es recuperable
-    private fun isRecoverableError(error: PlaybackException): Boolean {
-        // Define qué errores son recuperables para tu caso específico
-        return error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
-                error.errorCode == PlaybackException.ERROR_CODE_REMOTE_ERROR // Y otros errores recuperables
-    }
+    var horaActual by remember { mutableStateOf("") }
+    var fechaCompletaActual by remember { mutableStateOf("") }
 
-    // Método para intentar reconectar
-    private fun intentarReconexion() {
-        if (isReconnecting) {
-            return // No intenta reconectar si ya se está reconectando
-        }
+    LaunchedEffect(Unit) {
+        val formatHora = SimpleDateFormat("hh:mm:ss a", Locale.getDefault())
+        val formatFecha = SimpleDateFormat("EEEE, d 'de' MMMM 'de' yyyy", Locale("es", "ES"))
 
-        // Verifica si se alcanzó el máximo de intentos de reconexión
-        if (reconnectionAttempts >= maxReconnectionAttempts) {
-            Log.d("Reconexión", "Se alcanzó el máximo de intentos. No se puede reconectar.")
-            reconnectionAttempts = 0 // Reinicia los intentos de reconexión
-            isReconnecting = false // Indica que no se está reconectando
-
-            // Muestra un diálogo de error si no hay reproducción activa
-//            if (!isPlaybackActive) {
-//                showErrorDialog(
-//                    movieTitle,
-//                    movieCastv,
-//                    userId
-//                )
-//            }
-            return
-        }
-
-        // Verifica la conexión a internet
-        if (!isNetworkConnected()) {
-            Log.d("Reconexión", "No hay conexión a Internet. Esperando...")
-            return // No intenta reconectar si no hay conexión
-        }
-
-        reconnectionAttempts++ // Incrementa los intentos de reconexión
-        isReconnecting = true // Indica que se está reconectando
-
-        // Calcula el tiempo de espera para reconectar
-        val waitTime =
-            (2.0).pow(reconnectionAttempts).toLong() * 1000 // Espera un tiempo exponencial
-
-        // Inicia una corutina para manejar la reconexión
-        CoroutineScope(Dispatchers.Main).launch {
-            delay(waitTime) // Espera el tiempo calculado
-            // Intenta reiniciar la reproducción solo si streamUrl no es nulo
-            streamUrl.let { url ->
-                startMoviePlayback(
-                    url,
-                    movieTitle,
-                    movieCastv,
-                    movieImageUrl
-                ) // Llama al método de inicio
-                isReconnecting = false // Indica que no se está reconectando
-            }
+        while (isActive) {
+            val d = Date()
+            horaActual = formatHora.format(d).uppercase(Locale.getDefault())
+            fechaCompletaActual = formatFecha.format(d).replaceFirstChar { it.uppercase() }
+            delay(1000)
         }
     }
 
-    // Método para verificar si hay conexión a Internet
-    private fun isNetworkConnected(): Boolean {
-        val connectivityManager =
-            getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val networkInfo = connectivityManager.activeNetworkInfo
-        return networkInfo?.isConnected == true // Devuelve true si hay conexión
-    }
+    val tiempoRestante = maxOf(0L, totalDuration - currentPosition)
+    val strRestante = if (tiempoRestante > 0) {
+        val h = TimeUnit.MILLISECONDS.toHours(tiempoRestante)
+        val m = TimeUnit.MILLISECONDS.toMinutes(tiempoRestante) % 60
+        val s = TimeUnit.MILLISECONDS.toSeconds(tiempoRestante) % 60
+        String.format(Locale.getDefault(), "-%02d:%02d:%02d", h, m, s)
+    } else ""
 
-    //
-//    @SuppressLint("SetTextI18n")
-//    private fun showErrorDialog(movieTitle: String, movieCastv: Int, correoUsuario: String) {
-//        val dialogView = layoutInflater.inflate(R.layout.player_alerdialogo, null)
-//        val messageText = dialogView.findViewById<TextView>(R.id.messageText)
-//        val linkNosotros = dialogView.findViewById<TextView>(R.id.linkNosotros)
-//        val imageView = dialogView.findViewById<ImageView>(R.id.dialogImage)
-//        imageView.setImageResource(R.drawable.canal)
-//
-//        val spannable = SpannableStringBuilder()
-//
-//        // --- Título película
-//        val movieInfo = "Película: $movieTitle\n"
-//        spannable.append(movieInfo)
-//        val peliculaTexto = "Película:"
-//        val peliculaIndex = spannable.indexOf(peliculaTexto)
-//        spannable.setSpan(ForegroundColorSpan(Color.RED), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-//        spannable.setSpan(RelativeSizeSpan(1.3f), peliculaIndex, peliculaIndex + peliculaTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-//        val tituloIndex = peliculaIndex + peliculaTexto.length + 1
-//        spannable.setSpan(ForegroundColorSpan(Color.GREEN), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-//        spannable.setSpan(RelativeSizeSpan(1.4f), tituloIndex, tituloIndex + movieTitle.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-//
-//        // --- Precio CasTV
-//        val precioInfo = "Precio CasTV: $$movieCastv\n"
-//        spannable.append(precioInfo)
-//        val precioTexto = "Precio CasTV:"
-//        val precioIndex = spannable.indexOf(precioTexto)
-//        spannable.setSpan(ForegroundColorSpan(Color.RED), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-//        spannable.setSpan(RelativeSizeSpan(1.3f), precioIndex, precioIndex + precioTexto.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-//        val precioValorIndex = precioIndex + precioTexto.length + 2
-//        spannable.setSpan(ForegroundColorSpan(Color.GREEN), precioValorIndex, precioValorIndex + movieCastv.toString().length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-//        spannable.setSpan(RelativeSizeSpan(1.4f), precioValorIndex, precioValorIndex + movieCastv.toString().length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-//
-//        // Línea temporal mientras se obtiene usuario y saldo
-//        spannable.append("\nUsuario: Consultando...\n")
-//        spannable.append("Saldo actual: Consultando...\n")
-//
-//        // Texto final
-//        spannable.append("\n¡Gracias por tu pedido!")
-//        spannable.append("\nLa película estará disponible pronto. Estamos disponibles 24/7.")
-//        spannable.append("\nSi la película se estrenó hace menos de 1 mes, no será puesta en línea.")
-//        spannable.append("\nEn ese caso, el valor será reembolsado como crédito (CasTV).")
-//        spannable.append("\nRecuerda tener saldo en CasTV para futuros Alquileres.")
-//
-//        messageText.text = spannable
-//
-//        val correoUsuario = FirebaseAuth.getInstance().currentUser?.email ?: ""
-//
-//        if (correoUsuario.isNotEmpty()) {
-//            CastvHelper.obtenerDatosUsuario(
-//                correoUsuario,
-//                onSuccess = { nombre, correo, castv, _ ->
-//                    val usuarioIndex = spannable.indexOf("Usuario: Consultando...")
-//                    if (usuarioIndex != -1) {
-//                        spannable.replace(
-//                            usuarioIndex,
-//                            usuarioIndex + "Usuario: Consultando...".length,
-//                            "Usuario: $nombre"
-//                        )
-//                    }
-//
-//                    val saldoIndex = spannable.indexOf("Saldo actual: Consultando...")
-//                    if (saldoIndex != -1) {
-//                        spannable.replace(
-//                            saldoIndex,
-//                            saldoIndex + "Saldo actual: Consultando...".length,
-//                            "Saldo actual: $castv CasTV"
-//                        )
-//                    }
-//
-//                    messageText.text = spannable
-//                },
-//                onFailure = { e ->
-//                    Log.e("CastvHelper", "❌ Error obteniendo datos del usuario: ${e.message}")
-//                }
-//            )
-//        } else {
-//            Log.e("CastvHelper", "⚠️ Correo del usuario es nulo o vacío")
-//        }
-//
-//
-//        // Botones
-//        linkNosotros.text = "Más información aquí"
-//        linkNosotros.setTextColor(Color.RED)
-//        linkNosotros.paintFlags = linkNosotros.paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
-//        linkNosotros.setOnClickListener {
-//            val intent = Intent(this, Perfil::class.java)
-//            startActivity(intent)
-//        }
-//
-//// Colores de identidad CineParche
-//        val colorDorado = Color.parseColor("#C5A059")
-//        val colorFondo = Color.parseColor("#0A122A")
-//
-//        val alertDialog = AlertDialog.Builder(this)
-//            .setView(dialogView)
-//            // 1. Evita que se cierre con el botón atrás o tocando fuera
-//            .setCancelable(false)
-//            .setNegativeButton("Volver al contenido") { dialog, _ ->
-//                dialog.dismiss()
-//                finish()
-//            }
-//            .setNeutralButton("Alquilar Película", null)
-//            // Se eliminó el setPositiveButton ("Cerrar")
-//            .create()
-//
-//// 2. Refuerzo para que no se cierre al tocar fuera (opcional pero recomendado)
-//        alertDialog.setCanceledOnTouchOutside(false)
-//
-//// Aplicamos el fondo azul oscuro al View personalizado
-//        dialogView.setBackgroundColor(colorFondo)
-//
-//        alertDialog.setOnShowListener {
-//            val btnAlquilar = alertDialog.getButton(AlertDialog.BUTTON_NEUTRAL)
-//            val btnVolver = alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
-//
-//            // --- ESTILO DE TEXTO ---
-//            btnAlquilar.setTextColor(colorDorado)
-//            btnAlquilar.setTypeface(Typeface.DEFAULT_BOLD)
-//            btnVolver.setTextColor(colorDorado)
-//
-//            // --- CONFIGURACIÓN DE ENFOQUE Y SELECTOR ---
-//            val focusSelector = R.drawable.focus_selector
-//            // Solo aplicamos a los dos botones existentes
-//            listOf(btnAlquilar, btnVolver).forEach { button ->
-//                button.setBackgroundResource(focusSelector)
-//                button.isFocusable = true
-//                button.isFocusableInTouchMode = true
-//                button.setPadding(24, 12, 24, 12)
-//            }
-//
-//            // Asegurar que el contenedor de los botones no tenga bordes de otro color
-//            (btnAlquilar.parent as? View)?.setBackgroundColor(colorFondo)
-//
-//            // --- LÓGICA DE ALQUILER ---
-//            btnAlquilar.setOnClickListener {
-//                Log.d("ALQUILER_LOG", "1. Botón Alquilar presionado")
-//                verificarYProcesarPedido(alertDialog)
-//            }
-//
-//            // El foco inicia en Alquilar para facilitar la compra
-//            btnAlquilar.requestFocus()
-//        }
-//
-//        alertDialog.show()
-//
-//// Ventana totalmente inmersiva
-//        alertDialog.window?.setBackgroundDrawable(ColorDrawable(colorFondo))
-//    }
-//
-//    // Agregamos (dialog: AlertDialog) aquí
-//    private fun verificarYProcesarPedido(dialog: AlertDialog) {
-//        Log.d("ALQUILER_LOG", "2. Entrando a verificarYProcesarPedido para: $movieTitle")
-//
-//        val query = databaseRef.child("pedidosmovies")
-//            .orderByChild("title")
-//            .equalTo(movieTitle)
-//
-//        query.get().addOnSuccessListener { snapshot ->
-//            if (!snapshot.exists()) {
-//                Log.d("ALQUILER_LOG", "3. La película no ha sido pedida aún. Procediendo...")
-//                enviarPedido(dialog)
-//            } else {
-//                Log.d("ALQUILER_LOG", "3. La película YA existe en pedidos.")
-//                Toast.makeText(this, "Esta película ya fue pedida.", Toast.LENGTH_LONG).show()
-//            }
-//        }.addOnFailureListener { e ->
-//            Log.e("ALQUILER_LOG", "ERROR en consulta de pedidos: ${e.message}")
-//        }
-//    }
-    // Agregamos (dialog: AlertDialog) aquí
-//    private fun enviarPedido(dialog: AlertDialog) {
-//        if (isProcessingOrder) return
-//        isProcessingOrder = true
-//
-//        val user = auth.currentUser
-//        if (user != null && user.email != null) {
-//            val correoKey = user.email!!.replace(".", "_").replace("@", "_")
-//
-//            databaseRef.child("usuarios").child(correoKey).get().addOnSuccessListener { snapshot ->
-//                if (snapshot.exists()) {
-//                    val userName = snapshot.child("nombre").value?.toString() ?: "Sin nombre"
-//                    val userEmail = snapshot.child("correo").value?.toString() ?: user.email!!
-//                    val costoPedido = (movieCastv as? Number)?.toInt() ?: 0
-//
-//                    // ✅ Ahora enviamos los dos parámetros correctamente
-//                    verificarPuntos(correoKey, costoPedido) { tienePuntos ->
-//                        if (tienePuntos) {
-//                            val datos = hashMapOf(
-//                                "title" to movieTitle,
-//                                "castv" to costoPedido,
-//                                "email" to userEmail,
-//                                "nombre" to userName,
-//                                "userId" to snapshot.child("userId").value?.toString(),
-//                                "timestamp" to ServerValue.TIMESTAMP
-//                            )
-//
-//                            databaseRef.child("pedidosmovies").push().setValue(datos)
-//                                .addOnSuccessListener {
-//                                    dialog.dismiss()
-//                                    descontarPuntos(correoKey, costoPedido)
-//                                    enviarCorreoNuevoPedido(movieTitle)
-//                                    isProcessingOrder = false
-//                                }
-//                                .addOnFailureListener { e ->
-//                                    isProcessingOrder = false
-//                                    Toast.makeText(this, "Error al enviar: ${e.message}", Toast.LENGTH_SHORT).show()
-//                                }
-//                        } else {
-//                            isProcessingOrder = false
-//                            Toast.makeText(this, "Saldo CasTV insuficiente.", Toast.LENGTH_SHORT).show()
-//                        }
-//                    }
-//                } else {
-//                    isProcessingOrder = false
-//                }
-//            }.addOnFailureListener { isProcessingOrder = false }
-//        }
-//    }
-//    private fun verificarPuntos(correoKey: String, costo: Int, callback: (Boolean) -> Unit) {
-//        Log.d("ALQUILER_LOG", "Buscando en la ruta correcta: usuarios/$correoKey")
-//
-//        val userRef = databaseRef.child("usuarios").child(correoKey)
-//
-//        userRef.child("castv").get().addOnSuccessListener { snapshot ->
-//            if (snapshot.exists()) {
-//                val puntosActuales = (snapshot.value as? Number)?.toInt() ?: 0
-//                Log.d("ALQUILER_LOG", "✅ Puntos encontrados para $correoKey: $puntosActuales")
-//                callback(puntosActuales >= costo)
-//            } else {
-//                Log.e("ALQUILER_LOG", "❌ No se encontró la carpeta: usuarios/$correoKey")
-//                callback(false)
-//            }
-//        }.addOnFailureListener { e ->
-//            Log.e("ALQUILER_LOG", "Error de Firebase: ${e.message}")
-//            callback(false)
-//        }
-//    }
-//    private fun enviarCorreoNuevoPedido(movieTitle: String) {
-//        val url = "https://server-csks8w.fly.dev/correo"
-//
-//        // No codificamos el título, lo enviamos tal cual
-//        val jsonBody = JSONObject()
-//        jsonBody.put("titulo", movieTitle)
-//
-//        val requestQueue = Volley.newRequestQueue(this)
-//        val jsonRequest = object : JsonObjectRequest(
-//            Request.Method.POST, url, jsonBody,
-//            Response.Listener { response ->
-//                Log.d("Email", "✅ Correo enviado exitosamente: $response")
-//            },
-//            Response.ErrorListener { error ->
-//                Log.e("Email", "❌ Error al enviar el correo: ${error.message}")
-//            }
-//        ) {
-//            override fun getBodyContentType(): String = "application/json; charset=utf-8"
-//        }
-//
-//        requestQueue.add(jsonRequest)
-//    }
-//
-//    private fun descontarPuntos(correoKey: String, puntosADescontar: Int) {
-//        val userRef = FirebaseDatabase.getInstance().getReference("usuarios").child(correoKey)
-//
-//        userRef.child("castv").get().addOnSuccessListener { snapshot ->
-//            val castvActual = (snapshot.value as? Number)?.toInt() ?: 0
-//
-//            if (castvActual >= puntosADescontar) {
-//                val nuevoCastv = castvActual - puntosADescontar
-//
-//                userRef.child("castv").setValue(nuevoCastv)
-//                    .addOnSuccessListener {
-//                        Log.d("ALQUILER_LOG", "✅ Descuento aplicado. Nuevo saldo: $nuevoCastv")
-//                        Toast.makeText(this, "Pedido enviado exitosamente", Toast.LENGTH_SHORT).show()
-//
-//                        val intent = Intent(this, Perfil::class.java)
-//                        startActivity(intent)
-//                        finish()
-//                    }
-//                    .addOnFailureListener { e ->
-//                        Log.e("ALQUILER_LOG", "❌ Error al actualizar saldo: ${e.message}")
-//                    }
-//            }
-//        }.addOnFailureListener { e ->
-//            Log.e("ALQUILER_LOG", "Error de conexión: ${e.message}")
-//        }
-//    }
-    override fun onResume() {
-        super.onResume()
-        // Verificar si el player está en reproducción para actualizar el UI
-        if (player?.isPlaying == true) {
-            handler.postDelayed(runnableActualizar, 1000)
-        }
-    }
-
-
-    private fun releasePlayer() {
-        player?.removeListener(playerListener)
-        player?.release()
-        player = null
-    }
-    override fun onStop() {
-        super.onStop()
-        // Aseguramos la persistencia si el usuario minimizó o cambió de app bruscamente
-        guardarProgresoActual()
-    }
-
-    override fun onDestroy() {
-        // Salvaguarda final antes de liberar por completo el hardware del ExoPlayer
-        guardarProgresoActual()
-        super.onDestroy()
-        releasePlayer()
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) {
-            enterFullScreen()
-        }
-    }
-
-    private fun enterFullScreen() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            window.insetsController?.hide(android.view.WindowInsets.Type.systemBars())
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                    View.SYSTEM_UI_FLAG_FULLSCREEN
-                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Black.copy(alpha = 0.55f),
+                        Color.Transparent,
+                        Color.Black.copy(alpha = 0.70f)
                     )
-        }
-    }
+                )
+            )
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        // --- 1. BARRA SUPERIOR: RELOJ GIGANTE, FECHA E INDICADOR DE BÚFER ELEGANTE ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.Transparent),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "CINE",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black
+                )
+                Text(
+                    text = "PARCHE",
+                    color = ColorDorado,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
 
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = horaActual,
+                    color = ColorDorado,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = fechaCompletaActual,
+                    color = Color(0xFFE2E8F0),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
 
-    private fun setupControlTimers() {
-        runnableOcultar = object : Runnable {
-            override fun run() {
-                val now = System.currentTimeMillis()
-                val elapsed = now - lastInteractionTime
-
-                val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
-
-                val controlesTienenFoco = tieneFocoEnHijos(controles)
-
-                if (elapsed >= hideControlsDelay && !controlesTienenFoco && !menuAbierto) {
-                    // Ocultar controles
-                    controles.animate()
-                        .alpha(0f)
-                        .setDuration(300)
-                        .withEndAction {
-                            controles.visibility = View.GONE
-                            controles.alpha = 1f
-                        }
-                        .start()
+                // 🟢 INDICADOR DE BÚFER SUBTÍTULO ELEGANTE
+                if (estaCargando) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    IndicadorBufferSuperior(progreso = progresoSimulado)
                 }
-
-                // Si el menú sigue abierto y no hay interacción, lo cerramos
-                if (elapsed >= hideControlsDelay && menuAbierto) {
-                    mostarpelis()
-                }
-
-                // Continuar verificando cada segundo
-                handler.postDelayed(this, 1000)
             }
         }
 
-        binding.reproductor.setOnTouchListener { _, _ ->
-            showControlsAndResetTimer()
-            true
-        }
+        // --- 2. ZONA INFERIOR: FICHA GRANDE, SINOPSIS SUTIL Y BARRA DESPLAZABLE ---
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0x33000000))
+                    .border(0.8.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 110.dp, height = 160.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(1.5.dp, ColorDorado, RoundedCornerShape(8.dp))
+                ) {
+                    AsyncImage(
+                        model = movieImageUrl,
+                        contentDescription = movieTitle,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
 
-        showControlsAndResetTimer()
-    }
+                Spacer(modifier = Modifier.width(16.dp))
 
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = movieTitle,
+                        color = Color.White,
+                        fontSize = 23.sp,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.basicMarquee(
+                            iterations = Int.MAX_VALUE,
+                            delayMillis = 800,
+                            velocity = 35.dp
+                        )
+                    )
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN) {
-            // ⏱️ Mantiene el temporizador de ocultar controles
-            lastInteractionTime = System.currentTimeMillis()
-            handler.removeCallbacks(runnableOcultar)
-            handler.postDelayed(runnableOcultar, hideControlsDelay)
+                    Spacer(modifier = Modifier.height(4.dp))
 
-            // 🔙 Detectar teclas "atrás" universales
-            val keyCode = event.keyCode
-            val scanCode = event.scanCode
-            val keyName = KeyEvent.keyCodeToString(keyCode)
+                    Text(
+                        text = if (movieSynopsis.isNotBlank()) movieSynopsis else "Disfruta de la mejor producción del cine en CineParche.",
+                        color = Color(0xFFE2E8F0),
+                        fontSize = 13.sp,
+                        lineHeight = 17.sp,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
 
-            Log.d("KeyBack", "Tecla presionada: $keyCode ($keyName), scanCode: $scanCode")
-
-            val teclasAtras = setOf(
-                KeyEvent.KEYCODE_BACK,          // 4
-                KeyEvent.KEYCODE_ESCAPE,        // 111
-                KeyEvent.KEYCODE_BUTTON_B,      // 97 (Gamepad botón B)
-                4, 111, 158, 172                // Otros comunes por scanCode
+            // 🟢 BARRA DE PROGRESO DESPLAZABLE TV
+            BarraProgresoTVDesplazable(
+                posicionActual = currentPosition,
+                duracionTotal = totalDuration,
+                posicionBuffer = bufferedPosition,
+                strTiempoActual = DateUtils.formatElapsedTime(currentPosition / 1000),
+                strTiempoRestante = strRestante,
+                onInteraction = onInteraction,
+                onSeekingStateChanged = onSeekingStateChanged,
+                onSeekConfirmed = { nuevaPos ->
+                    onInteraction()
+                    onSeekTo(nuevaPos)
+                }
             )
 
-            if (keyCode in teclasAtras || scanCode in teclasAtras) {
-                onBackPressedDispatcher.onBackPressed()
-                return true
-            }
-        }
+            // 🟢 BOTONES DE ACCIÓN
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BotonIconoControlTV(
+                    icono = Icons.Default.Home,
+                    descripcion = "Inicio",
+                    onInteraction = onInteraction,
+                    onClick = onHomeExit
+                )
+                Spacer(modifier = Modifier.width(18.dp))
 
-        return super.dispatchKeyEvent(event)
-    }
+                BotonIconoControlTV(
+                    icono = Icons.Default.List,
+                    descripcion = "Cartelera",
+                    onInteraction = onInteraction,
+                    onClick = onToggleMenuPelis
+                )
+                Spacer(modifier = Modifier.width(18.dp))
 
+                BotonIconoControlTV(
+                    icono = if (isPlaying) Icons.Default.PlayArrow else Icons.Default.Refresh,
+                    descripcion = if (isPlaying) "Pausar" else "Reproducir",
+                    tamano = 56.dp,
+                    colorFondo = ColorDorado,
+                    colorIcono = Color.Black,
+                    modifier = Modifier.focusRequester(playPauseFocusRequester),
+                    onInteraction = onInteraction,
+                    onClick = onTogglePlayPause
+                )
+                Spacer(modifier = Modifier.width(18.dp))
 
-    private fun tieneFocoEnHijos(view: View): Boolean {
-        if (view.hasFocus()) return true
-        if (view is ViewGroup) {
-            for (i in 0 until view.childCount) {
-                if (tieneFocoEnHijos(view.getChildAt(i))) return true
-            }
-        }
-        return false
-    }
+                BotonIconoControlTV(
+                    icono = Icons.Default.Settings,
+                    descripcion = "Audios y Subtítulos",
+                    habilitado = tieneOpcionesPistas,
+                    onInteraction = onInteraction,
+                    onClick = onAbrirPistas
+                )
+                Spacer(modifier = Modifier.width(18.dp))
 
+                BotonIconoControlTV(
+                    icono = Icons.Default.Share,
+                    descripcion = "Aspect Ratio",
+                    onInteraction = onInteraction,
+                    onClick = onCycleAspectRatio
+                )
+                Spacer(modifier = Modifier.width(18.dp))
 
-    private fun showControlsAndResetTimer() {
-        lastInteractionTime = System.currentTimeMillis()
-        binding.reproductor.findViewById<ImageButton>(R.id.lista_pelis)
-        val controles = binding.reproductor.findViewById<View>(R.id.controles_reproductor)
-        if (controles.visibility != View.VISIBLE) {
-            controles.alpha = 0f
-            controles.visibility = View.VISIBLE
-            controles.animate().alpha(1f).setDuration(300).start()
-        }
-
-        handler.removeCallbacks(runnableOcultar)
-        handler.postDelayed(runnableOcultar, hideControlsDelay)
-    }
-
-
-    private fun activarListenersEnControles() {
-        val controles = binding.reproductor.findViewById<ViewGroup>(R.id.controles_reproductor)
-        val menuPelis = binding.reproductor.findViewById<RecyclerView>(R.id.peliscartelera)
-
-        // Escucha interacción en cada botón de los controles
-        for (i in 0 until controles.childCount) {
-            val child = controles.getChildAt(i)
-
-            child.setOnFocusChangeListener { _, hasFocus ->
-                if (hasFocus) showControlsAndResetTimer()
-            }
-
-            child.setOnTouchListener { _, _ ->
-                showControlsAndResetTimer()
-                false
-            }
-
-            child.setOnKeyListener { _, _, _ ->
-                showControlsAndResetTimer()
-                false
-            }
-
-            child.setOnHoverListener { _, _ ->
-                showControlsAndResetTimer()
-                false
-            }
-        }
-
-        // Escuchar interacción en el RecyclerView del menú de películas
-        menuPelis.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) showControlsAndResetTimer()
-        }
-
-        menuPelis.setOnTouchListener { _, _ ->
-            showControlsAndResetTimer()
-            false
-        }
-
-        menuPelis.setOnKeyListener { _, _, _ ->
-            showControlsAndResetTimer()
-            false
-        }
-
-        menuPelis.setOnHoverListener { _, _ ->
-            showControlsAndResetTimer()
-            false
-        }
-    }
-
-
-    private fun togglePlayPause() {
-        val player = binding.reproductor.player
-        val playPauseButton = findViewById<ImageButton>(R.id.play_pause)
-
-        if (player != null) {
-            if (player.isPlaying) {
-                player.pause()
-//                playPauseButton.setImageResource(R.drawable.stop)
-            } else {
-                player.play()
-//                playPauseButton.setImageResource(R.drawable.play)
-
-                // ✅ Reiniciar contador de tiempo manualmente
-                handler.removeCallbacks(runnableActualizar)
-                handler.post(runnableActualizar) // Esto reactiva actualizarTiempo()
+                BotonIconoControlTV(
+                    icono = Icons.Default.Person,
+                    descripcion = "Perfil",
+                    onInteraction = onInteraction,
+                    onClick = onAbrirPerfil
+                )
             }
         }
     }
+}
 
+// =========================================================================
+// 🟢 INDICADOR DE BÚFER SUPERIOR (CHIP DISCRETO)
+// =========================================================================
+@Composable
+fun IndicadorBufferSuperior(progreso: Int) {
+    val infiniteTransition = rememberInfiniteTransition(label = "bufferSuperior")
+    val alphaAnim by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(700, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
 
-    // Función para alternar entre pantalla completa y vista normal
-    private var currentAspectRatioMode = 0
-
-    @OptIn(UnstableApi::class)
-    private fun cycleAspectRatio() {
-        val playerView = binding.reproductor
-        val aspectRatios = listOf(
-            AspectRatioFrameLayout.RESIZE_MODE_FIT,
-            AspectRatioFrameLayout.RESIZE_MODE_FILL,
-            AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-            // Puedes agregar otros modos de AspectRatioFrameLayout si lo necesitas
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0x99000000))
+            .border(1.dp, ColorDorado.copy(alpha = alphaAnim), RoundedCornerShape(20.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        CircularProgressIndicator(
+            color = ColorDorado,
+            strokeWidth = 2.dp,
+            modifier = Modifier.size(11.dp)
         )
-        currentAspectRatioMode = (currentAspectRatioMode + 1) % aspectRatios.size
-        playerView.resizeMode = aspectRatios[currentAspectRatioMode]
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = "Optimizando... $progreso%",
+            color = ColorDorado,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
+    }
+}
+
+// =========================================================================
+// 🟢 BARRA DE PROGRESO DESPLAZABLE
+// =========================================================================
+@Composable
+fun BarraProgresoTVDesplazable(
+    posicionActual: Long,
+    duracionTotal: Long,
+    posicionBuffer: Long,
+    strTiempoActual: String,
+    strTiempoRestante: String,
+    onInteraction: () -> Unit,
+    onSeekingStateChanged: (Boolean) -> Unit,
+    onSeekConfirmed: (Long) -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    var targetSeekPosition by remember { mutableLongStateOf(posicionActual) }
+    var estaDesplazando by remember { mutableStateOf(false) }
+
+    LaunchedEffect(posicionActual) {
+        if (!estaDesplazando) {
+            targetSeekPosition = posicionActual
+        }
     }
 
-    private fun actualizarTiempo() {
-        val activePlayer = player
-        if (activePlayer != null) {
-            val estado = activePlayer.playbackState
+    val posRender = if (estaDesplazando) targetSeekPosition else posicionActual
+    val progresoFrac = if (duracionTotal > 0) (posRender.toFloat() / duracionTotal).coerceIn(0f, 1f) else 0f
+    val bufferFrac = if (duracionTotal > 0) (posicionBuffer.toFloat() / duracionTotal).coerceIn(0f, 1f) else 0f
 
-            // El ciclo continuará ejecutándose siempre y cuando el reproductor esté activo (reproduciendo o pausado)
-            if (estado != Player.STATE_IDLE && estado != Player.STATE_ENDED) {
-                MainScope().launch {
-                    val tiemporeproducido = binding.reproductor.findViewById<TextView>(R.id.tiemporeproducido)
-                    val tiempototal = binding.reproductor.findViewById<TextView>(R.id.tiempototal)
-                    val seekBar = binding.reproductor.findViewById<SeekBar>(R.id.progreso)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(if (isFocused) 1.02f else 1.0f)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isFocused) Color(0x33FFC107) else Color.Transparent)
+            .border(
+                width = if (isFocused) 2.dp else 0.dp,
+                color = ColorDorado,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .onFocusChanged { state ->
+                isFocused = state.isFocused
+                if (state.isFocused) {
+                    onInteraction()
+                }
+                if (!state.isFocused && estaDesplazando) {
+                    onSeekConfirmed(targetSeekPosition)
+                    estaDesplazando = false
+                    onSeekingStateChanged(false)
+                }
+            }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    onInteraction()
+                    val salto = 15_000L
+                    when (keyEvent.key) {
+                        Key.DirectionLeft -> {
+                            estaDesplazando = true
+                            onSeekingStateChanged(true)
+                            targetSeekPosition = maxOf(0L, targetSeekPosition - salto)
+                            true
+                        }
+                        Key.DirectionRight -> {
+                            estaDesplazando = true
+                            onSeekingStateChanged(true)
+                            targetSeekPosition = minOf(duracionTotal, targetSeekPosition + salto)
+                            true
+                        }
+                        Key.Enter, Key.DirectionCenter, Key.NumPadEnter -> {
+                            if (estaDesplazando) {
+                                onSeekConfirmed(targetSeekPosition)
+                                estaDesplazando = false
+                                onSeekingStateChanged(false)
+                            }
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = if (estaDesplazando) DateUtils.formatElapsedTime(targetSeekPosition / 1000) else strTiempoActual,
+            color = if (isFocused) ColorDorado else Color.White,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
 
-                    val posicionActual = activePlayer.currentPosition
-                    val duracionTotal = activePlayer.duration
-                    val tiempoRestante = duracionTotal - posicionActual
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp)
+                .height(20.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isFocused) 8.dp else 5.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF333333))
+            )
 
-                    // Mostrar tiempo reproducido
-                    tiemporeproducido.text = tiempoFormateado(posicionActual)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(bufferFrac)
+                    .height(if (isFocused) 8.dp else 5.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.Gray.copy(alpha = 0.5f))
+            )
 
-                    // Mostrar tiempo restante (hacia atrás)
-                    if (tiempoRestante > 0) {
-                        val h = TimeUnit.MILLISECONDS.toHours(tiempoRestante)
-                        val m = TimeUnit.MILLISECONDS.toMinutes(tiempoRestante) % 60
-                        val s = TimeUnit.MILLISECONDS.toSeconds(tiempoRestante) % 60
-                        tiempototal.text = String.format("%02d:%02d:%02d", h, m, s)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progresoFrac)
+                    .height(if (isFocused) 8.dp else 5.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (estaDesplazando) Color(0xFFFF9800) else ColorDorado)
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progresoFrac)
+                    .wrapContentWidth(Alignment.End)
+                    .size(if (isFocused) 16.dp else 11.dp)
+                    .clip(CircleShape)
+                    .background(Color.White)
+                    .border(2.dp, if (estaDesplazando) Color(0xFFFF9800) else ColorDorado, CircleShape)
+            )
+        }
+
+        Text(
+            text = if (estaDesplazando) "PULSA OK" else strTiempoRestante,
+            color = if (isFocused) ColorDorado else Color.LightGray,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
+    }
+}
+
+// =========================================================================
+// 🟢 BOTÓN CON FOCO REMARCADO PARA TV
+// =========================================================================
+@Composable
+fun BotonIconoControlTV(
+    icono: ImageVector,
+    descripcion: String,
+    tamano: Dp = 44.dp,
+    habilitado: Boolean = true,
+    colorFondo: Color = Color(0xFF222222),
+    colorIcono: Color = Color.White,
+    modifier: Modifier = Modifier,
+    onInteraction: () -> Unit = {},
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = modifier
+            .size(tamano)
+            .scale(if (isFocused) 1.18f else 1.0f)
+            .clip(CircleShape)
+            .background(
+                when {
+                    isFocused -> Color.White
+                    habilitado -> colorFondo
+                    else -> colorFondo.copy(alpha = 0.25f)
+                }
+            )
+            .border(
+                width = if (isFocused) 3.dp else 1.dp,
+                color = if (isFocused) ColorDorado else Color.Gray.copy(alpha = 0.2f),
+                shape = CircleShape
+            )
+            .onFocusChanged {
+                isFocused = it.isFocused
+                if (it.isFocused) onInteraction()
+            }
+            .clickable(
+                enabled = habilitado,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {
+                    onInteraction()
+                    onClick()
+                }
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icono,
+            contentDescription = descripcion,
+            tint = if (isFocused) Color.Black else if (habilitado) colorIcono else colorIcono.copy(alpha = 0.25f),
+            modifier = Modifier.size(tamano * 0.52f)
+        )
+    }
+}
+
+// =========================================================================
+// 🟢 MENÚ CARTELERA (MARQUEE SOLO EN LA TARJETA SELECCIONADA)
+// =========================================================================
+@Composable
+fun MenuCarteleraOverlay(
+    peliculas: List<Modelo>,
+    peliculaActualId: String,
+    onSelectMovie: (Modelo) -> Unit
+) {
+    val primerCardFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(150)
+        try {
+            primerCardFocusRequester.requestFocus()
+        } catch (_: Exception) {}
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0x55000000))
+            .padding(vertical = 12.dp, horizontal = 16.dp)
+    ) {
+        Column {
+            Text(
+                text = "🍿 PELÍCULAS EN GRATIS",
+                color = DoradoBrillante,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
+            )
+
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp)
+            ) {
+                itemsIndexed(peliculas, key = { _, movie -> movie.id }) { index, movie ->
+                    var isCardFocused by remember { mutableStateOf(false) }
+
+                    val countdownMillis = remember(movie.id, movie.countdownMinutes) {
+                        TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
+                    }
+                    var millisRestantes by remember(movie.id, movie.createdAt) {
+                        mutableLongStateOf(maxOf(0L, countdownMillis - (System.currentTimeMillis() - movie.createdAt)))
+                    }
+
+                    LaunchedEffect(movie.id) {
+                        while (millisRestantes > 0) {
+                            delay(1000)
+                            millisRestantes = maxOf(0L, countdownMillis - (System.currentTimeMillis() - movie.createdAt))
+                        }
+                    }
+
+                    val h = TimeUnit.MILLISECONDS.toHours(millisRestantes)
+                    val m = TimeUnit.MILLISECONDS.toMinutes(millisRestantes) % 60
+                    val s = TimeUnit.MILLISECONDS.toSeconds(millisRestantes) % 60
+                    val strTiempo = String.format(Locale.getDefault(), "▶ %02d:%02d:%02d", h, m, s)
+
+                    val cardModifier = if (index == 0) {
+                        Modifier.focusRequester(primerCardFocusRequester)
                     } else {
-                        tiempototal.text = ""
+                        Modifier
                     }
 
-                    // Avance del SeekBar y del Búfer
-                    if (duracionTotal > 0) {
-                        val progress = (posicionActual.toFloat() / duracionTotal * 100).toInt()
-                        seekBar.progress = progress
+                    Column(
+                        modifier = cardModifier
+                            .width(120.dp)
+                            .height(170.dp)
+                            .scale(if (isCardFocused) 1.10f else 1.0f)
+                            .shadow(
+                                elevation = if (isCardFocused) 20.dp else 0.dp,
+                                shape = RoundedCornerShape(12.dp),
+                                spotColor = DoradoBrillante
+                            )
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF1E293B))
+                            .border(
+                                width = if (isCardFocused) 3.dp else 1.dp,
+                                color = if (isCardFocused) DoradoBrillante else Color(0x33C5A059),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .onFocusChanged { isCardFocused = it.isFocused }
+                            .focusable()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                onSelectMovie(movie)
+                            }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        ) {
+                            AsyncImage(
+                                model = movie.imageUrl,
+                                contentDescription = movie.title,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
 
-                        // ========================================================
-                        // ACTUALIZACIÓN EN TIEMPO REAL:
-                        // Crecerá en pantalla de forma fluida incluso estando en PAUSA
-                        // ========================================================
-                        val porcentajeBuffer = activePlayer.bufferedPercentage
-                        seekBar.secondaryProgress = porcentajeBuffer
-                        // ========================================================
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .background(Color(0xE6107C41))
+                                    .padding(vertical = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = strTiempo,
+                                    color = Color.White,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // 🟢 MARQUEE SOLO EN LA TARJETA ENFOCADA
+                        val marqueeMod = if (isCardFocused) {
+                            Modifier.basicMarquee(
+                                iterations = Int.MAX_VALUE,
+                                delayMillis = 400,
+                                velocity = 35.dp
+                            )
+                        } else {
+                            Modifier
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(
+                                    if (isCardFocused) {
+                                        Modifier.background(DegradadoDoradoPremiun)
+                                    } else {
+                                        Modifier.background(Color(0xFF0F172A))
+                                    }
+                                )
+                                .padding(vertical = 4.dp, horizontal = 6.dp)
+                        ) {
+                            Text(
+                                text = movie.title,
+                                color = if (isCardFocused) Color.Black else Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = if (isCardFocused) TextOverflow.Clip else TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .then(marqueeMod)
+                            )
+                        }
                     }
-
-                    // Volvemos a programar la actualización en 1 segundo (esté o no en pausa)
-                    handler.removeCallbacks(runnableActualizar)
-                    handler.postDelayed(runnableActualizar, updateInterval)
                 }
             }
         }
     }
+}
 
-    private fun tiempoFormateado(tiempoMs: Long): String {
-        return DateUtils.formatElapsedTime(tiempoMs / 1000)
-    }
+// =========================================================================
+// 🟢 DIÁLOGOS Y SELECTOR DE PISTAS
+// =========================================================================
+@Composable
+fun DialogoContinuarProgreso(
+    progresoGuardado: Long,
+    onReiniciar: () -> Unit,
+    onReanudar: () -> Unit
+) {
+    var segundos by remember { mutableIntStateOf(10) }
+    val botonReanudarRequester = remember { FocusRequester() }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-
-        return when (keyCode) {
-            // ✅ Teclas que muestran el menú de películas
-            KeyEvent.KEYCODE_MENU,
-            KeyEvent.KEYCODE_PAGE_UP,
-            KeyEvent.KEYCODE_PAGE_DOWN,
-            174 -> {
-                mostarpelis()
-                true
-            }
-
-            // ✅ Todas las teclas "OK" o "Enter"
-            KeyEvent.KEYCODE_DPAD_CENTER,
-            KeyEvent.KEYCODE_ENTER,
-            KeyEvent.KEYCODE_NUMPAD_ENTER,
-            KeyEvent.KEYCODE_BUTTON_A,
-            KeyEvent.KEYCODE_MEDIA_PLAY,
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                showControlsAndResetTimer()
-                true
-            }
-
-            // 🔙 Tecla "Atrás"
-            KeyEvent.KEYCODE_BACK -> {
-                finish()
-               true
-            }
-
-            else -> super.onKeyDown(keyCode, event)
+    LaunchedEffect(Unit) {
+        botonReanudarRequester.requestFocus()
+        while (segundos > 0) {
+            delay(1000)
+            segundos--
         }
-
+        onReanudar()
     }
 
+    val horas = progresoGuardado / 3600000
+    val minutos = (progresoGuardado % 3600000) / 60000
+    val segs = (progresoGuardado % 60000) / 1000
+    val strTiempo = String.format(Locale.getDefault(), "%02d:%02d:%02d", horas, minutos, segs)
+
+    Dialog(onDismissRequest = onReanudar, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A122A)),
+            modifier = Modifier
+                .width(420.dp)
+                .wrapContentHeight()
+                .border(2.dp, ColorDorado, RoundedCornerShape(16.dp))
+                .padding(20.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "¿Deseas continuar?",
+                    color = ColorDorado,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Te quedaste en:",
+                    color = Color.White,
+                    fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = strTiempo,
+                    color = Color.White,
+                    fontSize = 28.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    BotonDialogoTV(
+                        texto = "REINICIAR",
+                        esPrincipal = false,
+                        onClick = onReiniciar
+                    )
+                    BotonDialogoTV(
+                        texto = "REANUDAR (${segundos}s)",
+                        esPrincipal = true,
+                        modifier = Modifier.focusRequester(botonReanudarRequester),
+                        onClick = onReanudar
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DialogoSelectorPistas(
+    audios: List<PistaAudio>,
+    subtitulos: List<PistaSubtitulo>,
+    onDismiss: () -> Unit,
+    onSelectAudio: (PistaAudio) -> Unit,
+    onSelectSubtitulo: (PistaSubtitulo) -> Unit,
+    onDesactivarSubtitulos: () -> Unit
+) {
+    val subtitulosApagados = subtitulos.none { it.estaSeleccionada }
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF141414)),
+            modifier = Modifier
+                .width(440.dp)
+                .heightIn(max = 380.dp)
+                .border(1.5.dp, ColorDorado, RoundedCornerShape(14.dp))
+                .padding(16.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Text(
+                    text = "🎧 AUDIO Y SUBTÍTULOS",
+                    color = ColorDorado,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = "Audios:",
+                            color = ColorDorado,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        audios.forEach { audio ->
+                            ItemPistaTV(
+                                texto = audio.nombre,
+                                seleccionada = audio.estaSeleccionada,
+                                onClick = { onSelectAudio(audio) }
+                            )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = "Subtítulos:",
+                            color = ColorDorado,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        ItemPistaTV(
+                            texto = "Desactivar Subtítulos",
+                            seleccionada = subtitulosApagados,
+                            onClick = onDesactivarSubtitulos
+                        )
+
+                        subtitulos.forEach { sub ->
+                            ItemPistaTV(
+                                texto = sub.nombre,
+                                seleccionada = sub.estaSeleccionada && !subtitulosApagados,
+                                onClick = { onSelectSubtitulo(sub) }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                    BotonDialogoTV(
+                        texto = "LISTO",
+                        esPrincipal = true,
+                        onClick = onDismiss
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ItemPistaTV(
+    texto: String,
+    seleccionada: Boolean,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(if (isFocused) 1.04f else 1.0f)
+            .clip(RoundedCornerShape(6.dp))
+            .background(
+                when {
+                    isFocused -> Color(0xFF2C2214)
+                    seleccionada -> Color(0xFF1E1E1E)
+                    else -> Color.Transparent
+                }
+            )
+            .border(
+                width = if (isFocused) 2.dp else if (seleccionada) 1.dp else 0.dp,
+                color = if (isFocused) ColorDorado else if (seleccionada) ColorDorado.copy(alpha = 0.5f) else Color.Transparent,
+                shape = RoundedCornerShape(6.dp)
+            )
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .padding(horizontal = 10.dp, vertical = 7.dp)
+    ) {
+        Text(
+            text = if (seleccionada) "➤  $texto" else "    $texto",
+            color = if (seleccionada || isFocused) ColorDorado else Color.White,
+            fontSize = 12.sp,
+            fontWeight = if (seleccionada || isFocused) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
