@@ -1,36 +1,27 @@
 package com.creativem.fulltv.principal
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
@@ -45,7 +36,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
-import kotlin.math.sin
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {
@@ -106,8 +96,8 @@ class SplashActivity : AppCompatActivity() {
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
 
         setContent {
-            SplashScreen(
-                frasesCine = frasesCine,
+            SplashScreenUltraFast(
+                fraseInicial = frasesCine.random(),
                 versionName = BuildConfig.VERSION_NAME
             )
         }
@@ -118,7 +108,7 @@ class SplashActivity : AppCompatActivity() {
     private fun iniciarCargaDeDatos() {
         lifecycleScope.launch {
             CoroutineScope(Dispatchers.IO).launch {
-                try { Validacioneslista.cargarPeliculas() } catch (e: Exception) {}
+                try { Validacioneslista.cargarPeliculas() } catch (_: Exception) {}
             }
 
             var cargado = false
@@ -185,7 +175,7 @@ class SplashActivity : AppCompatActivity() {
                                                     infoAdicionalText = "🎭 $generos  ⏱️ ${duracion} Min"
                                                 }
                                             } catch (e: Exception) {
-                                                Log.e("SPLASH_TMDB", "Error cargando detalles del banner: ${e.message}")
+                                                Log.e("SPLASH_TMDB", "Error cargando detalles: ${e.message}")
                                             }
 
                                             val backdropUrl = "https://image.tmdb.org/t/p/w1280${result.backdrop_path ?: result.poster_path}"
@@ -219,12 +209,12 @@ class SplashActivity : AppCompatActivity() {
                                                         .get()
                                                 }
                                             } catch (e: Exception) {
-                                                Log.e("SPLASH_GLIDE", "Error en precarga de imágenes: ${e.message}")
+                                                Log.e("SPLASH_GLIDE", "Error imagen: ${e.message}")
                                             }
                                         }
                                     }
                                 } catch (e: Exception) {
-                                    Log.e("SPLASH_TMDB", "Fallo de conexión a TMDb: ${e.message}")
+                                    Log.e("SPLASH_TMDB", "Fallo TMDb: ${e.message}")
                                 }
                             }
 
@@ -232,11 +222,11 @@ class SplashActivity : AppCompatActivity() {
                         } else false
                     }
                     cargado = exito
-                } catch (e: Exception) {
-                    Log.e("SPLASH", "Reintentando carga...")
+                } catch (_: Exception) {
+                    Log.e("SPLASH", "Reintentando...")
                 }
 
-                if (!cargado) delay(500)
+                if (!cargado) delay(400)
             }
 
             navegarSiguientePantalla()
@@ -260,436 +250,96 @@ class SplashActivity : AppCompatActivity() {
     }
 }
 
-// ==========================================
-// 🟢 FONDO CINEMATOGRÁFICO PREMIUM (ATMÓSFERA Y DESTELLOS EN TODA LA PANTALLA)
-// ==========================================
-private data class ParticulaCine(
-    val xRatio: Float,
-    val baseYRatio: Float,
-    val radioDp: Float,
-    val velocidad: Float,
-    val fase: Float,
-    val color: Color
-)
-
+// =========================================================================
+// 🟢 PANTALLA ULTRA LIGERA: 0% LAG, COLOR PLANO Y 100% RESPONSIVA PARA TV
+// =========================================================================
 @Composable
-fun FondoCinePremiumDestellos(
-    modifier: Modifier = Modifier
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "fondoAtmosphere")
-
-    // Pulsación suave del haz del proyector en la parte superior
-    val proyectorAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.65f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "proyectorAlpha"
-    )
-
-    // Expansión ambiental de la luz de sala de cine
-    val ambientScale by infiniteTransition.animateFloat(
-        initialValue = 0.92f,
-        targetValue = 1.12f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "ambientScale"
-    )
-
-    // Tiempo continuo para las partículas doradas flotantes
-    val particleTime by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(14000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "particleTime"
-    )
-
-    // Lista fija de partículas doradas (polvo de sala de cine iluminado)
-    val particulas = remember {
-        val random = java.util.Random(101)
-        List(36) {
-            val isGold = random.nextBoolean()
-            val color = if (isGold) Color(0xFFFFD56B) else Color(0xFFFFF7DD)
-            ParticulaCine(
-                xRatio = random.nextFloat(),
-                baseYRatio = random.nextFloat(),
-                radioDp = 1.3f + random.nextFloat() * 2.2f,
-                velocidad = 0.12f + random.nextFloat() * 0.32f,
-                fase = random.nextFloat() * 2f * Math.PI.toFloat(),
-                color = color
-            )
-        }
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color(0xFF030509)) // Negro azulado muy profundo de sala
-    ) {
-        // 1. Haz de luz del proyector cenital (viene desde arriba hacia el centro)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.70f)
-                .align(Alignment.TopCenter)
-                .alpha(proyectorAlpha)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color(0x40C5A059),
-                            Color(0x1C8A6E2F),
-                            Color(0x082B1E0C),
-                            Color.Transparent
-                        ),
-                        radius = 850f
-                    )
-                )
-        )
-
-        // 2. Halo ambiental expansivo en el centro (tono azul medianoche de cine)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .scale(ambientScale)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color(0x35192238),
-                            Color(0x160D1424),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-
-        // 3. Resplandor cálido inferior (Alfombra roja / iluminación de suelo)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(260.dp)
-                .align(Alignment.BottomCenter)
-                .alpha(proyectorAlpha * 0.7f)
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color(0x143A2C11),
-                            Color(0x30614B1F)
-                        )
-                    )
-                )
-        )
-
-        // 4. Lienzo de partículas doradas titilantes y flotantes
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val ancho = size.width
-            val alto = size.height
-
-            particulas.forEach { p ->
-                val progreso = (particleTime * p.velocidad + p.baseYRatio) % 1.0f
-                val y = alto * (1.0f - progreso)
-                val x = ancho * p.xRatio + (sin((particleTime * 2 * Math.PI + p.fase).toDouble()).toFloat() * 16f)
-
-                val brillo = (sin((particleTime * 4 * Math.PI + p.fase).toDouble()).toFloat() * 0.4f + 0.6f)
-                    .coerceIn(0.1f, 1f)
-
-                // Halo de la partícula
-                drawCircle(
-                    color = p.color.copy(alpha = brillo * 0.22f),
-                    radius = (p.radioDp * 2.6f).dp.toPx(),
-                    center = Offset(x, y)
-                )
-
-                // Núcleo brillante
-                drawCircle(
-                    color = p.color.copy(alpha = brillo * 0.85f),
-                    radius = p.radioDp.dp.toPx(),
-                    center = Offset(x, y)
-                )
-            }
-        }
-    }
-}
-
-// ==========================================
-// 🟢 DESTELLO CINEMATOGRÁFICO DETRÁS DEL ICONO
-// ==========================================
-@Composable
-fun DestelloCinemaDetras(
-    modifier: Modifier = Modifier
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "cinemaFlareAnim")
-
-    val flareScale by infiniteTransition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "flareScale"
-    )
-
-    val flareAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.45f,
-        targetValue = 0.85f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "flareAlpha"
-    )
-
-    val rotacionHaz by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(32000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rotacionHaz"
-    )
-
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.Center
-    ) {
-        // Halo difuso dorado
-        Box(
-            modifier = Modifier
-                .size(330.dp)
-                .scale(flareScale)
-                .alpha(flareAlpha)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color(0x88C5A059),
-                            Color(0x448A6E2F),
-                            Color(0x184A3B18),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = CircleShape
-                )
-        )
-
-        // Destello horizontal anamórfico de cámara
-        Box(
-            modifier = Modifier
-                .width(440.dp)
-                .height(42.dp)
-                .scale(flareScale)
-                .alpha(flareAlpha * 0.75f)
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color(0x22FFF1C5),
-                            Color(0xAAFFF3B0),
-                            Color(0xEEFFFFFF),
-                            Color(0xAAFFF3B0),
-                            Color(0x22FFF1C5),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-
-        // Haces de luz suaves en rotación
-        Box(
-            modifier = Modifier
-                .size(260.dp)
-                .rotate(rotacionHaz)
-                .alpha(flareAlpha * 0.35f)
-                .background(
-                    brush = Brush.sweepGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color(0x66FFD700),
-                            Color.Transparent,
-                            Color(0x33FFD700),
-                            Color.Transparent,
-                            Color(0x66FFD700),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = CircleShape
-                )
-        )
-    }
-}
-
-// ==========================================
-// 🟢 PANTALLA COMPOSABLE DE SPLASH PARA ANDROID TV
-// ==========================================
-@Composable
-fun SplashScreen(
-    frasesCine: List<String>,
+fun SplashScreenUltraFast(
+    fraseInicial: String,
     versionName: String
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    var fraseActual by remember { mutableStateOf("") }
-    val alphaAnim = remember { Animatable(0f) }
-
-    // Pulso suave continuo en el logo (efecto respiración cinemática)
-    val infiniteTransition = rememberInfiniteTransition(label = "logoPulse")
-    val logoScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scaleAnim"
-    )
-
-    // Degradado Dorado Premium
-    val goldGradient = remember {
-        Brush.linearGradient(
-            colors = listOf(
-                Color(0xFFFFF1C5),
-                Color(0xFFF5E6AD),
-                Color(0xFFC5A059),
-                Color(0xFF8A6E2F),
-                Color(0xFFC5A059)
-            )
-        )
-    }
-
-    // Ciclo de frases aleatorias no repetidas con SharedPreferences
-    LaunchedEffect(Unit) {
-        val prefs = context.getSharedPreferences("SplashPrefs", Context.MODE_PRIVATE)
-        val indicesString = prefs.getString("unshown_indices", "") ?: ""
-        var listaIndices = if (indicesString.isNotEmpty()) {
-            indicesString.split(",").mapNotNull { it.toIntOrNull() }.toMutableList()
-        } else {
-            mutableListOf()
-        }
-
-        if (listaIndices.isEmpty()) {
-            listaIndices = (0 until frasesCine.size).shuffled().toMutableList()
-            prefs.edit().putString("unshown_indices", listaIndices.joinToString(",")).apply()
-        }
-
-        while (isActive) {
-            if (listaIndices.isEmpty()) {
-                listaIndices = (0 until frasesCine.size).shuffled().toMutableList()
-            }
-
-            val index = listaIndices.removeAt(0)
-            prefs.edit().putString("unshown_indices", listaIndices.joinToString(",")).apply()
-            fraseActual = frasesCine[index]
-
-            // Entrada suave
-            alphaAnim.animateTo(1f, animationSpec = tween(350))
-            delay(2200)
-            // Salida suave
-            alphaAnim.animateTo(0f, animationSpec = tween(300))
-            delay(200)
-        }
-    }
-
+    // Fondo plano oscuro cinematográfico (#0A0C11). Cero uso de GPU.
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0A0C11))
     ) {
-        // 🟢 1. FONDO CON ATMÓSFERA Y DESTELLOS PREMIUM EN TODA LA PANTALLA
-        FondoCinePremiumDestellos()
-
-        // 🟢 2. CONTENIDO CENTRAL OPTIMIZADO PARA ANDROID TV
+        // Contenedor principal centrado
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 48.dp),
+                .padding(horizontal = 40.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // LOGO EN GRANDE CON DESTELLO CINEMATOGRÁFICO DETRÁS
-            Box(
+            // 1. Logo optimizado y estático (sin rotaciones pesadas)
+            Image(
+                painter = painterResource(id = R.drawable.icono),
+                contentDescription = "Logo CineParche",
                 modifier = Modifier
-                    .wrapContentSize()
-                    .padding(bottom = 12.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                // Destello detrás del logo
-                DestelloCinemaDetras()
-
-                // Logo principal con respiración
-                Image(
-                    painter = painterResource(id = R.drawable.icono),
-                    contentDescription = "Logo CineParche",
-                    modifier = Modifier
-                        .size(180.dp)
-                        .scale(logoScale),
-                    contentScale = ContentScale.Fit
-                )
-            }
-
-            // TÍTULO BIENVENIDO GRANDE PARA TV (42.sp)
-            Text(
-                text = "BIENVENIDO",
-                style = TextStyle(
-                    brush = goldGradient,
-                    fontSize = 42.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 4.sp,
-                    textAlign = TextAlign.Center
-                )
+                    .size(130.dp),
+                contentScale = ContentScale.Fit
             )
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
-            // CONTENEDOR CON ÍCONO DE CARGA Y FRASE DINÁMICA GRANDE (22.sp)
+            // 2. Título nítido con color dorado sólido para no consumir shaders
+            Text(
+                text = "BIENVENIDO",
+                color = Color(0xFFFFD56B),
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 3.sp,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // 3. Indicador de carga ligero + Frase fija
             Row(
                 modifier = Modifier
-                    .fillMaxWidth(0.85f)
-                    .height(68.dp),
+                    .fillMaxWidth(0.80f)
+                    .wrapContentHeight(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
                 CircularProgressIndicator(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .padding(end = 12.dp),
-                    color = Color(0xFFC5A059),
-                    strokeWidth = 3.dp,
-                    trackColor = Color(0xFF332A15)
+                    modifier = Modifier.size(24.dp),
+                    color = Color(0xFFFFD56B),
+                    strokeWidth = 2.5.dp,
+                    trackColor = Color(0xFF22252E)
                 )
 
+                Spacer(modifier = Modifier.width(16.dp))
+
                 Text(
-                    text = fraseActual,
-                    color = Color.White.copy(alpha = alphaAnim.value),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Medium,
+                    text = fraseInicial,
+                    color = Color(0xFFE2E4E9),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Normal,
                     textAlign = TextAlign.Start,
-                    lineHeight = 28.sp,
-                    maxLines = 2
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
 
-        // 🟢 3. VERSIÓN INFERIOR VISIBLE
+        // 4. Versión al fondo (Nunca se superpone con el centro)
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 36.dp)
+                .padding(bottom = 20.dp)
                 .background(
-                    color = Color.Black.copy(alpha = 0.6f),
-                    shape = RoundedCornerShape(12.dp)
+                    color = Color(0x33FFFFFF),
+                    shape = RoundedCornerShape(8.dp)
                 )
-                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .padding(horizontal = 14.dp, vertical = 4.dp)
         ) {
             Text(
                 text = "VERSIÓN $versionName",
-                color = Color(0xFFC5A059),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
+                color = Color(0xFFB0B4BE),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp
             )
         }
