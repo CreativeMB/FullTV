@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.creativem.fulltv.peliculas.PlayerPeliculas
@@ -1213,7 +1214,7 @@ fun DialogConfirmarAlquiler(
     val fecha = modelo.releaseDate ?: ""
     val tituloUsado = if (fecha.isNotEmpty()) "$tituloBase ($fecha)" else tituloBase
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = onDismiss,properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF0A122A)),
@@ -1298,7 +1299,7 @@ fun DialogEnlaceRoto(
     val fecha = modelo.releaseDate ?: ""
     val tituloUsado = if (fecha.isNotEmpty()) "$tituloBase ($fecha)" else tituloBase
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = onDismiss,properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF222222)),

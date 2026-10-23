@@ -1,5 +1,6 @@
 package com.creativem.fulltv.peliculas
 
+import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -54,11 +55,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
+import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.media3.common.util.UnstableApi
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.creativem.fulltv.BuildConfig
 import com.creativem.fulltv.R
 import com.creativem.fulltv.api.ApiPeliculaActivity
 import com.creativem.fulltv.api.MovieDetailResponse
@@ -80,9 +84,11 @@ import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 
 val ColorDorado = Color(0xFFC5A059)
 val ColorFondoOscuro = Color(0xFF0A122A)
@@ -292,6 +298,12 @@ fun PeliculasScreen(
     var mostrarPedido by remember { mutableStateOf(false) }
     var mostrarPaquete by remember { mutableStateOf(false) }
 
+    // 👇 ESTADOS PARA LA ACTUALIZACIÓN DE APK
+    var mostrarDialogoActualizacion by remember { mutableStateOf(false) }
+    var versionDisponible by remember { mutableStateOf("") }
+    var progresoDescarga by remember { mutableIntStateOf(-1) }
+    var mostrarDialogoDescarga by remember { mutableStateOf(false) }
+
     val menuFocusRequester = remember { FocusRequester() }
     val bannerFocusRequester = remember { FocusRequester() }
     val gridFocusRequester = remember { FocusRequester() }
@@ -315,14 +327,34 @@ fun PeliculasScreen(
         } else onDispose { }
     }
 
-    // 🟢 1. VERIFICACIÓN AUTOMÁTICA DE ALQUILERES ACTIVOS AL INICIAR
+    // 🟢 1. VERIFICACIÓN AUTOMÁTICA DE ACTUALIZACIONES (NUEVO CÓDIGO RESTAURADO)
+    LaunchedEffect(Unit) {
+        delay(2500) // Pequeño retraso para no saturar el inicio de la app
+        val versionLocal = BuildConfig.VERSION_NAME
+        val ref = databaseRef.child("noticia").child("us4vaaf0VPezu9vuc4ns")
+
+        ref.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    val versionRemota = snapshot.child("versionapk").getValue(String::class.java) ?: ""
+                    if (versionRemota.isNotEmpty() && esNuevaVersion(versionRemota, versionLocal)) {
+                        versionDisponible = versionRemota
+                        mostrarDialogoActualizacion = true
+                    }
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
+
+    // 🟢 2. VERIFICACIÓN AUTOMÁTICA DE ALQUILERES ACTIVOS AL INICIAR
     LaunchedEffect(Unit) {
         val user = auth.currentUser
         val email = user?.email
         if (user != null && !email.isNullOrBlank() && email != "invitado@fulltv.com") {
             if (!PeliculasActivity.haVerificadoAlquileresEnEstaSesion) {
                 PeliculasActivity.haVerificadoAlquileresEnEstaSesion = true
-                delay(2000) // 2 segundos igual a la versión original
+                delay(2000)
 
                 val correoKey = email.replace(".", "_").replace("@", "_")
                 val rentalsRef = databaseRef.child("usuarios").child(correoKey).child("alquileres")
@@ -352,7 +384,6 @@ fun PeliculasScreen(
 
                                     val tiempoTranscurrido = ahora - createdAt
 
-                                    // 🟢 SOLO SE MUESTRA SI YA INICIÓ LA HORA PROGRAMADA (tiempoTranscurrido >= 0)
                                     if (tiempoTranscurrido >= 0) {
                                         val durationMillis = TimeUnit.MINUTES.toMillis(countdownMinutes.toLong())
                                         val tiempoRestante = durationMillis - tiempoTranscurrido
@@ -369,10 +400,8 @@ fun PeliculasScreen(
                                                 )
                                             }
                                         } else {
-                                            child.ref.removeValue() // 🧹 Solo se elimina si YA inició y su tiempo llegó a 0
+                                            child.ref.removeValue()
                                         }
-                                    } else {
-                                        // ⏳ Si está programada a futuro (tiempoTranscurrido < 0), NO entra a la lista ni se borra
                                     }
                                 }
 
@@ -391,7 +420,7 @@ fun PeliculasScreen(
         }
     }
 
-    // 🟢 2. ESCUCHA DE FIREBASE EN TIEMPO REAL
+    // 🟢 3. ESCUCHA DE FIREBASE EN TIEMPO REAL
     LaunchedEffect(Unit) {
         databaseRef.child("movies").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -450,7 +479,7 @@ fun PeliculasScreen(
         })
     }
 
-    // 🟢 3. VIGILANTE DE EXPIRACIÓN EN SEGUNDO PLANO
+    // 🟢 4. VIGILANTE DE EXPIRACIÓN EN SEGUNDO PLANO
     LaunchedEffect(Unit) {
         while (isActive) {
             delay(1000)
@@ -662,7 +691,35 @@ fun PeliculasScreen(
             }
         }
 
-        // 🟢 DIÁLOGO DE ALQUILERES ACTIVOS (APARECE AL INICIO DE FORMA NATIVA)
+        // 🟢 DIÁLOGOS DE ACTUALIZACIÓN
+        if (mostrarDialogoActualizacion) {
+            DialogoActualizacion(
+                version = versionDisponible,
+                onConfirmar = {
+                    mostrarDialogoActualizacion = false
+                    mostrarDialogoDescarga = true
+                    descargarAPK(
+                        context = context,
+                        version = versionDisponible,
+                        onProgreso = { progreso -> progresoDescarga = progreso },
+                        onCompletado = { file ->
+                            progresoDescarga = 100
+                            instalarAPK(context, file)
+                        }
+                    )
+                },
+                onCancelar = { mostrarDialogoActualizacion = false }
+            )
+        }
+
+        if (mostrarDialogoDescarga) {
+            DialogoDescarga(
+                progreso = progresoDescarga,
+                version = versionDisponible
+            )
+        }
+
+        // 🟢 DIÁLOGO DE ALQUILERES ACTIVOS
         if (mostrarDialogoAlquileres && alquileresActivos.isNotEmpty()) {
             DialogoAlquileresActivos(
                 alquileres = alquileresActivos,
@@ -721,7 +778,7 @@ fun PeliculasScreen(
 }
 
 // ==========================================
-// 🟢 DIÁLOGO DE ALQUILERES ACTIVOS (NATIVO EN COMPOSE PARA TV)
+// 🟢 DIÁLOGO DE ALQUILERES ACTIVOS
 // ==========================================
 @Composable
 fun DialogoAlquileresActivos(
@@ -729,7 +786,7 @@ fun DialogoAlquileresActivos(
     onDismiss: () -> Unit,
     onSelectMovie: (Modelo) -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = onDismiss,properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
@@ -1543,12 +1600,13 @@ fun DialogoBuscador(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = onDismiss,properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
             modifier = Modifier
                 .widthIn(max = 800.dp)
+                .wrapContentHeight()
                 .fillMaxWidth(0.95f)
                 .fillMaxHeight(0.88f)
                 .border(2.dp, ColorDorado, RoundedCornerShape(16.dp))
@@ -1711,12 +1769,13 @@ fun DialogoPedido(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = onDismiss,  properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
             modifier = Modifier
                 .widthIn(max = 850.dp)
+                .wrapContentHeight()
                 .fillMaxWidth(0.95f)
                 .fillMaxHeight(0.88f)
                 .border(2.dp, ColorDorado, RoundedCornerShape(16.dp))
@@ -1744,7 +1803,13 @@ fun DialogoPedido(
                             selectedItem = null
                             mensajeError = ""
                         },
-                        placeholder = { Text("Escribe para buscar (Ej: Moana 2)", color = Color.Gray, fontSize = 15.sp) },
+                        placeholder = {
+                            Text(
+                                "Escribe para buscar (Ej: Moana 2)",
+                                color = Color.Gray,
+                                fontSize = 15.sp
+                            )
+                        },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
@@ -1781,7 +1846,11 @@ fun DialogoPedido(
                                         .fillMaxWidth()
                                         .scale(if (isFocusRow) 1.02f else 1.0f)
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isFocusRow) Color(0xFF2C2C2C) else Color(0xFF121212))
+                                        .background(
+                                            if (isFocusRow) Color(0xFF2C2C2C) else Color(
+                                                0xFF121212
+                                            )
+                                        )
                                         .border(
                                             width = if (isFocusRow) 2.dp else 0.dp,
                                             color = ColorDorado,
@@ -1812,7 +1881,13 @@ fun DialogoPedido(
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
-                                            text = "⭐ ${if (item.voteAverage > 0) String.format(Locale.US, "%.1f", item.voteAverage) else "N/A"}",
+                                            text = "⭐ ${
+                                                if (item.voteAverage > 0) String.format(
+                                                    Locale.US,
+                                                    "%.1f",
+                                                    item.voteAverage
+                                                ) else "N/A"
+                                            }",
                                             color = ColorDorado,
                                             fontSize = 12.sp
                                         )
@@ -1829,7 +1904,11 @@ fun DialogoPedido(
                                             .fillMaxWidth()
                                             .scale(if (isCustomFocus) 1.02f else 1.0f)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isCustomFocus) Color(0xFF2C2C2C) else Color(0xFF161616))
+                                            .background(
+                                                if (isCustomFocus) Color(0xFF2C2C2C) else Color(
+                                                    0xFF161616
+                                                )
+                                            )
                                             .border(
                                                 width = if (isCustomFocus) 2.dp else 0.dp,
                                                 color = ColorDorado,
@@ -1890,7 +1969,13 @@ fun DialogoPedido(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "⭐ ${if (selectedItem!!.voteAverage > 0) String.format(Locale.US, "%.1f", selectedItem!!.voteAverage) else "N/A"}  |  ${selectedItem!!.releaseDate}",
+                                    text = "⭐ ${
+                                        if (selectedItem!!.voteAverage > 0) String.format(
+                                            Locale.US,
+                                            "%.1f",
+                                            selectedItem!!.voteAverage
+                                        ) else "N/A"
+                                    }  |  ${selectedItem!!.releaseDate}",
                                     color = ColorDorado,
                                     fontSize = 14.sp
                                 )
@@ -1921,34 +2006,46 @@ fun DialogoPedido(
                             colors = ButtonDefaults.buttonColors(containerColor = ColorDorado),
                             onClick = {
                                 if (selectedItem == null) {
-                                    mensajeError = "Por favor selecciona una película de la lista sugerida."
+                                    mensajeError =
+                                        "Por favor selecciona una película de la lista sugerida."
                                     return@Button
                                 }
                                 if (saldoActual < costoPedido) {
-                                    mensajeError = "Saldo insuficiente en CasTV. Tienes $saldoActual y se requieren $costoPedido."
+                                    mensajeError =
+                                        "Saldo insuficiente en CasTV. Tienes $saldoActual y se requieren $costoPedido."
                                     return@Button
                                 }
 
                                 if (selectedItem!!.releaseDate.isNotBlank() && selectedItem!!.releaseDate != "Personalizado") {
                                     try {
-                                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                        val sdf =
+                                            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                                         val dateEstreno = sdf.parse(selectedItem!!.releaseDate)
                                         if (dateEstreno != null) {
-                                            val diffMillis = System.currentTimeMillis() - dateEstreno.time
+                                            val diffMillis =
+                                                System.currentTimeMillis() - dateEstreno.time
                                             val diffDias = TimeUnit.MILLISECONDS.toDays(diffMillis)
                                             if (diffDias < 40) {
-                                                val faltan = if (diffDias < 0) 40 + kotlin.math.abs(diffDias) else 40 - diffDias
-                                                mensajeError = "Película muy reciente (${selectedItem!!.releaseDate}). Deben pasar 40 días. Faltan aprox. $faltan días."
+                                                val faltan =
+                                                    if (diffDias < 0) 40 + abs(diffDias) else 40 - diffDias
+                                                mensajeError =
+                                                    "Película muy reciente (${selectedItem!!.releaseDate}). Deben pasar 40 días. Faltan aprox. $faltan días."
                                                 return@Button
                                             }
                                         }
-                                    } catch (_: Exception) {}
+                                    } catch (_: Exception) {
+                                    }
                                 }
 
                                 pasoConfirmacion = true
                             }
                         ) {
-                            Text("SIGUIENTE", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text(
+                                "SIGUIENTE",
+                                color = Color.Black,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
                         }
                     }
 
@@ -1986,10 +2083,24 @@ fun DialogoPedido(
                             )
                             Spacer(modifier = Modifier.width(14.dp))
                             Column {
-                                Text(selectedItem?.title ?: "", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                Text("⭐ ${selectedItem?.voteAverage ?: 0.0}  |  📅 ${selectedItem?.releaseDate}", color = ColorDorado, fontSize = 13.sp)
+                                Text(
+                                    selectedItem?.title ?: "",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "⭐ ${selectedItem?.voteAverage ?: 0.0}  |  📅 ${selectedItem?.releaseDate}",
+                                    color = ColorDorado,
+                                    fontSize = 13.sp
+                                )
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text(selectedItem?.overview ?: "", color = Color.LightGray, fontSize = 11.sp, maxLines = 3)
+                                Text(
+                                    selectedItem?.overview ?: "",
+                                    color = Color.LightGray,
+                                    fontSize = 11.sp,
+                                    maxLines = 3
+                                )
                             }
                         }
 
@@ -2001,11 +2112,29 @@ fun DialogoPedido(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("👤 Solicitante: $nombreUsuario", color = Color.White, fontSize = 14.sp)
-                            Text("💰 Saldo Actual: $saldoActual CasTV", color = Color.White, fontSize = 14.sp)
-                            Text("📉 Costo Pedido: $costoPedido CasTV", color = Color(0xFFFF5252), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Divider(color = Color(0xFF444444))
-                            Text("✅ Saldo Final: ${saldoActual - costoPedido} CasTV", color = ColorDorado, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                "👤 Solicitante: $nombreUsuario",
+                                color = Color.White,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                "💰 Saldo Actual: $saldoActual CasTV",
+                                color = Color.White,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                "📉 Costo Pedido: $costoPedido CasTV",
+                                color = Color(0xFFFF5252),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            HorizontalDivider(color = Color(0xFF444444))
+                            Text(
+                                "✅ Saldo Final: ${saldoActual - costoPedido} CasTV",
+                                color = ColorDorado,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
 
@@ -2029,17 +2158,24 @@ fun DialogoPedido(
                                 CastvHelper.mostrarSelectorFechaHora(activity) { fecha, hora ->
                                     val item = selectedItem ?: return@mostrarSelectorFechaHora
                                     val moviesRef = databaseRef.child("movies")
-                                    val correoUsuario = userEmail.ifBlank { correoKey.replace("_", ".") }
+                                    val correoUsuario =
+                                        userEmail.ifBlank { correoKey.replace("_", ".") }
 
-                                    moviesRef.orderByChild("originalTitle").equalTo(item.originalTitle)
-                                        .addListenerForSingleValueEvent(object : ValueEventListener {
+                                    moviesRef.orderByChild("originalTitle")
+                                        .equalTo(item.originalTitle)
+                                        .addListenerForSingleValueEvent(object :
+                                            ValueEventListener {
                                             override fun onDataChange(snapshot: DataSnapshot) {
                                                 val tiempoActual = System.currentTimeMillis()
                                                 if (snapshot.exists()) {
-                                                    val existingId = snapshot.children.firstOrNull()?.key ?: ""
+                                                    val existingId =
+                                                        snapshot.children.firstOrNull()?.key ?: ""
                                                     if (existingId.isNotEmpty()) {
-                                                        moviesRef.child(existingId).child("createdAt").setValue(tiempoActual)
-                                                        val solRef = moviesRef.child(existingId).child("solicitudes").push()
+                                                        moviesRef.child(existingId)
+                                                            .child("createdAt")
+                                                            .setValue(tiempoActual)
+                                                        val solRef = moviesRef.child(existingId)
+                                                            .child("solicitudes").push()
                                                         solRef.setValue(
                                                             mapOf(
                                                                 "id" to (solRef.key ?: ""),
@@ -2067,27 +2203,40 @@ fun DialogoPedido(
                                                         "trailerUrl" to "",
                                                         "userId" to nombreUsuario
                                                     )
-                                                    moviesRef.child(newId).setValue(mapaNueva).addOnSuccessListener {
-                                                        val solRef = moviesRef.child(newId).child("solicitudes").push()
-                                                        solRef.setValue(
-                                                            mapOf(
-                                                                "id" to (solRef.key ?: ""),
-                                                                "email" to correoUsuario,
-                                                                "userId" to nombreUsuario,
-                                                                "fechaActivacion" to fecha,
-                                                                "horaActivacion" to hora,
-                                                                "timestamp" to ServerValue.TIMESTAMP
+                                                    moviesRef.child(newId).setValue(mapaNueva)
+                                                        .addOnSuccessListener {
+                                                            val solRef = moviesRef.child(newId)
+                                                                .child("solicitudes").push()
+                                                            solRef.setValue(
+                                                                mapOf(
+                                                                    "id" to (solRef.key ?: ""),
+                                                                    "email" to correoUsuario,
+                                                                    "userId" to nombreUsuario,
+                                                                    "fechaActivacion" to fecha,
+                                                                    "horaActivacion" to hora,
+                                                                    "timestamp" to ServerValue.TIMESTAMP
+                                                                )
                                                             )
-                                                        )
-                                                    }
+                                                        }
                                                 }
 
-                                                val userRef = databaseRef.child("usuarios").child(correoKey)
-                                                userRef.child("castv").setValue(saldoActual - costoPedido).addOnSuccessListener {
-                                                    CastvHelper.registrarConsumo(correoUsuario, "PEDIDO: ${item.title}", costoPedido)
-                                                    Toast.makeText(activity, "¡Pedido realizado con éxito! 🎬", Toast.LENGTH_LONG).show()
-                                                    onDismiss()
-                                                }
+                                                val userRef =
+                                                    databaseRef.child("usuarios").child(correoKey)
+                                                userRef.child("castv")
+                                                    .setValue(saldoActual - costoPedido)
+                                                    .addOnSuccessListener {
+                                                        CastvHelper.registrarConsumo(
+                                                            correoUsuario,
+                                                            "PEDIDO: ${item.title}",
+                                                            costoPedido
+                                                        )
+                                                        Toast.makeText(
+                                                            activity,
+                                                            "¡Pedido realizado con éxito! 🎬",
+                                                            Toast.LENGTH_LONG
+                                                        ).show()
+                                                        onDismiss()
+                                                    }
                                             }
 
                                             override fun onCancelled(error: DatabaseError) {
@@ -2097,7 +2246,12 @@ fun DialogoPedido(
                                 }
                             }
                         ) {
-                            Text("CONFIRMAR Y PROGRAMAR", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text(
+                                "CONFIRMAR Y PROGRAMAR",
+                                color = Color.Black,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
                         }
                     }
                 }
@@ -2169,7 +2323,7 @@ fun DialogoPaquetes(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = onDismiss,properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
@@ -2416,7 +2570,7 @@ fun DialogoConfirmacionSalida(
         onCancelar()
     }
 
-    Dialog(onDismissRequest = onCancelar) {
+    Dialog(onDismissRequest = onCancelar,properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = ColorFondoOscuro),
@@ -2446,5 +2600,225 @@ fun DialogoConfirmacionSalida(
                 }
             }
         }
+    }
+}
+
+// ==========================================
+// 🟢 DIÁLOGOS DE ACTUALIZACIÓN (COMPOSE)
+// ==========================================
+@Composable
+fun DialogoActualizacion(
+    version: String,
+    onConfirmar: () -> Unit,
+    onCancelar: () -> Unit
+) {
+    Dialog(onDismissRequest = onCancelar,properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = ColorFondoOscuro),
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "🚀 Nueva Versión $version",
+                    color = ColorDorado,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Hemos mejorado CineParche para ti. Actualiza ahora para disfrutar de la mejor experiencia.",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    var isBtnActualizarFocused by remember { mutableStateOf(false) }
+                    Button(
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isBtnActualizarFocused) ColorDorado else Color(0xFF1A1A1A)
+                        ),
+                        onClick = onConfirmar,
+                        modifier = Modifier
+                            .onFocusChanged { isBtnActualizarFocused = it.isFocused }
+                            .focusable()
+                            .scale(if (isBtnActualizarFocused) 1.1f else 1.0f)
+                    ) {
+                        Text(
+                            text = "ACTUALIZAR",
+                            color = if (isBtnActualizarFocused) Color.Black else Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    var isBtnLuegoFocused by remember { mutableStateOf(false) }
+                    Button(
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isBtnLuegoFocused) ColorDorado else Color(0xFF1A1A1A)
+                        ),
+                        onClick = onCancelar,
+                        modifier = Modifier
+                            .onFocusChanged { isBtnLuegoFocused = it.isFocused }
+                            .focusable()
+                            .scale(if (isBtnLuegoFocused) 1.1f else 1.0f)
+                    ) {
+                        Text(
+                            text = "LUEGO",
+                            color = if (isBtnLuegoFocused) Color.Black else Color.LightGray
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DialogoDescarga(progreso: Int, version: String) {
+    Dialog(onDismissRequest = {}) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = ColorFondoOscuro),
+            modifier = Modifier.padding(16.dp).fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp).fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "📥 Actualizando CineParche v$version",
+                    color = ColorDorado,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+
+                LinearProgressIndicator(
+                    progress = { if (progreso >= 0) progreso / 100f else 0f },
+                    modifier = Modifier.fillMaxWidth().height(8.dp),
+                    color = ColorDorado,
+                    trackColor = Color.Gray,
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (progreso >= 0 && progreso < 100) {
+                    Text("Descargando... $progreso%", color = ColorDorado, fontSize = 16.sp)
+                } else if (progreso == 100) {
+                    Text("Descarga completada ✅", color = Color.Green, fontSize = 16.sp)
+                } else {
+                    Text("Iniciando descarga segura...", color = Color.White, fontSize = 16.sp)
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// 🟢 LÓGICA CORE DE INSTALACIÓN Y VERIFICACIÓN
+// ==========================================
+fun esNuevaVersion(remota: String, local: String): Boolean {
+    val r = remota.split(".")
+    val l = local.split(".")
+    for (i in 0 until maxOf(r.size, l.size)) {
+        val rv = r.getOrNull(i)?.toIntOrNull() ?: 0
+        val lv = l.getOrNull(i)?.toIntOrNull() ?: 0
+        if (rv > lv) return true
+        if (rv < lv) return false
+    }
+    return false
+}
+
+fun descargarAPK(
+    context: Context,
+    version: String,
+    onProgreso: (Int) -> Unit,
+    onCompletado: (File) -> Unit
+) {
+    val url = "https://github.com/CreativeMB/center/releases/download/apk/CineParcheApp-debug.apk"
+    val file = File(context.getExternalFilesDir(null), "CineParcheApp-debug.apk")
+    if (file.exists()) file.delete()
+
+    val request = DownloadManager.Request(Uri.parse(url))
+        .setTitle("CineParche v$version")
+        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+        .setDestinationUri(Uri.fromFile(file))
+
+    val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+    val downloadId = dm.enqueue(request)
+
+    CoroutineScope(Dispatchers.IO).launch {
+        var isDownloading = true
+        while (isDownloading) {
+            val q = DownloadManager.Query().setFilterById(downloadId)
+            val cursor = dm.query(q)
+            if (cursor != null && cursor.moveToFirst()) {
+                val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                val downloadedIndex = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                val totalIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+
+                if (statusIndex >= 0 && downloadedIndex >= 0 && totalIndex >= 0) {
+                    val status = cursor.getInt(statusIndex)
+                    val downloaded = cursor.getLong(downloadedIndex)
+                    val total = cursor.getLong(totalIndex)
+
+                    if (total > 0) {
+                        val progress = ((downloaded * 100) / total).toInt()
+                        withContext(Dispatchers.Main) { onProgreso(progress) }
+                    }
+
+                    if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                        isDownloading = false
+                        withContext(Dispatchers.Main) {
+                            onProgreso(100)
+                            delay(800)
+                            onCompletado(file)
+                        }
+                    } else if (status == DownloadManager.STATUS_FAILED) {
+                        isDownloading = false
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "Error en la descarga", Toast.LENGTH_SHORT).show()
+                            onProgreso(-1)
+                        }
+                    }
+                }
+            }
+            cursor?.close()
+            if (isDownloading) delay(500)
+        }
+    }
+}
+
+fun instalarAPK(context: Context, file: File) {
+    val authority = "${context.packageName}.provider"
+    val uri = FileProvider.getUriForFile(context, authority, file)
+
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "application/vnd.android.package-archive")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        if (!context.packageManager.canRequestPackageInstalls()) {
+            context.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")))
+            Toast.makeText(context, "Autoriza la instalación y vuelve a intentarlo", Toast.LENGTH_LONG).show()
+            return
+        }
+    }
+
+    try {
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        android.util.Log.e("Instalador", "Error al abrir: ${e.message}")
     }
 }

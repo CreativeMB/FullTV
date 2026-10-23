@@ -43,6 +43,8 @@
         <activity
             android:name=".peliculas.PeliculasActivity"
             android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden"
             android:windowSoftInputMode="stateAlwaysHidden"
             android:theme="@style/Theme.FullTV.tv">
 
@@ -56,12 +58,15 @@
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".api.PeliculasApiActivity"
+            android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="false"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".principal.Login"
             android:exported="false"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.AppCompat.NoActionBar"/>
 
         <activity
@@ -73,24 +78,23 @@
             android:name=".peliculasvalidas.PeliculasValidasActivity"
             android:exported="false"
             android:windowSoftInputMode="stateHidden|adjustPan"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden"
             tools:ignore="Instantiatable"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".principal.Perfil"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden"
-            android:screenOrientation="unspecified"/>
+           />
         <activity
             android:name=".peliculas.PlayerPeliculas"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:screenOrientation="landscape"
             android:hardwareAccelerated="true"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
-        <activity
-            android:name=".tv.PlayerTv"
-            android:configChanges="orientation|screenSize|keyboardHidden"
 
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".api.TrailerActivity"
             android:screenOrientation="landscape"
