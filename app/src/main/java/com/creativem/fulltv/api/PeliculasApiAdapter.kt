@@ -1,159 +1,159 @@
-package com.creativem.fulltv.api
-
-import android.graphics.Color
-import android.text.TextUtils
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.TextView
-import androidx.recyclerview.widget.LinearSmoothScroller
-import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
-import com.creativem.fulltv.R
-import com.creativem.fulltv.principal.Modelo
-
-class PeliculasApiAdapter(
-    private val modeloList: MutableList<Modelo>,
-    private val onMovieClick: (Modelo) -> Unit
-) : RecyclerView.Adapter<PeliculasApiAdapter.SmallMovieViewHolder>() {
-
-    private var selectedPosition = RecyclerView.NO_POSITION
-
-    inner class SmallMovieViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val movieImage: ImageView = view.findViewById(R.id.movie_image_small)
-        val movieTitle: TextView = view.findViewById(R.id.movie_title_small)
-        // El itemView ya es el CardView en este caso
-    }
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SmallMovieViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_api_peluculas, parent, false)
-        return SmallMovieViewHolder(view)
-    }
-
-    override fun onBindViewHolder(holder: SmallMovieViewHolder, position: Int) {
-        val movie = modeloList[position]
-
-        // 1. CONFIGURACIÓN DEL TÍTULO Y FECHA COMPLETA
-        val tituloOriginal = movie.title // Aquí viene "Ápex"
-        val fecha = movie.releaseDate    // Aquí viene "2026-04-24"
-
-        holder.movieTitle.apply {
-            // Si hay fecha, unimos las dos variables. Si no, mostramos solo el título.
-            text = if (fecha.isNotEmpty()) "$tituloOriginal ($fecha)" else tituloOriginal
-
-            ellipsize = TextUtils.TruncateAt.MARQUEE
-            marqueeRepeatLimit = -1
-            isSingleLine = true
-            isSelected = false // Se activa en el focus
-        }
-
-        // 2. CARGA DE IMAGEN (fitXY)
-        Glide.with(holder.itemView.context)
-            .load(movie.imageUrl)
-            .dontAnimate()
-            .placeholder(R.drawable.pelifondo)
-            .error(R.drawable.icono)
-            .into(holder.movieImage)
-
-        // --- EFECTO DE FOCO VISUAL ---
-        holder.itemView.isFocusable = true
-        val colorDorado = androidx.core.content.ContextCompat.getColor(holder.itemView.context, R.color.cine_dorado)
-        // Calculamos el grosor en DP para que no sea muy delgado en TV
-        val strokePx = (4 * holder.itemView.context.resources.displayMetrics.density).toInt()
-        val focusedBorder = android.graphics.drawable.GradientDrawable().apply {
-            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-            setStroke(strokePx, colorDorado)
-            setColor(android.graphics.Color.TRANSPARENT) // Totalmente transparente adentro
-            cornerRadius = 8f // Redondeo
-        }
-
-        // 3. GESTIÓN DE FOCO, ZOOM Y CENTRADO HORIZONTAL
-        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
-            val card = view as? androidx.cardview.widget.CardView
-            val currentPos = holder.bindingAdapterPosition
-
-            if (hasFocus && currentPos != RecyclerView.NO_POSITION) {
-
-                // --- A. CENTRADO HORIZONTAL ---
-                val parentRV = view.parent as? RecyclerView
-                parentRV?.let { rv ->
-                    val scroller = object : LinearSmoothScroller(rv.context) {
-                        override fun calculateDtToFit(viewStart: Int, viewEnd: Int, boxStart: Int, boxEnd: Int, snapPreference: Int): Int {
-                            // Centrar: (Centro del RV) - (Centro del Item)
-                            return (boxStart + (boxEnd - boxStart) / 2) - (viewStart + (viewEnd - viewStart) / 2)
-                        }
-                        override fun calculateSpeedPerPixel(displayMetrics: android.util.DisplayMetrics): Float {
-                            return 100f / displayMetrics.densityDpi
-                        }
-                    }
-                    scroller.targetPosition = currentPos
-                    rv.layoutManager?.startSmoothScroll(scroller)
-
-                    // Impedir que el foco salte fuera de la lista
-                    rv.requestChildFocus(view, view)
-                }
-
-                // --- B. ZOOM Y CAPAS ---
-                view.bringToFront()
-                (view.parent as? View)?.requestLayout()
-                (view.parent as? View)?.invalidate()
-
-                // Brillo máximo (Sin atenuado)
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    view.foreground = focusedBorder
-                }
-                view.alpha = 1.0f
-
-                view.animate()
-                    .scaleX(1.2f)
-                    .scaleY(1.2f)
-                    .translationZ(30f)
-                    .setDuration(200)
-                    .start()
-
-                // --- C. COLORES ---
-                card?.setCardBackgroundColor(Color.parseColor("#FFD700")) // Oro
-                card?.cardElevation = 20f
-                holder.movieTitle.setTextColor(colorDorado)
-                holder.movieTitle.isSelected = true
-
-            } else if (!hasFocus) {
-                // --- RESET AL PERDER FOCO ---
-                view.animate()
-                    .scaleX(1.0f)
-                    .scaleY(1.0f)
-                    .translationZ(0f)
-                    .setDuration(200)
-                    .start()
-// ¡AQUÍ ESTÁ LA CORRECCIÓN! (Quitar el borde al salir)
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    view.foreground = null
-                }
-                card?.setCardBackgroundColor(Color.parseColor("#1A1A1A"))
-                card?.cardElevation = 4f
-                holder.movieTitle.setTextColor(Color.WHITE)
-                holder.movieTitle.isSelected = false
-            }
-        }
-
-        // 4. CLICK PARA SELECCIONAR
-        holder.itemView.setOnClickListener {
-            val pos = holder.bindingAdapterPosition
-            if (pos != RecyclerView.NO_POSITION) {
-                selectedPosition = pos
-                notifyDataSetChanged() // Refresca para el resaltado
-                onMovieClick(modeloList[pos])
-            }
-        }
-    }
-
-    override fun getItemCount(): Int = modeloList.size
-
-    fun updateMovies(newModelos: List<Modelo>) {
-        modeloList.clear()
-        modeloList.addAll(newModelos)
-        notifyDataSetChanged()
-    }
-}
+//package com.creativem.fulltv.api
+//
+//import android.graphics.Color
+//import android.text.TextUtils
+//import android.view.LayoutInflater
+//import android.view.View
+//import android.view.ViewGroup
+//import android.widget.ImageView
+//import android.widget.TextView
+//import androidx.recyclerview.widget.LinearSmoothScroller
+//import androidx.recyclerview.widget.RecyclerView
+//import com.bumptech.glide.Glide
+//import com.creativem.fulltv.R
+//import com.creativem.fulltv.principal.Modelo
+//
+//class PeliculasApiAdapter(
+//    private val modeloList: MutableList<Modelo>,
+//    private val onMovieClick: (Modelo) -> Unit
+//) : RecyclerView.Adapter<PeliculasApiAdapter.SmallMovieViewHolder>() {
+//
+//    private var selectedPosition = RecyclerView.NO_POSITION
+//
+//    inner class SmallMovieViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+//        val movieImage: ImageView = view.findViewById(R.id.movie_image_small)
+//        val movieTitle: TextView = view.findViewById(R.id.movie_title_small)
+//        // El itemView ya es el CardView en este caso
+//    }
+//
+//    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SmallMovieViewHolder {
+//        val view = LayoutInflater.from(parent.context)
+//            .inflate(R.layout.item_api_peluculas, parent, false)
+//        return SmallMovieViewHolder(view)
+//    }
+//
+//    override fun onBindViewHolder(holder: SmallMovieViewHolder, position: Int) {
+//        val movie = modeloList[position]
+//
+//        // 1. CONFIGURACIÓN DEL TÍTULO Y FECHA COMPLETA
+//        val tituloOriginal = movie.title // Aquí viene "Ápex"
+//        val fecha = movie.releaseDate    // Aquí viene "2026-04-24"
+//
+//        holder.movieTitle.apply {
+//            // Si hay fecha, unimos las dos variables. Si no, mostramos solo el título.
+//            text = if (fecha.isNotEmpty()) "$tituloOriginal ($fecha)" else tituloOriginal
+//
+//            ellipsize = TextUtils.TruncateAt.MARQUEE
+//            marqueeRepeatLimit = -1
+//            isSingleLine = true
+//            isSelected = false // Se activa en el focus
+//        }
+//
+//        // 2. CARGA DE IMAGEN (fitXY)
+//        Glide.with(holder.itemView.context)
+//            .load(movie.imageUrl)
+//            .dontAnimate()
+//            .placeholder(R.drawable.pelifondo)
+//            .error(R.drawable.icono)
+//            .into(holder.movieImage)
+//
+//        // --- EFECTO DE FOCO VISUAL ---
+//        holder.itemView.isFocusable = true
+//        val colorDorado = androidx.core.content.ContextCompat.getColor(holder.itemView.context, R.color.cine_dorado)
+//        // Calculamos el grosor en DP para que no sea muy delgado en TV
+//        val strokePx = (4 * holder.itemView.context.resources.displayMetrics.density).toInt()
+//        val focusedBorder = android.graphics.drawable.GradientDrawable().apply {
+//            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+//            setStroke(strokePx, colorDorado)
+//            setColor(android.graphics.Color.TRANSPARENT) // Totalmente transparente adentro
+//            cornerRadius = 8f // Redondeo
+//        }
+//
+//        // 3. GESTIÓN DE FOCO, ZOOM Y CENTRADO HORIZONTAL
+//        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+//            val card = view as? androidx.cardview.widget.CardView
+//            val currentPos = holder.bindingAdapterPosition
+//
+//            if (hasFocus && currentPos != RecyclerView.NO_POSITION) {
+//
+//                // --- A. CENTRADO HORIZONTAL ---
+//                val parentRV = view.parent as? RecyclerView
+//                parentRV?.let { rv ->
+//                    val scroller = object : LinearSmoothScroller(rv.context) {
+//                        override fun calculateDtToFit(viewStart: Int, viewEnd: Int, boxStart: Int, boxEnd: Int, snapPreference: Int): Int {
+//                            // Centrar: (Centro del RV) - (Centro del Item)
+//                            return (boxStart + (boxEnd - boxStart) / 2) - (viewStart + (viewEnd - viewStart) / 2)
+//                        }
+//                        override fun calculateSpeedPerPixel(displayMetrics: android.util.DisplayMetrics): Float {
+//                            return 100f / displayMetrics.densityDpi
+//                        }
+//                    }
+//                    scroller.targetPosition = currentPos
+//                    rv.layoutManager?.startSmoothScroll(scroller)
+//
+//                    // Impedir que el foco salte fuera de la lista
+//                    rv.requestChildFocus(view, view)
+//                }
+//
+//                // --- B. ZOOM Y CAPAS ---
+//                view.bringToFront()
+//                (view.parent as? View)?.requestLayout()
+//                (view.parent as? View)?.invalidate()
+//
+//                // Brillo máximo (Sin atenuado)
+//                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+//                    view.foreground = focusedBorder
+//                }
+//                view.alpha = 1.0f
+//
+//                view.animate()
+//                    .scaleX(1.2f)
+//                    .scaleY(1.2f)
+//                    .translationZ(30f)
+//                    .setDuration(200)
+//                    .start()
+//
+//                // --- C. COLORES ---
+//                card?.setCardBackgroundColor(Color.parseColor("#FFD700")) // Oro
+//                card?.cardElevation = 20f
+//                holder.movieTitle.setTextColor(colorDorado)
+//                holder.movieTitle.isSelected = true
+//
+//            } else if (!hasFocus) {
+//                // --- RESET AL PERDER FOCO ---
+//                view.animate()
+//                    .scaleX(1.0f)
+//                    .scaleY(1.0f)
+//                    .translationZ(0f)
+//                    .setDuration(200)
+//                    .start()
+//// ¡AQUÍ ESTÁ LA CORRECCIÓN! (Quitar el borde al salir)
+//                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+//                    view.foreground = null
+//                }
+//                card?.setCardBackgroundColor(Color.parseColor("#1A1A1A"))
+//                card?.cardElevation = 4f
+//                holder.movieTitle.setTextColor(Color.WHITE)
+//                holder.movieTitle.isSelected = false
+//            }
+//        }
+//
+//        // 4. CLICK PARA SELECCIONAR
+//        holder.itemView.setOnClickListener {
+//            val pos = holder.bindingAdapterPosition
+//            if (pos != RecyclerView.NO_POSITION) {
+//                selectedPosition = pos
+//                notifyDataSetChanged() // Refresca para el resaltado
+//                onMovieClick(modeloList[pos])
+//            }
+//        }
+//    }
+//
+//    override fun getItemCount(): Int = modeloList.size
+//
+//    fun updateMovies(newModelos: List<Modelo>) {
+//        modeloList.clear()
+//        modeloList.addAll(newModelos)
+//        notifyDataSetChanged()
+//    }
+//}

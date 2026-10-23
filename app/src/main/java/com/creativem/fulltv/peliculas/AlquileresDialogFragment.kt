@@ -1,269 +1,330 @@
 package com.creativem.fulltv.peliculas
 
-import android.app.AlertDialog
-import android.app.Dialog
-import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.GradientDrawable
-import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.view.Gravity
-import android.view.ViewGroup
-import android.view.WindowManager
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
-import androidx.fragment.app.DialogFragment
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.creativem.fulltv.peliculas.AlquileresAdapter
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import com.creativem.fulltv.principal.Modelo
 import com.google.firebase.database.FirebaseDatabase
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import java.util.concurrent.TimeUnit
 
-class AlquileresDialogFragment : DialogFragment() {
-    companion object {
-        private const val ARG_CORREO_KEY = "correo_key"
-        private const val ARG_MOVIES_LIST = "movies_list"
-        private const val ARG_CREATED_ATS = "created_ats"
-        private const val ARG_COUNTDOWNS = "countdowns"
+@Composable
+fun DialogoAlquileresActivos(
+    alquileres: List<Modelo.AlquilerItem>,
+    correoKey: String,
+    onReproducir: (Modelo) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val ahoraInicial = remember { System.currentTimeMillis() }
 
-        fun newInstance(alquileres: List<Modelo.AlquilerItem>, correoKey: String): AlquileresDialogFragment {
-            val fragment = AlquileresDialogFragment()
-
-            val movies = ArrayList<Modelo>()
-            val createdAts = LongArray(alquileres.size)
-            val countdowns = IntArray(alquileres.size)
-
-            alquileres.forEachIndexed { index, item ->
-                movies.add(item.movie)
-                createdAts[index] = item.createdAt
-                countdowns[index] = item.countdownMinutes
-            }
-
-            val args = Bundle().apply {
-                putString(ARG_CORREO_KEY, correoKey)
-                putSerializable(ARG_MOVIES_LIST, movies)
-                putLongArray(ARG_CREATED_ATS, createdAts)
-                putIntArray(ARG_COUNTDOWNS, countdowns)
-            }
-            fragment.arguments = args
-            return fragment
+    // Reconstrucción y filtrado de alquileres activos
+    val listaAlquileres = remember {
+        mutableStateListOf<Modelo.AlquilerItem>().apply {
+            addAll(
+                alquileres.filter { item ->
+                    val tiempoTranscurrido = ahoraInicial - item.createdAt
+                    val durationMillis = TimeUnit.MINUTES.toMillis(item.countdownMinutes.toLong())
+                    tiempoTranscurrido >= 0 && (durationMillis - tiempoTranscurrido) > 0
+                }
+            )
         }
     }
 
-    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        val parentActivity = requireActivity() as PeliculasActivity
-        val correoKey = arguments?.getString(ARG_CORREO_KEY) ?: ""
-
-        val movies = arguments?.getSerializable(ARG_MOVIES_LIST) as? ArrayList<Modelo> ?: ArrayList()
-        val createdAts = arguments?.getLongArray(ARG_CREATED_ATS) ?: LongArray(0)
-        val countdowns = arguments?.getIntArray(ARG_COUNTDOWNS) ?: IntArray(0)
-
-        // --- RECONSTRUCCIÓN Y FILTRADO SEGURO DE ALQUILERES ---
-        val ahora = System.currentTimeMillis()
-
-        val alquileresReconstruidos = movies.mapIndexed { index, movie ->
-            Modelo.AlquilerItem(
-                movie = movie,
-                createdAt = createdAts.getOrElse(index) { 0L },
-                countdownMinutes = countdowns.getOrElse(index) { 0 }
-            )
-        }.filter { item ->
-            // 🟢 CLAVE: Solo se incluyen en la ventana emergente si ya inició su hora de activación
-            val tiempoTranscurrido = ahora - item.createdAt
-            tiempoTranscurrido >= 0
+    // Si la lista está vacía de entrada, se cierra de inmediato
+    LaunchedEffect(listaAlquileres.size) {
+        if (listaAlquileres.isEmpty()) {
+            onDismiss()
         }
+    }
 
-        // 🧹 Si tras el filtro no hay alquileres verdaderamente activos, se cancela el diálogo de inmediato
-        if (alquileresReconstruidos.isEmpty()) {
-            Handler(Looper.getMainLooper()).post {
-                dismiss()
-            }
+    if (listaAlquileres.isEmpty()) return
+
+    val botonCerrarFocusRequester = remember { FocusRequester() }
+    val primerElementoFocusRequester = remember { FocusRequester() }
+
+    // Asignar foco inicial en Android TV
+    LaunchedEffect(Unit) {
+        delay(300)
+        try {
+            primerElementoFocusRequester.requestFocus()
+        } catch (_: Exception) {
+            botonCerrarFocusRequester.requestFocus()
         }
+    }
 
-        val colorDorado = Color.parseColor("#C5A059")
-        val colorFondo = Color.parseColor("#0A122A")
-        val displayMetrics = resources.displayMetrics
-        val density = displayMetrics.density
-        val dpToPx = { dp: Int -> (dp * density).toInt() }
-
-        val maxDialogWidth = dpToPx(520)
-        val targetWidth = minOf((displayMetrics.widthPixels * 0.9f).toInt(), maxDialogWidth)
-
-        // OPTIMIZACIÓN: Se desactivó clipChildren y clipToPadding para evitar recortes al escalar
-        val scrollView = ScrollView(parentActivity).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                targetWidth,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-            isFillViewport = true
-            clipChildren = false // PERMITIR DIBUJADO FUERA DE LÍMITES
-            clipToPadding = false // PERMITIR DIBUJADO EN EL PADDING
-            background = GradientDrawable().apply {
-                setColor(colorFondo)
-                cornerRadius = dpToPx(16).toFloat()
-                setStroke(dpToPx(2), colorDorado)
-            }
-        }
-
-        // OPTIMIZACIÓN: Se desactivó clipChildren y clipToPadding
-        val container = LinearLayout(parentActivity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dpToPx(20), dpToPx(20), dpToPx(20), dpToPx(20))
-            clipChildren = false // PERMITIR DIBUJADO FUERA DE LÍMITES
-            clipToPadding = false // PERMITIR DIBUJADO EN EL PADDING
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        }
-
-        val titulo = TextView(parentActivity).apply {
-            text = "🍿 ALQUILERES ACTIVOS"
-            textSize = 18f
-            setTextColor(colorDorado)
-            gravity = Gravity.CENTER
-            setTypeface(null, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                bottomMargin = dpToPx(8)
-            }
-        }
-
-        val mensaje = TextView(parentActivity).apply {
-            text = "Tienes películas listas con tiempo de visualización activo:(contenido en Perfil)"
-            textSize = 13f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                bottomMargin = dpToPx(14)
-            }
-        }
-
-        // OPTIMIZACIÓN: Aumento de padding vertical (de 6dp a 16dp) y eliminación de recorte de bordes
-        val rvAlquileres = RecyclerView(parentActivity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                bottomMargin = dpToPx(20)
-            }
-            // Añadimos más espacio vertical (16dp) para el crecimiento visual de las tarjetas con foco
-            setPadding(0, dpToPx(16), 0, dpToPx(16))
-            clipToPadding = false // IMPORTANTE: Desactivado para que no se corte dentro del padding
-            clipChildren = false  // IMPORTANTE: Desactivado para que no se corte fuera del RecyclerView
-
-            layoutManager = LinearLayoutManager(parentActivity, LinearLayoutManager.HORIZONTAL, false)
-            isFocusable = true
-            isFocusableInTouchMode = true
-        }
-
-        val adapter = AlquileresAdapter(
-            items = alquileresReconstruidos.toMutableList(),
-            onListEmpty = {
-                dismiss()
-            },
-            onItemExpired = { itemExpirado ->
-                val clave = itemExpirado.movie.title.replace(".", "_")
-                    .replace("$", "_")
-                    .replace("#", "_")
-                    .replace("[", "_")
-                    .replace("]", "_")
-                FirebaseDatabase.getInstance().reference.child("usuarios").child(correoKey)
-                    .child("alquileres")
-                    .child(clave)
-                    .removeValue()
-            },
-            onItemClick = { item ->
-                dismiss()
-                parentActivity.irAlReproductor(item.movie)
-            }
+    Dialog(
+        onDismissRequest = { /* No cancelable por fuera */ },
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false
         )
-        rvAlquileres.adapter = adapter
+    ) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = ColorFondoOscuro),
+            modifier = Modifier
+                .widthIn(max = 540.dp)
+                .fillMaxWidth(0.92f)
+                .wrapContentHeight()
+                .border(2.dp, ColorDorado, RoundedCornerShape(16.dp))
+                .padding(2.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // TÍTULO
+                Text(
+                    text = "🍿 ALQUILERES ACTIVOS",
+                    color = ColorDorado,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
 
-        val btnCerrar = TextView(parentActivity).apply {
-            text = "ENTENDIDO"
-            setTextColor(Color.BLACK)
-            textSize = 14f
-            setTypeface(null, Typeface.BOLD)
-            gravity = Gravity.CENTER
-            setPadding(dpToPx(40), dpToPx(12), dpToPx(40), dpToPx(12))
-            background = GradientDrawable().apply {
-                setColor(colorDorado)
-                cornerRadius = dpToPx(8).toFloat()
-            }
-            isFocusable = true
-            isFocusableInTouchMode = true
+                Spacer(modifier = Modifier.height(6.dp))
 
-            setOnClickListener {
-                dismiss()
-            }
+                // MENSAJE INFORMATIVO
+                Text(
+                    text = "Tienes películas listas con tiempo de visualización activo:\n(contenido en Perfil)",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp
+                )
 
-            setOnFocusChangeListener { v, hasFocus ->
-                if (hasFocus) {
-                    v.scaleX = 1.05f
-                    v.scaleY = 1.05f
-                    (v as TextView).background = GradientDrawable().apply {
-                        setColor(Color.WHITE)
-                        cornerRadius = dpToPx(8).toFloat()
-                    }
-                } else {
-                    v.scaleX = 1f
-                    v.scaleY = 1f
-                    (v as TextView).background = GradientDrawable().apply {
-                        setColor(colorDorado)
-                        cornerRadius = dpToPx(8).toFloat()
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // LISTA HORIZONTAL DE TARJETAS DE ALQUILER
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    items(listaAlquileres, key = { it.movie.id }) { item ->
+                        val isFirst = listaAlquileres.indexOf(item) == 0
+
+                        ItemAlquilerCard(
+                            item = item,
+                            modifier = if (isFirst) Modifier.focusRequester(primerElementoFocusRequester) else Modifier,
+                            onExpired = {
+                                // Limpieza en Firebase
+                                val clave = item.movie.title.replace(".", "_")
+                                    .replace("$", "_")
+                                    .replace("#", "_")
+                                    .replace("[", "_")
+                                    .replace("]", "_")
+
+                                FirebaseDatabase.getInstance().reference
+                                    .child("usuarios")
+                                    .child(correoKey)
+                                    .child("alquileres")
+                                    .child(clave)
+                                    .removeValue()
+
+                                listaAlquileres.remove(item)
+                            },
+                            onClick = {
+                                onDismiss()
+                                onReproducir(item.movie)
+                            }
+                        )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // BOTÓN ENTENDIDO
+                BotonEntendido(
+                    focusRequester = botonCerrarFocusRequester,
+                    onClick = onDismiss
+                )
             }
         }
+    }
+}
 
-        val bottomLayout = LinearLayout(parentActivity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+// ==========================================
+// 🟢 TARJETA INDIVIDUAL CON TEMPORIZADOR
+// ==========================================
+@Composable
+private fun ItemAlquilerCard(
+    item: Modelo.AlquilerItem,
+    modifier: Modifier = Modifier,
+    onExpired: () -> Unit,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.1f else 1.0f,
+        animationSpec = tween(150),
+        label = "alquilerScale"
+    )
+
+    val durationMillis = remember(item) { TimeUnit.MINUTES.toMillis(item.countdownMinutes.toLong()) }
+    var millisRestantes by remember(item) {
+        val transcurrido = System.currentTimeMillis() - item.createdAt
+        mutableLongStateOf(maxOf(0L, durationMillis - transcurrido))
+    }
+
+    // Cuenta regresiva por tarjeta en tiempo real
+    LaunchedEffect(item.movie.id) {
+        while (isActive && millisRestantes > 0) {
+            delay(1000)
+            val transcurrido = System.currentTimeMillis() - item.createdAt
+            val rest = durationMillis - transcurrido
+            if (rest <= 0L) {
+                millisRestantes = 0L
+                onExpired()
+                break
+            } else {
+                millisRestantes = rest
+            }
+        }
+    }
+
+    val horas = TimeUnit.MILLISECONDS.toHours(millisRestantes)
+    val minutos = TimeUnit.MILLISECONDS.toMinutes(millisRestantes) % 60
+    val segundos = TimeUnit.MILLISECONDS.toSeconds(millisRestantes) % 60
+    val tiempoFormateado = String.format("⏱ %02d:%02d:%02d", horas, minutos, segundos)
+
+    Column(
+        modifier = modifier
+            .width(135.dp)
+            .scale(scale)
+            .zIndex(if (isFocused) 5f else 0f)
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .width(135.dp)
+                .height(190.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .border(
+                    width = if (isFocused) 2.5.dp else 1.dp,
+                    color = if (isFocused) ColorDorado else Color.Gray.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(8.dp)
+                )
+        ) {
+            GlideImageCustom(
+                url = item.movie.imageUrl,
+                modifier = Modifier.fillMaxSize()
             )
-            addView(btnCerrar)
-        }
 
-        container.addView(titulo)
-        container.addView(mensaje)
-        container.addView(rvAlquileres)
-        container.addView(bottomLayout)
-
-        scrollView.addView(container)
-
-        val builder = AlertDialog.Builder(parentActivity)
-        val dialog = builder.setView(scrollView).create()
-
-        dialog.setCancelable(false)
-        dialog.setCanceledOnTouchOutside(false)
-
-        dialog.window?.apply {
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            setLayout(targetWidth, WindowManager.LayoutParams.WRAP_CONTENT)
-        }
-
-        Handler(Looper.getMainLooper()).postDelayed({
-            if (dialog.isShowing) {
-                if (alquileresReconstruidos.isNotEmpty()) {
-                    val primerElemento = rvAlquileres.layoutManager?.findViewByPosition(0)
-                    primerElemento?.requestFocus() ?: btnCerrar.requestFocus()
-                } else {
-                    btnCerrar.requestFocus()
-                }
+            // Etiqueta de tiempo sobrepuesta en la parte inferior del póster
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .background(Color.Black.copy(alpha = 0.85f))
+                    .padding(vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = tiempoFormateado,
+                    color = ColorDorado,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
-        }, 500)
+        }
 
-        return dialog
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = item.movie.title,
+            color = if (isFocused) ColorDorado else Color.White,
+            fontSize = 12.sp,
+            fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+// ==========================================
+// 🟢 BOTÓN ENTENDIDO (COMPOSABLE ADAPTADO A TV)
+// ==========================================
+@Composable
+private fun BotonEntendido(
+    focusRequester: FocusRequester,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.05f else 1.0f,
+        animationSpec = tween(150),
+        label = "btnEntendidoScale"
+    )
+
+    Box(
+        modifier = Modifier
+            .scale(scale)
+            .focusRequester(focusRequester)
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .background(
+                color = if (isFocused) Color.White else ColorDorado,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(horizontal = 42.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "ENTENDIDO",
+            color = Color.Black,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
