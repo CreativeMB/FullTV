@@ -1,10 +1,5 @@
 package com.creativem.fulltv.peliculas
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -26,8 +22,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,21 +36,22 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun MenuLateralVertical(
-    saldoCasTV: String,
+    saldoCasTV: String = "",
     isBannerVisible: Boolean,
     hasPromos: Boolean,
     menuFocusRequester: FocusRequester,
     bannerFocusRequester: FocusRequester,
     gridFocusRequester: FocusRequester,
-    onMenuExpandChange: (Boolean) -> Unit,
+    onMenuExpandChange: (Boolean) -> Unit = {},
     onItemClick: (String) -> Unit
 ) {
-    var isMenuFocused by remember { mutableStateOf(false) }
+    // Detección responsiva de pantalla (TV vs Móvil)
+    val config = LocalConfiguration.current
+    val esTv = config.screenWidthDp > 600
 
-    // Foco exclusivo para el primer elemento ("TV")
+    // Foco directo y asegurado en "TV" al iniciar la pantalla
     val firstItemFocusRequester = remember { FocusRequester() }
 
-    // Forzar el cursor en "TV" inmediatamente al abrir esta pantalla
     LaunchedEffect(Unit) {
         delay(250)
         try {
@@ -60,7 +59,8 @@ fun MenuLateralVertical(
         } catch (_: Exception) {}
     }
 
-    val menuItems = remember(saldoCasTV) {
+    // Lista fija de opciones
+    val menuItems = remember {
         listOf(
             MenuPrincipalItem("TV", R.drawable.tv),
             MenuPrincipalItem("Alquila", R.drawable.cine),
@@ -69,17 +69,12 @@ fun MenuLateralVertical(
             MenuPrincipalItem("Buscar", R.drawable.buscar),
             MenuPrincipalItem("Paquete", R.drawable.activacion),
             MenuPrincipalItem("Perfil", R.drawable.home),
-            MenuPrincipalItem("$$saldoCasTV CasTV", R.drawable.pagos),
             MenuPrincipalItem("Cerrar", R.drawable.cerrrarp)
         )
     }
 
-    // Ancho compacto: 68.dp contraído / 138.dp expandido
-    val menuWidth by animateDpAsState(
-        targetValue = if (isMenuFocused) 138.dp else 68.dp,
-        animationSpec = tween(120),
-        label = "menuWidth"
-    )
+    // Ancho fijo ultra angosto (Sin animaciones de ensanchamiento)
+    val menuWidth = if (esTv) 68.dp else 58.dp
 
     Box(
         modifier = Modifier
@@ -88,7 +83,6 @@ fun MenuLateralVertical(
             .zIndex(30f)
             .background(Color.Black.copy(alpha = 0.95f))
             .onFocusChanged {
-                isMenuFocused = it.hasFocus
                 onMenuExpandChange(it.hasFocus)
             }
             .focusRequester(menuFocusRequester)
@@ -98,13 +92,14 @@ fun MenuLateralVertical(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            contentPadding = PaddingValues(vertical = if (esTv) 12.dp else 8.dp),
+            verticalArrangement = Arrangement.spacedBy(if (esTv) 4.dp else 2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             itemsIndexed(menuItems) { index, item ->
-                MenuComposeItemRow(
+                MenuComposeItemVertical(
                     item = item,
-                    isExpanded = isMenuFocused,
+                    esTv = esTv,
                     itemModifier = if (index == 0) Modifier.focusRequester(firstItemFocusRequester) else Modifier,
                     onClick = { onItemClick(item.name) }
                 )
@@ -113,83 +108,70 @@ fun MenuLateralVertical(
     }
 }
 
+// ====================================================================
+// 🟢 ELEMENTO DE MENÚ: ICONO ARRIBA + TEXTO ABAJO (MÍNIMO RECURSO)
+// ====================================================================
 @Composable
-fun MenuComposeItemRow(
+fun MenuComposeItemVertical(
     item: MenuPrincipalItem,
-    isExpanded: Boolean,
+    esTv: Boolean,
     itemModifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val esCasTV = remember(item.name) { item.name.contains("CasTV") }
     var isFocused by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(46.dp)
-            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .height(if (esTv) 52.dp else 46.dp)
+            .padding(horizontal = 4.dp, vertical = 2.dp)
             .zIndex(if (isFocused) 5f else 0f)
             .then(itemModifier)
-            .focusProperties { canFocus = !esCasTV }
-            .onFocusChanged { if (!esCasTV) isFocused = it.isFocused }
-            .then(
-                if (!esCasTV) {
-                    Modifier
-                        .focusable()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = onClick
-                        )
-                } else Modifier
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
             ),
-        contentAlignment = Alignment.CenterStart
+        contentAlignment = Alignment.Center
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .wrapContentWidth()
-                .fillMaxHeight()
+                .fillMaxSize()
+                .scale(if (isFocused) 1.05f else 1.0f)
+                .clip(RoundedCornerShape(8.dp))
                 .then(
-                    if (isFocused && !esCasTV) {
+                    if (isFocused) {
                         Modifier
-                            .background(
-                                color = Color(0xFF262626),
-                                shape = RoundedCornerShape(8.dp)
-                            )
+                            .background(Color(0xFF262626))
                             .border(1.5.dp, ColorDorado, RoundedCornerShape(8.dp))
                     } else Modifier
                 )
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 2.dp, vertical = 3.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
+            // Icono arriba
             Image(
                 painter = painterResource(id = item.iconResId),
                 contentDescription = item.name,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(if (esTv) 20.dp else 17.dp),
                 contentScale = ContentScale.Fit
             )
 
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = fadeIn(tween(100)),
-                exit = fadeOut(tween(80))
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = item.name,
-                        color = when {
-                            esCasTV -> ColorDorado
-                            isFocused -> ColorDorado
-                            else -> Color.White
-                        },
-                        fontSize = 12.sp,
-                        fontWeight = if (isFocused || esCasTV) FontWeight.Bold else FontWeight.Normal,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
+            Spacer(modifier = Modifier.height(2.dp))
+
+            // Texto abajo (Siempre visible de forma instantánea)
+            Text(
+                text = item.name,
+                color = if (isFocused) ColorDorado else Color.White,
+                fontSize = if (esTv) 10.sp else 8.5.sp,
+                fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
+                textAlign = TextAlign.Center,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

@@ -11,19 +11,27 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,7 +85,7 @@ suspend fun generarBitmapQROptimizado(texto: String): Bitmap? = withContext(Disp
 fun BotonDialogoTV(
     texto: String,
     esPrincipal: Boolean = false,
-    colorBase: Color = if (esPrincipal) ColorDorado else Color(0xFF2A2A2A),
+    colorBase: Color = if (esPrincipal) ColorDorado else Color(0xFF262626),
     colorTextoBase: Color = if (esPrincipal) Color.Black else Color.White,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
@@ -163,7 +171,7 @@ fun DialogoAlquileresActivos(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "Películas disponibles en tu cuenta listas para ver:",
+                    text = "Películas activas listas para reproducir:",
                     color = Color.LightGray,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center
@@ -290,7 +298,7 @@ fun DialogoAlquileresActivos(
 }
 
 // ==========================================
-// 2. DIÁLOGO BUSCADOR
+// 2. DIÁLOGO BUSCADOR (LIBERACIÓN DE FOCO TV)
 // ==========================================
 @Composable
 fun DialogoBuscador(
@@ -309,6 +317,11 @@ fun DialogoBuscador(
     val resultados = remember { mutableStateListOf<Modelo>() }
     var estaBuscando by remember { mutableStateOf(false) }
     var isInputFocused by remember { mutableStateOf(false) }
+
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val inputFocusRequester = remember { FocusRequester() }
+    val primerResultadoFocusRequester = remember { FocusRequester() }
+    val botonCerrarFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(query) {
         val queryRaw = query.trim()
@@ -378,11 +391,19 @@ fun DialogoBuscador(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                // Campo de texto con flecha abajo desbloqueada para TV
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("Escribe el nombre de la película...", color = Color.Gray, fontSize = 14.sp) },
+                    placeholder = { Text("Escribe para buscar...", color = Color.Gray, fontSize = 14.sp) },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        keyboardController?.hide()
+                        if (resultados.isNotEmpty()) {
+                            try { primerResultadoFocusRequester.requestFocus() } catch (_: Exception) {}
+                        }
+                    }),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
@@ -392,7 +413,11 @@ fun DialogoBuscador(
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .focusRequester(inputFocusRequester)
                         .onFocusChanged { isInputFocused = it.isFocused }
+                        .focusProperties {
+                            down = if (resultados.isNotEmpty()) primerResultadoFocusRequester else botonCerrarFocusRequester
+                        }
                         .border(
                             width = if (isInputFocused) 2.dp else 0.dp,
                             color = ColorDorado,
@@ -415,12 +440,26 @@ fun DialogoBuscador(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(resultados) { item ->
+                    itemsIndexed(resultados) { index, item ->
                         var isItemFocused by remember { mutableStateOf(false) }
+
+                        val rowModifier = if (index == 0) {
+                            Modifier
+                                .focusRequester(primerResultadoFocusRequester)
+                                .focusProperties {
+                                    up = inputFocusRequester
+                                    if (resultados.size == 1) down = botonCerrarFocusRequester
+                                }
+                        } else if (index == resultados.size - 1) {
+                            Modifier.focusProperties { down = botonCerrarFocusRequester }
+                        } else {
+                            Modifier
+                        }
 
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .then(rowModifier)
                                 .scale(if (isItemFocused) 1.02f else 1.0f)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(if (isItemFocused) Color(0xFF2E2E2E) else Color(0xFF101010))
@@ -463,6 +502,11 @@ fun DialogoBuscador(
                     BotonDialogoTV(
                         texto = "CERRAR",
                         esPrincipal = false,
+                        modifier = Modifier
+                            .focusRequester(botonCerrarFocusRequester)
+                            .focusProperties {
+                                up = if (resultados.isNotEmpty()) primerResultadoFocusRequester else inputFocusRequester
+                            },
                         onClick = onDismiss
                     )
                 }
@@ -472,7 +516,7 @@ fun DialogoBuscador(
 }
 
 // ==========================================
-// 3. DIÁLOGO PEDIDO DE PELÍCULAS
+// 3. DIÁLOGO PEDIDO (SIN EDITAR TÍTULO REPETIDO)
 // ==========================================
 @Composable
 fun DialogoPedido(
@@ -497,6 +541,12 @@ fun DialogoPedido(
     val sugerencias = remember { mutableStateListOf<TmdbResultadoItem>() }
     var nombreUsuario by remember { mutableStateOf("Usuario") }
     var isInputFocused by remember { mutableStateOf(false) }
+
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val searchInputFocusRequester = remember { FocusRequester() }
+    val primeraSugerenciaFocusRequester = remember { FocusRequester() }
+    val btnSiguienteFocusRequester = remember { FocusRequester() }
+    val btnCancelarFocusRequester = remember { FocusRequester() }
 
     val costoPedido = 20
 
@@ -553,7 +603,7 @@ fun DialogoPedido(
             ) {
                 if (!pasoConfirmacion) {
                     Text(
-                        text = "🎬 SOLICITAR PELÍCULA",
+                        text = if (selectedItem == null) "🎬 BUSCAR PELÍCULA PARA PEDIR" else "🎬 PELÍCULA SELECCIONADA",
                         color = ColorDorado,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
@@ -562,55 +612,81 @@ fun DialogoPedido(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = {
-                            query = it
-                            selectedItem = null
-                            mensajeError = ""
-                        },
-                        placeholder = { Text("Escribe para buscar (Ej: Moana 2)", color = Color.Gray, fontSize = 14.sp) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = ColorDorado,
-                            unfocusedBorderColor = if (isInputFocused) ColorDorado else Color.Gray,
-                            cursorColor = ColorDorado
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onFocusChanged { isInputFocused = it.isFocused }
-                            .border(
-                                width = if (isInputFocused) 2.dp else 0.dp,
-                                color = ColorDorado,
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                    )
-
                     if (mensajeError.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = mensajeError,
                             color = Color(0xFFFF5252),
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
                         )
+                        Spacer(modifier = Modifier.height(6.dp))
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
+                    // 🟢 SI NO HAY PELÍCULA SELECCIONADA: Mostramos la caja de texto y la lista
                     if (selectedItem == null) {
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = {
+                                query = it
+                                mensajeError = ""
+                            },
+                            placeholder = { Text("Escribe para buscar (Ej: Moana 2)", color = Color.Gray, fontSize = 14.sp) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = {
+                                keyboardController?.hide()
+                                if (sugerencias.isNotEmpty()) {
+                                    try { primeraSugerenciaFocusRequester.requestFocus() } catch (_: Exception) {}
+                                }
+                            }),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = ColorDorado,
+                                unfocusedBorderColor = if (isInputFocused) ColorDorado else Color.Gray,
+                                cursorColor = ColorDorado
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(searchInputFocusRequester)
+                                .onFocusChanged { isInputFocused = it.isFocused }
+                                .focusProperties {
+                                    down = if (sugerencias.isNotEmpty()) primeraSugerenciaFocusRequester else btnCancelarFocusRequester
+                                }
+                                .border(
+                                    width = if (isInputFocused) 2.dp else 0.dp,
+                                    color = ColorDorado,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
                         LazyColumn(
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            items(sugerencias) { item ->
+                            itemsIndexed(sugerencias) { index, item ->
                                 var isFocusRow by remember { mutableStateOf(false) }
+
+                                val rowModifier = if (index == 0) {
+                                    Modifier
+                                        .focusRequester(primeraSugerenciaFocusRequester)
+                                        .focusProperties {
+                                            up = searchInputFocusRequester
+                                            if (sugerencias.size == 1) down = btnCancelarFocusRequester
+                                        }
+                                } else if (index == sugerencias.size - 1) {
+                                    Modifier.focusProperties { down = btnCancelarFocusRequester }
+                                } else {
+                                    Modifier
+                                }
 
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .then(rowModifier)
                                         .scale(if (isFocusRow) 1.02f else 1.0f)
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(if (isFocusRow) Color(0xFF2C2C2C) else Color(0xFF101010))
@@ -623,7 +699,6 @@ fun DialogoPedido(
                                         .focusable()
                                         .clickable {
                                             selectedItem = item
-                                            query = "${item.title} (${item.releaseDate})"
                                             sugerencias.clear()
                                         }
                                         .padding(8.dp),
@@ -695,97 +770,127 @@ fun DialogoPedido(
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            BotonDialogoTV(
+                                texto = "CANCELAR",
+                                esPrincipal = false,
+                                modifier = Modifier
+                                    .focusRequester(btnCancelarFocusRequester)
+                                    .focusProperties {
+                                        up = if (sugerencias.isNotEmpty()) primeraSugerenciaFocusRequester else searchInputFocusRequester
+                                    },
+                                onClick = onDismiss
+                            )
+                        }
+
                     } else {
+                        // 🟢 SI YA SE SELECCIONÓ: No volvemos a mostrar la caja de texto. Solo la ficha técnica
                         Row(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(Color(0xFF101010))
-                                .border(1.5.dp, ColorDorado, RoundedCornerShape(12.dp))
-                                .padding(12.dp),
+                                .border(2.dp, ColorDorado, RoundedCornerShape(12.dp))
+                                .padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             GlideImageCustom(
                                 url = selectedItem!!.posterPath,
                                 modifier = Modifier
-                                    .size(width = 85.dp, height = 130.dp)
+                                    .size(width = 95.dp, height = 145.dp)
                                     .clip(RoundedCornerShape(8.dp))
                             )
-                            Spacer(modifier = Modifier.width(14.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "${selectedItem!!.title} (${selectedItem!!.releaseDate})",
                                     color = Color.White,
-                                    fontSize = 15.sp,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Spacer(modifier = Modifier.height(3.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "⭐ ${if (selectedItem!!.voteAverage > 0) String.format(Locale.US, "%.1f", selectedItem!!.voteAverage) else "N/A"}",
                                     color = ColorDorado,
-                                    fontSize = 12.sp
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     text = selectedItem!!.overview,
                                     color = Color.LightGray,
-                                    fontSize = 11.sp,
-                                    maxLines = 3,
+                                    fontSize = 12.sp,
+                                    maxLines = 4,
                                     overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            BotonDialogoTV(
+                                texto = "CAMBIAR",
+                                esPrincipal = false,
+                                onClick = {
+                                    selectedItem = null
+                                    query = ""
+                                }
+                            )
+
+                            Row {
+                                BotonDialogoTV(
+                                    texto = "CANCELAR",
+                                    esPrincipal = false,
+                                    onClick = onDismiss
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                BotonDialogoTV(
+                                    texto = "SIGUIENTE",
+                                    esPrincipal = true,
+                                    modifier = Modifier.focusRequester(btnSiguienteFocusRequester),
+                                    onClick = {
+                                        if (saldoActual < costoPedido) {
+                                            mensajeError = "Saldo insuficiente en CasTV. Tienes $saldoActual y se requieren $costoPedido."
+                                            return@BotonDialogoTV
+                                        }
+
+                                        if (selectedItem!!.releaseDate.isNotBlank() && selectedItem!!.releaseDate != "Personalizado") {
+                                            try {
+                                                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                                val dateEstreno = sdf.parse(selectedItem!!.releaseDate)
+                                                if (dateEstreno != null) {
+                                                    val diffMillis = System.currentTimeMillis() - dateEstreno.time
+                                                    val diffDias = TimeUnit.MILLISECONDS.toDays(diffMillis)
+                                                    if (diffDias < 40) {
+                                                        val faltan = if (diffDias < 0) 40 + abs(diffDias) else 40 - diffDias
+                                                        mensajeError = "Película muy reciente (${selectedItem!!.releaseDate}). Deben pasar 40 días. Faltan aprox. $faltan días."
+                                                        return@BotonDialogoTV
+                                                    }
+                                                }
+                                            } catch (_: Exception) {}
+                                        }
+
+                                        pasoConfirmacion = true
+                                    }
                                 )
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        BotonDialogoTV(
-                            texto = "CANCELAR",
-                            esPrincipal = false,
-                            onClick = onDismiss
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        BotonDialogoTV(
-                            texto = "SIGUIENTE",
-                            esPrincipal = true,
-                            onClick = {
-                                if (selectedItem == null) {
-                                    mensajeError = "Por favor selecciona una película de la lista sugerida."
-                                    return@BotonDialogoTV
-                                }
-                                if (saldoActual < costoPedido) {
-                                    mensajeError = "Saldo insuficiente en CasTV. Tienes $saldoActual y se requieren $costoPedido."
-                                    return@BotonDialogoTV
-                                }
-
-                                if (selectedItem!!.releaseDate.isNotBlank() && selectedItem!!.releaseDate != "Personalizado") {
-                                    try {
-                                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                                        val dateEstreno = sdf.parse(selectedItem!!.releaseDate)
-                                        if (dateEstreno != null) {
-                                            val diffMillis = System.currentTimeMillis() - dateEstreno.time
-                                            val diffDias = TimeUnit.MILLISECONDS.toDays(diffMillis)
-                                            if (diffDias < 40) {
-                                                val faltan = if (diffDias < 0) 40 + abs(diffDias) else 40 - diffDias
-                                                mensajeError = "Película muy reciente (${selectedItem!!.releaseDate}). Deben pasar 40 días. Faltan aprox. $faltan días."
-                                                return@BotonDialogoTV
-                                            }
-                                        }
-                                    } catch (_: Exception) {}
-                                }
-
-                                pasoConfirmacion = true
-                            }
-                        )
-                    }
-
                 } else {
+                    // 🟢 CONFIRMACIÓN FINAL
                     Text(
                         text = "📋 CONFIRMAR PEDIDO",
                         color = ColorDorado,
