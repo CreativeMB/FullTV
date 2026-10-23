@@ -147,7 +147,7 @@ fun DialogoAlquileresActivos(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161616)),
+            colors = CardDefaults.cardColors(containerColor = ColorFondoOscuro),
             modifier = Modifier
                 .width(anchoMax)
                 .wrapContentHeight()
@@ -204,7 +204,7 @@ fun DialogoAlquileresActivos(
                         val h = TimeUnit.MILLISECONDS.toHours(millisRestantes)
                         val m = TimeUnit.MILLISECONDS.toMinutes(millisRestantes) % 60
                         val s = TimeUnit.MILLISECONDS.toSeconds(millisRestantes) % 60
-                        val tiempoFormato = String.format("▶ %02d:%02d:%02d", h, m, s)
+                        val tiempoFormato = String.format(Locale.getDefault(), "▶ %02d:%02d:%02d", h, m, s)
 
                         var isCardFocused by remember { mutableStateOf(false) }
 
@@ -370,7 +370,7 @@ fun DialogoBuscador(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161616)),
+            colors = CardDefaults.cardColors(containerColor = ColorFondoOscuro),
             modifier = Modifier
                 .width(anchoMax)
                 .heightIn(max = altoMax)
@@ -391,7 +391,6 @@ fun DialogoBuscador(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Campo de texto con flecha abajo desbloqueada para TV
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
@@ -516,7 +515,7 @@ fun DialogoBuscador(
 }
 
 // ==========================================
-// 3. DIÁLOGO PEDIDO (SIN EDITAR TÍTULO REPETIDO)
+// 3. DIÁLOGO PEDIDO (VALIDACIÓN ROBUSTA DE CASTV)
 // ==========================================
 @Composable
 fun DialogoPedido(
@@ -534,12 +533,15 @@ fun DialogoPedido(
     val anchoMax = if (esTv) 760.dp else (config.screenWidthDp * 0.95f).dp
     val altoMax = (config.screenHeightDp * 0.88f).dp
 
+    // 🟢 Sincronización en tiempo real del saldo CasTV
+    var saldoReal by remember { mutableIntStateOf(saldoActual) }
+    var nombreUsuario by remember { mutableStateOf("Usuario") }
+
     var pasoConfirmacion by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var selectedItem by remember { mutableStateOf<TmdbResultadoItem?>(null) }
     var mensajeError by remember { mutableStateOf("") }
     val sugerencias = remember { mutableStateListOf<TmdbResultadoItem>() }
-    var nombreUsuario by remember { mutableStateOf("Usuario") }
     var isInputFocused by remember { mutableStateOf(false) }
 
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -550,11 +552,26 @@ fun DialogoPedido(
 
     val costoPedido = 20
 
-    LaunchedEffect(correoKey) {
+    // Listener reactivo a Firebase para asegurar el saldo y nombre más frescos
+    DisposableEffect(correoKey) {
         if (correoKey.isNotBlank()) {
-            databaseRef.child("usuarios").child(correoKey).child("nombre").get().addOnSuccessListener {
-                nombreUsuario = it.value?.toString() ?: "Usuario"
+            val userRef = databaseRef.child("usuarios").child(correoKey)
+            val listener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    nombreUsuario = snapshot.child("nombre").value?.toString() ?: "Usuario"
+                    val castvVal = snapshot.child("castv").value
+                    saldoReal = when (castvVal) {
+                        is Long -> castvVal.toInt()
+                        is Number -> castvVal.toInt()
+                        else -> castvVal?.toString()?.toIntOrNull() ?: saldoActual
+                    }
+                }
+                override fun onCancelled(error: DatabaseError) {}
             }
+            userRef.addValueEventListener(listener)
+            onDispose { userRef.removeEventListener(listener) }
+        } else {
+            onDispose {}
         }
     }
 
@@ -590,7 +607,7 @@ fun DialogoPedido(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161616)),
+            colors = CardDefaults.cardColors(containerColor = ColorFondoOscuro),
             modifier = Modifier
                 .width(anchoMax)
                 .heightIn(max = altoMax)
@@ -623,7 +640,6 @@ fun DialogoPedido(
                         Spacer(modifier = Modifier.height(6.dp))
                     }
 
-                    // 🟢 SI NO HAY PELÍCULA SELECCIONADA: Mostramos la caja de texto y la lista
                     if (selectedItem == null) {
                         OutlinedTextField(
                             value = query,
@@ -790,7 +806,6 @@ fun DialogoPedido(
                         }
 
                     } else {
-                        // 🟢 SI YA SE SELECCIONÓ: No volvemos a mostrar la caja de texto. Solo la ficha técnica
                         Row(
                             modifier = Modifier
                                 .weight(1f)
@@ -846,6 +861,7 @@ fun DialogoPedido(
                                 onClick = {
                                     selectedItem = null
                                     query = ""
+                                    mensajeError = ""
                                 }
                             )
 
@@ -861,8 +877,10 @@ fun DialogoPedido(
                                     esPrincipal = true,
                                     modifier = Modifier.focusRequester(btnSiguienteFocusRequester),
                                     onClick = {
-                                        if (saldoActual < costoPedido) {
-                                            mensajeError = "Saldo insuficiente en CasTV. Tienes $saldoActual y se requieren $costoPedido."
+                                        // 🟢 Validación estricta con feedback sonoro/visual
+                                        if (saldoReal < costoPedido) {
+                                            mensajeError = "Saldo insuficiente en CasTV. Tienes $saldoReal y se requieren $costoPedido."
+                                            Toast.makeText(activity, "Saldo insuficiente: tienes $saldoReal de $costoPedido CasTV necesarios", Toast.LENGTH_SHORT).show()
                                             return@BotonDialogoTV
                                         }
 
@@ -876,6 +894,7 @@ fun DialogoPedido(
                                                     if (diffDias < 40) {
                                                         val faltan = if (diffDias < 0) 40 + abs(diffDias) else 40 - diffDias
                                                         mensajeError = "Película muy reciente (${selectedItem!!.releaseDate}). Deben pasar 40 días. Faltan aprox. $faltan días."
+                                                        Toast.makeText(activity, mensajeError, Toast.LENGTH_LONG).show()
                                                         return@BotonDialogoTV
                                                     }
                                                 }
@@ -890,7 +909,7 @@ fun DialogoPedido(
                     }
 
                 } else {
-                    // 🟢 CONFIRMACIÓN FINAL
+                    // 🟢 PASO CONFIRMACIÓN FINAL
                     Text(
                         text = "📋 CONFIRMAR PEDIDO",
                         color = ColorDorado,
@@ -947,10 +966,10 @@ fun DialogoPedido(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text("👤 Solicitante: $nombreUsuario", color = Color.White, fontSize = 13.sp)
-                            Text("💰 Saldo Actual: $saldoActual CasTV", color = Color.White, fontSize = 13.sp)
+                            Text("💰 Saldo Actual: $saldoReal CasTV", color = Color.White, fontSize = 13.sp)
                             Text("📉 Costo Pedido: $costoPedido CasTV", color = Color(0xFFFF5252), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             HorizontalDivider(color = Color(0xFF333333))
-                            Text("✅ Saldo Final: ${saldoActual - costoPedido} CasTV", color = ColorDorado, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("✅ Saldo Final: ${saldoReal - costoPedido} CasTV", color = ColorDorado, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -971,6 +990,13 @@ fun DialogoPedido(
                             texto = "CONFIRMAR",
                             esPrincipal = true,
                             onClick = {
+                                // 🟢 Validación de seguridad final previa a la transacción
+                                if (saldoReal < costoPedido) {
+                                    Toast.makeText(activity, "Saldo insuficiente para completar el pedido.", Toast.LENGTH_SHORT).show()
+                                    pasoConfirmacion = false
+                                    return@BotonDialogoTV
+                                }
+
                                 CastvHelper.mostrarSelectorFechaHora(activity) { fecha, hora ->
                                     val item = selectedItem ?: return@mostrarSelectorFechaHora
                                     val moviesRef = databaseRef.child("movies")
@@ -1028,8 +1054,10 @@ fun DialogoPedido(
                                                     }
                                                 }
 
+                                                // 🟢 Descontar usando el saldo real validado
                                                 val userRef = databaseRef.child("usuarios").child(correoKey)
-                                                userRef.child("castv").setValue(saldoActual - costoPedido).addOnSuccessListener {
+                                                val nuevoSaldo = saldoReal - costoPedido
+                                                userRef.child("castv").setValue(nuevoSaldo).addOnSuccessListener {
                                                     CastvHelper.registrarConsumo(correoUsuario, "PEDIDO: ${item.title}", costoPedido)
                                                     Toast.makeText(activity, "¡Pedido realizado con éxito! 🎬", Toast.LENGTH_LONG).show()
                                                     onDismiss()
@@ -1125,7 +1153,7 @@ fun DialogoPaquetes(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161616)),
+            colors = CardDefaults.cardColors(containerColor = ColorFondoOscuro),
             modifier = Modifier
                 .width(anchoMax)
                 .wrapContentHeight()
@@ -1371,16 +1399,22 @@ fun DialogoPaquetes(
 }
 
 // ==========================================
-// 5. DIÁLOGO CONFIRMACIÓN SALIDA
+// 5. DIÁLOGO CONFIRMACIÓN SALIDA (CORREGIDO ANCHO TV)
 // ==========================================
 @Composable
 fun DialogoConfirmacionSalida(
     onConfirmar: () -> Unit,
     onCancelar: () -> Unit
 ) {
+    val config = LocalConfiguration.current
+    val esTv = config.screenWidthDp > 600
     var segundos by remember { mutableIntStateOf(5) }
 
+    // Foco automático al botón seguro (VOLVER) en TV
+    val botonVolverRequester = remember { FocusRequester() }
+
     LaunchedEffect(Unit) {
+        botonVolverRequester.requestFocus()
         while (segundos > 0) {
             delay(1000)
             segundos--
@@ -1390,40 +1424,52 @@ fun DialogoConfirmacionSalida(
 
     Dialog(onDismissRequest = onCancelar, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = ColorFondoOscuro),
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier
+                // 🟢 CORRECCIÓN: Se fija un ancho máximo ideal para evitar que se estire a toda la pantalla
+                .width(if (esTv) 420.dp else (config.screenWidthDp * 0.88f).dp)
+                .wrapContentHeight()
+                .padding(16.dp)
+                .border(2.dp, ColorDorado, RoundedCornerShape(16.dp))
         ) {
             Column(
-                modifier = Modifier.padding(22.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = "¿Desea cerrar CineParche?",
                     color = ColorDorado,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
+                    fontSize = 18.sp,
+                    textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Si sales ahora, te perderás lo mejor del parche.",
-                    color = Color.White,
+                    color = Color.LightGray,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(20.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
                 ) {
                     BotonDialogoTV(
                         texto = "SÍ, SALIR",
-                        esPrincipal = true,
+                        esPrincipal = false,
+                        modifier = Modifier.weight(1f),
                         onClick = onConfirmar
                     )
                     BotonDialogoTV(
                         texto = "VOLVER (${segundos}s)",
-                        esPrincipal = false,
+                        esPrincipal = true,
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(botonVolverRequester),
                         onClick = onCancelar
                     )
                 }
