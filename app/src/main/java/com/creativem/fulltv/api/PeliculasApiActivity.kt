@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
 import android.view.WindowManager
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -37,6 +36,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -231,12 +231,13 @@ class PeliculasApiActivity : ComponentActivity() {
                             }
                         }
                         withContext(Dispatchers.Main) {
+                            val peliculasSinDuplicados = allModelos.distinctBy { it.id }
                             extraInfoMap.putAll(tempExtras)
-                            peliculasList = allModelos
+                            peliculasList = peliculasSinDuplicados
                             isLoading = false
-                            if (allModelos.isNotEmpty()) {
+                            if (peliculasSinDuplicados.isNotEmpty()) {
                                 peliculaEnfocada = null
-                                onMovieFocused(allModelos.first())
+                                onMovieFocused(peliculasSinDuplicados.first())
                             }
                         }
                     } catch (e: Exception) {
@@ -264,18 +265,14 @@ class PeliculasApiActivity : ComponentActivity() {
                 sinopsis = sinopsisActual,
                 infoAdicional = infoAdicionalActual,
                 calificacion = calificacionActual,
-                hasTrailer = currentTrailerKey.isNotEmpty(),
                 onCategoriaClick = { cargarCategoria(it) },
                 onMovieFocused = { onMovieFocused(it) },
                 onVerTrailerClick = {
-                    if (currentTrailerKey.isNotEmpty()) {
-                        val intent = Intent(context, TrailerActivity::class.java).apply {
-                            putExtra("EXTRA_TRAILER_KEY", currentTrailerKey)
-                        }
-                        context.startActivity(intent)
-                    } else {
-                        Toast.makeText(context, "Tráiler no disponible para este título", Toast.LENGTH_SHORT).show()
+                    val intent = Intent(context, TrailerActivity::class.java).apply {
+                        putExtra("EXTRA_TRAILER_KEY", currentTrailerKey)
+                        putExtra("EXTRA_MOVIE_TITLE", peliculaEnfocada?.title ?: "")
                     }
+                    context.startActivity(intent)
                 },
                 onMovieClick = { movie ->
                     val intent = Intent(context, ApiPeliculaActivity::class.java).apply {
@@ -361,7 +358,6 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
     sinopsis: String,
     infoAdicional: String,
     calificacion: String,
-    hasTrailer: Boolean,
     onCategoriaClick: (String) -> Unit,
     onMovieFocused: (Modelo) -> Unit,
     onVerTrailerClick: () -> Unit,
@@ -375,9 +371,21 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
     val menuFocusRequester = remember { FocusRequester() }
     val carouselFocusRequester = remember { FocusRequester() }
     val trailerFocusRequester = remember { FocusRequester() }
+    val firstMovieFocusRequester = remember { FocusRequester() }
+
+    // Salto automático al primer ítem de la categoría
+    LaunchedEffect(peliculas) {
+        if (peliculas.isNotEmpty()) {
+            carouselListState.scrollToItem(0)
+            delay(120)
+            try {
+                firstMovieFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(FondoNegroSala)) {
-        // Fondo cinemático optimizado sin sombras pesadas
+        // 🟢 FONDO CINEMÁTICO (BACKDROP) MUCHO MÁS VISIBLE
         Crossfade(
             targetState = backdropUrl,
             animationSpec = tween(400),
@@ -396,46 +404,55 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
             }
         }
 
-        // Capa oscura translúcida fija para lectura nítida
+        // 🟢 DEGRADADO CINEMÁTICO LATERAL: Oscuro a la izquierda para leer, transparente al centro/derecha para ver la imagen
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xEE07090E))
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            Color(0xF607090E), // Fondo firme en el texto
+                            Color(0xD907090E),
+                            Color(0x7507090E), // Muy translúcido para apreciar el póster de fondo
+                            Color(0x3507090E)
+                        )
+                    )
+                )
         )
 
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 6.dp, top = 8.dp, bottom = 8.dp, end = 16.dp)
+                .padding(start = 6.dp, top = 6.dp, bottom = 6.dp, end = 12.dp)
         ) {
-            // 🟢 1. MENÚ VERTICAL ULTRA ANGOSTO EN EL LADO IZQUIERDO (Icono arriba + Texto abajo)
+            // MENÚ VERTICAL ULTRA COMPACTO (Izquierda)
             MenuCategoriasVertical(
                 categorias = categorias,
                 categoriaSeleccionada = categoriaSeleccionada,
                 esTv = esTv,
                 menuFocusRequester = menuFocusRequester,
-                carouselFocusRequester = carouselFocusRequester,
+                carouselFocusRequester = firstMovieFocusRequester,
                 onCategoriaClick = onCategoriaClick
             )
 
             Spacer(modifier = Modifier.width(14.dp))
 
-            // 🟢 2. CONTENIDO PRINCIPAL: VITRINA ARRIBA + CARRUSEL ABAJO
+            // CONTENIDO PRINCIPAL APROVECHANDO TODA LA PANTALLA
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // SECCIÓN SUPERIOR: PÓSTER GRANDE + DETALLES + BOTÓN TRÁILER DEBAJO
+                // 🟢 SECCIÓN SUPERIOR: PÓSTER EXTRA GRANDE (200.dp x 280.dp) + TEXTOS GRANDES
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1.15f)
-                        .padding(top = 4.dp),
+                        .weight(1.38f)
+                        .padding(top = 2.dp),
                     verticalAlignment = Alignment.Top
                 ) {
-                    // Póster grande destacado
+                    // Póster grande destacado sin vacíos
                     if (peliculaEnfocada != null) {
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
@@ -444,17 +461,17 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                                 .build(),
                             contentDescription = peliculaEnfocada.title,
                             modifier = Modifier
-                                .width(if (esTv) 150.dp else 120.dp)
+                                .width(if (esTv) 200.dp else 140.dp)
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(10.dp))
-                                .border(2.dp, DoradoPrincipal, RoundedCornerShape(10.dp)),
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(2.5.dp, DoradoPrincipal, RoundedCornerShape(12.dp)),
                             contentScale = ContentScale.Crop
                         )
 
-                        Spacer(modifier = Modifier.width(18.dp))
+                        Spacer(modifier = Modifier.width(20.dp))
                     }
 
-                    // Información central ampliada (Mayor espacio para sinopsis)
+                    // Información central completa y de tamaño grande para TV
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -465,117 +482,125 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                             Text(
                                 text = peliculaEnfocada.title,
                                 color = Color.White,
-                                fontSize = if (esTv) 24.sp else 20.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontSize = if (esTv) 32.sp else 22.sp,
+                                fontWeight = FontWeight.ExtraBold,
                                 maxLines = 1,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .basicMarquee(iterations = Int.MAX_VALUE, delayMillis = 1000)
                             )
 
-                            Spacer(modifier = Modifier.height(3.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
 
-                            // Metadatos (Año, Calificación, Insignia Alquila)
+                            // Metadatos (Año, Calificación, Insignia Alquila aquí en CineParche)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = "📅 " + (peliculaEnfocada.releaseDate?.take(4) ?: "Estreno"),
                                     color = Color(0xFFE2E8F0),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontSize = if (esTv) 15.sp else 12.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
 
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(14.dp))
 
                                 Text(
                                     text = calificacion,
                                     color = DoradoBrillante,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = if (esTv) 16.sp else 13.sp,
+                                    fontWeight = FontWeight.ExtraBold
                                 )
 
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(14.dp))
 
+                                // 🟢 INSIGNIA LIMPIA: Alquila aquí en CineParche (sin mayúsculas agresivas)
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
+                                        .clip(RoundedCornerShape(6.dp))
                                         .background(Color(0x3300E676))
-                                        .border(1.dp, Color(0xFF00E676), RoundedCornerShape(4.dp))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        .border(1.dp, Color(0xFF00E676), RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 9.dp, vertical = 2.5.dp)
                                 ) {
                                     Text(
-                                        text = "ALQUILA YA",
+                                        text = "Alquila aquí en CineParche",
                                         color = Color(0xFF00E676),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = if (esTv) 12.sp else 10.sp,
+                                        fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         softWrap = false
                                     )
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
 
                             // Géneros y duración
                             Text(
                                 text = infoAdicional,
-                                color = Color(0xFF94A3B8),
-                                fontSize = 12.sp,
+                                color = Color(0xFFCBD5E1),
+                                fontSize = if (esTv) 14.sp else 12.sp,
+                                fontWeight = FontWeight.Medium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
 
                             Spacer(modifier = Modifier.height(6.dp))
 
-                            // Sinopsis ampliada con más espacio
+                            // 🟢 SINOPSIS COMPLETA Y EXTENSA (HASTA 8 RENGLONES PARA NO DEJAR VACÍOS)
                             Text(
                                 text = sinopsis,
-                                color = Color(0xFFCBD5E1),
-                                fontSize = 12.5.sp,
-                                maxLines = 5,
+                                color = Color(0xFFE2E8F0),
+                                fontSize = if (esTv) 15.5.sp else 12.5.sp,
+                                maxLines = 8,
                                 overflow = TextOverflow.Ellipsis,
-                                lineHeight = 17.sp,
+                                lineHeight = if (esTv) 22.sp else 17.sp,
                                 modifier = Modifier.fillMaxWidth()
-                            )
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // 🟢 BOTÓN DE TRÁILER SIMPLE UBICADO DEBAJO DE LA SINOPSIS
-                            BotonTrailerSimpleDebajo(
-                                hasTrailer = hasTrailer,
-                                trailerFocusRequester = trailerFocusRequester,
-                                carouselFocusRequester = carouselFocusRequester,
-                                menuFocusRequester = menuFocusRequester,
-                                onClick = onVerTrailerClick
                             )
                         } else {
                             Text(
                                 text = "Navega con las flechas del control para ver detalles.",
                                 color = Color(0xFF94A3B8),
-                                fontSize = 14.sp
+                                fontSize = 16.sp
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // SECCIÓN INFERIOR: CARRUSEL HORIZONTAL
-                Column(
+                // 🟢 FILA UNIFICADA: SOLO CATÁLOGO Y CATEGORÍA (SIN TEXTO EXTRA) + BOTÓN TRÁILER
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(0.95f)
+                        .height(44.dp)
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "CATÁLOGO • $categoriaSeleccionada",
+                        text = "Catálogo: $categoriaSeleccionada",
                         color = DoradoBrillante,
-                        fontSize = 13.sp,
+                        fontSize = if (esTv) 16.sp else 13.5.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 4.dp)
+                        maxLines = 1
                     )
 
+                    // Botón en formato pregunta alineado a la derecha de la barra
+                    BotonTrailerCentradoPregunta(
+                        esTv = esTv,
+                        trailerFocusRequester = trailerFocusRequester,
+                        carouselFocusRequester = firstMovieFocusRequester,
+                        menuFocusRequester = menuFocusRequester,
+                        onClick = onVerTrailerClick
+                    )
+                }
+
+                // SECCIÓN INFERIOR: CARRUSEL HORIZONTAL CON PÓSTERS AMPLIOS
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1.02f)
+                ) {
                     if (isLoading) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = DoradoPrincipal, strokeWidth = 2.5.dp)
+                            CircularProgressIndicator(color = DoradoPrincipal, strokeWidth = 3.dp)
                         }
                     } else {
                         LazyRow(
@@ -587,14 +612,22 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                                     left = menuFocusRequester
                                     up = trailerFocusRequester
                                 },
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            contentPadding = PaddingValues(end = 200.dp)
+                            contentPadding = PaddingValues(end = 220.dp)
                         ) {
-                            itemsIndexed(peliculas, key = { _, movie -> movie.id }) { index, movie ->
+                            itemsIndexed(peliculas, key = { index, movie -> "${movie.id}_$index" }) { index, movie ->
+                                val itemModifier = if (index == 0) {
+                                    Modifier.focusRequester(firstMovieFocusRequester)
+                                } else {
+                                    Modifier
+                                }
+
                                 MovieHorizontalItemDorado(
                                     movie = movie,
+                                    esTv = esTv,
                                     isSelected = movie.id == peliculaEnfocada?.id,
+                                    modifier = itemModifier,
                                     onFocused = {
                                         onMovieFocused(movie)
                                         scope.launch {
@@ -638,7 +671,7 @@ fun MenuCategoriasVertical(
     carouselFocusRequester: FocusRequester,
     onCategoriaClick: (String) -> Unit
 ) {
-    val anchoMenu = if (esTv) 68.dp else 58.dp
+    val anchoMenu = if (esTv) 72.dp else 58.dp
 
     Box(
         modifier = Modifier
@@ -665,7 +698,7 @@ fun MenuCategoriasVertical(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(if (esTv) 50.dp else 44.dp)
+                        .height(if (esTv) 52.dp else 44.dp)
                         .padding(horizontal = 4.dp)
                         .scale(if (isFocused) 1.05f else 1.0f)
                         .clip(RoundedCornerShape(8.dp))
@@ -695,17 +728,15 @@ fun MenuCategoriasVertical(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        // Icono alusivo representativo ligero (sin consumo de memoria)
                         Text(
                             text = obtenerIconoGenero(cat),
-                            fontSize = if (esTv) 15.sp else 13.sp
+                            fontSize = if (esTv) 16.sp else 13.sp
                         )
                         Spacer(modifier = Modifier.height(1.dp))
-                        // Texto debajo
                         Text(
                             text = cat,
                             color = if (isFocused || isSelected) DoradoBrillante else Color(0xFFCBD5E1),
-                            fontSize = if (esTv) 9.sp else 8.sp,
+                            fontSize = if (esTv) 9.5.sp else 8.sp,
                             fontWeight = if (isFocused || isSelected) FontWeight.Bold else FontWeight.Normal,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -718,32 +749,36 @@ fun MenuCategoriasVertical(
     }
 }
 
-// 🟢 BOTÓN SIMPLE DE TRÁILER DEBAJO DE LA SINOPSIS
+// ====================================================================
+// 🟢 BOTÓN EN FORMATO PREGUNTA (AMPLIO Y VISIBLE)
+// ====================================================================
 @Composable
-fun BotonTrailerSimpleDebajo(
-    hasTrailer: Boolean,
+fun BotonTrailerCentradoPregunta(
+    esTv: Boolean,
     trailerFocusRequester: FocusRequester,
     carouselFocusRequester: FocusRequester,
     menuFocusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .wrapContentWidth()
-            .height(34.dp)
-            .scale(if (isFocused) 1.04f else 1.0f)
-            .clip(RoundedCornerShape(6.dp))
+            .height(if (esTv) 38.dp else 32.dp)
+            .scale(if (isFocused) 1.05f else 1.0f)
+            .clip(RoundedCornerShape(8.dp))
             .background(if (isFocused) Color.White else Color(0xFF1E293B))
             .border(
-                width = if (isFocused) 2.dp else 1.dp,
+                width = if (isFocused) 2.5.dp else 1.2.dp,
                 color = if (isFocused) DoradoPrincipal else Color(0xFF334155),
-                shape = RoundedCornerShape(6.dp)
+                shape = RoundedCornerShape(8.dp)
             )
             .focusRequester(trailerFocusRequester)
             .focusProperties {
                 down = carouselFocusRequester
+                up = menuFocusRequester
                 left = menuFocusRequester
             }
             .onFocusChanged { isFocused = it.isFocused }
@@ -754,42 +789,46 @@ fun BotonTrailerSimpleDebajo(
             ) {
                 onClick()
             }
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = if (esTv) 20.dp else 14.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = "▶",
                 color = if (isFocused) Color.Black else DoradoPrincipal,
-                fontSize = 11.sp,
+                fontSize = if (esTv) 13.sp else 11.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = if (hasTrailer) "Ver Tráiler Oficial" else "Tráiler no disponible",
+                text = "¿Quieres ver el tráiler?",
                 color = if (isFocused) Color.Black else Color.White,
-                fontSize = 12.sp,
+                fontSize = if (esTv) 13.sp else 11.5.sp,
                 fontWeight = FontWeight.Bold
             )
         }
     }
 }
 
-// 🟢 TARJETA DE PELÍCULA HORIZONTAL LIGERA (SIN SHADOWS NI OVERHEAD)
+// ====================================================================
+// 🟢 TARJETA DE PELÍCULA EN CARRUSEL (CON MARQUESINA EN ENFOQUE O SELECCIÓN)
+// ====================================================================
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MovieHorizontalItemDorado(
     movie: Modelo,
+    esTv: Boolean,
     isSelected: Boolean,
+    modifier: Modifier = Modifier,
     onFocused: () -> Unit,
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier
-            .width(108.dp)
-            .height(145.dp)
+        modifier = modifier
+            .width(if (esTv) 130.dp else 108.dp)
+            .fillMaxHeight()
             .scale(if (isFocused) 1.06f else 1.0f)
             .clip(RoundedCornerShape(8.dp))
             .background(Color(0xFF141923))
@@ -824,21 +863,31 @@ fun MovieHorizontalItemDorado(
             contentScale = ContentScale.Crop
         )
 
+        // 🟢 Marquesina activa si está enfocada O si es la película actualmente seleccionada
+        val marqueeMod = if (isFocused || isSelected) {
+            Modifier.basicMarquee(iterations = Int.MAX_VALUE, delayMillis = 600, velocity = 35.dp)
+        } else {
+            Modifier
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(if (isFocused) DoradoPrincipal else Color(0xFF0C1017))
-                .padding(vertical = 3.dp, horizontal = 4.dp),
+                .padding(vertical = 4.dp, horizontal = 4.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = movie.title,
-                color = if (isFocused) Color.Black else Color.White,
-                fontSize = 10.5.sp,
+                color = if (isFocused) Color.Black else if (isSelected) DoradoBrillante else Color.White,
+                fontSize = if (esTv) 11.5.sp else 10.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
+                overflow = if (isFocused || isSelected) TextOverflow.Clip else TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(marqueeMod)
             )
         }
     }
