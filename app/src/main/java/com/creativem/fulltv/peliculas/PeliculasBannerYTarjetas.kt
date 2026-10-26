@@ -119,7 +119,7 @@ fun GlideImageCustom(
 }
 
 // ==========================================
-// 🟢 BANNER HERO ESTILO NETFLIX (CAJUELA ORGANIZADA)
+// 🟢 BANNER HERO ESTILO NETFLIX (DISEÑO PRÉMIUM)
 // ==========================================
 @Composable
 fun BannerNetflixHero(
@@ -221,14 +221,12 @@ fun BannerNetflixHero(
             .clip(RoundedCornerShape(12.dp))
             .background(Color.Black)
     ) {
-        // Fondo cinemático
         GlideImageCustom(
             url = backdropUrl,
             modifier = Modifier.fillMaxSize(),
             isBackdrop = true
         )
 
-        // Degradado lateral para lectura
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -243,14 +241,13 @@ fun BannerNetflixHero(
                 )
         )
 
-        // Contenedor principal: Póster Fijo a la izquierda + Columna limpia a la derecha
         Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 🟢 1. PÓSTER GRANDE PRINCIPAL (NUNCA SERÁ TAPADO)
+            // PÓSTER GRANDE PRINCIPAL
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -263,37 +260,82 @@ fun BannerNetflixHero(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // 🟢 2. COLUMNA DERECHA: TEXTOS ARRIBA Y CAJUELA CON SCROLL ABAJO
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Zona superior: Datos TMDB
+                // ZONA SUPERIOR: TÍTULO + ETIQUETA PROMOCIONAL + DATOS
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = tmdbTitle,
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = tmdbTitle,
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        // 🟢 ETIQUETA LLAMATIVA Y ELEGANTE (CORTESÍA DE CINEPARCHE)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(
+                                            Color(0x3300E676),
+                                            Color(0x40C5A059)
+                                        )
+                                    )
+                                )
+                                .border(
+                                    width = 1.2.dp,
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(Color(0xFF00E676), Color(0xFFFFD56B))
+                                    ),
+                                    shape = RoundedCornerShape(6.dp)
+                                )
+                                .padding(horizontal = 9.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "🎁 DISPONIBLE AL PÚBLICO • CORTESÍA CINEPARCHE",
+                                color = Color(0xFF00E676),
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(3.dp))
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(text = tmdbRating, color = ColorDorado, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(text = contadorFormato, color = ColorDorado, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
+
                     Spacer(modifier = Modifier.height(2.dp))
+
                     Text(
                         text = tmdbInfoAdicional,
                         color = Color(0xFFD4AF37),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
                     )
+
                     Spacer(modifier = Modifier.height(4.dp))
+
                     Text(
                         text = tmdbOverview,
                         color = Color.LightGray,
@@ -304,7 +346,7 @@ fun BannerNetflixHero(
                     )
                 }
 
-                // 🟢 3. CAJUELA DE PÓSTERS LIBRES (COMIENZA DESDE EL PÓSTER GRANDE HASTA EL FINAL)
+                // 🟢 CAJUELA CON MINI PÓSTERS LIMPIOS (SIN EL TEXTO "LIBRE" ENCIMA)
                 LazyRow(
                     state = carouselState,
                     modifier = Modifier
@@ -327,14 +369,14 @@ fun BannerNetflixHero(
                         Box(
                             modifier = Modifier
                                 .width(50.dp)
-                                .height(72.dp)
+                                .height(74.dp)
                                 .scale(if (isItemFocused) 1.08f else 1.0f)
                                 .zIndex(if (isItemFocused) 10f else 1f)
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(Color(0xFF1E1E1E))
                                 .border(
                                     width = if (isItemFocused) 2.dp else if (isSelected) 1.5.dp else 0.5.dp,
-                                    color = if (isItemFocused) ColorDorado else if (isSelected) Color.White else Color.Gray.copy(alpha = 0.5f),
+                                    color = if (isItemFocused) ColorDorado else if (isSelected) Color.White else Color.Gray.copy(alpha = 0.4f),
                                     shape = RoundedCornerShape(6.dp)
                                 )
                                 .onFocusChanged {
@@ -345,30 +387,14 @@ fun BannerNetflixHero(
                                 }
                                 .focusable()
                                 .clickable {
-                                    // Al pulsar OK se reproduce directamente
                                     onPlayMovie(promoMovie)
                                 }
                         ) {
+                            // Póster 100% visible sin ningún cartel tapándolo
                             GlideImageCustom(
                                 url = promoMovie.imageUrl,
                                 modifier = Modifier.fillMaxSize()
                             )
-
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .fillMaxWidth()
-                                    .background(Color.Black.copy(alpha = 0.82f))
-                                    .padding(vertical = 1.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "LIBRE",
-                                    color = ColorDorado,
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
                         }
                     }
                 }
