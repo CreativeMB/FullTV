@@ -11,6 +11,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -117,7 +119,7 @@ fun GlideImageCustom(
 }
 
 // ==========================================
-// 🟢 BANNER HERO ESTILO NETFLIX
+// 🟢 BANNER HERO ESTILO NETFLIX (CAJUELA ORGANIZADA)
 // ==========================================
 @Composable
 fun BannerNetflixHero(
@@ -131,7 +133,7 @@ fun BannerNetflixHero(
     menuFocusRequester: FocusRequester,
     onBannerFocusState: (Boolean) -> Unit,
     onSelectPromo: (Int) -> Unit,
-    onClickPromo: () -> Unit,
+    onClickPromo: () -> Unit = {},
     onPlayMovie: (Modelo) -> Unit
 ) {
     var tmdbTitle by remember(movie.id) { mutableStateOf(movie.title) }
@@ -140,8 +142,6 @@ fun BannerNetflixHero(
     var tmdbInfoAdicional by remember(movie.id) { mutableStateOf(movie.genres.ifBlank { "Acción • Aventura • Cine" }) }
     var backdropUrl by remember(movie.id) { mutableStateOf(movie.imageUrl) }
     var posterUrl by remember(movie.id) { mutableStateOf(movie.imageUrl) }
-
-    var isPlayButtonFocused by remember { mutableStateOf(false) }
 
     val durationMillis = remember(movie.id, movie.countdownMinutes) {
         TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
@@ -211,177 +211,165 @@ fun BannerNetflixHero(
     val segundos = TimeUnit.MILLISECONDS.toSeconds(millisRestantes) % 60
     val contadorFormato = String.format("▶ %02d:%02d:%02d", horas, minutos, segundos)
 
+    val carouselState = rememberLazyListState()
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(250.dp)
+            .height(255.dp)
             .padding(horizontal = 6.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(Color.Black)
     ) {
+        // Fondo cinemático
         GlideImageCustom(
             url = backdropUrl,
             modifier = Modifier.fillMaxSize(),
             isBackdrop = true
         )
 
+        // Degradado lateral para lectura
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(
-                            Color.Black.copy(alpha = 0.95f),
-                            Color.Black.copy(alpha = 0.70f),
+                            Color.Black.copy(alpha = 0.96f),
+                            Color.Black.copy(alpha = 0.75f),
                             Color.Transparent
                         )
                     )
                 )
         )
 
+        // Contenedor principal: Póster Fijo a la izquierda + Columna limpia a la derecha
         Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // 🟢 1. PÓSTER GRANDE PRINCIPAL (NUNCA SERÁ TAPADO)
             Box(
                 modifier = Modifier
-                    .height(200.dp)
+                    .fillMaxHeight()
                     .aspectRatio(2f / 3f)
                     .clip(RoundedCornerShape(8.dp))
-                    .border(1.5.dp, ColorDorado, RoundedCornerShape(8.dp))
+                    .border(2.dp, ColorDorado, RoundedCornerShape(8.dp))
             ) {
                 GlideImageCustom(url = posterUrl, modifier = Modifier.fillMaxSize())
             }
 
             Spacer(modifier = Modifier.width(16.dp))
 
+            // 🟢 2. COLUMNA DERECHA: TEXTOS ARRIBA Y CAJUELA CON SCROLL ABAJO
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = tmdbTitle,
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(3.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = tmdbRating, color = ColorDorado, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(text = contadorFormato, color = ColorDorado, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                // Zona superior: Datos TMDB
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = tmdbTitle,
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = tmdbRating, color = ColorDorado, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(text = contadorFormato, color = ColorDorado, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = tmdbInfoAdicional,
+                        color = Color(0xFFD4AF37),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = tmdbOverview,
+                        color = Color.LightGray,
+                        fontSize = 11.5.sp,
+                        maxLines = 2,
+                        lineHeight = 15.sp,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = tmdbInfoAdicional,
-                    color = Color(0xFFD4AF37),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = tmdbOverview,
-                    color = Color.LightGray,
-                    fontSize = 12.sp,
-                    maxLines = 2,
-                    lineHeight = 15.sp,
-                    overflow = TextOverflow.Ellipsis
-                )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Box(
+                // 🟢 3. CAJUELA DE PÓSTERS LIBRES (COMIENZA DESDE EL PÓSTER GRANDE HASTA EL FINAL)
+                LazyRow(
+                    state = carouselState,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(if (isPlayButtonFocused) Color.White else ColorDorado)
-                        .border(
-                            width = if (isPlayButtonFocused) 2.dp else 0.dp,
-                            color = ColorDorado,
-                            shape = RoundedCornerShape(6.dp)
-                        )
-                        .onFocusChanged {
-                            isPlayButtonFocused = it.isFocused
-                            onBannerFocusState(it.hasFocus)
-                        }
+                        .fillMaxWidth()
+                        .height(78.dp)
+                        .focusRequester(bannerFocusRequester)
+                        .onFocusChanged { onBannerFocusState(it.hasFocus) }
                         .focusProperties {
                             down = gridFocusRequester
                             left = menuFocusRequester
-                        }
-                        .focusable()
-                        .clickable { onClickPromo() }
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                        },
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    contentPadding = PaddingValues(end = 40.dp)
                 ) {
-                    Text(
-                        text = "▶ REPRODUCIR",
-                        color = Color.Black,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
+                    itemsIndexed(promosList) { idx, promoMovie ->
+                        var isItemFocused by remember { mutableStateOf(false) }
+                        val isSelected = idx == selectedIndex
 
-        LazyRow(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = 10.dp)
-                .focusRequester(bannerFocusRequester)
-                .onFocusChanged { onBannerFocusState(it.hasFocus) }
-                .focusProperties {
-                    down = gridFocusRequester
-                    left = menuFocusRequester
-                },
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            itemsIndexed(promosList) { idx, promoMovie ->
-                var isItemFocused by remember { mutableStateOf(false) }
-                val isSelected = idx == selectedIndex
+                        Box(
+                            modifier = Modifier
+                                .width(50.dp)
+                                .height(72.dp)
+                                .scale(if (isItemFocused) 1.08f else 1.0f)
+                                .zIndex(if (isItemFocused) 10f else 1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF1E1E1E))
+                                .border(
+                                    width = if (isItemFocused) 2.dp else if (isSelected) 1.5.dp else 0.5.dp,
+                                    color = if (isItemFocused) ColorDorado else if (isSelected) Color.White else Color.Gray.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(6.dp)
+                                )
+                                .onFocusChanged {
+                                    isItemFocused = it.isFocused
+                                    if (it.isFocused) {
+                                        onSelectPromo(idx)
+                                    }
+                                }
+                                .focusable()
+                                .clickable {
+                                    // Al pulsar OK se reproduce directamente
+                                    onPlayMovie(promoMovie)
+                                }
+                        ) {
+                            GlideImageCustom(
+                                url = promoMovie.imageUrl,
+                                modifier = Modifier.fillMaxSize()
+                            )
 
-                Box(
-                    modifier = Modifier
-                        .size(width = 46.dp, height = 66.dp)
-                        .zIndex(if (isItemFocused) 10f else 1f)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xFF1E1E1E))
-                        .border(
-                            width = if (isItemFocused) 2.dp else if (isSelected) 1.5.dp else 0.5.dp,
-                            color = if (isItemFocused) ColorDorado else if (isSelected) Color.White else Color.Gray.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(6.dp)
-                        )
-                        .onFocusChanged {
-                            isItemFocused = it.isFocused
-                            if (it.isFocused) {
-                                onSelectPromo(idx)
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .background(Color.Black.copy(alpha = 0.82f))
+                                    .padding(vertical = 1.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "LIBRE",
+                                    color = ColorDorado,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
-                        .focusable()
-                        .clickable { onPlayMovie(promoMovie) }
-                ) {
-                    GlideImageCustom(
-                        url = promoMovie.imageUrl,
-                        modifier = Modifier.fillMaxSize()
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.8f))
-                            .padding(vertical = 1.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "LIBRE",
-                            color = ColorDorado,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
             }
@@ -418,7 +406,6 @@ fun PeliculaCard(
         }
     }
 
-    // Temporizador activo ÚNICAMENTE si la película tiene promo en curso
     if (movie.countdownMinutes > 0 && millisRestantes > 0) {
         LaunchedEffect(movie.id, movie.countdownMinutes, movie.createdAt) {
             while (millisRestantes > 0) {
@@ -443,7 +430,6 @@ fun PeliculaCard(
                 isFocused = it.isFocused
                 if (it.isFocused) {
                     coroutineScope.launch {
-                        // Desplazamiento nativo sin trucos de offset que causaban el salto de pantalla
                         bringIntoViewRequester.bringIntoView()
                     }
                 }

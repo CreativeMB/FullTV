@@ -368,24 +368,24 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
     val config = LocalConfiguration.current
     val esTv = config.screenWidthDp > 600
 
+    // 🟢 FocusRequesters limpios y seguros
     val menuFocusRequester = remember { FocusRequester() }
-    val carouselFocusRequester = remember { FocusRequester() }
     val trailerFocusRequester = remember { FocusRequester() }
-    val firstMovieFocusRequester = remember { FocusRequester() }
+    val currentMovieFocusRequester = remember { FocusRequester() }
 
-    // Salto automático al primer ítem de la categoría
+    // Salto automático al primer ítem al cargar
     LaunchedEffect(peliculas) {
         if (peliculas.isNotEmpty()) {
             carouselListState.scrollToItem(0)
-            delay(120)
+            delay(150)
             try {
-                firstMovieFocusRequester.requestFocus()
+                currentMovieFocusRequester.requestFocus()
             } catch (_: Exception) {}
         }
     }
 
     Box(modifier = Modifier.fillMaxSize().background(FondoNegroSala)) {
-        // 🟢 FONDO CINEMÁTICO (BACKDROP) MUCHO MÁS VISIBLE
+        // FONDO CINEMÁTICO (BACKDROP)
         Crossfade(
             targetState = backdropUrl,
             animationSpec = tween(400),
@@ -404,16 +404,16 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
             }
         }
 
-        // 🟢 DEGRADADO CINEMÁTICO LATERAL: Oscuro a la izquierda para leer, transparente al centro/derecha para ver la imagen
+        // DEGRADADO CINEMÁTICO LATERAL
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(
-                            Color(0xF607090E), // Fondo firme en el texto
+                            Color(0xF607090E),
                             Color(0xD907090E),
-                            Color(0x7507090E), // Muy translúcido para apreciar el póster de fondo
+                            Color(0x7507090E),
                             Color(0x3507090E)
                         )
                     )
@@ -431,7 +431,7 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                 categoriaSeleccionada = categoriaSeleccionada,
                 esTv = esTv,
                 menuFocusRequester = menuFocusRequester,
-                carouselFocusRequester = firstMovieFocusRequester,
+                movieFocusRequester = currentMovieFocusRequester,
                 onCategoriaClick = onCategoriaClick
             )
 
@@ -444,7 +444,7 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // 🟢 SECCIÓN SUPERIOR: PÓSTER EXTRA GRANDE (200.dp x 280.dp) + TEXTOS GRANDES
+                // SECCIÓN SUPERIOR: PÓSTER + DATOS
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -452,7 +452,6 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                         .padding(top = 2.dp),
                     verticalAlignment = Alignment.Top
                 ) {
-                    // Póster grande destacado sin vacíos
                     if (peliculaEnfocada != null) {
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
@@ -471,7 +470,6 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                         Spacer(modifier = Modifier.width(20.dp))
                     }
 
-                    // Información central completa y de tamaño grande para TV
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -492,7 +490,6 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
 
                             Spacer(modifier = Modifier.height(4.dp))
 
-                            // Metadatos (Año, Calificación, Insignia Alquila aquí en CineParche)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = "📅 " + (peliculaEnfocada.releaseDate?.take(4) ?: "Estreno"),
@@ -512,7 +509,6 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
 
                                 Spacer(modifier = Modifier.width(14.dp))
 
-                                // 🟢 INSIGNIA LIMPIA: Alquila aquí en CineParche (sin mayúsculas agresivas)
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
@@ -533,7 +529,6 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
 
                             Spacer(modifier = Modifier.height(4.dp))
 
-                            // Géneros y duración
                             Text(
                                 text = infoAdicional,
                                 color = Color(0xFFCBD5E1),
@@ -545,7 +540,6 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
 
                             Spacer(modifier = Modifier.height(6.dp))
 
-                            // 🟢 SINOPSIS COMPLETA Y EXTENSA (HASTA 8 RENGLONES PARA NO DEJAR VACÍOS)
                             Text(
                                 text = sinopsis,
                                 color = Color(0xFFE2E8F0),
@@ -565,7 +559,7 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                     }
                 }
 
-                // 🟢 FILA UNIFICADA: SOLO CATÁLOGO Y CATEGORÍA (SIN TEXTO EXTRA) + BOTÓN TRÁILER
+                // FILA: CATÁLOGO + BOTÓN TRÁILER
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -582,17 +576,17 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                         maxLines = 1
                     )
 
-                    // Botón en formato pregunta alineado a la derecha de la barra
+                    // 🟢 BOTÓN TRÁILER: Conectado para saltar arriba/izquierda al menú y abajo al mismo póster
                     BotonTrailerCentradoPregunta(
                         esTv = esTv,
                         trailerFocusRequester = trailerFocusRequester,
-                        carouselFocusRequester = firstMovieFocusRequester,
+                        currentMovieFocusRequester = currentMovieFocusRequester,
                         menuFocusRequester = menuFocusRequester,
                         onClick = onVerTrailerClick
                     )
                 }
 
-                // SECCIÓN INFERIOR: CARRUSEL HORIZONTAL CON PÓSTERS AMPLIOS
+                // SECCIÓN INFERIOR: CARRUSEL HORIZONTAL CON PÓSTERS
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -605,29 +599,22 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                     } else {
                         LazyRow(
                             state = carouselListState,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .focusRequester(carouselFocusRequester)
-                                .focusProperties {
-                                    left = menuFocusRequester
-                                    up = trailerFocusRequester
-                                },
+                            modifier = Modifier.fillMaxSize(),
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             contentPadding = PaddingValues(end = 220.dp)
                         ) {
                             itemsIndexed(peliculas, key = { index, movie -> "${movie.id}_$index" }) { index, movie ->
-                                val itemModifier = if (index == 0) {
-                                    Modifier.focusRequester(firstMovieFocusRequester)
-                                } else {
-                                    Modifier
-                                }
+                                val isSelected = movie.id == peliculaEnfocada?.id
 
                                 MovieHorizontalItemDorado(
                                     movie = movie,
                                     esTv = esTv,
-                                    isSelected = movie.id == peliculaEnfocada?.id,
-                                    modifier = itemModifier,
+                                    isSelected = isSelected,
+                                    isFirstItem = index == 0,
+                                    trailerFocusRequester = trailerFocusRequester,
+                                    menuFocusRequester = menuFocusRequester,
+                                    currentMovieFocusRequester = if (isSelected) currentMovieFocusRequester else null,
                                     onFocused = {
                                         onMovieFocused(movie)
                                         scope.launch {
@@ -660,7 +647,7 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
 }
 
 // ====================================================================
-// 🟢 MENÚ LATERAL IZQUIERDO VERTICAL ULTRA ANGOSTO (ICONO + TEXTO)
+// 🟢 MENÚ LATERAL IZQUIERDO VERTICAL ULTRA ANGOSTO
 // ====================================================================
 @Composable
 fun MenuCategoriasVertical(
@@ -668,7 +655,7 @@ fun MenuCategoriasVertical(
     categoriaSeleccionada: String,
     esTv: Boolean,
     menuFocusRequester: FocusRequester,
-    carouselFocusRequester: FocusRequester,
+    movieFocusRequester: FocusRequester,
     onCategoriaClick: (String) -> Unit
 ) {
     val anchoMenu = if (esTv) 72.dp else 58.dp
@@ -680,10 +667,6 @@ fun MenuCategoriasVertical(
             .clip(RoundedCornerShape(10.dp))
             .background(Color(0xFF0F121A))
             .border(1.dp, Color(0xFF1E2433), RoundedCornerShape(10.dp))
-            .focusRequester(menuFocusRequester)
-            .focusProperties {
-                right = carouselFocusRequester
-            }
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -691,9 +674,16 @@ fun MenuCategoriasVertical(
             verticalArrangement = Arrangement.spacedBy(4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            itemsIndexed(categorias) { _, cat ->
+            itemsIndexed(categorias) { index, cat ->
                 val isSelected = cat == categoriaSeleccionada
                 var isFocused by remember { mutableStateOf(false) }
+
+                // 🟢 Enganchamos el FocusRequester al elemento seleccionado o al primero
+                val itemFocusModifier = if (isSelected || (categoriaSeleccionada.isEmpty() && index == 0)) {
+                    Modifier.focusRequester(menuFocusRequester)
+                } else {
+                    Modifier
+                }
 
                 Box(
                     modifier = Modifier
@@ -714,6 +704,10 @@ fun MenuCategoriasVertical(
                             color = if (isFocused) DoradoPrincipal else if (isSelected) DoradoPrincipal.copy(alpha = 0.5f) else Color.Transparent,
                             shape = RoundedCornerShape(8.dp)
                         )
+                        .then(itemFocusModifier)
+                        .focusProperties {
+                            right = movieFocusRequester // 🟢 Flecha DERECHA salta al póster enfocado
+                        }
                         .onFocusChanged { isFocused = it.isFocused }
                         .focusable()
                         .clickable(
@@ -756,7 +750,7 @@ fun MenuCategoriasVertical(
 fun BotonTrailerCentradoPregunta(
     esTv: Boolean,
     trailerFocusRequester: FocusRequester,
-    carouselFocusRequester: FocusRequester,
+    currentMovieFocusRequester: FocusRequester,
     menuFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
@@ -777,9 +771,9 @@ fun BotonTrailerCentradoPregunta(
             )
             .focusRequester(trailerFocusRequester)
             .focusProperties {
-                down = carouselFocusRequester
-                up = menuFocusRequester
-                left = menuFocusRequester
+                down = currentMovieFocusRequester // 🟢 Flecha ABAJO: salta al póster seleccionado
+                up = menuFocusRequester           // 🟢 Flecha ARRIBA: salta al menú lateral
+                left = menuFocusRequester         // 🟢 Flecha IZQUIERDA: salta al menú lateral
             }
             .onFocusChanged { isFocused = it.isFocused }
             .focusable()
@@ -811,7 +805,7 @@ fun BotonTrailerCentradoPregunta(
 }
 
 // ====================================================================
-// 🟢 TARJETA DE PELÍCULA EN CARRUSEL (CON MARQUESINA EN ENFOQUE O SELECCIÓN)
+// 🟢 TARJETA DE PELÍCULA EN CARRUSEL
 // ====================================================================
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -819,11 +813,21 @@ fun MovieHorizontalItemDorado(
     movie: Modelo,
     esTv: Boolean,
     isSelected: Boolean,
+    isFirstItem: Boolean,
+    trailerFocusRequester: FocusRequester,
+    menuFocusRequester: FocusRequester,
+    currentMovieFocusRequester: FocusRequester?,
     modifier: Modifier = Modifier,
     onFocused: () -> Unit,
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
+
+    val focusMod = if (currentMovieFocusRequester != null) {
+        Modifier.focusRequester(currentMovieFocusRequester)
+    } else {
+        Modifier
+    }
 
     Column(
         modifier = modifier
@@ -837,6 +841,15 @@ fun MovieHorizontalItemDorado(
                 color = if (isFocused) DoradoBrillante else if (isSelected) DoradoPrincipal else Color(0xFF262E3D),
                 shape = RoundedCornerShape(8.dp)
             )
+            .then(focusMod)
+            .focusProperties {
+                // 🟢 NO IMPORTA QUÉ PÓSTER SEA: ARRIBA siempre va a ver tráiler
+                up = trailerFocusRequester
+                // Si es el primer ítem, IZQUIERDA va al menú lateral
+                if (isFirstItem) {
+                    left = menuFocusRequester
+                }
+            }
             .onFocusChanged { state ->
                 isFocused = state.isFocused
                 if (state.isFocused) {
@@ -863,7 +876,6 @@ fun MovieHorizontalItemDorado(
             contentScale = ContentScale.Crop
         )
 
-        // 🟢 Marquesina activa si está enfocada O si es la película actualmente seleccionada
         val marqueeMod = if (isFocused || isSelected) {
             Modifier.basicMarquee(iterations = Int.MAX_VALUE, delayMillis = 600, velocity = 35.dp)
         } else {
@@ -893,7 +905,6 @@ fun MovieHorizontalItemDorado(
     }
 }
 
-// Helper de iconos alusivos ultraligeros
 private fun obtenerIconoGenero(categoria: String): String {
     return when (categoria) {
         "Populares" -> "🔥"

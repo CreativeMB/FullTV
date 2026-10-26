@@ -79,6 +79,7 @@ import com.creativem.fulltv.api.MovieResponse
 import com.creativem.fulltv.api.TMDbApiService
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
 import com.creativem.fulltv.principal.*
+import com.google.firebase.database.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -176,7 +177,6 @@ class PlayerPeliculas : AppCompatActivity() {
         if (event.action == AndroidKeyEvent.ACTION_DOWN) {
             val code = event.keyCode
 
-            // Cada pulsación reinicia el temporizador de ocultar controles
             onUserInteraction?.invoke()
 
             if (code in listOf(AndroidKeyEvent.KEYCODE_MENU, AndroidKeyEvent.KEYCODE_PAGE_UP, AndroidKeyEvent.KEYCODE_PAGE_DOWN, 174)) {
@@ -184,12 +184,10 @@ class PlayerPeliculas : AppCompatActivity() {
                 return true
             }
 
-            // Si la cartelera está abierta, no interferir con las teclas del D-Pad
             if (isMenuCarteleraOpenState()) {
                 return super.dispatchKeyEvent(event)
             }
 
-            // Si los controles están ocultos, cualquier botón de acción los despierta
             if (!areControlsVisibleState()) {
                 val teclasDespertar = listOf(
                     AndroidKeyEvent.KEYCODE_DPAD_CENTER,
@@ -257,27 +255,144 @@ fun PlayerPeliculasScreen(
     var gateoTicks by remember { mutableIntStateOf(0) }
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
+    // 🟢 LISTAS EN TIEMPO REAL (ALQUILERES PRIMERO + CARTELERA GENERAL)
     val peliculasActivas = remember { mutableStateListOf<Modelo>() }
+    val idsAlquileresUsuario = remember { mutableStateListOf<String>() }
+    val todasLasPeliculasFirebase = remember { mutableStateListOf<Modelo>() }
+    var snapshotAlquileres by remember { mutableStateOf<DataSnapshot?>(null) }
+
+    val auth = remember { com.google.firebase.auth.FirebaseAuth.getInstance() }
+    val userEmail = auth.currentUser?.email
+    val correoKey = remember(userEmail) { userEmail?.replace(".", "_")?.replace("@", "_") ?: "" }
+    val databaseRef = remember { com.google.firebase.database.FirebaseDatabase.getInstance().reference }
+
+    fun normalizarClave(texto: String): String {
+        return texto.replace(".", "_")
+            .replace("$", "_")
+            .replace("#", "_")
+            .replace("[", "_")
+            .replace("]", "_")
+    }
+
+    // 🟢 FUNCIÓN QUE COMBINA ALQUILERES DE PRIMERAS Y LUEGO LAS GRATIS
+    fun sincronizarCartelera() {
+        val ahora = System.currentTimeMillis()
+        val cachePorTitulo = todasLasPeliculasFirebase.associateBy { normalizarClave(it.title) }
+        val cachePorId = todasLasPeliculasFirebase.associateBy { it.id }
+
+        val misAlquileres = mutableListOf<Modelo>()
+        val misIds = mutableSetOf<String>()
+
+        // 1. Procesar alquileres personales del perfil
+        snapshotAlquileres?.children?.forEach { child ->
+            val tituloKey = child.key ?: return@forEach
+            val createdAtRaw = (child.child("createdAt").value as? Number)?.toLong() ?: 0L
+            val countdownMinutes = (child.child("countdownMinutes").value as? Number)?.toInt() ?: 0
+
+            val createdAtMillis = if (createdAtRaw in 1..999999999999L) createdAtRaw * 1000 else createdAtRaw
+            val durationMillis = TimeUnit.MINUTES.toMillis(countdownMinutes.toLong())
+
+            if (countdownMinutes > 0 && (ahora - createdAtMillis) in 0 until durationMillis) {
+                val movieOriginal = cachePorTitulo[tituloKey] ?: cachePorId[tituloKey]
+                if (movieOriginal != null) {
+                    val movieAlquilada = movieOriginal.copy(
+                        createdAt = createdAtMillis,
+                        countdownMinutes = countdownMinutes
+                    )
+                    misAlquileres.add(movieAlquilada)
+                    misIds.add(movieAlquilada.id)
+                }
+            }
+        }
+
+        // 2. Procesar cartelera gratis (excluyendo si ya la tiene alquilada para no duplicar)
+        val promosGenerales = todasLasPeliculasFirebase.filter { m ->
+            val durationMillis = TimeUnit.MINUTES.toMillis(m.countdownMinutes.toLong())
+            val createdAtMillis = if (m.createdAt in 1..999999999999L) m.createdAt * 1000 else m.createdAt
+            m.countdownMinutes > 0 && (ahora - createdAtMillis) in 0 until durationMillis && !misIds.contains(m.id)
+        }.sortedByDescending { it.createdAt }
+
+        // 3. Unir: ALQUILERES PRIMERO SIEMPRE
+        val combinadas = mutableListOf<Modelo>()
+        combinadas.addAll(misAlquileres)
+        combinadas.addAll(promosGenerales)
+
+        peliculasActivas.clear()
+        peliculasActivas.addAll(combinadas)
+
+        idsAlquileresUsuario.clear()
+        idsAlquileresUsuario.addAll(misIds)
+
+        if (combinadas.isEmpty() && menuPelisAbierto) {
+            menuPelisAbierto = false
+        }
+    }
+
+    // 🟢 ESCUCHA DE FIREBASE EN TIEMPO REAL: MOVIES
+    DisposableEffect(Unit) {
+        val moviesRef = databaseRef.child("movies")
+        val listenerMovies = object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (snapshot.exists()) {
+                    val raw = snapshot.children.mapNotNull { child ->
+                        val m = child.getValue(Modelo::class.java)
+                        m?.apply { id = child.key ?: "" }
+                    }
+                    todasLasPeliculasFirebase.clear()
+                    todasLasPeliculasFirebase.addAll(raw)
+                    sincronizarCartelera()
+                }
+            }
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+        }
+        moviesRef.addValueEventListener(listenerMovies)
+        onDispose { moviesRef.removeEventListener(listenerMovies) }
+    }
+
+    // 🟢 ESCUCHA DE FIREBASE EN TIEMPO REAL: ALQUILERES DEL PERFIL
+    DisposableEffect(correoKey) {
+        if (correoKey.isNotEmpty()) {
+            val rentalsRef = databaseRef.child("usuarios").child(correoKey).child("alquileres")
+            val listenerRentals = object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    snapshotAlquileres = snapshot
+                    sincronizarCartelera()
+                }
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+            }
+            rentalsRef.addValueEventListener(listenerRentals)
+            onDispose { rentalsRef.removeEventListener(listenerRentals) }
+        } else {
+            onDispose {}
+        }
+    }
+
+    // 🟢 RELOJ VIGILANTE CADA SEGUNDO (Actualiza contadores y retira expiradas)
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            delay(1000)
+            if (todasLasPeliculasFirebase.isNotEmpty() || snapshotAlquileres != null) {
+                sincronizarCartelera()
+            }
+        }
+    }
 
     var mostrarDialogoContinuar by remember { mutableStateOf(false) }
     var progresoGuardadoEncontrado by remember { mutableLongStateOf(0L) }
-
     var reconnectionAttempts by remember { mutableIntStateOf(0) }
     val maxReconnectionAttempts = 10
 
-    // Cliente Retrofit para traer la sinopsis desde TMDb
     val apiService = remember {
-        val client = OkHttpClient.Builder().hostnameVerifier { _, _ -> true }.build()
-        Retrofit.Builder()
+        val client = okhttp3.OkHttpClient.Builder().hostnameVerifier { _, _ -> true }.build()
+        retrofit2.Retrofit.Builder()
             .baseUrl("https://api.themoviedb.org/3/")
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
             .client(client)
             .build()
-            .create(TMDbApiService::class.java)
+            .create(com.creativem.fulltv.api.TMDbApiService::class.java)
     }
     val apiKey = "678193d2c735c6f37840cee035f4d69a"
 
-    // 🟢 CONSULTAR SINOPSIS DESDE TMDB (Con Unit al final para evitar errores de tipo)
     LaunchedEffect(movieTitle) {
         if (movieSynopsis.isBlank() || movieSynopsis.length < 15) {
             val queryLimpia = movieTitle
@@ -296,22 +411,17 @@ fun PlayerPeliculasScreen(
                                 movieSynopsis = primera.overview!!
                             }
                         }
-                    } catch (e: Exception) {
-                        Log.e("PlayerTMDb", "Error al obtener sinopsis: ${e.message}")
-                    }
+                    } catch (_: Exception) {}
                     Unit
                 }
             }
         }
     }
 
-    // 🟢 VINCULACIÓN INTELIGENTE DE EVENTOS
     DisposableEffect(menuPelisAbierto, controlesVisibles) {
         activity.areControlsVisibleState = { controlesVisibles }
         activity.isMenuCarteleraOpenState = { menuPelisAbierto }
-        activity.onUserInteraction = {
-            lastInteractionTime = System.currentTimeMillis()
-        }
+        activity.onUserInteraction = { lastInteractionTime = System.currentTimeMillis() }
         activity.onWakeUpControls = {
             if (!menuPelisAbierto) {
                 lastInteractionTime = System.currentTimeMillis()
@@ -321,9 +431,7 @@ fun PlayerPeliculasScreen(
         activity.onToggleMenuCartelera = {
             lastInteractionTime = System.currentTimeMillis()
             menuPelisAbierto = !menuPelisAbierto
-            if (menuPelisAbierto) {
-                controlesVisibles = false
-            }
+            if (menuPelisAbierto) controlesVisibles = false
         }
         onDispose {
             activity.onWakeUpControls = null
@@ -444,7 +552,6 @@ fun PlayerPeliculasScreen(
             requestProperties["Accept"] = "*/*"
             requestProperties["ngrok-skip-browser-warning"] = "true"
 
-            // 🟢 CORREGIDO: Smart Cast seguro a través de variable inmutable 'ref'
             val ref = finalReferer
             if (!ref.isNullOrEmpty()) {
                 requestProperties["Referer"] = ref
@@ -543,9 +650,6 @@ fun PlayerPeliculasScreen(
 
     LaunchedEffect(streamUrl) {
         if (streamUrl.isNotBlank()) {
-            withContext(Dispatchers.IO) {
-                if (!Validacioneslista.yaCargado()) Validacioneslista.cargarPeliculas()
-            }
             val guardado = obtenerProgresoGuardado(streamUrl, movieTitle, movieCastv)
             if (guardado > 0) {
                 progresoGuardadoEncontrado = guardado
@@ -553,24 +657,6 @@ fun PlayerPeliculasScreen(
             } else {
                 prepararReproductor(initialStartPosition)
             }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        while (isActive) {
-            val lista = Validacioneslista.obtenerPeliculasValidas()
-            val activas = lista.filter { movie ->
-                val durationMs = TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
-                val transcurrido = System.currentTimeMillis() - movie.createdAt
-                movie.countdownMinutes > 0 && (durationMs - transcurrido) > 0
-            }.sortedByDescending { it.createdAt }
-
-            peliculasActivas.clear()
-            peliculasActivas.addAll(activas)
-
-            if (activas.isEmpty() && menuPelisAbierto) menuPelisAbierto = false
-            if (Validacioneslista.yaCargado()) break
-            delay(3000)
         }
     }
 
@@ -602,7 +688,6 @@ fun PlayerPeliculasScreen(
         }
     }
 
-    // 🟢 CONTROL INTELIGENTE DE AUTO-OCULTAR: NO se oculta si se está manipulando o buscando en el slider
     LaunchedEffect(controlesVisibles, lastInteractionTime, menuPelisAbierto, estaDesplazandoProgreso) {
         if (controlesVisibles && !menuPelisAbierto && !estaDesplazandoProgreso) {
             delay(6000)
@@ -621,12 +706,8 @@ fun PlayerPeliculasScreen(
 
     BackHandler {
         when {
-            menuPelisAbierto -> {
-                menuPelisAbierto = false
-            }
-            controlesVisibles -> {
-                controlesVisibles = false
-            }
+            menuPelisAbierto -> menuPelisAbierto = false
+            controlesVisibles -> controlesVisibles = false
             else -> {
                 guardarProgresoActual()
                 onFinish()
@@ -671,7 +752,6 @@ fun PlayerPeliculasScreen(
             }
         )
 
-        // 🟢 INDICADOR DE BUFFER SUPERIOR DISCRETO (Aparece arriba si los controles están ocultos)
         if (estaCargando && !controlesVisibles) {
             Box(
                 modifier = Modifier
@@ -683,7 +763,6 @@ fun PlayerPeliculasScreen(
             }
         }
 
-        // 🟢 CONTROLES CINEMATOGRÁFICOS
         AnimatedVisibility(
             visible = controlesVisibles && !menuPelisAbierto,
             enter = fadeIn(animationSpec = tween(300)),
@@ -736,7 +815,7 @@ fun PlayerPeliculasScreen(
             )
         }
 
-        // 🟢 MENÚ CARTELERA
+        // 🟢 MENÚ CARTELERA CON ALQUILERES DE PRIMERAS
         AnimatedVisibility(
             visible = menuPelisAbierto,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -745,6 +824,7 @@ fun PlayerPeliculasScreen(
         ) {
             MenuCarteleraOverlay(
                 peliculas = peliculasActivas,
+                idsAlquileres = idsAlquileresUsuario,
                 peliculaActualId = "",
                 onSelectMovie = { seleccionada ->
                     guardarProgresoActual()
@@ -876,7 +956,6 @@ fun OverlayCinematograficoTV(
             .padding(horizontal = 24.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // --- 1. BARRA SUPERIOR: RELOJ GIGANTE, FECHA E INDICADOR DE BÚFER ELEGANTE ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -914,7 +993,6 @@ fun OverlayCinematograficoTV(
                     fontWeight = FontWeight.SemiBold
                 )
 
-                // 🟢 INDICADOR DE BÚFER SUBTÍTULO ELEGANTE
                 if (estaCargando) {
                     Spacer(modifier = Modifier.height(4.dp))
                     IndicadorBufferSuperior(progreso = progresoSimulado)
@@ -922,7 +1000,6 @@ fun OverlayCinematograficoTV(
             }
         }
 
-        // --- 2. ZONA INFERIOR: FICHA GRANDE, SINOPSIS SUTIL Y BARRA DESPLAZABLE ---
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -983,7 +1060,6 @@ fun OverlayCinematograficoTV(
                 }
             }
 
-            // 🟢 BARRA DE PROGRESO DESPLAZABLE TV
             BarraProgresoTVDesplazable(
                 posicionActual = currentPosition,
                 duracionTotal = totalDuration,
@@ -998,7 +1074,6 @@ fun OverlayCinematograficoTV(
                 }
             )
 
-            // 🟢 BOTONES DE ACCIÓN
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
@@ -1304,11 +1379,12 @@ fun BotonIconoControlTV(
 }
 
 // =========================================================================
-// 🟢 MENÚ CARTELERA (MARQUEE SOLO EN LA TARJETA SELECCIONADA)
+// 🟢 MENÚ CARTELERA (ALQUILERES PRIMERO EN DORADO, GRATIS EN VERDE)
 // =========================================================================
 @Composable
 fun MenuCarteleraOverlay(
     peliculas: List<Modelo>,
+    idsAlquileres: List<String>,
     peliculaActualId: String,
     onSelectMovie: (Modelo) -> Unit
 ) {
@@ -1324,17 +1400,32 @@ fun MenuCarteleraOverlay(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0x55000000))
+            .background(Color(0x77000000))
             .padding(vertical = 12.dp, horizontal = 16.dp)
     ) {
         Column {
-            Text(
-                text = "🍿 PELÍCULAS EN GRATIS",
-                color = DoradoBrillante,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 6.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "🍿 PELÍCULAS EN CARTELERA",
+                    color = DoradoBrillante,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                if (idsAlquileres.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "(${idsAlquileres.size} alquiladas activas de primeras)",
+                        color = ColorDorado,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
 
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -1343,25 +1434,32 @@ fun MenuCarteleraOverlay(
             ) {
                 itemsIndexed(peliculas, key = { _, movie -> movie.id }) { index, movie ->
                     var isCardFocused by remember { mutableStateOf(false) }
+                    val esAlquilerPersonal = idsAlquileres.contains(movie.id)
 
+                    val createdAtMillis = remember(movie.createdAt) {
+                        if (movie.createdAt in 1..999999999999L) movie.createdAt * 1000 else movie.createdAt
+                    }
                     val countdownMillis = remember(movie.id, movie.countdownMinutes) {
                         TimeUnit.MINUTES.toMillis(movie.countdownMinutes.toLong())
                     }
-                    var millisRestantes by remember(movie.id, movie.createdAt) {
-                        mutableLongStateOf(maxOf(0L, countdownMillis - (System.currentTimeMillis() - movie.createdAt)))
+                    var millisRestantes by remember(movie.id, createdAtMillis) {
+                        mutableLongStateOf(maxOf(0L, countdownMillis - (System.currentTimeMillis() - createdAtMillis)))
                     }
 
-                    LaunchedEffect(movie.id) {
+                    LaunchedEffect(movie.id, createdAtMillis) {
                         while (millisRestantes > 0) {
                             delay(1000)
-                            millisRestantes = maxOf(0L, countdownMillis - (System.currentTimeMillis() - movie.createdAt))
+                            millisRestantes = maxOf(0L, countdownMillis - (System.currentTimeMillis() - createdAtMillis))
                         }
                     }
 
                     val h = TimeUnit.MILLISECONDS.toHours(millisRestantes)
                     val m = TimeUnit.MILLISECONDS.toMinutes(millisRestantes) % 60
                     val s = TimeUnit.MILLISECONDS.toSeconds(millisRestantes) % 60
-                    val strTiempo = String.format(Locale.getDefault(), "▶ %02d:%02d:%02d", h, m, s)
+                    val tiempoFormateado = String.format(Locale.getDefault(), "%02d:%02d:%02d", h, m, s)
+
+                    val strTiempo = if (esAlquilerPersonal) "⭐ ALQUILER $tiempoFormateado" else "▶ GRATIS $tiempoFormateado"
+                    val colorBadge = if (esAlquilerPersonal) Color(0xE6C5A059) else Color(0xE6107C41)
 
                     val cardModifier = if (index == 0) {
                         Modifier.focusRequester(primerCardFocusRequester)
@@ -1377,13 +1475,13 @@ fun MenuCarteleraOverlay(
                             .shadow(
                                 elevation = if (isCardFocused) 20.dp else 0.dp,
                                 shape = RoundedCornerShape(12.dp),
-                                spotColor = DoradoBrillante
+                                spotColor = if (esAlquilerPersonal) ColorDorado else DoradoBrillante
                             )
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color(0xFF1E293B))
                             .border(
                                 width = if (isCardFocused) 3.dp else 1.dp,
-                                color = if (isCardFocused) DoradoBrillante else Color(0x33C5A059),
+                                color = if (isCardFocused) ColorDorado else if (esAlquilerPersonal) ColorDorado.copy(alpha = 0.6f) else Color(0x33C5A059),
                                 shape = RoundedCornerShape(12.dp)
                             )
                             .onFocusChanged { isCardFocused = it.isFocused }
@@ -1407,24 +1505,25 @@ fun MenuCarteleraOverlay(
                                 contentScale = ContentScale.Crop
                             )
 
+                            // Insignia: Dorada si es del perfil, Verde si es gratis de la comunidad
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
                                     .fillMaxWidth()
-                                    .background(Color(0xE6107C41))
+                                    .background(colorBadge)
                                     .padding(vertical = 2.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = strTiempo,
                                     color = Color.White,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
                                 )
                             }
                         }
 
-                        // 🟢 MARQUEE SOLO EN LA TARJETA ENFOCADA
                         val marqueeMod = if (isCardFocused) {
                             Modifier.basicMarquee(
                                 iterations = Int.MAX_VALUE,
@@ -1466,7 +1565,6 @@ fun MenuCarteleraOverlay(
         }
     }
 }
-
 // =========================================================================
 // 🟢 DIÁLOGOS Y SELECTOR DE PISTAS
 // =========================================================================
