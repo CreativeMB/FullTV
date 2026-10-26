@@ -11,6 +11,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -231,6 +232,67 @@ fun PerfilScreenDashboard(
         }
     }
 
+    // Variable auxiliar para sumar los usuarios que realmente estén conectados en Firebase
+    var baseConectados by remember { mutableIntStateOf(1) }
+
+    // =========================================================================
+    // 🧠 SIMULADOR INTELIGENTE DE RITMO LENTO (CINE / STREAMING TV)
+    // =========================================================================
+    LaunchedEffect(Unit) {
+        // Función interna para calcular el rango adecuado según hora y día
+        fun obtenerRangoSegunHorario(): Pair<Int, Int> {
+            val cal = java.util.Calendar.getInstance()
+            val hora = cal.get(java.util.Calendar.HOUR_OF_DAY) // 0 a 23
+            val diaSemana = cal.get(java.util.Calendar.DAY_OF_WEEK) // 1=Dom, 6=Vie, 7=Sáb
+
+            val esFinDeSemana = diaSemana == java.util.Calendar.FRIDAY ||
+                    diaSemana == java.util.Calendar.SATURDAY ||
+                    diaSemana == java.util.Calendar.SUNDAY
+
+            // Rango de concurrentes acorde a una comunidad de ~1000 usuarios
+            val (minBase, maxBase) = when (hora) {
+                in 1..6 -> 12 to 24          // 🌙 Madrugada (1% a 2.5%)
+                in 7..11 -> 25 to 45         // ☕ Mañana (2.5% a 4.5%)
+                in 12..17 -> 45 to 75        // ⛅ Tarde (4.5% a 7.5%)
+                in 18..23 -> 85 to 140       // 🎬 Prime Time / Noche pico (8.5% a 14%)
+                else -> 35 to 55             // 🕛 Medianoche (en descenso)
+            }
+
+            // Fin de semana: la gente ve más películas (+30% de audiencia)
+            val boostFinSemana = if (esFinDeSemana) 1.30f else 1.0f
+            return Pair((minBase * boostFinSemana).toInt(), (maxBase * boostFinSemana).toInt())
+        }
+
+        // 1. ARRANCAR DIRECTO EN EL NÚMERO ADECUADO (sin esperas ni saltos)
+        val rangoInicial = obtenerRangoSegunHorario()
+        var simulados = kotlin.random.Random.nextInt(rangoInicial.first, rangoInicial.second)
+        usuariosOnline = simulados + baseConectados
+
+        // 2. CICLO CON ESPERAS DE MINUTOS (Comportamiento de streaming real)
+        while (true) {
+            // ⏳ Espera entre 60 y 140 segundos (1 a 2.3 minutos entre cada cambio)
+            delay(kotlin.random.Random.nextLong(60_000L, 140_000L))
+
+            val (rangoMin, rangoMax) = obtenerRangoSegunHorario()
+
+            if (simulados < rangoMin) {
+                simulados += kotlin.random.Random.nextInt(1, 3) // Sube sutilmente
+            } else if (simulados > rangoMax) {
+                simulados -= kotlin.random.Random.nextInt(1, 3) // Baja sutilmente
+            } else {
+                // Variación muy orgánica: puede subir 1, bajar 1 o quedarse exactamente igual (0)
+                val variacion = kotlin.random.Random.nextInt(-1, 2) // -1, 0 ó +1
+                simulados = (simulados + variacion).coerceIn(rangoMin, rangoMax)
+            }
+
+            // Actualizar el número en pantalla
+            usuariosOnline = simulados + baseConectados
+        }
+    }
+
+    // =========================================================================
+    // 2. LISTENER DE FIREBASE (PERFIL Y COMUNIDAD DE ~100)
+    // =========================================================================
     DisposableEffect(correoKey) {
         fotoUsuarioUrl = user?.photoUrl?.toString()
         val refUsuarios = databaseRef.child("usuarios")
@@ -245,9 +307,14 @@ fun PerfilScreenDashboard(
                     if (isOnline) conectadosReales++ else desconectadosReales++
                 }
 
-                usuariosOnline = maxOf(1, conectadosReales)
-                usuariosOffline = desconectadosReales + 100
+                // Guardamos los reales para sumarlos a la fluctuación
+                baseConectados = conectadosReales
 
+                // Base fija de 1,000 usuarios falsos + los que existan en Firebase
+                val baseComunidad = 100
+                usuariosOffline = baseComunidad + desconectadosReales
+
+                // Carga de datos de perfil del usuario logueado
                 if (correoKey.isNotEmpty()) {
                     val miUser = snapshot.child(correoKey)
                     val nombreDb = miUser.child("nombre").value?.toString()
@@ -266,13 +333,13 @@ fun PerfilScreenDashboard(
                     saldoCastv = miUser.child("castv").value?.toString() ?: "0"
                 }
             }
+
             override fun onCancelled(error: DatabaseError) {}
         }
 
         refUsuarios.addValueEventListener(listenerUsuarios)
         onDispose { refUsuarios.removeEventListener(listenerUsuarios) }
     }
-
     LaunchedEffect(correoKey) {
         databaseRef.child("movies").addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(moviesSnapshot: DataSnapshot) {
@@ -409,7 +476,7 @@ fun PerfilScreenDashboard(
                     Text(
                         text = nombreUsuario,
                         color = Color.White,
-                        fontSize = if (esTv) 15.sp else 13.sp,
+                        fontSize = if (esTv) 25.sp else 13.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -429,13 +496,13 @@ fun PerfilScreenDashboard(
                     Text(
                         text = horaEnVivo,
                         color = ColorDoradoBrillante,
-                        fontSize = if (esTv) 15.5.sp else 13.5.sp,
+                        fontSize = if (esTv) 25.5.sp else 13.5.sp,
                         fontWeight = FontWeight.Black
                     )
                     Text(
                         text = fechaCompletaEnVivo,
                         color = Color.White,
-                        fontSize = if (esTv) 12.sp else 10.5.sp,
+                        fontSize = if (esTv) 16.sp else 10.5.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -453,7 +520,7 @@ fun PerfilScreenDashboard(
                     Text(
                         text = "💰 $saldoCastv CasTV",
                         color = ColorDoradoBrillante,
-                        fontSize = if (esTv) 13.5.sp else 12.sp,
+                        fontSize = if (esTv) 20.sp else 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -624,7 +691,9 @@ fun TarjetaQRsGigantesLimpios(
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = if (isFocused) Color(0xFF161E2E) else ColorCardPerfil),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isFocused) Color(0xFF161E2E) else ColorCardPerfil
+        ),
         modifier = modifier
             .border(
                 width = if (isFocused) 2.dp else 1.dp,
@@ -640,6 +709,7 @@ fun TarjetaQRsGigantesLimpios(
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // ENCABEZADO
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -648,95 +718,113 @@ fun TarjetaQRsGigantesLimpios(
                 Text(
                     text = "📲 COMUNIDAD Y REDES OFICIALES",
                     color = ColorDoradoPerfil,
-                    fontSize = if (esTv) 14.sp else 12.5.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = if (esTv) 13.5.sp else 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
                 )
 
                 Text(
-                    text = "📷 Escanea desde tu sillón con tu móvil",
+                    text = "📷 Escanea con tu móvil",
                     color = ColorDoradoBrillante,
-                    fontSize = if (esTv) 11.5.sp else 10.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontSize = if (esTv) 11.sp else 9.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
                 )
             }
 
+            // CONTENIDO: DISTRIBUCIÓN RESPONSIVA AUTOMÁTICA
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // QR Canal Oficial
-                Row(
+                // 1. QR Canal Oficial
+                Column(
                     modifier = Modifier
                         .weight(1f)
+                        .fillMaxHeight()
                         .clip(RoundedCornerShape(10.dp))
                         .background(Color(0xFF0B0E17))
                         .border(1.2.dp, Color(0xFF1E2638), RoundedCornerShape(10.dp))
-                        .padding(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.canal),
-                        contentDescription = "Canal Oficial",
+                    // Contenedor responsivo: aprovecha todo el alto sobrante y mantiene el QR cuadrado
+                    Box(
                         modifier = Modifier
-                            .size(if (esTv) 128.dp else 95.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.White)
-                            .padding(4.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Canal Oficial",
-                            color = Color.White,
-                            fontSize = if (esTv) 16.sp else 13.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Cartelera y estrenos diarios al instante en Telegram.",
-                            color = Color(0xFFCBD5E1),
-                            fontSize = if (esTv) 12.sp else 10.5.sp,
-                            lineHeight = if (esTv) 16.sp else 14.sp
+                            .weight(1f)
+                            .aspectRatio(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.canal),
+                            contentDescription = "Canal Oficial",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.White)
+                                .padding(4.dp)
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "Canal Oficial",
+                        color = Color.White,
+                        fontSize = if (esTv) 14.sp else 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
+                    )
                 }
 
-                // QR Grupo Parche
-                Row(
+                // 2. QR Grupo Parche
+                Column(
                     modifier = Modifier
                         .weight(1f)
+                        .fillMaxHeight()
                         .clip(RoundedCornerShape(10.dp))
                         .background(Color(0xFF0B0E17))
                         .border(1.2.dp, Color(0xFF1E2638), RoundedCornerShape(10.dp))
-                        .padding(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.grupo),
-                        contentDescription = "Grupo Parche",
+                    // Contenedor responsivo: aprovecha todo el alto sobrante y mantiene el QR cuadrado
+                    Box(
                         modifier = Modifier
-                            .size(if (esTv) 128.dp else 95.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.White)
-                            .padding(4.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Grupo Parche",
-                            color = Color.White,
-                            fontSize = if (esTv) 16.sp else 13.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Pide tus películas favoritas y debate con la comunidad.",
-                            color = Color(0xFFCBD5E1),
-                            fontSize = if (esTv) 12.sp else 10.5.sp,
-                            lineHeight = if (esTv) 16.sp else 14.sp
+                            .weight(1f)
+                            .aspectRatio(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.grupo),
+                            contentDescription = "Grupo Parche",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.White)
+                                .padding(4.dp)
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "Grupo Parche",
+                        color = Color.White,
+                        fontSize = if (esTv) 14.sp else 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
+                    )
                 }
             }
         }
@@ -760,6 +848,7 @@ fun TarjetaEstadisticasNumerosGrandes(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = if (isFocused) Color(0xFF161E2E) else ColorCardPerfil),
         modifier = modifier
+            .scale(if (isFocused) 1.02f else 1.0f)
             .border(
                 width = if (isFocused) 2.dp else 1.dp,
                 color = if (isFocused) ColorDoradoPerfil else Color(0xFF1E2638),
@@ -771,68 +860,114 @@ fun TarjetaEstadisticasNumerosGrandes(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.SpaceAround
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // SECCIÓN SUPERIOR: ESTRENO DESTACADO GIGANTE Y BIEN ALINEADO
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "$totalPeliculasValidadas",
                     color = ColorDoradoBrillante,
-                    fontSize = if (esTv) 28.sp else 22.sp,
-                    fontWeight = FontWeight.Black
+                    fontSize = if (esTv) 44.sp else 26.sp,
+                    fontWeight = FontWeight.Black,
+                    lineHeight = if (esTv) 44.sp else 26.sp
                 )
                 Spacer(modifier = Modifier.width(10.dp))
-                Column {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
                     Text(
-                        text = "Estrenos Listos para Ver",
+                        text = "PELÍCULAS ALQUILAR YA ",
                         color = Color.White,
-                        fontSize = if (esTv) 13.5.sp else 12.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = if (esTv) 18.sp else 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
                     )
                     Text(
-                        text = "Pestaña ACTIVAR • Inmediatos",
+                        text = "Pestaña ACTIVAR ",
                         color = Color(0xFF34D399),
-                        fontSize = if (esTv) 11.sp else 9.5.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontSize = if (esTv) 18.sp else 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
                     )
                 }
             }
 
             HorizontalDivider(color = Color(0xFF1E2638), thickness = 0.8.dp)
 
+            // SECCIÓN INFERIOR: DISTRIBUCIÓN 50/50 CON CONTENEDORES EQUITATIVOS (SIN HUECOS)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Bloque En Vivo (Ocupa exactamente la mitad)
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0x1410B981))
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = "$usuariosOnline",
                         color = Color(0xFF34D399),
-                        fontSize = if (esTv) 24.sp else 19.sp,
-                        fontWeight = FontWeight.Black
+                        fontSize = if (esTv) 44.sp else 19.sp,
+                        fontWeight = FontWeight.Black,
+                        lineHeight = if (esTv) 44.sp else 19.sp
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Column {
-                        Text("🟢 En Vivo", color = Color.White, fontSize = if (esTv) 12.sp else 10.5.sp, fontWeight = FontWeight.Bold)
-                        Text("Online", color = Color(0xFF94A3B8), fontSize = if (esTv) 10.sp else 8.5.sp)
+                        Text(
+                            text = "🟢",
+                            color = Color.White,
+                            fontSize = if (esTv) 11.5.sp else 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Online",
+                            color = Color(0xFF94A3B8),
+                            fontSize = if (esTv) 9.5.sp else 8.5.sp
+                        )
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Bloque Comunidad (Ocupa exactamente la otra mitad)
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0x1B0277BD))
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = "$usuariosOffline",
-                        color = Color(0xFFF87171),
-                        fontSize = if (esTv) 24.sp else 19.sp,
-                        fontWeight = FontWeight.Black
+                        color = Color(0xFF0277BD),
+                        fontSize = if (esTv) 44.sp else 19.sp,
+                        fontWeight = FontWeight.Black,
+                        lineHeight = if (esTv) 44.sp else 19.sp
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Column {
-                        Text("🔴 Comunidad", color = Color.White, fontSize = if (esTv) 12.sp else 10.5.sp, fontWeight = FontWeight.Bold)
-                        Text("Total", color = Color(0xFF94A3B8), fontSize = if (esTv) 10.sp else 8.5.sp)
+                        Text(
+                            text = "🔵",
+                            color = Color.White,
+                            fontSize = if (esTv) 11.5.sp else 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "comunidad",
+                            color = Color(0xFF94A3B8),
+                            fontSize = if (esTv) 9.5.sp else 8.5.sp
+                        )
                     }
                 }
             }
@@ -1028,6 +1163,7 @@ fun OverlayGuiaCineParchePantallaCompleta(
     val scrollState = rememberScrollState()
     val primerItemRequester = remember { FocusRequester() }
 
+    // Foco inicial automático para el control remoto
     LaunchedEffect(Unit) {
         delay(150)
         try { primerItemRequester.requestFocus() } catch (_: Exception) {}
@@ -1036,20 +1172,25 @@ fun OverlayGuiaCineParchePantallaCompleta(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFA050810))
-            .padding(horizontal = 26.dp, vertical = 18.dp)
+            .background(Color(0xF5060911)) // Fondo cinema ultra oscuro
+            .padding(horizontal = 28.dp, vertical = 20.dp)
     ) {
+        // Tarjeta principal limpia y elegante (sin borde naranja fijo)
         Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0D121F)),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1523)),
             modifier = Modifier
                 .fillMaxSize()
-                .border(2.dp, ColorDoradoPerfil, RoundedCornerShape(16.dp))
+                .border(
+                    width = 1.dp,
+                    color = Color(0x1FFFFFFF), // Borde tenue premium tipo cristal
+                    shape = RoundedCornerShape(18.dp)
+                )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .padding(horizontal = 26.dp, vertical = 20.dp)
             ) {
                 // ENCABEZADO SUPERIOR
                 Row(
@@ -1058,83 +1199,107 @@ fun OverlayGuiaCineParchePantallaCompleta(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "📋 GUÍA OFICIAL CINEPARCHE",
+                        text = "📋 GUÍA Y POLÍTICAS DE CONTENIDO",
                         color = ColorDoradoBrillante,
-                        fontSize = 21.sp,
-                        fontWeight = FontWeight.Black
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.5.sp
                     )
 
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF261D09))
-                            .border(1.dp, ColorDoradoPerfil, RoundedCornerShape(8.dp))
+                            .background(Color(0xFF192233))
+                            .border(1.dp, Color(0x33FFD56B), RoundedCornerShape(8.dp))
                             .padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {
                         Text(
-                            text = "SISTEMA CASTV OFICIAL",
+                            text = "CineParche OFICIAL",
                             color = ColorDoradoBrillante,
-                            fontSize = 12.sp,
+                            fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // CONTENIDO LIMPIO SIN RECUADROS: EL RECUADRO SOLO APARECE AL ENFOCAR
+                // CONTENIDO LIMPIO: EL RECUADRO SOLO APARECE CON EL FOCUS DEL CONTROL
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .verticalScroll(scrollState),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // SECCIÓN 1: FLUJO DE PAGO Y COSTO POR CRÉDITO
+                    // SECCIÓN INICIAL: RESUMEN DE NAVEGACIÓN
                     ItemSeccionGuiaTvLimpio(
-                        icono = "💳",
-                        titulo = "1. CÓMO RECARGAR TU SALDO CASTV (PROCESO FÁCIL)",
-                        cuerpo = "1. Vas a la opción <b>'PAQUETES'</b> en el menú principal y eliges el plan que prefieras.<br>" +
-                                "2. Se generará un <b>código QR en la pantalla de tu TV</b>: lo escaneas con la cámara de tu móvil.<br>" +
-                                "3. Realizas el pago y <b>cargas la foto del comprobante desde tu móvil</b>.<br>" +
-                                "4. Nuestro equipo revisa el comprobante y <b>te activan el saldo CasTV de inmediato en tu cuenta</b>.<br><br>" +
-                                "<b>¿Cómo rinden los paquetes?</b><br>" +
-                                "Todos los créditos son iguales y <b>nunca vencen</b>. La única diferencia es que entre mayor sea el paquete, <b>más barato te sale cada CasTV</b>:<br>" +
-                                "• <b>Bronce (50 CasTV):</b> Paquete base de entrada.<br>" +
-                                "• <b>Plata (120 CasTV):</b> Cada CasTV te sale más barato que en el primero.<br>" +
-                                "• <b>Oro VIP (250 CasTV):</b> Es el que tiene el costo más bajo por crédito (máximo ahorro por película).",
+                        icono = "🧭",
+                        titulo = "GUÍA RÁPIDA DE OPCIONES DEL MENÚ",
+                        cuerpo = "• <b>📺 TV:</b> Canales en vivo 100% gratuitos de listas abiertas.<br>" +
+                                "• <b>🎬 ALQUILA:</b> Explora el catálogo general, ve tráilers y programa tus alquileres.<br>" +
+                                "• <b>⚡ ACTIVAR:</b> Películas listas para ver al instante con contador activo.<br>" +
+                                "• <b>📦 PEDIR:</b> Solicita películas de la red o personalizadas por Nombre y Año.<br>" +
+                                "• <b>🔍 BUSCAR:</b> Buscador rápido de contenido en nuestra red.<br>" +
+                                "• <b>💳 PAQUETE:</b> Selecciona tu PAQUETE y recarga saldo CasTV por código QR.<br>" +
+                                "• <b>👤 PERFIL:</b> Revisa tu saldo disponible, películas activas y esta guía.<br>" +
+                                "• <b>🚪 CERRAR:</b> Cambia de cuenta si usas varios perfiles en el hogar.",
                         modifier = Modifier.focusRequester(primerItemRequester)
                     )
 
-                    // SECCIÓN 2: ALQUILER POR TIEMPO Y CONTADOR REGRESIVO
+                    // SECCIÓN 1: PROCESO DE RECARGA Y PAQUETES
+                    ItemSeccionGuiaTvLimpio(
+                        icono = "💳",
+                        titulo = "1. CÓMO RECARGAR SALDO CASTV",
+                        cuerpo = "<b>Pasos para recargar:</b><br>" +
+                                "1. Ve a <b>'PAQUETES'</b> en el menú principal y elige tu PAQUETE.<br>" +
+                                "2. Escanea con la cámara de tu móvil el <b>código QR</b> en pantalla.<br>" +
+                                "3. Realiza el pago y <b>sube el comprobante</b> desde tu celular.<br>" +
+                                "4. Validamos tu pago y <b>activamos tu saldo CasTV al instante</b>.<br><br>" +
+                                "<b>Rendimiento de los paquetes (saldo acumulable sin vencimiento):</b><br>" +
+                                "• <b>Bronce (50 CasTV):</b> Básico.<br>" +
+                                "• <b>Plata (120 CasTV):</b> Más Popular.<br>" +
+                                "• <b>Oro VIP (250 CasTV):</b> VIP."
+                    )
+
+                    // SECCIÓN 2: TIEMPOS DE ALQUILER Y CONTADOR REGRESIVO
                     ItemSeccionGuiaTvLimpio(
                         icono = "⏱️",
-                        titulo = "2. ALQUILER POR TIEMPO (CONTADOR REGRESIVO)",
-                        cuerpo = "• <b>⚡ ACTIVAR:</b> Películas verificadas listas para ver ya. Inicia el contador y dale play al instante.<br>" +
-                                "• <b>📅 ALQUILAR:</b> Programa tu película para el fin de semana sin que el tiempo empiece a correr antes de la cita.<br>" +
-                                "• <b>Cero Dobles Cobros:</b> Si ya tienes una película activa en tu perfil, reprodúcela cuantas veces quieras mientras el contador siga activo."
+                        titulo = "2. MODALIDADES DE ALQUILER",
+                        cuerpo = "• <b>⚡ ACTIVAR (Ver al Instante):</b> Para películas disponibles ya. Al activar, se inicia el contador de <b>5 horas continuas</b> para disfrutar la reproducción.<br>" +
+                                "• <b>📅 ALQUILAR (Programar Fecha):</b> Agenda la película para la fecha y hora que prefieras. <b>El contador de 5 horas NO empieza a correr</b> hasta llegada la fecha programada.<br>" +
+                                "• <b>🛡️ Cero Dobles Cobros:</b> Reproduce tu película activa cuantas veces quieras mientras el contador continúe activo en tu perfil."
                     )
 
-                    // SECCIÓN 3: TV EN VIVO Y CONTENIDO DE INTERNET
+                    // SECCIÓN 3: TV EN VIVO Y CINE EN CORTESÍA
                     ItemSeccionGuiaTvLimpio(
                         icono = "📺",
-                        titulo = "3. TELEVISIÓN EN VIVO 100% GRATIS & RED",
-                        cuerpo = "• <b>TV En Vivo:</b> Más de 2,400 canales de televisión abierta sin ningún costo, sin saldo y sin suscripciones.<br>" +
-                                "• <b>Contenido de Internet:</b> CineParche es una plataforma comunitaria que organiza y comparte transmisiones multimedia libres y públicas de la red.<br>" +
-                                "• <b>Películas en Cortesía:</b> Disfruta periódicamente de estrenos en rotación gratuita para todos."
+                        titulo = "3. TV EN VIVO GRATIS & CINE COMUNITARIO",
+                        cuerpo = "• <b>TV En Vivo Gratis:</b> Más de 1,300 canales de televisión abierta sin suscripciones, pagos ni registros.<br>" +
+                                "• <b>Listas IPTV de Terceros:</b> CineParche retransmite y organiza listas IPTV públicas de internet sin costo comercial.<br>" +
+                                "• <b>Cine en Cortesía:</b> Disfruta de películas promocionales en rotación gratuita para toda la comunidad (señalizadas con etiqueta <b>ONLINE</b>)."
                     )
 
-                    // SECCIÓN 4: PEDIDOS Y SOPORTE
+                    // SECCIÓN 4: SOLICITUDES Y SOPORTE OFICIAL
                     ItemSeccionGuiaTvLimpio(
                         icono = "📲",
-                        titulo = "4. PEDIDOS DE PELÍCULAS Y CANALES OFICIALES 24/7",
-                        cuerpo = "• <b>Opción 'PEDIR':</b> Si no ves la película que buscas, usa el botón Pedir para que la subamos a la cartelera.<br>" +
-                                "• <b>Atención en Telegram:</b> Soporte activo en nuestro Canal Oficial y Grupo Parche.<br>" +
-                                "• <b>Sitio Web Oficial:</b> <font color='#FFD56B'><b>https://onnline.web.app/CineParche</b></font>"
+                        titulo = "4. PEDIDOS DE PELÍCULAS Y SOPORTE 24/7",
+                        cuerpo = "• <b>Opción 'PEDIR':</b> Si buscas una película no disponible en catálogo, solicítala con <b>Nombre y Año</b> para que la subamos a la cartelera.<br>" +
+                                "• <b>Soporte Telegram:</b> Atención activa 24/7 en nuestro Canal Oficial y Grupo Parche.<br>" +
+                                "• <b>Web Oficial:</b> <font color='#FFD56B'><b>https://onnline.web.app/CineParche</b></font>"
+                    )
+
+                    // SECCIÓN 5: MARCO LEGAL Y RESPONSABILIDAD
+                    ItemSeccionGuiaTvLimpio(
+                        icono = "⚖️",
+                        titulo = "5. AVISO LEGAL Y PROPIEDAD DE CONTENIDO",
+                        cuerpo = "• <b>Televisión Libre:</b> Las señales de TV abierta provienen de enlaces IPTV públicos en la red. CineParche no produce ni distribuye estas señales, solo las organiza de forma gratuita.<br>" +
+                                "• <b>Alquiler por Tiempo:</b> No se cobra por la venta o propiedad del material audiovisual. Los créditos CasTV cubren exclusivamente el servicio de acceso y uso de la plataforma por tiempo limitado (contador regresivo).<br>" +
+                                "• <b>Derechos de Autor:</b> CineParche no almacena ni aloja archivos multimedia en servidores propios; actúa estrictamente como un indexador y reproductor de enlaces multimedia de la red."
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // BOTONES DE ACCIÓN INFERIORES NAVEGABLES
                 Row(
@@ -1142,50 +1307,63 @@ fun OverlayGuiaCineParchePantallaCompleta(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Botón Sitio Web
                     var isWebFocused by remember { mutableStateOf(false) }
+                    val webScale by animateFloatAsState(if (isWebFocused) 1.03f else 1.0f, label = "scaleWeb")
+                    val webBorderColor by animateColorAsState(
+                        if (isWebFocused) ColorDoradoBrillante else Color(0x33FFFFFF),
+                        label = "colorWeb"
+                    )
 
                     Box(
                         modifier = Modifier
-                            .scale(if (isWebFocused) 1.04f else 1.0f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isWebFocused) Color(0xFF2C394F) else Color(0xFF161F2E))
-                            .border(
-                                width = if (isWebFocused) 2.dp else 1.dp,
-                                color = if (isWebFocused) ColorDoradoBrillante else Color(0xFF26324D),
-                                shape = RoundedCornerShape(8.dp)
-                            )
+                            .scale(webScale)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isWebFocused) Color(0xFF222C3D) else Color(0xFF141A26))
+                            .border(width = if (isWebFocused) 2.dp else 1.dp, color = webBorderColor, shape = RoundedCornerShape(10.dp))
                             .onFocusChanged { isWebFocused = it.isFocused }
                             .focusable()
                             .clickable {
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://onnline.web.app/CineParche"))
                                 context.startActivity(intent)
                             }
-                            .padding(horizontal = 22.dp, vertical = 10.dp)
+                            .padding(horizontal = 22.dp, vertical = 12.dp)
                     ) {
                         Text(
                             text = "🌐 ABRIR ONNLINE.WEB.APP/CINEPARCHE",
-                            color = if (isWebFocused) ColorDoradoBrillante else Color.White,
-                            fontSize = 13.5.sp,
+                            color = if (isWebFocused) ColorDoradoBrillante else Color(0xFFDDDDDD),
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
+                    // Botón Volver / Entendido
                     var isCerrarFocused by remember { mutableStateOf(false) }
+                    val cerrarScale by animateFloatAsState(if (isCerrarFocused) 1.04f else 1.0f, label = "scaleCerrar")
+                    val cerrarBgColor by animateColorAsState(
+                        if (isCerrarFocused) ColorDoradoBrillante else ColorDoradoPerfil,
+                        label = "colorCerrar"
+                    )
 
                     Box(
                         modifier = Modifier
-                            .scale(if (isCerrarFocused) 1.05f else 1.0f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isCerrarFocused) Color.White else ColorDoradoPerfil)
+                            .scale(cerrarScale)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(cerrarBgColor)
+                            .border(
+                                width = if (isCerrarFocused) 2.dp else 0.dp,
+                                color = if (isCerrarFocused) Color.White else Color.Transparent,
+                                shape = RoundedCornerShape(10.dp)
+                            )
                             .onFocusChanged { isCerrarFocused = it.isFocused }
                             .focusable()
                             .clickable(onClick = onDismiss)
-                            .padding(horizontal = 30.dp, vertical = 10.dp)
+                            .padding(horizontal = 30.dp, vertical = 12.dp)
                     ) {
                         Text(
                             text = "ENTENDIDO / VOLVER AL PERFIL",
-                            color = Color.Black,
-                            fontSize = 14.sp,
+                            color = Color(0xFF0B0E14),
+                            fontSize = 13.5.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
