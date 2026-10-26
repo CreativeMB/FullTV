@@ -1,3 +1,8 @@
+@file:OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.ui.ExperimentalComposeUiApi::class
+)
+
 package com.creativem.fulltv.api
 
 import android.content.Context
@@ -235,8 +240,8 @@ class PeliculasApiActivity : ComponentActivity() {
                             extraInfoMap.putAll(tempExtras)
                             peliculasList = peliculasSinDuplicados
                             isLoading = false
+                            // 🟢 Asignamos la primera película directamente sin dejar peliculaEnfocada en null
                             if (peliculasSinDuplicados.isNotEmpty()) {
-                                peliculaEnfocada = null
                                 onMovieFocused(peliculasSinDuplicados.first())
                             }
                         }
@@ -368,7 +373,7 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
     val config = LocalConfiguration.current
     val esTv = config.screenWidthDp > 600
 
-    // 🟢 FocusRequesters limpios y seguros
+    // 🟢 FocusRequesters limpios
     val menuFocusRequester = remember { FocusRequester() }
     val trailerFocusRequester = remember { FocusRequester() }
     val currentMovieFocusRequester = remember { FocusRequester() }
@@ -377,7 +382,7 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
     LaunchedEffect(peliculas) {
         if (peliculas.isNotEmpty()) {
             carouselListState.scrollToItem(0)
-            delay(150)
+            delay(160)
             try {
                 currentMovieFocusRequester.requestFocus()
             } catch (_: Exception) {}
@@ -430,6 +435,8 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                 categorias = categorias,
                 categoriaSeleccionada = categoriaSeleccionada,
                 esTv = esTv,
+                isLoading = isLoading,
+                hasPeliculas = peliculas.isNotEmpty(),
                 menuFocusRequester = menuFocusRequester,
                 movieFocusRequester = currentMovieFocusRequester,
                 onCategoriaClick = onCategoriaClick
@@ -437,7 +444,7 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
 
             Spacer(modifier = Modifier.width(14.dp))
 
-            // CONTENIDO PRINCIPAL APROVECHANDO TODA LA PANTALLA
+            // CONTENIDO PRINCIPAL
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -576,9 +583,10 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                         maxLines = 1
                     )
 
-                    // 🟢 BOTÓN TRÁILER: Conectado para saltar arriba/izquierda al menú y abajo al mismo póster
                     BotonTrailerCentradoPregunta(
                         esTv = esTv,
+                        isLoading = isLoading,
+                        hasPeliculas = peliculas.isNotEmpty(),
                         trailerFocusRequester = trailerFocusRequester,
                         currentMovieFocusRequester = currentMovieFocusRequester,
                         menuFocusRequester = menuFocusRequester,
@@ -586,7 +594,7 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                     )
                 }
 
-                // SECCIÓN INFERIOR: CARRUSEL HORIZONTAL CON PÓSTERS
+                // SECCIÓN INFERIOR: CARRUSEL HORIZONTAL
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -606,6 +614,8 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                         ) {
                             itemsIndexed(peliculas, key = { index, movie -> "${movie.id}_$index" }) { index, movie ->
                                 val isSelected = movie.id == peliculaEnfocada?.id
+                                // 🟢 SI NINGUNA ESTÁ SELECCIONADA AÚN, INDEX 0 TOMA EL FOCUS REQUESTER
+                                val isTarget = isSelected || (peliculaEnfocada == null && index == 0)
 
                                 MovieHorizontalItemDorado(
                                     movie = movie,
@@ -614,7 +624,7 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
                                     isFirstItem = index == 0,
                                     trailerFocusRequester = trailerFocusRequester,
                                     menuFocusRequester = menuFocusRequester,
-                                    currentMovieFocusRequester = if (isSelected) currentMovieFocusRequester else null,
+                                    currentMovieFocusRequester = if (isTarget) currentMovieFocusRequester else null,
                                     onFocused = {
                                         onMovieFocused(movie)
                                         scope.launch {
@@ -647,13 +657,15 @@ fun PantallaPeliculasHorizontalConMenuIzquierdo(
 }
 
 // ====================================================================
-// 🟢 MENÚ LATERAL IZQUIERDO VERTICAL ULTRA ANGOSTO
+// 🟢 MENÚ LATERAL IZQUIERDO VERTICAL (BLINDADO CONTRA CRASH DE FOCO)
 // ====================================================================
 @Composable
 fun MenuCategoriasVertical(
     categorias: List<String>,
     categoriaSeleccionada: String,
     esTv: Boolean,
+    isLoading: Boolean,
+    hasPeliculas: Boolean,
     menuFocusRequester: FocusRequester,
     movieFocusRequester: FocusRequester,
     onCategoriaClick: (String) -> Unit
@@ -678,7 +690,6 @@ fun MenuCategoriasVertical(
                 val isSelected = cat == categoriaSeleccionada
                 var isFocused by remember { mutableStateOf(false) }
 
-                // 🟢 Enganchamos el FocusRequester al elemento seleccionado o al primero
                 val itemFocusModifier = if (isSelected || (categoriaSeleccionada.isEmpty() && index == 0)) {
                     Modifier.focusRequester(menuFocusRequester)
                 } else {
@@ -706,7 +717,8 @@ fun MenuCategoriasVertical(
                         )
                         .then(itemFocusModifier)
                         .focusProperties {
-                            right = movieFocusRequester // 🟢 Flecha DERECHA salta al póster enfocado
+                            // 🟢 BLINDAJE: Solo salta si hay películas y NO está cargando
+                            right = if (!isLoading && hasPeliculas) movieFocusRequester else FocusRequester.Cancel
                         }
                         .onFocusChanged { isFocused = it.isFocused }
                         .focusable()
@@ -744,11 +756,13 @@ fun MenuCategoriasVertical(
 }
 
 // ====================================================================
-// 🟢 BOTÓN EN FORMATO PREGUNTA (AMPLIO Y VISIBLE)
+// 🟢 BOTÓN EN FORMATO PREGUNTA (BLINDADO CONTRA CRASH DE FOCO)
 // ====================================================================
 @Composable
 fun BotonTrailerCentradoPregunta(
     esTv: Boolean,
+    isLoading: Boolean,
+    hasPeliculas: Boolean,
     trailerFocusRequester: FocusRequester,
     currentMovieFocusRequester: FocusRequester,
     menuFocusRequester: FocusRequester,
@@ -771,9 +785,10 @@ fun BotonTrailerCentradoPregunta(
             )
             .focusRequester(trailerFocusRequester)
             .focusProperties {
-                down = currentMovieFocusRequester // 🟢 Flecha ABAJO: salta al póster seleccionado
-                up = menuFocusRequester           // 🟢 Flecha ARRIBA: salta al menú lateral
-                left = menuFocusRequester         // 🟢 Flecha IZQUIERDA: salta al menú lateral
+                // 🟢 BLINDAJE: Solo salta hacia abajo si hay películas y NO está cargando
+                down = if (!isLoading && hasPeliculas) currentMovieFocusRequester else FocusRequester.Cancel
+                up = menuFocusRequester
+                left = menuFocusRequester
             }
             .onFocusChanged { isFocused = it.isFocused }
             .focusable()
@@ -843,9 +858,7 @@ fun MovieHorizontalItemDorado(
             )
             .then(focusMod)
             .focusProperties {
-                // 🟢 NO IMPORTA QUÉ PÓSTER SEA: ARRIBA siempre va a ver tráiler
                 up = trailerFocusRequester
-                // Si es el primer ítem, IZQUIERDA va al menú lateral
                 if (isFirstItem) {
                     left = menuFocusRequester
                 }
