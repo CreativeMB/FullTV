@@ -68,7 +68,7 @@ fun MenuLateralVertical(
             MenuPrincipalItem("Pedir", R.drawable.pedido),
             MenuPrincipalItem("Buscar", R.drawable.buscar),
             MenuPrincipalItem("Paquete", R.drawable.activacion),
-            MenuPrincipalItem("Perfil", R.drawable.home),
+            MenuPrincipalItem("Perfil", R.drawable.outline_contacts_product_24),
             MenuPrincipalItem("Cerrar", R.drawable.cerrrarp)
         )
     }

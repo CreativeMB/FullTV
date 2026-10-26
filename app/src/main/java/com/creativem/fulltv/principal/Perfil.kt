@@ -2,15 +2,15 @@ package com.creativem.fulltv.principal
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.ImageView
-import android.widget.TextView
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -34,16 +34,15 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import androidx.core.text.HtmlCompat
 import androidx.core.view.WindowCompat
 import com.bumptech.glide.Glide
@@ -54,8 +53,10 @@ import com.creativem.fulltv.peliculas.PlayerPeliculas
 import com.creativem.fulltv.peliculasvalidas.Validacioneslista
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -71,6 +72,9 @@ class Perfil : AppCompatActivity() {
     private val databaseRef by lazy { FirebaseDatabase.getInstance().reference }
     private val auth by lazy { FirebaseAuth.getInstance() }
 
+    var isGuiaAbierta: () -> Boolean = { false }
+    var cerrarGuiaAction: (() -> Unit)? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
@@ -80,6 +84,7 @@ class Perfil : AppCompatActivity() {
         setContent {
             MaterialTheme {
                 PerfilScreenDashboard(
+                    activity = this,
                     auth = auth,
                     databaseRef = databaseRef,
                     versionApp = BuildConfig.VERSION_NAME,
@@ -118,6 +123,10 @@ class Perfil : AppCompatActivity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (isGuiaAbierta()) {
+                cerrarGuiaAction?.invoke()
+                return true
+            }
             CastvHelper.regresarAPeliculas(this)
             return true
         }
@@ -126,10 +135,11 @@ class Perfil : AppCompatActivity() {
 }
 
 // =========================================================================
-// 🟢 PANTALLA DASHBOARD: TODO EN 1 SOLA PANTALLA DE TV SIN VACÍOS
+// 🟢 PANTALLA DASHBOARD PRINCIPAL
 // =========================================================================
 @Composable
 fun PerfilScreenDashboard(
+    activity: Perfil,
     auth: FirebaseAuth,
     databaseRef: DatabaseReference,
     versionApp: String,
@@ -144,14 +154,23 @@ fun PerfilScreenDashboard(
     var saldoCastv by remember { mutableStateOf("0") }
     var estaCargando by remember { mutableStateOf(true) }
 
-    var totalPeliculas by remember { mutableIntStateOf(Validacioneslista.obtenerPeliculasValidas().size) }
+    var totalPeliculasValidadas by remember { mutableIntStateOf(Validacioneslista.obtenerPeliculasValidas().size) }
     var usuariosOnline by remember { mutableIntStateOf(0) }
     var usuariosOffline by remember { mutableIntStateOf(0) }
 
     var horaEnVivo by remember { mutableStateOf("") }
-    var fechaEnVivo by remember { mutableStateOf("") }
+    var fechaCompletaEnVivo by remember { mutableStateOf("") }
 
-    var mostrarDialogoInfo by remember { mutableStateOf(false) }
+    var mostrarGuiaPantallaCompleta by remember { mutableStateOf(false) }
+
+    DisposableEffect(mostrarGuiaPantallaCompleta) {
+        activity.isGuiaAbierta = { mostrarGuiaPantallaCompleta }
+        activity.cerrarGuiaAction = { mostrarGuiaPantallaCompleta = false }
+        onDispose {
+            activity.isGuiaAbierta = { false }
+            activity.cerrarGuiaAction = null
+        }
+    }
 
     val alquileresVigentes = remember { mutableStateListOf<Modelo.AlquilerItem>() }
     val cachePeliculas = remember { mutableMapOf<String, Modelo>() }
@@ -163,8 +182,8 @@ fun PerfilScreenDashboard(
     val backButtonFocusRequester = remember { FocusRequester() }
 
     BackHandler {
-        if (mostrarDialogoInfo) {
-            mostrarDialogoInfo = false
+        if (mostrarGuiaPantallaCompleta) {
+            mostrarGuiaPantallaCompleta = false
         } else {
             onRegresar()
         }
@@ -185,20 +204,33 @@ fun PerfilScreenDashboard(
         } catch (_: Exception) {}
     }
 
-    // 🕒 Reloj y estadísticas en tiempo real
     LaunchedEffect(Unit) {
-        val formatoHora = SimpleDateFormat("hh:mm a", Locale.getDefault())
-        val formatoFecha = SimpleDateFormat("EEE, dd MMM", Locale.getDefault())
+        withContext(Dispatchers.IO) {
+            try {
+                if (!Validacioneslista.yaCargado()) {
+                    Validacioneslista.cargarPeliculas()
+                }
+            } catch (_: Exception) {}
+        }
+        totalPeliculasValidadas = Validacioneslista.obtenerPeliculasValidas().size
+    }
+
+    LaunchedEffect(Unit) {
+        val formatoHora = SimpleDateFormat("hh:mm:ss a", Locale.getDefault())
+        val formatoFechaCompleta = SimpleDateFormat("EEEE, d 'de' MMMM 'de' yyyy", Locale("es", "ES"))
+
         while (isActive) {
             val ahora = Date()
             horaEnVivo = formatoHora.format(ahora).uppercase(Locale.getDefault())
-            fechaEnVivo = formatoFecha.format(ahora).replaceFirstChar { it.uppercase() }
-            totalPeliculas = Validacioneslista.obtenerPeliculasValidas().size
+            fechaCompletaEnVivo = formatoFechaCompleta.format(ahora).replaceFirstChar { it.uppercase() }
+            val cant = Validacioneslista.obtenerPeliculasValidas().size
+            if (cant > 0 && cant != totalPeliculasValidadas) {
+                totalPeliculasValidadas = cant
+            }
             delay(1000)
         }
     }
 
-    // 👤 Escucha de usuarios en tiempo real
     DisposableEffect(correoKey) {
         fotoUsuarioUrl = user?.photoUrl?.toString()
         val refUsuarios = databaseRef.child("usuarios")
@@ -213,7 +245,7 @@ fun PerfilScreenDashboard(
                     if (isOnline) conectadosReales++ else desconectadosReales++
                 }
 
-                usuariosOnline = conectadosReales
+                usuariosOnline = maxOf(1, conectadosReales)
                 usuariosOffline = desconectadosReales + 100
 
                 if (correoKey.isNotEmpty()) {
@@ -241,7 +273,6 @@ fun PerfilScreenDashboard(
         onDispose { refUsuarios.removeEventListener(listenerUsuarios) }
     }
 
-    // 🍿 Alquileres activos
     LaunchedEffect(correoKey) {
         databaseRef.child("movies").addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(moviesSnapshot: DataSnapshot) {
@@ -262,10 +293,11 @@ fun PerfilScreenDashboard(
                                 if (rentalsSnapshot.exists()) {
                                     for (child in rentalsSnapshot.children) {
                                         val tituloKey = child.key ?: continue
-                                        val createdAt = (child.child("createdAt").value as? Number)?.toLong() ?: 0L
+                                        val createdAtRaw = (child.child("createdAt").value as? Number)?.toLong() ?: 0L
                                         val countdownMinutes = (child.child("countdownMinutes").value as? Number)?.toInt() ?: 0
 
-                                        val tiempoTranscurrido = ahora - createdAt
+                                        val createdAtMillis = if (createdAtRaw in 1..999999999999L) createdAtRaw * 1000 else createdAtRaw
+                                        val tiempoTranscurrido = ahora - createdAtMillis
 
                                         if (tiempoTranscurrido >= 0) {
                                             val durationMillis = TimeUnit.MINUTES.toMillis(countdownMinutes.toLong())
@@ -277,7 +309,7 @@ fun PerfilScreenDashboard(
                                                     alquileresVigentes.add(
                                                         Modelo.AlquilerItem(
                                                             movie = movie,
-                                                            createdAt = createdAt,
+                                                            createdAt = createdAtMillis,
                                                             countdownMinutes = countdownMinutes
                                                         )
                                                     )
@@ -315,16 +347,16 @@ fun PerfilScreenDashboard(
         ) {
 
             // =================================================================
-            // 🟢 1. ENCABEZADO SUPERIOR: PERFIL, ESTADÍSTICAS EN 1 LÍNEA Y SALDO
+            // 🟢 1. BARRA SUPERIOR DESPEJADA Y ELEGANTE
             // =================================================================
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .height(if (esTv) 58.dp else 52.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(ColorCardPerfil)
-                    .border(1.dp, Color(0xFF1E2638), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 10.dp),
+                    .border(1.dp, Color(0xFF1E2638), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 BotonCircularCompacto(
@@ -335,15 +367,15 @@ fun PerfilScreenDashboard(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Regresar",
                         tint = ColorDoradoPerfil,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(if (esTv) 40.dp else 36.dp)
                         .clip(CircleShape)
                         .border(1.5.dp, ColorDoradoPerfil, CircleShape),
                     contentAlignment = Alignment.Center
@@ -371,65 +403,57 @@ fun PerfilScreenDashboard(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
-                Column(modifier = Modifier.widthIn(max = 175.dp)) {
+                Column(modifier = Modifier.widthIn(max = 240.dp)) {
                     Text(
                         text = nombreUsuario,
                         color = Color.White,
-                        fontSize = 14.sp,
+                        fontSize = if (esTv) 15.sp else 13.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "v$versionApp • $email",
-                        color = Color(0xFF8C95A8),
-                        fontSize = 10.5.sp,
+                        color = Color(0xFF94A3B8),
+                        fontSize = if (esTv) 11.5.sp else 10.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.weight(1f))
 
-                // Estadísticas en 1 sola pastilla
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xFF161C2C))
-                        .border(0.8.dp, Color(0xFF26324D), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("🎬 $totalPeliculas Películas", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text("   |   ", color = Color(0xFF404E6B), fontSize = 10.sp)
-                    Text("🟢 $usuariosOnline en línea", color = Color(0xFF34D399), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text("   |   ", color = Color(0xFF404E6B), fontSize = 10.sp)
-                    Text("🔴 $usuariosOffline comunidad", color = Color(0xFFF87171), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = horaEnVivo,
+                        color = ColorDoradoBrillante,
+                        fontSize = if (esTv) 15.5.sp else 13.5.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Text(
+                        text = fechaCompletaEnVivo,
+                        color = Color.White,
+                        fontSize = if (esTv) 12.sp else 10.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(text = horaEnVivo, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(text = fechaEnVivo, color = Color(0xFF8C95A8), fontSize = 10.sp)
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF221A08))
-                        .border(1.dp, ColorDoradoPerfil, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                        .background(Color(0xFF261D09))
+                        .border(1.2.dp, ColorDoradoPerfil, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "💰 $saldoCastv CasTV",
-                        color = ColorDoradoPerfil,
-                        fontSize = 12.5.sp,
+                        color = ColorDoradoBrillante,
+                        fontSize = if (esTv) 13.5.sp else 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -438,74 +462,94 @@ fun PerfilScreenDashboard(
             Spacer(modifier = Modifier.height(8.dp))
 
             // =================================================================
-            // 🟢 2. CENTRO: COMUNIDAD QRs (IZQ) Y GUÍA/BENEFICIOS COMPLETA (DER)
+            // 🟢 2. CENTRO: QRs GIGANTES + NÚMEROS DESTACADOS + BOTÓN GUÍA
             // =================================================================
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1.05f),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Tarjeta QRs que LLENA el espacio por completo
-                TarjetaQRsModernaCompleta(
+                // QRs GIGANTES LIMPIOS (128dp)
+                TarjetaQRsGigantesLimpios(
+                    esTv = esTv,
                     modifier = Modifier
-                        .weight(0.95f)
+                        .weight(1.22f)
                         .fillMaxHeight()
                 )
 
-                // Tarjeta de Guía y Beneficios rica en contenido
-                TarjetaInfoExpandiblePreview(
+                // Números Grandes + Botón Guía Compacto
+                Column(
                     modifier = Modifier
-                        .weight(1.05f)
+                        .weight(0.78f)
                         .fillMaxHeight(),
-                    onClick = { mostrarDialogoInfo = true }
-                )
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    TarjetaEstadisticasNumerosGrandes(
+                        esTv = esTv,
+                        totalPeliculasValidadas = totalPeliculasValidadas,
+                        usuariosOnline = usuariosOnline,
+                        usuariosOffline = usuariosOffline,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    BotonAccesoGuiaCompacto(
+                        esTv = esTv,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(if (esTv) 48.dp else 44.dp),
+                        onClick = { mostrarGuiaPantallaCompleta = true }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
             // =================================================================
-            // 🟢 3. ABAJO: ALQUILERES ACTIVOS EN PÓSTER VERTICAL (COMO EL CATÁLOGO)
+            // 🟢 3. ABAJO: ALQUILERES ACTIVOS ESPACIOSOS (225.dp)
             // =================================================================
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (esTv) 210.dp else 175.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .height(if (esTv) 225.dp else 190.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(ColorCardPerfil)
-                    .border(1.dp, Color(0xFF1E2638), RoundedCornerShape(10.dp))
-                    .padding(8.dp)
+                    .border(1.dp, Color(0xFF1E2638), RoundedCornerShape(12.dp))
+                    .padding(10.dp)
             ) {
                 if (estaCargando) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = ColorDoradoPerfil, strokeWidth = 2.5.dp, modifier = Modifier.size(32.dp))
+                        CircularProgressIndicator(color = ColorDoradoPerfil, strokeWidth = 3.dp, modifier = Modifier.size(36.dp))
                     }
                 } else if (alquileresVigentes.isNotEmpty()) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 6.dp, start = 4.dp),
+                                .padding(bottom = 6.dp, start = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
                                 text = "🍿 TUS ALQUILERES ACTIVOS",
-                                color = ColorDoradoPerfil,
-                                fontSize = 12.5.sp,
+                                color = ColorDoradoBrillante,
+                                fontSize = if (esTv) 14.sp else 12.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "${alquileresVigentes.size} disponibles para reproducir",
-                                color = Color(0xFF8C95A8),
-                                fontSize = 11.sp
+                                text = "${alquileresVigentes.size} disponibles para reproducir ahora",
+                                color = Color(0xFF94A3B8),
+                                fontSize = if (esTv) 12.sp else 10.5.sp
                             )
                         }
 
-                        // 🟢 Carrusel horizontal con PÓSTERS VERTICALES idénticos al catálogo
                         LazyRow(
                             modifier = Modifier.fillMaxSize(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
                             contentPadding = PaddingValues(horizontal = 4.dp)
                         ) {
                             items(alquileresVigentes, key = { it.movie.id }) { item ->
@@ -527,23 +571,24 @@ fun PerfilScreenDashboard(
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 20.dp),
+                            .padding(horizontal = 24.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Text(text = "🍿", fontSize = 32.sp)
-                        Spacer(modifier = Modifier.width(14.dp))
+                        Text(text = "🍿", fontSize = 38.sp)
+                        Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             Text(
-                                text = "Aquí saldrán tus alquileres activos",
+                                text = "Aquí saldrán tus películas alquiladas activas",
                                 color = Color.White,
-                                fontSize = 14.sp,
+                                fontSize = if (esTv) 15.5.sp else 13.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
+                            Spacer(modifier = Modifier.height(3.dp))
                             Text(
                                 text = "Canjea cualquier película con tus créditos CasTV en la cartelera y podrás verla inmediatamente aquí.",
-                                color = Color(0xFF8C95A8),
-                                fontSize = 11.5.sp
+                                color = Color(0xFF94A3B8),
+                                fontSize = if (esTv) 12.sp else 11.sp
                             )
                         }
                     }
@@ -551,15 +596,299 @@ fun PerfilScreenDashboard(
             }
         }
 
-        // Diálogo con indicaciones completas
-        if (mostrarDialogoInfo) {
-            DialogoInformacionCompleta(onDismiss = { mostrarDialogoInfo = false })
+        // =================================================================
+        // 🟢 GUÍA EN PANTALLA COMPLETA NATIVA (LIMPIA, SIN RECUADROS EXTRA)
+        // =================================================================
+        AnimatedVisibility(
+            visible = mostrarGuiaPantallaCompleta,
+            enter = fadeIn(tween(250)),
+            exit = fadeOut(tween(250)),
+            modifier = Modifier.zIndex(150f)
+        ) {
+            OverlayGuiaCineParchePantallaCompleta(
+                onDismiss = { mostrarGuiaPantallaCompleta = false }
+            )
         }
     }
 }
 
 // =========================================================================
-// 🟢 PÓSTER VERTICAL DE ALQUILER (IGUAL AL DE LAS OTRAS PANTALLAS)
+// 🟢 TARJETA DE QRs GIGANTES (128.dp)
+// =========================================================================
+@Composable
+fun TarjetaQRsGigantesLimpios(
+    esTv: Boolean,
+    modifier: Modifier = Modifier
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = if (isFocused) Color(0xFF161E2E) else ColorCardPerfil),
+        modifier = modifier
+            .border(
+                width = if (isFocused) 2.dp else 1.dp,
+                color = if (isFocused) ColorDoradoPerfil else Color(0xFF1E2638),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "📲 COMUNIDAD Y REDES OFICIALES",
+                    color = ColorDoradoPerfil,
+                    fontSize = if (esTv) 14.sp else 12.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    text = "📷 Escanea desde tu sillón con tu móvil",
+                    color = ColorDoradoBrillante,
+                    fontSize = if (esTv) 11.5.sp else 10.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // QR Canal Oficial
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF0B0E17))
+                        .border(1.2.dp, Color(0xFF1E2638), RoundedCornerShape(10.dp))
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.canal),
+                        contentDescription = "Canal Oficial",
+                        modifier = Modifier
+                            .size(if (esTv) 128.dp else 95.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White)
+                            .padding(4.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Canal Oficial",
+                            color = Color.White,
+                            fontSize = if (esTv) 16.sp else 13.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Cartelera y estrenos diarios al instante en Telegram.",
+                            color = Color(0xFFCBD5E1),
+                            fontSize = if (esTv) 12.sp else 10.5.sp,
+                            lineHeight = if (esTv) 16.sp else 14.sp
+                        )
+                    }
+                }
+
+                // QR Grupo Parche
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF0B0E17))
+                        .border(1.2.dp, Color(0xFF1E2638), RoundedCornerShape(10.dp))
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.grupo),
+                        contentDescription = "Grupo Parche",
+                        modifier = Modifier
+                            .size(if (esTv) 128.dp else 95.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White)
+                            .padding(4.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Grupo Parche",
+                            color = Color.White,
+                            fontSize = if (esTv) 16.sp else 13.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Pide tus películas favoritas y debate con la comunidad.",
+                            color = Color(0xFFCBD5E1),
+                            fontSize = if (esTv) 12.sp else 10.5.sp,
+                            lineHeight = if (esTv) 16.sp else 14.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// =========================================================================
+// 🟢 TARJETA DE ESTADÍSTICAS ENFOCADA EN NÚMEROS GIGANTES
+// =========================================================================
+@Composable
+fun TarjetaEstadisticasNumerosGrandes(
+    esTv: Boolean,
+    totalPeliculasValidadas: Int,
+    usuariosOnline: Int,
+    usuariosOffline: Int,
+    modifier: Modifier = Modifier
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = if (isFocused) Color(0xFF161E2E) else ColorCardPerfil),
+        modifier = modifier
+            .border(
+                width = if (isFocused) 2.dp else 1.dp,
+                color = if (isFocused) ColorDoradoPerfil else Color(0xFF1E2638),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.SpaceAround
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "$totalPeliculasValidadas",
+                    color = ColorDoradoBrillante,
+                    fontSize = if (esTv) 28.sp else 22.sp,
+                    fontWeight = FontWeight.Black
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "Estrenos Listos para Ver",
+                        color = Color.White,
+                        fontSize = if (esTv) 13.5.sp else 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Pestaña ACTIVAR • Inmediatos",
+                        color = Color(0xFF34D399),
+                        fontSize = if (esTv) 11.sp else 9.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Color(0xFF1E2638), thickness = 0.8.dp)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "$usuariosOnline",
+                        color = Color(0xFF34D399),
+                        fontSize = if (esTv) 24.sp else 19.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text("🟢 En Vivo", color = Color.White, fontSize = if (esTv) 12.sp else 10.5.sp, fontWeight = FontWeight.Bold)
+                        Text("Online", color = Color(0xFF94A3B8), fontSize = if (esTv) 10.sp else 8.5.sp)
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "$usuariosOffline",
+                        color = Color(0xFFF87171),
+                        fontSize = if (esTv) 24.sp else 19.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text("🔴 Comunidad", color = Color.White, fontSize = if (esTv) 12.sp else 10.5.sp, fontWeight = FontWeight.Bold)
+                        Text("Total", color = Color(0xFF94A3B8), fontSize = if (esTv) 10.sp else 8.5.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// =========================================================================
+// 🟢 BOTÓN COMPACTO DE ACCESO A GUÍA Y REGLAS
+// =========================================================================
+@Composable
+fun BotonAccesoGuiaCompacto(
+    esTv: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = modifier
+            .scale(if (isFocused) 1.03f else 1.0f)
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (isFocused) Color(0xFF261D09) else ColorCardPerfil)
+            .border(
+                width = if (isFocused) 2.dp else 1.dp,
+                color = if (isFocused) ColorDoradoBrillante else Color(0xFF1E2638),
+                shape = RoundedCornerShape(10.dp)
+            )
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(text = "📖", fontSize = 18.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "GUÍA Y REGLAS (PULSA OK)",
+                color = if (isFocused) ColorDoradoBrillante else Color.White,
+                fontSize = if (esTv) 12.5.sp else 11.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
+    }
+}
+
+// =========================================================================
+// 🟢 PÓSTER VERTICAL DE ALQUILER (225.dp ESPACIOSO)
 // =========================================================================
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -572,15 +901,18 @@ fun TarjetaAlquilerPosterVertical(
     val durationMillis = remember(item.movie.id, item.countdownMinutes) {
         TimeUnit.MINUTES.toMillis(item.countdownMinutes.toLong())
     }
-    var millisRestantes by remember(item.movie.id, item.createdAt, item.countdownMinutes) {
-        val transcurrido = System.currentTimeMillis() - item.createdAt
+    val createdAtMillis = remember(item.movie.id, item.createdAt) {
+        if (item.createdAt in 1..999999999999L) item.createdAt * 1000 else item.createdAt
+    }
+    var millisRestantes by remember(item.movie.id, createdAtMillis, item.countdownMinutes) {
+        val transcurrido = System.currentTimeMillis() - createdAtMillis
         mutableLongStateOf(maxOf(0L, durationMillis - transcurrido))
     }
 
-    LaunchedEffect(item.movie.id, item.createdAt) {
+    LaunchedEffect(item.movie.id, createdAtMillis) {
         while (millisRestantes > 0) {
             delay(1000)
-            val transcurrido = System.currentTimeMillis() - item.createdAt
+            val transcurrido = System.currentTimeMillis() - createdAtMillis
             val rest = durationMillis - transcurrido
             if (rest <= 0) {
                 millisRestantes = 0L
@@ -601,7 +933,7 @@ fun TarjetaAlquilerPosterVertical(
 
     Column(
         modifier = Modifier
-            .width(if (esTv) 115.dp else 95.dp)
+            .width(if (esTv) 120.dp else 100.dp)
             .fillMaxHeight()
             .scale(if (isFocused) 1.05f else 1.0f)
             .clip(RoundedCornerShape(8.dp))
@@ -641,25 +973,23 @@ fun TarjetaAlquilerPosterVertical(
                 }
             )
 
-            // Insignia verde de cuenta regresiva en el borde inferior del póster
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .background(Color(0xE6107C41))
-                    .padding(vertical = 2.dp),
+                    .padding(vertical = 3.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = contadorTexto,
                     color = Color.White,
-                    fontSize = 9.5.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
         }
 
-        // Título con marquesina cuando está enfocado
         val marqueeMod = if (isFocused) {
             Modifier.basicMarquee(iterations = Int.MAX_VALUE, delayMillis = 600, velocity = 35.dp)
         } else {
@@ -670,13 +1000,13 @@ fun TarjetaAlquilerPosterVertical(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(if (isFocused) ColorDoradoPerfil else Color(0xFF0C1017))
-                .padding(vertical = 3.dp, horizontal = 4.dp),
+                .padding(vertical = 4.dp, horizontal = 4.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = item.movie.title,
                 color = if (isFocused) Color.Black else Color.White,
-                fontSize = 10.5.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = if (isFocused) TextOverflow.Clip else TextOverflow.Ellipsis,
@@ -688,284 +1018,175 @@ fun TarjetaAlquilerPosterVertical(
 }
 
 // =========================================================================
-// 🟢 TARJETA DE QRs QUE LLENA EL ESPACIO POR COMPLETO
+// 🟢 OVERLAY GUÍA COMPLETA OFICIAL CINEPARCHE (LIMPIA, SIN RECUADROS PESADOS)
 // =========================================================================
 @Composable
-fun TarjetaQRsModernaCompleta(
-    modifier: Modifier = Modifier
-) {
-    var isFocused by remember { mutableStateOf(false) }
-
-    Card(
-        shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = if (isFocused) Color(0xFF161E2E) else ColorCardPerfil),
-        modifier = modifier
-            .border(
-                width = if (isFocused) 2.dp else 1.dp,
-                color = if (isFocused) ColorDoradoPerfil else Color(0xFF1E2638),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .onFocusChanged { isFocused = it.isFocused }
-            .focusable()
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "📲 COMUNIDAD Y REDES OFICIALES",
-                color = ColorDoradoPerfil,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // QR Canal Oficial
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF0B0E17))
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.canal),
-                        contentDescription = "Canal Oficial",
-                        modifier = Modifier
-                            .size(62.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color.White)
-                            .padding(2.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text("Canal Oficial", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                        Text("Cartelera y estrenos diarios al instante.", color = Color(0xFF8C95A8), fontSize = 10.sp, lineHeight = 13.sp)
-                    }
-                }
-
-                // QR Grupo Parche
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF0B0E17))
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.grupo),
-                        contentDescription = "Grupo Parche",
-                        modifier = Modifier
-                            .size(62.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color.White)
-                            .padding(2.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text("Grupo Parche", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                        Text("Comparte opiniones y pide tus películas favoritas.", color = Color(0xFF8C95A8), fontSize = 10.sp, lineHeight = 13.sp)
-                    }
-                }
-            }
-
-            Text(
-                text = "Escanea con la cámara de tu celular para unirte a los grupos oficiales.",
-                color = Color(0xFF6B7280),
-                fontSize = 10.5.sp
-            )
-        }
-    }
-}
-
-// =========================================================================
-// 🟢 TARJETA DE GUÍA Y BENEFICIOS RICA EN CONTENIDO
-// =========================================================================
-@Composable
-fun TarjetaInfoExpandiblePreview(
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    var isFocused by remember { mutableStateOf(false) }
-
-    Card(
-        shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = if (isFocused) Color(0xFF181F2E) else ColorCardPerfil),
-        modifier = modifier
-            .border(
-                width = if (isFocused) 2.dp else 1.dp,
-                color = if (isFocused) ColorDoradoPerfil else Color(0xFF1E2638),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .onFocusChanged { isFocused = it.isFocused }
-            .focusable()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "ℹ️ GUÍA, BENEFICIOS E INDICACIONES",
-                    color = ColorDoradoPerfil,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(if (isFocused) ColorDoradoPerfil else Color(0xFF1E2638))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = "PULSA OK PARA EXPANDIR 🔍",
-                        color = if (isFocused) Color.Black else Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                Text(
-                    text = "• 1. Activaciones Inmediatas: Canjea con tus créditos CasTV y reproduce al instante sin esperas ni límites.",
-                    color = Color(0xFFCBD5E1),
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "• 2. Estrenos Programados: Pide tus películas preferidas y prográmalas en cartelera para toda la comunidad.",
-                    color = Color(0xFFCBD5E1),
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "• 3. Soporte y Comunidad: Actualizaciones constantes, cartelera verificada a diario y atención activa 24/7.",
-                    color = Color(0xFFCBD5E1),
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Text(
-                text = "Presiona el botón de tu control para leer todas las instrucciones y reglas detalladas del servicio.",
-                color = if (isFocused) ColorDoradoPerfil else Color(0xFF8C95A8),
-                fontSize = 10.sp,
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-            )
-        }
-    }
-}
-
-// =========================================================================
-// 🟢 DIÁLOGO COMPLETO DE INFORMACIÓN (SIN CORTES)
-// =========================================================================
-@Composable
-fun DialogoInformacionCompleta(
+fun OverlayGuiaCineParchePantallaCompleta(
     onDismiss: () -> Unit
 ) {
-    val botonCerrarFocusRequester = remember { FocusRequester() }
+    val context = LocalContext.current
+    val scrollState = rememberScrollState()
+    val primerItemRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
         delay(150)
-        try { botonCerrarFocusRequester.requestFocus() } catch (_: Exception) {}
+        try { primerItemRequester.requestFocus() } catch (_: Exception) {}
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFA050810))
+            .padding(horizontal = 26.dp, vertical = 18.dp)
     ) {
         Card(
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF131722)),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0D121F)),
             modifier = Modifier
-                .widthIn(max = 750.dp)
-                .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.85f)
-                .border(2.dp, ColorDoradoPerfil, RoundedCornerShape(14.dp))
+                .fillMaxSize()
+                .border(2.dp, ColorDoradoPerfil, RoundedCornerShape(16.dp))
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(20.dp)
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
             ) {
-                Text(
-                    text = "📋 GUÍA COMPLETA E INDICACIONES DEL SERVICIO",
-                    color = ColorDoradoPerfil,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                // ENCABEZADO SUPERIOR
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ItemIndicacionDetalladaHtml(htmlResId = R.string.columna_1, titulo = "PUNTO 1: BENEFICIOS Y REGLAS")
-                    HorizontalDivider(color = Color(0xFF1E2638), thickness = 1.dp)
-                    ItemIndicacionDetalladaHtml(htmlResId = R.string.columna_2, titulo = "PUNTO 2: SOLICITUDES Y PEDIDOS")
-                    HorizontalDivider(color = Color(0xFF1E2638), thickness = 1.dp)
-                    ItemIndicacionDetalladaHtml(htmlResId = R.string.columna_3, titulo = "PUNTO 3: SOPORTE Y ACTIVACIONES")
+                    Text(
+                        text = "📋 GUÍA OFICIAL CINEPARCHE",
+                        color = ColorDoradoBrillante,
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.Black
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF261D09))
+                            .border(1.dp, ColorDoradoPerfil, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "SISTEMA CASTV OFICIAL",
+                            color = ColorDoradoBrillante,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
+                // CONTENIDO LIMPIO SIN RECUADROS: EL RECUADRO SOLO APARECE AL ENFOCAR
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(scrollState),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    var isBtnFocused by remember { mutableStateOf(false) }
+                    // SECCIÓN 1: FLUJO DE PAGO Y COSTO POR CRÉDITO
+                    ItemSeccionGuiaTvLimpio(
+                        icono = "💳",
+                        titulo = "1. CÓMO RECARGAR TU SALDO CASTV (PROCESO FÁCIL)",
+                        cuerpo = "1. Vas a la opción <b>'PAQUETES'</b> en el menú principal y eliges el plan que prefieras.<br>" +
+                                "2. Se generará un <b>código QR en la pantalla de tu TV</b>: lo escaneas con la cámara de tu móvil.<br>" +
+                                "3. Realizas el pago y <b>cargas la foto del comprobante desde tu móvil</b>.<br>" +
+                                "4. Nuestro equipo revisa el comprobante y <b>te activan el saldo CasTV de inmediato en tu cuenta</b>.<br><br>" +
+                                "<b>¿Cómo rinden los paquetes?</b><br>" +
+                                "Todos los créditos son iguales y <b>nunca vencen</b>. La única diferencia es que entre mayor sea el paquete, <b>más barato te sale cada CasTV</b>:<br>" +
+                                "• <b>Bronce (50 CasTV):</b> Paquete base de entrada.<br>" +
+                                "• <b>Plata (120 CasTV):</b> Cada CasTV te sale más barato que en el primero.<br>" +
+                                "• <b>Oro VIP (250 CasTV):</b> Es el que tiene el costo más bajo por crédito (máximo ahorro por película).",
+                        modifier = Modifier.focusRequester(primerItemRequester)
+                    )
+
+                    // SECCIÓN 2: ALQUILER POR TIEMPO Y CONTADOR REGRESIVO
+                    ItemSeccionGuiaTvLimpio(
+                        icono = "⏱️",
+                        titulo = "2. ALQUILER POR TIEMPO (CONTADOR REGRESIVO)",
+                        cuerpo = "• <b>⚡ ACTIVAR:</b> Películas verificadas listas para ver ya. Inicia el contador y dale play al instante.<br>" +
+                                "• <b>📅 ALQUILAR:</b> Programa tu película para el fin de semana sin que el tiempo empiece a correr antes de la cita.<br>" +
+                                "• <b>Cero Dobles Cobros:</b> Si ya tienes una película activa en tu perfil, reprodúcela cuantas veces quieras mientras el contador siga activo."
+                    )
+
+                    // SECCIÓN 3: TV EN VIVO Y CONTENIDO DE INTERNET
+                    ItemSeccionGuiaTvLimpio(
+                        icono = "📺",
+                        titulo = "3. TELEVISIÓN EN VIVO 100% GRATIS & RED",
+                        cuerpo = "• <b>TV En Vivo:</b> Más de 2,400 canales de televisión abierta sin ningún costo, sin saldo y sin suscripciones.<br>" +
+                                "• <b>Contenido de Internet:</b> CineParche es una plataforma comunitaria que organiza y comparte transmisiones multimedia libres y públicas de la red.<br>" +
+                                "• <b>Películas en Cortesía:</b> Disfruta periódicamente de estrenos en rotación gratuita para todos."
+                    )
+
+                    // SECCIÓN 4: PEDIDOS Y SOPORTE
+                    ItemSeccionGuiaTvLimpio(
+                        icono = "📲",
+                        titulo = "4. PEDIDOS DE PELÍCULAS Y CANALES OFICIALES 24/7",
+                        cuerpo = "• <b>Opción 'PEDIR':</b> Si no ves la película que buscas, usa el botón Pedir para que la subamos a la cartelera.<br>" +
+                                "• <b>Atención en Telegram:</b> Soporte activo en nuestro Canal Oficial y Grupo Parche.<br>" +
+                                "• <b>Sitio Web Oficial:</b> <font color='#FFD56B'><b>https://onnline.web.app/CineParche</b></font>"
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // BOTONES DE ACCIÓN INFERIORES NAVEGABLES
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    var isWebFocused by remember { mutableStateOf(false) }
 
                     Box(
                         modifier = Modifier
-                            .focusRequester(botonCerrarFocusRequester)
-                            .scale(if (isBtnFocused) 1.05f else 1.0f)
+                            .scale(if (isWebFocused) 1.04f else 1.0f)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (isBtnFocused) Color.White else ColorDoradoPerfil)
-                            .onFocusChanged { isBtnFocused = it.isFocused }
+                            .background(if (isWebFocused) Color(0xFF2C394F) else Color(0xFF161F2E))
+                            .border(
+                                width = if (isWebFocused) 2.dp else 1.dp,
+                                color = if (isWebFocused) ColorDoradoBrillante else Color(0xFF26324D),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .onFocusChanged { isWebFocused = it.isFocused }
                             .focusable()
-                            .clickable(onClick = onDismiss)
-                            .padding(horizontal = 24.dp, vertical = 8.dp)
+                            .clickable {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://onnline.web.app/CineParche"))
+                                context.startActivity(intent)
+                            }
+                            .padding(horizontal = 22.dp, vertical = 10.dp)
                     ) {
                         Text(
-                            text = "ENTENDIDO / CERRAR",
-                            color = Color.Black,
-                            fontSize = 13.sp,
+                            text = "🌐 ABRIR ONNLINE.WEB.APP/CINEPARCHE",
+                            color = if (isWebFocused) ColorDoradoBrillante else Color.White,
+                            fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    var isCerrarFocused by remember { mutableStateOf(false) }
+
+                    Box(
+                        modifier = Modifier
+                            .scale(if (isCerrarFocused) 1.05f else 1.0f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isCerrarFocused) Color.White else ColorDoradoPerfil)
+                            .onFocusChanged { isCerrarFocused = it.isFocused }
+                            .focusable()
+                            .clickable(onClick = onDismiss)
+                            .padding(horizontal = 30.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            text = "ENTENDIDO / VOLVER AL PERFIL",
+                            color = Color.Black,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.ExtraBold
                         )
                     }
                 }
@@ -974,34 +1195,49 @@ fun DialogoInformacionCompleta(
     }
 }
 
+// 🟢 COMPONENTE LIMPIO SIN RECUADRO FIJO (SOLO MARCA EL FOCO CON BORDE DORADO AL PASAR)
 @Composable
-fun ItemIndicacionDetalladaHtml(
-    htmlResId: Int,
-    titulo: String
+fun ItemSeccionGuiaTvLimpio(
+    icono: String,
+    titulo: String,
+    cuerpo: String,
+    modifier: Modifier = Modifier
 ) {
-    val htmlString = stringResource(id = htmlResId)
+    var isFocused by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = titulo,
-            color = ColorDoradoPerfil,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        AndroidView(
-            modifier = Modifier.fillMaxWidth(),
-            factory = { ctx ->
-                TextView(ctx).apply {
-                    setTextColor(android.graphics.Color.parseColor("#CBD5E1"))
-                    textSize = 13f
-                    setLineSpacing(4f, 1.2f)
-                }
-            },
-            update = { textView ->
-                textView.text = HtmlCompat.fromHtml(htmlString, HtmlCompat.FROM_HTML_MODE_LEGACY)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (isFocused) Color(0xFF161E2E) else Color.Transparent)
+            .border(
+                width = if (isFocused) 2.dp else 0.dp,
+                color = if (isFocused) ColorDoradoBrillante else Color.Transparent,
+                shape = RoundedCornerShape(10.dp)
+            )
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(icono, fontSize = 20.sp)
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = titulo,
+                    color = if (isFocused) ColorDoradoBrillante else ColorDoradoPerfil,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
-        )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = HtmlCompat.fromHtml(cuerpo, HtmlCompat.FROM_HTML_MODE_LEGACY).toString(),
+                color = Color(0xFFE2E8F0),
+                fontSize = 14.5.sp,
+                lineHeight = 19.sp
+            )
+        }
     }
 }
 
@@ -1018,7 +1254,7 @@ fun BotonCircularCompacto(
 
     Box(
         modifier = modifier
-            .size(34.dp)
+            .size(38.dp)
             .scale(if (isFocused) 1.1f else 1.0f)
             .clip(CircleShape)
             .background(if (isFocused) Color(0xFF2B354C) else Color(0xFF161C2C))
