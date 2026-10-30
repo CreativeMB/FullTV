@@ -290,7 +290,12 @@ fun TvInteractiveScreen(
         userEmail?.replace(".", "_")?.replace("@", "_")
     }
 
-    var masterChannels by remember { mutableStateOf<List<Modelo>>(emptyList()) }
+    // 🟢 Registro de canales revisados
+    var reviewedChannelKeys by remember {
+        mutableStateOf(prefs.getStringSet("reviewed_tv_channels", emptySet()) ?: emptySet())
+    }
+
+    var rawMasterChannels by remember { mutableStateOf<List<Modelo>>(emptyList()) }
     var favoriteTitles by remember { mutableStateOf<Set<String>>(emptySet()) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedChannel by remember { mutableStateOf<Modelo?>(null) }
@@ -300,6 +305,34 @@ fun TvInteractiveScreen(
     var isChannelLoading by remember { mutableStateOf(true) }
     var isChannelOffline by remember { mutableStateOf(false) }
 
+    // 🟢 Función para obtener la clave única del canal
+    fun getChannelKey(canal: Modelo): String {
+        return if (canal.streamUrl.isNotBlank()) canal.streamUrl.trim() else canal.title.trim().lowercase()
+    }
+
+    // 🟢 Marcar canal como revisado
+    val marcarComoRevisado: (Modelo) -> Unit = { canal ->
+        val key = getChannelKey(canal)
+        if (!reviewedChannelKeys.contains(key)) {
+            val updated = reviewedChannelKeys.toMutableSet().apply { add(key) }
+            reviewedChannelKeys = updated
+            prefs.edit().putStringSet("reviewed_tv_channels", updated).apply()
+        }
+    }
+
+    // 🟢 Retiene temporalmente el canal recién revisado en su posición hasta que el foco cambie
+    var retainedChannelKey by remember { mutableStateOf<String?>(null) }
+
+    // 🟢 Lista inteligente: los NUEVOS y el canal actualmente retenido van al inicio
+    val masterChannels = remember(rawMasterChannels, reviewedChannelKeys, retainedChannelKey) {
+        val alInicio = rawMasterChannels.filter {
+            !reviewedChannelKeys.contains(getChannelKey(it)) || getChannelKey(it) == retainedChannelKey
+        }
+        val yaRevisados = rawMasterChannels.filter {
+            reviewedChannelKeys.contains(getChannelKey(it)) && getChannelKey(it) != retainedChannelKey
+        }
+        alInicio + yaRevisados
+    }
     val filteredChannels = remember(searchQuery, masterChannels) {
         if (searchQuery.isBlank()) {
             masterChannels
@@ -438,6 +471,7 @@ fun TvInteractiveScreen(
                             val nuevoIndex = if (indexActual == -1 || indexActual >= activeChannelsList.size - 1) 0 else indexActual + 1
                             val siguienteCanal = activeChannelsList[nuevoIndex]
                             selectedChannel = siguienteCanal
+                            marcarComoRevisado(siguienteCanal)
                             TvRepository.lastPlayedChannel = siguienteCanal
                             prefs.edit().putString("last_selected_channel_id", siguienteCanal.id).apply()
                             reloadTrigger = System.currentTimeMillis()
@@ -487,6 +521,7 @@ fun TvInteractiveScreen(
                 val siguienteCanal = listaActual[nuevoIndex]
 
                 selectedChannel = siguienteCanal
+                marcarComoRevisado(siguienteCanal)
                 TvRepository.lastPlayedChannel = siguienteCanal
                 prefs.edit().putString("last_selected_channel_id", siguienteCanal.id).apply()
                 reloadTrigger = System.currentTimeMillis()
@@ -568,6 +603,7 @@ fun TvInteractiveScreen(
                 }
                 val nuevoCanal = activeChannelsList[nuevoIndex]
                 selectedChannel = nuevoCanal
+                marcarComoRevisado(nuevoCanal)
                 TvRepository.lastPlayedChannel = nuevoCanal
                 prefs.edit().putString("last_selected_channel_id", nuevoCanal.id).apply()
                 reloadTrigger = System.currentTimeMillis()
@@ -590,7 +626,20 @@ fun TvInteractiveScreen(
         }
     }
 
-    val seleccionarCanalConRecarga: (Modelo) -> Unit = { canal ->
+    var focusTargetIndex by remember { mutableStateOf<Int?>(null) }
+
+    fun seleccionarCanalConRecarga(canal: Modelo) {
+        val key = getChannelKey(canal)
+        val eraNuevo = !reviewedChannelKeys.contains(key)
+
+        // Si era nuevo, lo retenemos en su sitio para que no salte mientras lo miramos
+        if (eraNuevo) {
+            retainedChannelKey = key
+        }
+
+        // Se marca como revisado: la etiqueta "NUEVO" desaparece al instante
+        marcarComoRevisado(canal)
+
         if (selectedChannel?.id == canal.id) {
             reloadTrigger = System.currentTimeMillis()
         } else {
@@ -601,7 +650,7 @@ fun TvInteractiveScreen(
         }
     }
 
-    // 🟢 CARGA Y SINCRONIZACIÓN INTELIGENTE (BARRIDO EN TIEMPO REAL)
+    // 🟢 CARGA Y SINCRONIZACIÓN INTELIGENTE
     val cargarCanales: () -> Unit = {
         isLoading = true
         coroutineScope.launch(Dispatchers.IO) {
@@ -625,7 +674,6 @@ fun TvInteractiveScreen(
                 }
             }
 
-            // Fallback a preferencias locales si Firebase no arrojó o no hay internet
             if (userFavsSet.isEmpty()) {
                 val localFavs = prefs.getStringSet("fav_titles", emptySet()) ?: emptySet()
                 userFavsSet.addAll(localFavs.map { it.trim().lowercase() })
@@ -642,7 +690,7 @@ fun TvInteractiveScreen(
                     val downloaded = descargarM3uStream(m3uUrl)
 
                     withContext(Dispatchers.Main) {
-                        masterChannels = downloaded
+                        rawMasterChannels = downloaded
                         favoriteTitles = userFavsSet
                         TvRepository.channelListMaster = downloaded
 
@@ -652,20 +700,21 @@ fun TvInteractiveScreen(
                             ?: downloaded.firstOrNull()
 
                         selectedChannel = canalASelec
+                        canalASelec?.let { marcarComoRevisado(it) }
                         TvRepository.lastPlayedChannel = canalASelec
                         isLoading = false
                         reloadTrigger = System.currentTimeMillis()
                     }
                 } else {
                     withContext(Dispatchers.Main) {
-                        masterChannels = emptyList()
+                        rawMasterChannels = emptyList()
                         isLoading = false
                     }
                 }
             } catch (e: Exception) {
                 Log.e("TV_ACTIVITY", "Error descargando canales", e)
                 withContext(Dispatchers.Main) {
-                    masterChannels = emptyList()
+                    rawMasterChannels = emptyList()
                     isLoading = false
                 }
             }
@@ -678,6 +727,7 @@ fun TvInteractiveScreen(
 
     // 🟢 ALTERNAR FAVORITO EN FIREBASE Y LOCAL
     val toggleFavorite = { canal: Modelo ->
+        marcarComoRevisado(canal)
         val titleKey = canal.title.trim().lowercase()
         val firebaseSafeKey = titleKey.replace(".", "_")
             .replace("$", "_")
@@ -699,7 +749,6 @@ fun TvInteractiveScreen(
         favoriteTitles = newFavs
         prefs.edit().putStringSet("fav_titles", newFavs).apply()
 
-        // Sincronizar en Firebase en segundo plano
         if (!correoKey.isNullOrEmpty()) {
             coroutineScope.launch(Dispatchers.IO) {
                 try {
@@ -1065,14 +1114,22 @@ fun TvInteractiveScreen(
                                 items = filteredChannels,
                                 key = { _, it -> "all_${it.title}" }
                             ) { index, canal ->
+                                val channelKey = getChannelKey(canal)
                                 val isCurrentSelected = selectedChannel?.id == canal.id
                                 val isFav = favoriteTitles.contains(canal.title.trim().lowercase())
+                                // La etiqueta desaparece en cuanto se reproduce
+                                val isNewChannel = !reviewedChannelKeys.contains(channelKey)
 
                                 HorizontalChannelCard(
                                     canal = canal,
                                     isFavorite = isFav,
                                     isSelected = isCurrentSelected,
+                                    isNew = isNewChannel,
                                     onFocused = {
+                                        // 🟢 Si el usuario movió el cursor a otro canal diferente, liberamos el anterior para que vuelva a su orden M3U
+                                        if (retainedChannelKey != null && retainedChannelKey != channelKey) {
+                                            retainedChannelKey = null
+                                        }
                                         channelsRowState.animateScrollAndCentralizeItem(index, coroutineScope)
                                     },
                                     onClick = { seleccionarCanalConRecarga(canal) },
@@ -1806,6 +1863,7 @@ fun HorizontalChannelCard(
     canal: Modelo,
     isFavorite: Boolean,
     isSelected: Boolean,
+    isNew: Boolean = false,
     onFocused: () -> Unit,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
@@ -1824,6 +1882,7 @@ fun HorizontalChannelCard(
     val borderColor = when {
         isFocused -> GoldAccent
         isSelected -> RedLive
+        isNew -> Color(0xFF00E676)
         else -> Color(0xFF2A2A38)
     }
 
@@ -1841,7 +1900,7 @@ fun HorizontalChannelCard(
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
             .border(
-                width = if (isFocused) 3.dp else 1.5.dp,
+                width = if (isFocused) 3.dp else if (isNew) 2.dp else 1.5.dp,
                 color = borderColor,
                 shape = RoundedCornerShape(12.dp)
             )
@@ -1907,6 +1966,28 @@ fun HorizontalChannelCard(
                 modifier = Modifier.fillMaxSize()
             )
 
+            // 🟢 Etiqueta NUEVO llamativa
+            if (isNew) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFF00C853))
+                        .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "NUEVO",
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+
             if (isFavorite) {
                 Box(
                     modifier = Modifier
@@ -1938,10 +2019,11 @@ fun HorizontalChannelCard(
                 color = when {
                     isFocused -> GoldAccent
                     isSelected -> Color.White
+                    isNew -> Color(0xFF80FFA2)
                     else -> Color(0xFFD0D0DC)
                 },
                 fontSize = 11.5.sp,
-                fontWeight = if (isFocused || isSelected) FontWeight.Bold else FontWeight.Medium,
+                fontWeight = if (isFocused || isSelected || isNew) FontWeight.Bold else FontWeight.Medium,
                 maxLines = 1,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
