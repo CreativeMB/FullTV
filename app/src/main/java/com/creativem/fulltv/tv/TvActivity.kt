@@ -25,7 +25,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -446,6 +448,11 @@ fun TvInteractiveScreen(
                 retryCount = 0
                 isChannelLoading = false
                 isChannelOffline = false
+
+                // 🟢 AQUÍ: El canal sí funciona y se está viendo, lo marcamos como revisado
+                selectedChannel?.let { canal ->
+                    marcarComoRevisado(canal)
+                }
             }
 
             override fun onPlayerError(error: PlaybackException) {
@@ -471,7 +478,10 @@ fun TvInteractiveScreen(
                             val nuevoIndex = if (indexActual == -1 || indexActual >= activeChannelsList.size - 1) 0 else indexActual + 1
                             val siguienteCanal = activeChannelsList[nuevoIndex]
                             selectedChannel = siguienteCanal
-                            marcarComoRevisado(siguienteCanal)
+
+                            // ❌ QUITA ESTO: marcarComoRevisado(siguienteCanal)
+                            // (No marcar si fue salto por error)
+
                             TvRepository.lastPlayedChannel = siguienteCanal
                             prefs.edit().putString("last_selected_channel_id", siguienteCanal.id).apply()
                             reloadTrigger = System.currentTimeMillis()
@@ -504,6 +514,25 @@ fun TvInteractiveScreen(
         }
     }
 
+    // 🟢 Temporizador del Banner en Pantalla Completa (10 segundos)
+    var isBannerVisible by remember { mutableStateOf(false) }
+    var bannerTrigger by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(bannerTrigger, isFullScreen) {
+        if (isFullScreen) {
+            isBannerVisible = true
+            delay(10000)
+            isBannerVisible = false
+        } else {
+            isBannerVisible = false
+        }
+    }
+
+    // 🟢 Lista exclusiva de Favoritos para Pantalla Completa
+    val fullScreenChannelsList = remember(filteredFavorites, masterChannels) {
+        if (filteredFavorites.isNotEmpty()) filteredFavorites else masterChannels
+    }
+
     LaunchedEffect(selectedChannel, reloadTrigger, exoPlayer) {
         val player = exoPlayer ?: return@LaunchedEffect
         val canal = selectedChannel ?: return@LaunchedEffect
@@ -521,7 +550,10 @@ fun TvInteractiveScreen(
                 val siguienteCanal = listaActual[nuevoIndex]
 
                 selectedChannel = siguienteCanal
-                marcarComoRevisado(siguienteCanal)
+
+                // ❌ QUITA ESTO: marcarComoRevisado(siguienteCanal)
+                // (Dejar que conserve la etiqueta NUEVO hasta que realmente funcione o lo elija)
+
                 TvRepository.lastPlayedChannel = siguienteCanal
                 prefs.edit().putString("last_selected_channel_id", siguienteCanal.id).apply()
                 reloadTrigger = System.currentTimeMillis()
@@ -650,6 +682,21 @@ fun TvInteractiveScreen(
         }
     }
 
+    // 🟢 Función de navegación infinita por favoritos (Arriba/Abajo)
+    fun cambiarCanalFavorito(siguiente: Boolean) {
+        if (fullScreenChannelsList.isEmpty()) return
+        val indexActual = fullScreenChannelsList.indexOfFirst { it.streamUrl == selectedChannel?.streamUrl }
+        val nuevoIndex = if (siguiente) {
+            if (indexActual == -1 || indexActual >= fullScreenChannelsList.size - 1) 0 else indexActual + 1
+        } else {
+            if (indexActual <= 0) fullScreenChannelsList.size - 1 else indexActual - 1
+        }
+        val nuevoCanal = fullScreenChannelsList[nuevoIndex]
+        seleccionarCanalConRecarga(nuevoCanal)
+        bannerTrigger = System.currentTimeMillis()
+    }
+
+
     // 🟢 CARGA Y SINCRONIZACIÓN INTELIGENTE
     val cargarCanales: () -> Unit = {
         isLoading = true
@@ -694,7 +741,8 @@ fun TvInteractiveScreen(
                         favoriteTitles = userFavsSet
                         TvRepository.channelListMaster = downloaded
 
-                        val canalASelec = TvRepository.lastPlayedChannel
+                        // Validamos que el canal guardado/anterior realmente exista en la nueva lista M3U
+                        val canalASelec = downloaded.firstOrNull { it.streamUrl == TvRepository.lastPlayedChannel?.streamUrl }
                             ?: downloaded.firstOrNull { it.id == savedChannelId }
                             ?: downloaded.firstOrNull { userFavsSet.contains(it.title.trim().lowercase()) }
                             ?: downloaded.firstOrNull()
@@ -805,6 +853,7 @@ fun TvInteractiveScreen(
         Box(modifier = Modifier.fillMaxSize()) {
 
             // 1. PANTALLA COMPLETA
+            // 1. PANTALLA COMPLETA
             if (isFullScreen) {
                 val fullScreenFocusRequester = remember { FocusRequester() }
 
@@ -835,29 +884,58 @@ fun TvInteractiveScreen(
                             .focusRequester(fullScreenFocusRequester)
                             .focusable()
                             .onKeyEvent { keyEvent ->
+                                if (keyEvent.type != KeyEventType.KeyUp) return@onKeyEvent false
                                 val keyCode = keyEvent.nativeKeyEvent.keyCode
-                                val isOkKey = keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
-                                        keyCode == AndroidKeyEvent.KEYCODE_ENTER ||
-                                        keyCode == AndroidKeyEvent.KEYCODE_NUMPAD_ENTER ||
-                                        keyCode == AndroidKeyEvent.KEYCODE_BUTTON_A ||
-                                        keyCode == AndroidKeyEvent.KEYCODE_MENU
 
-                                if (isOkKey && keyEvent.type == KeyEventType.KeyUp) {
-                                    if (!isSideMenuVisible) {
-                                        onToggleSideMenu(true)
-                                    }
-                                    true
-                                } else if (keyCode == AndroidKeyEvent.KEYCODE_DPAD_LEFT && keyEvent.type == KeyEventType.KeyUp) {
-                                    if (isSideMenuVisible) {
+                                if (isSideMenuVisible) {
+                                    if (keyCode == AndroidKeyEvent.KEYCODE_DPAD_LEFT || keyCode == AndroidKeyEvent.KEYCODE_BACK) {
                                         onToggleSideMenu(false)
+                                        bannerTrigger = System.currentTimeMillis()
+                                        return@onKeyEvent true
                                     }
-                                    true
-                                } else {
-                                    false
+                                    return@onKeyEvent false
+                                }
+
+                                when (keyCode) {
+                                    // 🟢 Flecha ARRIBA: Canal Favorito Anterior (Infinito)
+                                    AndroidKeyEvent.KEYCODE_DPAD_UP -> {
+                                        cambiarCanalFavorito(false)
+                                        true
+                                    }
+                                    // 🟢 Flecha ABAJO: Canal Favorito Siguiente (Infinito)
+                                    AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
+                                        cambiarCanalFavorito(true)
+                                        true
+                                    }
+                                    // 🟢 OK: Si el banner no está visible lo abre; si ya está, abre el menú
+                                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                                    AndroidKeyEvent.KEYCODE_ENTER,
+                                    AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                                    AndroidKeyEvent.KEYCODE_BUTTON_A,
+                                    AndroidKeyEvent.KEYCODE_MENU -> {
+                                        if (!isBannerVisible) {
+                                            bannerTrigger = System.currentTimeMillis()
+                                        } else {
+                                            onToggleSideMenu(true)
+                                        }
+                                        true
+                                    }
+                                    AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
+                                        onToggleSideMenu(true)
+                                        true
+                                    }
+                                    else -> {
+                                        bannerTrigger = System.currentTimeMillis()
+                                        false
+                                    }
                                 }
                             }
                             .clickable {
-                                onToggleSideMenu(!isSideMenuVisible)
+                                if (!isBannerVisible) {
+                                    bannerTrigger = System.currentTimeMillis()
+                                } else {
+                                    onToggleSideMenu(!isSideMenuVisible)
+                                }
                             }
                     )
 
@@ -868,6 +946,27 @@ fun TvInteractiveScreen(
                         isMini = false
                     )
 
+                    // 🟢 BANNER OSD (NOMBRE GRANDE, IMAGEN E INDICACIONES POR 10 SEGUNDOS)
+                    val channelIndex = remember(selectedChannel, fullScreenChannelsList) {
+                        val idx = fullScreenChannelsList.indexOfFirst { it.streamUrl == selectedChannel?.streamUrl }
+                        if (idx != -1) idx + 1 else 1
+                    }
+
+                    AnimatedVisibility(
+                        visible = isBannerVisible && !isSideMenuVisible,
+                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .zIndex(50f)
+                    ) {
+                        FullScreenChannelBanner(
+                            channel = selectedChannel,
+                            currentIndex = channelIndex,
+                            totalChannels = fullScreenChannelsList.size
+                        )
+                    }
+
                     AnimatedVisibility(
                         visible = isSideMenuVisible,
                         enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
@@ -877,7 +976,7 @@ fun TvInteractiveScreen(
                             .zIndex(100f)
                     ) {
                         FavoritesOverlayMenu(
-                            favoriteChannels = if (filteredFavorites.isNotEmpty()) filteredFavorites else masterChannels,
+                            favoriteChannels = fullScreenChannelsList,
                             currentStreamUrl = selectedChannel?.streamUrl ?: "",
                             isMenuVisible = isSideMenuVisible,
                             onCloseMenu = { onToggleSideMenu(false) },
@@ -2073,6 +2172,12 @@ private fun descargarM3uStream(urlString: String): List<Modelo> {
             connection.connectTimeout = 15000
             connection.readTimeout = 15000
             connection.requestMethod = "GET"
+            // 🟢 EVITAR CACHÉ DEL SERVIDOR Y DEL DISPOSITIVO
+            connection.useCaches = false
+            connection.defaultUseCaches = false
+            connection.setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate")
+            connection.setRequestProperty("Pragma", "no-cache")
+            connection.setRequestProperty("Expires", "0")
             connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
             connection.instanceFollowRedirects = true
 
@@ -2199,5 +2304,145 @@ private fun androidx.compose.foundation.lazy.LazyListState.animateScrollAndCentr
         } else {
             this@animateScrollAndCentralizeMenuItem.animateScrollToItem(index)
         }
+    }
+}
+
+// -------------------------------------------------------------
+// BANNER INFORMATIVO EN PANTALLA COMPLETA (OSD)
+// -------------------------------------------------------------
+@kotlin.OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun FullScreenChannelBanner(
+    channel: Modelo?,
+    currentIndex: Int,
+    totalChannels: Int,
+    modifier: Modifier = Modifier
+) {
+    if (channel == null) return
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.Black.copy(alpha = 0.75f),
+                        Color.Black.copy(alpha = 0.95f)
+                    )
+                )
+            )
+            .padding(horizontal = 32.dp, vertical = 22.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // Logo del canal GRANDE
+            Box(
+                modifier = Modifier
+                    .size(85.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF0F0F16))
+                    .border(2.dp, GoldAccent.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                    .padding(6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                ChannelLogoImage(
+                    imageUrl = channel.imageUrl,
+                    contentDescription = channel.title,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            // Datos del canal (NOMBRE GRANDE E INDICACIONES)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(RedLive)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "EN VIVO",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Text(
+                        text = "FAVORITOS • CANAL $currentIndex DE $totalChannels",
+                        color = GoldAccent,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                }
+
+                // Nombre grande con desplazamiento automático
+                Text(
+                    text = channel.title,
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.basicMarquee(
+                        iterations = Int.MAX_VALUE,
+                        delayMillis = 800,
+                        velocity = 40.dp
+                    )
+                )
+
+                // Indicaciones de control
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
+                    KeyHintBadge(keys = "▲ / ▼", label = "Navegar Favoritos")
+                    KeyHintBadge(keys = "OK", label = "Lista de Canales")
+                    KeyHintBadge(keys = "ATRÁS", label = "Volver")
+                }
+            }
+        }
+    }
+}
+@Composable
+private fun KeyHintBadge(keys: String, label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xFF28283E))
+                .border(1.dp, Color(0xFF454562), RoundedCornerShape(6.dp))
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = keys,
+                color = GoldAccent,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Text(
+            text = label,
+            color = Color(0xFFD0D0DC),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
