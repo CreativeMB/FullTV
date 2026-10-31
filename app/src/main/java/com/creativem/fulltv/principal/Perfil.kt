@@ -236,57 +236,65 @@ fun PerfilScreenDashboard(
     var baseConectados by remember { mutableIntStateOf(1) }
 
     // =========================================================================
-    // 🧠 SIMULADOR INTELIGENTE DE RITMO LENTO (CINE / STREAMING TV)
+    // 🧠 SIMULADOR PRECISO CON TOPE ESTRICTO (ONLINE NUNCA SUPERA A LA COMUNIDAD)
     // =========================================================================
-    LaunchedEffect(Unit) {
-        // Función interna para calcular el rango adecuado según hora y día
-        fun obtenerRangoSegunHorario(): Pair<Int, Int> {
+    LaunchedEffect(usuariosOffline) {
+        fun calcularRangoSegunComunidad(): Pair<Int, Int> {
             val cal = java.util.Calendar.getInstance()
-            val hora = cal.get(java.util.Calendar.HOUR_OF_DAY) // 0 a 23
-            val diaSemana = cal.get(java.util.Calendar.DAY_OF_WEEK) // 1=Dom, 6=Vie, 7=Sáb
+            val hora = cal.get(java.util.Calendar.HOUR_OF_DAY)
+            val diaSemana = cal.get(java.util.Calendar.DAY_OF_WEEK)
 
             val esFinDeSemana = diaSemana == java.util.Calendar.FRIDAY ||
                     diaSemana == java.util.Calendar.SATURDAY ||
                     diaSemana == java.util.Calendar.SUNDAY
 
-            // Rango de concurrentes acorde a una comunidad de ~1000 usuarios
-            val (minBase, maxBase) = when (hora) {
-                in 1..6 -> 12 to 24          // 🌙 Madrugada (1% a 2.5%)
-                in 7..11 -> 25 to 45         // ☕ Mañana (2.5% a 4.5%)
-                in 12..17 -> 45 to 75        // ⛅ Tarde (4.5% a 7.5%)
-                in 18..23 -> 85 to 140       // 🎬 Prime Time / Noche pico (8.5% a 14%)
-                else -> 35 to 55             // 🕛 Medianoche (en descenso)
+            // Tope de la comunidad (usa el valor real o un mínimo si Firebase aún no responde)
+            val tope = if (usuariosOffline > 0) usuariosOffline else 100
+
+            // Porcentajes reales de concurrencia sobre la comunidad
+            val (pctMin, pctMax) = when (hora) {
+                in 1..6 -> 0.08f to 0.16f     // 🌙 Madrugada (8% a 16%)
+                in 7..11 -> 0.18f to 0.28f    // ☕ Mañana (18% a 28%)
+                in 12..17 -> 0.30f to 0.44f   // ⛅ Tarde (30% a 44%)
+                in 18..23 -> 0.48f to 0.65f   // 🎬 Prime Time Noche (48% a 65%)
+                else -> 0.20f to 0.30f        // 🕛 Medianoche (20% a 30%)
             }
 
-            // Fin de semana: la gente ve más películas (+30% de audiencia)
-            val boostFinSemana = if (esFinDeSemana) 1.30f else 1.0f
-            return Pair((minBase * boostFinSemana).toInt(), (maxBase * boostFinSemana).toInt())
+            val boost = if (esFinDeSemana) 1.10f else 1.0f
+
+            // Límites calculados respetando que el máximo nunca supere el 75% de la comunidad
+            val minCalculado = (tope * pctMin * boost).toInt().coerceAtLeast(1)
+            val techoMaximo = (tope * 0.75f).toInt().coerceAtLeast(minCalculado)
+            val maxCalculado = (tope * pctMax * boost).toInt().coerceIn(minCalculado, techoMaximo)
+
+            return Pair(minCalculado, maxCalculado)
         }
 
-        // 1. ARRANCAR DIRECTO EN EL NÚMERO ADECUADO (sin esperas ni saltos)
-        val rangoInicial = obtenerRangoSegunHorario()
-        var simulados = kotlin.random.Random.nextInt(rangoInicial.first, rangoInicial.second)
-        usuariosOnline = simulados + baseConectados
+        val (minInicial, maxInicial) = calcularRangoSegunComunidad()
+        var simulados = kotlin.random.Random.nextInt(minInicial, maxInicial + 1)
+        val topeBase = if (usuariosOffline > 0) usuariosOffline else 100
 
-        // 2. CICLO CON ESPERAS DE MINUTOS (Comportamiento de streaming real)
+        // Asignación inicial: tope estricto de seguridad
+        usuariosOnline = (simulados + baseConectados).coerceIn(1, (topeBase - 2).coerceAtLeast(1))
+
         while (true) {
-            // ⏳ Espera entre 60 y 140 segundos (1 a 2.3 minutos entre cada cambio)
-            delay(kotlin.random.Random.nextLong(60_000L, 140_000L))
+            delay(kotlin.random.Random.nextLong(60_000L, 130_000L))
 
-            val (rangoMin, rangoMax) = obtenerRangoSegunHorario()
+            val (rMin, rMax) = calcularRangoSegunComunidad()
+            val topeActual = if (usuariosOffline > 0) usuariosOffline else 100
 
-            if (simulados < rangoMin) {
-                simulados += kotlin.random.Random.nextInt(1, 3) // Sube sutilmente
-            } else if (simulados > rangoMax) {
-                simulados -= kotlin.random.Random.nextInt(1, 3) // Baja sutilmente
+            if (simulados < rMin) {
+                simulados += kotlin.random.Random.nextInt(1, 3)
+            } else if (simulados > rMax) {
+                simulados -= kotlin.random.Random.nextInt(1, 3)
             } else {
-                // Variación muy orgánica: puede subir 1, bajar 1 o quedarse exactamente igual (0)
-                val variacion = kotlin.random.Random.nextInt(-1, 2) // -1, 0 ó +1
-                simulados = (simulados + variacion).coerceIn(rangoMin, rangoMax)
+                simulados += kotlin.random.Random.nextInt(-1, 2)
             }
 
-            // Actualizar el número en pantalla
-            usuariosOnline = simulados + baseConectados
+            simulados = simulados.coerceIn(rMin, rMax)
+
+            // 🟢 GARANTÍA MATEMÁTICA: usuariosOnline JAMÁS superará a usuariosOffline
+            usuariosOnline = (simulados + baseConectados).coerceIn(1, (topeActual - 2).coerceAtLeast(1))
         }
     }
 

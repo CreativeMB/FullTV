@@ -290,33 +290,37 @@ fun BannerNetflixHero(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(
+                                    // 🟢 Fondo oscuro cinematográfico con tinte esmeralda/dorado para máximo contraste
                                     Brush.horizontalGradient(
                                         colors = listOf(
-                                            Color(0x3300E676),
-                                            Color(0x40C5A059)
+                                            Color(0xF506150E), // Negro esmeralda profundo
+                                            Color(0xF5171306)  // Negro dorado profundo
                                         )
                                     )
                                 )
                                 .border(
-                                    width = 1.2.dp,
+                                    width = 1.dp,
                                     brush = Brush.horizontalGradient(
-                                        colors = listOf(Color(0xFF00E676), Color(0xFFFFD56B))
+                                        colors = listOf(
+                                            Color(0xFF00E676), // Verde Neón
+                                            Color(0xFFFFD56B)  // Dorado Premium
+                                        )
                                     ),
                                     shape = RoundedCornerShape(6.dp)
                                 )
-                                .padding(horizontal = 9.dp, vertical = 3.dp)
+                                .padding(horizontal = 9.dp, vertical = 3.5.dp)
                         ) {
                             Text(
                                 text = "🎁 DISPONIBLE AL PÚBLICO • CORTESÍA CINEPARCHE",
-                                color = Color(0xFF00E676),
+                                color = Color(0xFF69F0AE), // Verde menta brillante (resalta mucho más que el verde plano)
                                 fontSize = 9.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 0.4.sp, // 🟢 Detalle clave para que el texto mayúsculo se vea prémium
                                 maxLines = 1,
                                 softWrap = false
                             )
                         }
                     }
-
                     Spacer(modifier = Modifier.height(3.dp))
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
